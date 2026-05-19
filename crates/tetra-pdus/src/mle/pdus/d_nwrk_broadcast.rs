@@ -62,7 +62,7 @@ impl DNwrkBroadcast {
             }
         }
 
-        // MLE PDUs do not use M-bits (Annex E.2.1) — no trailing delimiter to read
+        // MLE PDUs do not use M-bits (Annex E.2.1) — PDU ends after last Type 2 element
 
         Ok(DNwrkBroadcast {
             cell_re_select_parameters,
@@ -129,7 +129,6 @@ impl DNwrkBroadcast {
                 neighbour.to_bitbuf(buffer)?;
             }
         }
-
         // MLE PDUs do not use M-bits (Annex E.2.1) — PDU ends after last Type 2 element
 
         Ok(())
