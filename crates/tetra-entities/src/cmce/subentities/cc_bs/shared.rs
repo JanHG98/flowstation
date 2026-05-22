@@ -455,19 +455,19 @@ impl CcBsSubentity {
     }
 
     /// Decode External Subscriber Number IE (BCD-packed digits, ETSI 14.8.21).
-    /// Type3FieldGeneric.data is a u64 (up to 64 bits packed).
+    /// Type3FieldGeneric.data is u128 (up to 128 bits packed, max 32 BCD digits).
+    /// ETSI specifies a max of 24 digits but we support up to 32 to cover edge cases.
     pub(super) fn decode_external_subscriber_number(field: &Type3FieldGeneric) -> String {
         if field.len == 0 {
             return String::new();
         }
 
-        let nibble_count = (field.len / 4).min(16) as usize; // max 64 bits = 16 nibbles
-        let total_bits = nibble_count * 4; // computed once, outside the loop
+        let nibble_count = (field.len / 4).min(32) as usize; // max 128 bits = 32 nibbles
+        let total_bits = nibble_count * 4;
         let mut digits = String::with_capacity(nibble_count);
         for i in 0..nibble_count {
             // data stores the dialled number BCD-packed with the most-significant
-            // nibble at the top of the used bits (not at bit 60 of the u64).
-            // E.g. "600" with len=12 → data=0x0600, nibbles at shifts 8, 4, 0.
+            // nibble at the top of the used bits.
             let shift = total_bits - 4 - (i * 4);
             let nibble = ((field.data >> shift) & 0x0f) as u8;
             match nibble {
@@ -482,15 +482,16 @@ impl CcBsSubentity {
     }
 
     /// Encode External Subscriber Number IE (ETSI 14.8.21).
-    /// Type3FieldGeneric.data is a u64 (up to 64 bits packed).
+    /// Supports up to 32 BCD digits (128 bits). ETSI allows up to 24 in spec; we go a bit further.
     pub(super) fn encode_external_subscriber_number(number: &str) -> Option<Type3FieldGeneric> {
         let trimmed = number.trim();
         if trimmed.is_empty() {
             return None;
         }
 
-        let mut nibbles: Vec<u8> = Vec::with_capacity(16);
-        let mut encoded_preview = String::with_capacity(16);
+        const MAX_DIGITS: usize = 32;
+        let mut nibbles: Vec<u8> = Vec::with_capacity(MAX_DIGITS);
+        let mut encoded_preview = String::with_capacity(MAX_DIGITS);
 
         for ch in trimmed.chars() {
             let nibble = match ch {
@@ -503,11 +504,10 @@ impl CcBsSubentity {
                 }
             };
 
-            if nibbles.len() == 16 {
-                tracing::debug!(
-                    "CMCE: truncating external number '{}' to first 16 BCD digits ('{}')",
-                    number,
-                    encoded_preview
+            if nibbles.len() == MAX_DIGITS {
+                tracing::warn!(
+                    "CMCE: external subscriber number '{}' exceeds {} BCD digits — truncating to '{}'",
+                    number, MAX_DIGITS, encoded_preview
                 );
                 break;
             }
@@ -522,13 +522,11 @@ impl CcBsSubentity {
         }
 
         let len_bits = nibbles.len() * 4;
-        let mut data: u64 = 0;
-        // Pack nibbles MSB-first within the used bits, matching decode_external_subscriber_number.
-        // decode uses shift = total_bits - 4 - (i * 4), so nibble[0] is at the top of used bits.
-        // E.g. "600" (3 nibbles, len=12): nibble[0]=6 at shift=8, nibble[1]=0 at shift=4, nibble[2]=0 at shift=0.
+        let mut data: u128 = 0;
+        // Pack nibbles MSB-first within the used bits, matching decode.
         for (idx, nibble) in nibbles.into_iter().enumerate() {
             let shift = len_bits - 4 - (idx * 4);
-            data |= (nibble as u64) << shift;
+            data |= (nibble as u128) << shift;
         }
 
         Some(Type3FieldGeneric {
@@ -1071,6 +1069,18 @@ impl CcBsSubentity {
             (id, c.calling_addr.ssi, c.called_addr.ssi, !c.simplex_duplex)
         }).collect()
     }
+
+    /// Find the active call_id occupying the given timeslot, group or individual.
+    /// Returns None if the timeslot is idle. Used by the recording manager.
+    pub fn call_id_for_ts(&self, ts: u8) -> Option<u16> {
+        if let Some((&id, _)) = self.active_calls.iter().find(|(_, c)| c.ts == ts) {
+            return Some(id);
+        }
+        if let Some((&id, _)) = self.individual_calls.iter().find(|(_, c)| c.is_active() && (c.calling_ts == ts || c.called_ts == ts)) {
+            return Some(id);
+        }
+        None
+    }
 }
 
 #[cfg(test)]
@@ -1086,10 +1096,28 @@ mod tests {
     }
 
     #[test]
-    fn external_subscriber_number_truncates_to_16_digits() {
-        let number = "12345678901234567";
+    fn external_subscriber_number_supports_24_digits() {
+        // ETSI EN 300 392-2 §14.8.21 max is 24 digits.
+        let number = "123456789012345678901234";
         let field = CcBsSubentity::encode_external_subscriber_number(number).expect("field should be generated");
-        assert_eq!(field.len, 64);
-        assert_eq!(CcBsSubentity::decode_external_subscriber_number(&field), "1234567890123456");
+        assert_eq!(field.len, 96);
+        assert_eq!(CcBsSubentity::decode_external_subscriber_number(&field), number);
+    }
+
+    #[test]
+    fn external_subscriber_number_supports_32_digits() {
+        // We support up to 32 (128 bits) — above the ETSI max for safety margin.
+        let number = "12345678901234567890123456789012";
+        let field = CcBsSubentity::encode_external_subscriber_number(number).expect("field should be generated");
+        assert_eq!(field.len, 128);
+        assert_eq!(CcBsSubentity::decode_external_subscriber_number(&field), number);
+    }
+
+    #[test]
+    fn external_subscriber_number_truncates_above_32_digits() {
+        let number = "123456789012345678901234567890123"; // 33 digits
+        let field = CcBsSubentity::encode_external_subscriber_number(number).expect("field should be generated");
+        assert_eq!(field.len, 128);
+        assert_eq!(CcBsSubentity::decode_external_subscriber_number(&field), "12345678901234567890123456789012");
     }
 }

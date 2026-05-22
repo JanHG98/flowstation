@@ -1,11 +1,24 @@
 //! Device-specific SoapySDR settings
 
+use std::sync::OnceLock;
 use tetra_config::bluestation::{StackMode, sec_phy_soapy::*};
+
+/// Global record of the SDR device that was auto-detected at startup. Set once by
+/// `SdrSettings::get_settings()` and read by the dashboard to show a hardware badge.
+/// Empty if no SoapySDR backend is in use (e.g. file backend, monitor-only stack).
+static DETECTED_SDR_NAME: OnceLock<String> = OnceLock::new();
+
+/// Public accessor for the dashboard / telemetry / logging.
+/// Returns `None` if no SDR has been detected yet.
+pub fn detected_sdr_name() -> Option<String> {
+    DETECTED_SDR_NAME.get().cloned()
+}
 
 /// Enum of all supported devices
 pub enum SupportedDevice {
     LimeSdr(LimeSdrModel),
     SXceiver,
+    MuCell,
     PlutoSdr,
     Usrp(UsrpModel),
 }
@@ -41,6 +54,7 @@ impl SupportedDevice {
             ("FT601", _) => Some(Self::LimeSdr(LimeSdrModel::OtherFt601)),
 
             ("sx", _) => Some(Self::SXceiver),
+            ("mucell", _) => Some(Self::MuCell),
 
             ("PlutoSDR", _) => Some(Self::PlutoSdr),
 
@@ -140,6 +154,10 @@ impl SdrSettings {
 
         // TODO: check for extra gain fields in cfg
 
+        // Record the resolved device name so the dashboard can display a hardware badge.
+        // OnceLock::set is a no-op if already set; safe to call repeatedly.
+        let _ = DETECTED_SDR_NAME.set(settings.name.clone());
+
         Ok(settings)
     }
 
@@ -149,6 +167,8 @@ impl SdrSettings {
             SupportedDevice::LimeSdr(model) => Self::settings_limesdr(mode, model),
 
             SupportedDevice::SXceiver => Self::settings_sxceiver(mode, cfg.fs),
+
+            SupportedDevice::MuCell => Self::settings_mucell(mode, cfg.fs),
 
             SupportedDevice::PlutoSdr => Self::settings_pluto(mode),
 
@@ -242,6 +262,27 @@ impl SdrSettings {
         let fs = fs_override.unwrap_or(600e3);
         Self {
             name: "SXceiver".to_string(),
+            fs,
+
+            rx_ant: Some("RX".to_string()),
+            tx_ant: Some("TX".to_string()),
+
+            rx_gain: vec![("LNA".to_string(), 42.0), ("PGA".to_string(), 16.0)],
+            tx_gain: vec![("DAC".to_string(), 9.0), ("MIXER".to_string(), 30.0)],
+
+            rx_args: vec![("period".to_string(), block_size(fs).to_string())],
+            tx_args: vec![("period".to_string(), block_size(fs).to_string())],
+
+            ..Self::default(mode)
+        }
+    }
+
+    fn settings_mucell(mode: StackMode, fs_override: Option<f64>) -> Self {
+        // Similar to SXCeiver for now.
+        // Might be adapted later for PA gain and other settings.
+        let fs = fs_override.unwrap_or(600e3);
+        Self {
+            name: "µCell".to_string(),
             fs,
 
             rx_ant: Some("RX".to_string()),

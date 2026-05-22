@@ -44,11 +44,13 @@ fn decode_dtmf_digit(nibble: u8) -> Option<char> {
 
 #[inline]
 fn type3_read_bit(field: &Type3FieldGeneric, bit_idx: usize) -> Option<u8> {
-    // Type3FieldGeneric.data is a u64 holding up to 64 bits (MSB-first)
-    if bit_idx >= field.len || bit_idx >= 64 {
+    // Type3FieldGeneric.data is a u128 holding up to 128 bits (MSB-first within field.len bits)
+    if bit_idx >= field.len || bit_idx >= 128 {
         return None;
     }
-    let shift = 63 - bit_idx;
+    // We use len-based indexing: bit 0 is at shift = field.len - 1, bit N at shift = field.len - 1 - N.
+    // This matches the encoding convention (MSB-first within used bits).
+    let shift = field.len - 1 - bit_idx;
     Some(((field.data >> shift) & 0x01) as u8)
 }
 

@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::{Arc, Mutex, RwLock};
@@ -41,6 +42,109 @@ impl UpdateState {
 }
 
 type SharedUpdateState = Arc<Mutex<UpdateState>>;
+
+/// In-memory session store for cookie-based authentication.
+///
+/// We deliberately don't use Basic Auth from the browser any more: on iOS Safari and
+/// older mobile browsers the native Basic Auth dialog frequently asks for credentials
+/// 2-3 times in a row, prompts on every WebSocket reconnect, or "forgets" credentials
+/// after switching tabs. A cookie-backed session avoids all of that and lets us
+/// design a proper login screen.
+///
+/// Tokens are random 32-byte hex strings. They expire after 7 days of inactivity.
+/// The store is per-process (no on-disk persistence) — restarting FlowStation logs
+/// every session out. That's fine: the dashboard is typically a single-operator tool.
+pub struct SessionStore {
+    sessions: HashMap<String, std::time::Instant>,
+    /// Sessions older than this are pruned on access.
+    ttl: std::time::Duration,
+}
+
+impl SessionStore {
+    fn new() -> Self {
+        Self {
+            sessions: HashMap::new(),
+            ttl: std::time::Duration::from_secs(7 * 24 * 60 * 60),
+        }
+    }
+
+    /// Create a new session, return its token. Caller sets it as a cookie.
+    fn create(&mut self) -> String {
+        self.prune();
+        let token = generate_session_token();
+        self.sessions.insert(token.clone(), std::time::Instant::now());
+        token
+    }
+
+    /// Return true if the token is known and not expired. Refreshes last-seen on hit.
+    fn validate(&mut self, token: &str) -> bool {
+        self.prune();
+        if let Some(seen) = self.sessions.get_mut(token) {
+            *seen = std::time::Instant::now();
+            return true;
+        }
+        false
+    }
+
+    fn invalidate(&mut self, token: &str) {
+        self.sessions.remove(token);
+    }
+
+    fn prune(&mut self) {
+        let now = std::time::Instant::now();
+        let ttl = self.ttl;
+        self.sessions.retain(|_, seen| now.duration_since(*seen) < ttl);
+    }
+}
+
+type SharedSessionStore = Arc<Mutex<SessionStore>>;
+
+/// 32 bytes of entropy → 64-char hex string. Uses the OS RNG via `getrandom`-style
+/// `/dev/urandom` read. Falls back to a time+pid mix if /dev/urandom is unavailable —
+/// not cryptographically perfect, but adequate for a session token on a LAN-only
+/// dashboard. Production-grade deployments behind a reverse proxy already get HTTPS
+/// hardening from the proxy layer.
+fn generate_session_token() -> String {
+    let mut bytes = [0u8; 32];
+    if let Ok(mut f) = std::fs::File::open("/dev/urandom") {
+        use std::io::Read;
+        let _ = f.read_exact(&mut bytes);
+    } else {
+        // Fallback: deterministic-ish entropy from time + pid + addr-of-self.
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos()).unwrap_or(0);
+        let pid = std::process::id() as u128;
+        let mix = nanos.wrapping_mul(0x9e37_79b9_7f4a_7c15).wrapping_add(pid << 64);
+        for (i, b) in bytes.iter_mut().enumerate() {
+            *b = ((mix >> (i * 4)) & 0xff) as u8;
+        }
+    }
+    let mut s = String::with_capacity(64);
+    for b in &bytes {
+        s.push_str(&format!("{:02x}", b));
+    }
+    s
+}
+
+/// Extract `fs_session=<token>` from a Cookie header in the raw request.
+fn parse_session_cookie(headers: &str) -> Option<String> {
+    for line in headers.lines() {
+        let lower = line.to_ascii_lowercase();
+        if let Some(rest) = lower.strip_prefix("cookie:") {
+            // Use original (non-lowered) line for the value to preserve case in token.
+            let value_line = &line["cookie:".len()..];
+            for kv in value_line.split(';') {
+                let kv = kv.trim();
+                if let Some(token) = kv.strip_prefix("fs_session=") {
+                    return Some(token.to_string());
+                }
+            }
+            let _ = rest;
+        }
+    }
+    None
+}
 
 /// Resolve the FlowStation git source directory for OTA updates.
 ///
@@ -211,9 +315,38 @@ fn run_update(update: SharedUpdateState, config_path: String, source_dir_overrid
     // Step 2: explicit sanity check that this is a working git repo.
     // The .git existence check in resolve_source_dir() is necessary but not sufficient
     // (e.g. a corrupted repo). This catches edge cases with a clear error.
+    //
+    // Common edge case: FlowStation runs as root (e.g. via systemd) but the git clone
+    // lives in a user's home directory (e.g. /home/pi/tetra-bluestation, owned by pi:pi).
+    // Recent git versions refuse to operate on repos owned by a different user with
+    // "dubious ownership" — fatal: detected dubious ownership in repository at '...'.
+    // We try once first, and if we see that error, register the path as a safe.directory
+    // via `git config --global --add safe.directory <path>` and retry.
     log!(update, "--- Verifying git repository ---");
     if run_cmd_output(&update, "git", &["-C", src_str, "rev-parse", "--is-inside-work-tree"], &src_dir).is_none() {
-        return;
+        // Check if the failure was specifically dubious ownership. The error went to the log
+        // already; we look at the log content to decide whether to attempt the auto-fix.
+        let saw_dubious_ownership = {
+            let u = update.lock().unwrap();
+            u.log.contains("dubious ownership")
+        };
+        if !saw_dubious_ownership {
+            return;
+        }
+        log!(update, "");
+        log!(update, "--- Detected dubious ownership — registering as safe.directory ---");
+        if run_cmd_output(&update, "git", &["config", "--global", "--add", "safe.directory", src_str], &src_dir).is_none() {
+            log!(update, "ERROR: could not register safe.directory automatically.");
+            log!(update, "Manual fix: run this on the server as the user that runs FlowStation:");
+            log!(update, "    git config --global --add safe.directory {}", src_str);
+            return;
+        }
+        // Retry the verification.
+        if run_cmd_output(&update, "git", &["-C", src_str, "rev-parse", "--is-inside-work-tree"], &src_dir).is_none() {
+            log!(update, "ERROR: git verification still failing after safe.directory fix.");
+            return;
+        }
+        log!(update, "✓ safe.directory registered, continuing.");
     }
 
     // Step 3: fetch remote without merging — just update refs
@@ -286,8 +419,11 @@ pub struct DashboardServer {
     /// Optional override for the OTA update source directory.
     /// If None, the update routine auto-detects.
     source_dir_override: Option<String>,
-    /// HTTP Basic Auth credentials. None = no auth (open access).
+    /// Authentication credentials. None = no auth (open access). When set, requests
+    /// must carry a valid `fs_session` cookie obtained from `POST /api/login`.
     auth: Option<(String, String)>,
+    /// In-memory session store backing the cookie auth.
+    sessions: SharedSessionStore,
     /// Last time a ts_voice WS message was broadcast per TS (indexed 0..3 for TS1..TS4)
     ts_last_broadcast: std::sync::Mutex<[std::time::Instant; 4]>,
 }
@@ -304,6 +440,7 @@ impl DashboardServer {
             update_state: Arc::new(Mutex::new(UpdateState::new())),
             source_dir_override: None,
             auth: None,
+            sessions: Arc::new(Mutex::new(SessionStore::new())),
             ts_last_broadcast: std::sync::Mutex::new([now; 4]),
         }
     }
@@ -346,6 +483,7 @@ impl DashboardServer {
         let source_dir_override = self.source_dir_override.clone();
         let auth = self.auth.clone();
         let shared_config = self.shared_config.clone();
+        let sessions = Arc::clone(&self.sessions);
 
         std::thread::Builder::new()
             .name("dashboard-server".into())
@@ -364,9 +502,10 @@ impl DashboardServer {
                     let source_dir_override = source_dir_override.clone();
                     let auth = auth.clone();
                     let shared_config = shared_config.clone();
+                    let sessions = Arc::clone(&sessions);
                     std::thread::Builder::new()
                         .name("dashboard-conn".into())
-                        .spawn(move || handle_connection(stream, state, clients, config_path, cmd_tx, update_state, source_dir_override, auth, shared_config))
+                        .spawn(move || handle_connection(stream, state, clients, config_path, cmd_tx, update_state, source_dir_override, auth, shared_config, sessions))
                         .ok();
                 }
             })
@@ -540,6 +679,10 @@ fn event_to_ws_msg(event: &TelemetryEvent) -> Option<String> {
 
 /// Parse the `Authorization: Basic <base64>` header from raw HTTP headers string.
 /// Returns `Some((username, password))` on success, `None` if absent or malformed.
+///
+/// Kept for potential future use (e.g. an opt-in scripting endpoint). The dashboard
+/// now uses cookie-based sessions, so this is currently unreferenced.
+#[allow(dead_code)]
 fn parse_basic_auth(headers: &str) -> Option<(String, String)> {
     for line in headers.lines() {
         let lower = line.to_lowercase();
@@ -573,7 +716,8 @@ fn timing_safe_eq(a: &[u8], b: &[u8]) -> bool {
 }
 
 /// Send an HTTP 401 Unauthorized response that triggers the browser's native
-/// Basic Auth dialog.
+/// Basic Auth dialog. Unused since the switch to cookie sessions.
+#[allow(dead_code)]
 fn http_response_401(mut stream: TcpStream) {
     let body = "Unauthorized";
     let resp = format!(
@@ -630,6 +774,7 @@ fn handle_connection(
     source_dir_override: Option<String>,
     auth: Option<(String, String)>,
     shared_config: Option<tetra_config::bluestation::SharedConfig>,
+    sessions: SharedSessionStore,
 ) {
     let _ = stream.set_read_timeout(Some(std::time::Duration::from_millis(500)));
 
@@ -646,24 +791,112 @@ fn handle_connection(
     let header_str = String::from_utf8_lossy(&header_buf);
     let req_line = header_str.lines().next().unwrap_or("").to_string();
 
-    // ── HTTP Basic Auth check ────────────────────────────────────────────────
-    // Runs on every request when auth is configured. The check is done before
-    // any routing so that no endpoint is ever reachable without credentials.
+    // ── Cookie-session auth ──────────────────────────────────────────────────
+    // We replaced the browser-native Basic Auth dialog with a form-based login at
+    // /login that issues an fs_session cookie. The native dialog has well-known
+    // mobile usability issues (iOS Safari prompts 2-3 times, forgets credentials
+    // between WebSocket reconnects, etc.). With cookies we control the UX fully.
+    //
+    // Public routes (no auth required): GET /login, POST /api/login, static assets.
+    // Every other route is checked here against the session store.
     if let Some((ref expected_user, ref expected_pass)) = auth {
-        let authorized = parse_basic_auth(&header_str)
-            .map(|(u, p)| timing_safe_eq(u.as_bytes(), expected_user.as_bytes())
-                       && timing_safe_eq(p.as_bytes(), expected_pass.as_bytes()))
+        // Login page and login API must remain reachable without a session.
+        let is_login_page = req_line.starts_with("GET /login ") || req_line.starts_with("GET /login?");
+        let is_login_api  = req_line.starts_with("POST /api/login ");
+
+        // Validate session cookie when present. Note: validate() refreshes last-seen,
+        // so active users effectively never time out.
+        let session_ok = parse_session_cookie(&header_str)
+            .and_then(|token| {
+                let mut store = sessions.lock().ok()?;
+                Some(store.validate(&token))
+            })
             .unwrap_or(false);
 
-        if !authorized {
-            // Consume the stream into a BufReader just to drain headers, then send 401.
+        if is_login_page {
             let mut buf = BufReader::new(stream);
             loop {
                 let mut line = String::new();
                 let _ = buf.read_line(&mut line);
                 if line == "\r\n" || line.is_empty() || line == "\n" { break; }
             }
-            http_response_401(buf.into_inner());
+            // If already logged in, send them straight to the dashboard.
+            if session_ok {
+                http_redirect(buf.into_inner(), "/");
+            } else {
+                serve_login_page(buf.into_inner());
+            }
+            return;
+        }
+
+        if is_login_api {
+            // Body has form-encoded or JSON-encoded credentials.
+            let mut buf = BufReader::new(stream);
+            let mut content_length = 0usize;
+            loop {
+                let mut line = String::new();
+                let _ = buf.read_line(&mut line);
+                if line == "\r\n" || line.is_empty() || line == "\n" { break; }
+                let lower = line.to_lowercase();
+                if lower.starts_with("content-length:") {
+                    content_length = lower.trim_start_matches("content-length:").trim()
+                        .trim_end_matches("\r\n").trim_end_matches('\n').parse().unwrap_or(0);
+                }
+            }
+            let mut body = vec![0u8; content_length.min(4096)];
+            let _ = buf.read_exact(&mut body);
+            let body_str = String::from_utf8_lossy(&body);
+
+            let (user, pass) = parse_login_body(&body_str);
+            let ok = timing_safe_eq(user.as_bytes(), expected_user.as_bytes())
+                  && timing_safe_eq(pass.as_bytes(), expected_pass.as_bytes());
+
+            if ok {
+                let token = if let Ok(mut store) = sessions.lock() { store.create() }
+                            else { String::new() };
+                tracing::info!("Dashboard: login OK (user: {})", user);
+                serve_login_success(buf.into_inner(), &token);
+            } else {
+                tracing::warn!("Dashboard: login FAILED (user attempt: {})", user);
+                // Small artificial delay to limit brute-force throughput.
+                std::thread::sleep(std::time::Duration::from_millis(500));
+                http_response(buf.into_inner(), 401, "Invalid credentials");
+            }
+            return;
+        }
+
+        // Logout: invalidate the cookie, then redirect to /login.
+        if req_line.starts_with("POST /api/logout") || req_line.starts_with("GET /logout") {
+            if let Some(token) = parse_session_cookie(&header_str) {
+                if let Ok(mut store) = sessions.lock() {
+                    store.invalidate(&token);
+                }
+            }
+            let mut buf = BufReader::new(stream);
+            loop {
+                let mut line = String::new();
+                let _ = buf.read_line(&mut line);
+                if line == "\r\n" || line.is_empty() || line == "\n" { break; }
+            }
+            serve_logout(buf.into_inner());
+            return;
+        }
+
+        // All other routes require a valid session.
+        if !session_ok {
+            let mut buf = BufReader::new(stream);
+            loop {
+                let mut line = String::new();
+                let _ = buf.read_line(&mut line);
+                if line == "\r\n" || line.is_empty() || line == "\n" { break; }
+            }
+            // For GET / (the dashboard SPA): redirect to /login so the browser navigates.
+            // For API requests: 401 so JS code can detect and refresh.
+            if req_line.starts_with("GET / ") || req_line.starts_with("GET /?") || req_line == "GET / HTTP/1.1" {
+                http_redirect(buf.into_inner(), "/login");
+            } else {
+                http_response(buf.into_inner(), 401, "Unauthorized — please log in");
+            }
             return;
         }
     }
@@ -923,56 +1156,13 @@ fn handle_connection(
 
 fn handle_ws(stream: TcpStream, state: DashboardState, clients: WsClients,
              cmd_tx: Arc<Mutex<Option<CmdSender>>>, update_state: SharedUpdateState,
-             auth: Option<(String, String)>) {
+             _auth: Option<(String, String)>) {
     let _ = stream.set_read_timeout(Some(std::time::Duration::from_millis(50)));
 
-    // When auth is enabled, verify credentials during the WS upgrade handshake.
-    // tungstenite's accept_hdr callback lets us inspect HTTP headers before upgrading;
-    // returning an error aborts the upgrade and we can send a 401 instead.
-    let auth_clone = auth.clone();
-    let callback = move |req: &Request, res: Response| {
-        if let Some((ref expected_user, ref expected_pass)) = auth_clone {
-            // Extract Authorization header from the WS upgrade request.
-            let auth_header = req.headers()
-                .get("authorization")
-                .and_then(|v| v.to_str().ok())
-                .unwrap_or("");
-
-            // Parse "Basic <base64>"
-            let authorized = if let Some(encoded) = auth_header.strip_prefix("Basic ").or_else(|| auth_header.strip_prefix("basic ")) {
-                use base64::Engine;
-                base64::engine::general_purpose::STANDARD
-                    .decode(encoded.trim())
-                    .ok()
-                    .and_then(|b| String::from_utf8(b).ok())
-                    .map(|s| {
-                        let mut parts = s.splitn(2, ':');
-                        let u = parts.next().unwrap_or("").as_bytes().to_vec();
-                        let p = parts.next().unwrap_or("").as_bytes().to_vec();
-                        timing_safe_eq(&u, expected_user.as_bytes())
-                            && timing_safe_eq(&p, expected_pass.as_bytes())
-                    })
-                    .unwrap_or(false)
-            } else {
-                false
-            };
-
-            if !authorized {
-                // Reject the WS upgrade with 401. The browser will show the auth dialog
-                // and retry; subsequent HTTP requests will be caught by handle_connection.
-                let reject = tungstenite::http::Response::builder()
-                    .status(401)
-                    .header("WWW-Authenticate", "Basic realm=\"FlowStation Dashboard\"")
-                    .body(Some("Unauthorized".into()))
-                    .unwrap_or_else(|_| {
-                        // Fallback: plain 401 with no extra headers
-                        let mut r = tungstenite::http::Response::new(Some("Unauthorized".into()));
-                        *r.status_mut() = tungstenite::http::StatusCode::UNAUTHORIZED;
-                        r
-                    });
-                return Err(reject);
-            }
-        }
+    // Note: cookie-based auth is checked by handle_connection BEFORE we get here,
+    // so we don't need to re-validate during the WS upgrade. The cookie travels on
+    // the Upgrade request and was already verified against the session store.
+    let callback = move |_req: &Request, res: Response| -> Result<Response, _> {
         Ok(res)
     };
 
@@ -1251,6 +1441,11 @@ fn serve_system_info(mut stream: TcpStream, config_path: &str) {
         })
         .unwrap_or_else(|| "SoapySDRUtil not available".to_string());
 
+    // Auto-detected SDR name — set by `phy::components::soapy_settings::get_settings()`
+    // at stack startup. None if no SoapySDR-backed phy is in use (file backend etc).
+    let sdr_name = crate::phy::components::soapy_settings::detected_sdr_name()
+        .unwrap_or_else(|| "unknown".to_string());
+
     let body = serde_json::to_string(&serde_json::json!({
         "hostname": hostname,
         "uptime_secs": uptime_secs,
@@ -1265,6 +1460,7 @@ fn serve_system_info(mut stream: TcpStream, config_path: &str) {
         "ram_used_mb": ram_used_mb,
         "cpu_temp_c": cpu_temp_c,
         "soapy_info": soapy_info,
+        "sdr_name": sdr_name,
     })).unwrap_or_else(|_| "{}".to_string());
 
     let header = format!(
@@ -1412,4 +1608,120 @@ fn http_response(mut stream: TcpStream, code: u16, body: &str) {
         code, status, body.len(), body
     );
     let _ = stream.write_all(resp.as_bytes());
+}
+
+// ── Login UI / session helpers ──────────────────────────────────────────────
+
+/// Parse a login POST body. Accepts both `application/x-www-form-urlencoded`
+/// (user=...&password=...) and a minimal JSON shape `{"user":"...","password":"..."}`.
+/// This makes the endpoint trivially usable from both an HTML form and fetch().
+fn parse_login_body(body: &str) -> (String, String) {
+    let trimmed = body.trim();
+    // JSON shape: look for "user":"..." and "password":"..." anywhere in the string.
+    // We deliberately don't bring in a JSON parser for these two fields.
+    if trimmed.starts_with('{') {
+        let user = json_field(trimmed, "user").unwrap_or_default();
+        let pass = json_field(trimmed, "password").unwrap_or_default();
+        return (user, pass);
+    }
+    // Form-encoded.
+    let mut user = String::new();
+    let mut pass = String::new();
+    for pair in trimmed.split('&') {
+        let mut it = pair.splitn(2, '=');
+        let k = it.next().unwrap_or("");
+        let v = it.next().unwrap_or("");
+        let decoded = url_decode(v);
+        match k {
+            "user" | "username" => user = decoded,
+            "password" | "pass" => pass = decoded,
+            _ => {}
+        }
+    }
+    (user, pass)
+}
+
+fn json_field(s: &str, key: &str) -> Option<String> {
+    let needle = format!("\"{}\"", key);
+    let idx = s.find(&needle)?;
+    let after = &s[idx + needle.len()..];
+    let colon = after.find(':')?;
+    let rest = after[colon + 1..].trim_start();
+    let rest = rest.strip_prefix('"')?;
+    let end = rest.find('"')?;
+    Some(rest[..end].to_string())
+}
+
+fn url_decode(s: &str) -> String {
+    let bytes = s.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        match bytes[i] {
+            b'+' => { out.push(b' '); i += 1; }
+            b'%' if i + 2 < bytes.len() => {
+                let hi = (bytes[i + 1] as char).to_digit(16);
+                let lo = (bytes[i + 2] as char).to_digit(16);
+                if let (Some(h), Some(l)) = (hi, lo) {
+                    out.push((h * 16 + l) as u8);
+                    i += 3;
+                } else {
+                    out.push(bytes[i]); i += 1;
+                }
+            }
+            b => { out.push(b); i += 1; }
+        }
+    }
+    String::from_utf8(out).unwrap_or_default()
+}
+
+fn http_redirect(mut stream: TcpStream, location: &str) {
+    let resp = format!(
+        "HTTP/1.1 302 Found\r\nLocation: {}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+        location
+    );
+    let _ = stream.write_all(resp.as_bytes());
+}
+
+fn serve_login_success(mut stream: TcpStream, token: &str) {
+    // Two cookies:
+    //   fs_session: HttpOnly — the actual session token, inaccessible to JS.
+    //   fs_auth: readable — a marker telling the dashboard JS "auth is on",
+    //                       so it can decide to show the Logout button.
+    // The marker carries no security value; the HttpOnly session is what's checked.
+    let body = "{\"ok\":true}";
+    let resp = format!(
+        "HTTP/1.1 200 OK\r\n\
+         Content-Type: application/json\r\n\
+         Content-Length: {}\r\n\
+         Set-Cookie: fs_session={}; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800\r\n\
+         Set-Cookie: fs_auth=1; Path=/; SameSite=Lax; Max-Age=604800\r\n\
+         Connection: close\r\n\r\n{}",
+        body.len(), token, body
+    );
+    let _ = stream.write_all(resp.as_bytes());
+}
+
+fn serve_logout(mut stream: TcpStream) {
+    // Expire both cookies immediately; client navigates to /login next.
+    let resp = "HTTP/1.1 302 Found\r\n\
+                Location: /login\r\n\
+                Set-Cookie: fs_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0\r\n\
+                Set-Cookie: fs_auth=; Path=/; SameSite=Lax; Max-Age=0\r\n\
+                Content-Length: 0\r\n\
+                Connection: close\r\n\r\n";
+    let _ = stream.write_all(resp.as_bytes());
+}
+
+fn serve_login_page(mut stream: TcpStream) {
+    let body = crate::net_dashboard::html::LOGIN_HTML;
+    let header = format!(
+        "HTTP/1.1 200 OK\r\n\
+         Content-Type: text/html; charset=utf-8\r\n\
+         Content-Length: {}\r\n\
+         Connection: close\r\n\r\n",
+        body.len()
+    );
+    let _ = stream.write_all(header.as_bytes());
+    let _ = stream.write_all(body.as_bytes());
 }

@@ -29,7 +29,7 @@ html,body{height:100%;overflow:hidden;}
   --card-shadow: 0 1px 3px rgba(0,0,0,0.4);
   --r: 8px;
   --mono: 'ui-monospace','Cascadia Code','Consolas','Liberation Mono','Menlo',monospace;
-  --sans: 'ui-sans-serif','system-ui',-apple-system,'Segoe UI',sans-serif;
+  --sans: 'ui-sans-serif', system-ui, -apple-system, 'Segoe UI', 'Microsoft YaHei', 'Noto Sans SC', 'PingFang SC', 'Hiragino Sans GB', 'WenQuanYi Micro Hei', sans-serif;
 }
 [data-theme="light"]{
   --bg:#f0f4f9;--bg2:#ffffff;--bg3:#e8eef6;--bg4:#dce4ef;
@@ -216,6 +216,46 @@ body{
 .topbar-sep{color:var(--border2);margin:0 2px;}
 .topbar-sub{font-size:12px;color:var(--text3);font-family:var(--mono);}
 .topbar-right{margin-left:auto;display:flex;align-items:center;gap:8px;}
+
+/* SDR hardware badge — shows the auto-detected SDR (LimeSDR, SXceiver, µCell, etc).
+   Positioned between the page title and the right-side controls. Carries a subtle
+   animated dot to convey "live link to RF". */
+.sdr-badge{
+  display:flex;align-items:center;gap:7px;
+  padding:5px 10px;
+  background:rgba(0,212,168,0.08);
+  border:1px solid rgba(0,212,168,0.3);
+  border-radius:6px;
+  font-family:var(--mono);font-size:10px;font-weight:600;
+  letter-spacing:0.05em;
+  color:var(--accent);
+  margin-left:14px;
+  cursor:default;
+  transition:background 0.15s;
+}
+.sdr-badge:hover{background:rgba(0,212,168,0.14);}
+.sdr-badge-dot{
+  width:6px;height:6px;border-radius:50%;
+  background:var(--accent);
+  box-shadow:0 0 6px var(--accent);
+  animation:sdr-pulse 2s ease-in-out infinite;
+}
+@keyframes sdr-pulse{
+  0%,100%{opacity:1;}
+  50%{opacity:0.4;}
+}
+.sdr-badge-label{white-space:nowrap;}
+
+/* Logout button: muted icon in topbar, becomes warning-red on hover. */
+.logout-btn{
+  width:30px;height:30px;
+  display:flex;align-items:center;justify-content:center;
+  background:transparent;border:1px solid var(--border);border-radius:6px;
+  color:var(--text3);cursor:pointer;font-size:14px;
+  transition:all 0.15s;
+  margin-left:4px;
+}
+.logout-btn:hover{color:var(--danger);border-color:var(--danger);background:rgba(255,77,94,0.08);}
 
 /* Theme picker */
 .theme-picker{display:flex;border:1px solid var(--border);border-radius:6px;overflow:hidden;}
@@ -469,6 +509,64 @@ td code{
   .stat-grid{grid-template-columns:1fr 1fr;}
   #sidebar-toggle-btn{display:flex;}
 }
+
+/* ── Phone portrait (~380px) — single column, larger touch targets ── */
+@media(max-width:500px){
+  /* Sidebar covers more of the viewport so the menu items are tappable */
+  #sidebar{width:80vw!important;min-width:240px!important;max-width:280px;}
+
+  /* Tighter topbar so the title + lang/theme don't overflow */
+  #topbar{height:48px;padding:0 8px;gap:6px;}
+  .topbar-title{font-size:13px;}
+  .topbar-sub{display:none;}
+  .topbar-sep{display:none;}
+  .topbar-right{gap:4px;}
+  .theme-btn{padding:3px 6px;font-size:9px;}
+  .lang-btn{padding:2px 4px;font-size:9px;}
+  /* SDR badge: keep the dot but shrink the text; if the badge would push out the
+     right-side controls, hide the label entirely. */
+  .sdr-badge{margin-left:6px;padding:4px 7px;font-size:9px;}
+  .sdr-badge-label{max-width:60px;overflow:hidden;text-overflow:ellipsis;}
+  .logout-btn{width:30px;height:30px;font-size:13px;}
+
+  #content{padding:8px;}
+
+  /* Cards in a single column so each one is readable */
+  .stat-grid{grid-template-columns:1fr;gap:10px;}
+
+  /* TS visualizer: 2x2 instead of 1x4 so each block stays usable */
+  .ts-grid{grid-template-columns:1fr 1fr;gap:8px;padding:10px 12px;}
+
+  /* System info: vertical layout per row, full-width values */
+  .info-row{flex-direction:column;align-items:flex-start;gap:4px;padding:10px 14px;}
+  .info-key{min-width:0!important;font-size:10px;}
+
+  /* Tables: stacked-cards layout via data-label attributes on td (set in JS).
+     For tables without labels, fall back to compact rows + horizontal scroll. */
+  table{font-size:12px;}
+  th,td{padding:8px 6px!important;}
+  /* Hide less-important columns on phones to keep tables one-screen-wide */
+  .col-mobile-hide{display:none;}
+
+  /* Log: shorter on phone (more room for other UI) and break long lines */
+  .log-wrap{height:300px!important;font-size:10px!important;padding:8px 10px!important;}
+  .log-line{flex-wrap:wrap;}
+  .log-ts{font-size:9px;}
+  .log-level{width:38px;font-size:9px;}
+
+  /* Modal dialogs: near full screen on phone, scrollable content */
+  .modal{width:95vw!important;max-height:90vh!important;padding:14px!important;overflow-y:auto;}
+  .modal-title{font-size:11px;margin-bottom:12px;padding-bottom:8px;}
+  #update-modal .modal{width:95vw!important;}
+  .update-terminal{height:200px!important;font-size:10px!important;}
+
+  /* Make buttons easier to tap */
+  button,.btn{min-height:36px;}
+
+  /* Forms: stack inputs full-width */
+  input[type="text"],input[type="number"],textarea,select{font-size:16px;} /* 16px prevents iOS zoom on focus */
+}
+
 @media(min-width:701px){
   #mobile-overlay{display:none!important;}
   #sidebar-toggle-btn-mobile{display:none!important;}
@@ -675,6 +773,13 @@ td code{
   <div id="topbar">
     <button id="sidebar-toggle-btn" onclick="openMobileSidebar()">☰</button>
     <div class="topbar-title" id="topbar-title">Radios</div>
+
+    <!-- SDR hardware badge — auto-detected at stack startup. Hidden until populated. -->
+    <div id="sdr-badge" class="sdr-badge" style="display:none" title="Detected SDR hardware">
+      <span class="sdr-badge-dot"></span>
+      <span class="sdr-badge-label" id="sdr-badge-label">—</span>
+    </div>
+
     <div class="topbar-right">
       <div class="theme-picker">
         <button class="theme-btn active" data-t="dark" onclick="setTheme('dark',this)">Dark</button>
@@ -687,7 +792,10 @@ td code{
         <button class="lang-btn" onclick="setLang('de',this)">DE</button>
         <button class="lang-btn" onclick="setLang('es',this)">ES</button>
         <button class="lang-btn" onclick="setLang('hu',this)">HU</button>
+        <button class="lang-btn" onclick="setLang('zh',this)">CN</button>
       </div>
+      <!-- Logout: clears session cookie and redirects to /login. Hidden when auth is off. -->
+      <button class="logout-btn" id="logout-btn" onclick="doLogout()" title="Log out" style="display:none">⏻</button>
     </div>
   </div>
 
@@ -814,10 +922,10 @@ td code{
               <thead><tr>
                 <th data-i18n="th_issi">ISSI</th>
                 <th data-i18n="th_groups">Groups</th>
-                <th data-i18n="th_ee">EE</th>
+                <th class="col-mobile-hide" data-i18n="th_ee">EE</th>
                 <th data-i18n="th_signal">Signal</th>
                 <th data-i18n="th_status">Status</th>
-                <th data-i18n="th_last_seen">Last seen</th>
+                <th class="col-mobile-hide" data-i18n="th_last_seen">Last seen</th>
                 <th data-i18n="th_actions">Actions</th>
               </tr></thead>
               <tbody id="ms-tbody"></tbody>
@@ -837,7 +945,7 @@ td code{
           <div class="table-wrap">
             <table>
               <thead><tr>
-                <th data-i18n="th_id">ID</th>
+                <th class="col-mobile-hide" data-i18n="th_id">ID</th>
                 <th data-i18n="th_type">Type</th>
                 <th data-i18n="th_caller">Caller</th>
                 <th data-i18n="th_dest">Destination</th>
@@ -1125,6 +1233,7 @@ const LANGS={
     confirm_kick:'Kick ISSI {issi}?\nTerminal will be deregistered and forced to re-attach.',
     confirm_restart:'Restart FlowStation?\nAll active calls will be dropped.',
     confirm_shutdown:'Shutdown FlowStation?\nThe service will stop and must be restarted manually.',
+    confirm_logout:'Log out?',
     saved:'✓ Saved — restart to apply.',save_fail:'✗ Save failed',conn_error:'Connection error.',
     update:'⬆ Update',update_title:'OTA Update — github.com/razvanzeces/flowstation',
     update_confirm:'Pull latest from main and rebuild?\nThe service will restart automatically.',
@@ -1173,6 +1282,7 @@ const LANGS={
     confirm_kick:'Kick ISSI {issi}?\nTerminalul va fi deînregistrat și forțat să se reconecteze.',
     confirm_restart:'Repornire FlowStation?\nToate apelurile active vor fi întrerupte.',
     confirm_shutdown:'Oprire FlowStation?\nServiciul se va opri și trebuie repornit manual.',
+    confirm_logout:'Deconectare?',
     saved:'✓ Salvat — repornire pentru aplicare.',save_fail:'✗ Salvare eșuată',conn_error:'Eroare de conexiune.',
     update:'⬆ Update',update_title:'Update OTA — github.com/razvanzeces/flowstation',
     update_confirm:'Descarcă ultima versiune din main și recompilează?\nServiciul va reporni automat.',
@@ -1220,6 +1330,7 @@ const LANGS={
     confirm_kick:'ISSI {issi} entfernen?\nDas Terminal wird abgemeldet und zur Neuanmeldung gezwungen.',
     confirm_restart:'FlowStation neu starten?\nAlle aktiven Anrufe werden beendet.',
     confirm_shutdown:'FlowStation herunterfahren?\nDer Dienst wird gestoppt und muss manuell neu gestartet werden.',
+    confirm_logout:'Abmelden?',
     saved:'✓ Gespeichert — Neustart zum Anwenden.',save_fail:'✗ Fehler beim Speichern',conn_error:'Verbindungsfehler.',
     update:'⬆ Update',update_title:'OTA-Update — github.com/razvanzeces/flowstation',
     update_confirm:'Neueste Version von main holen und neu bauen?\nDer Dienst startet automatisch neu.',
@@ -1267,6 +1378,7 @@ const LANGS={
     confirm_kick:'¿Expulsar ISSI {issi}?\nEl terminal será desregistrado y forzado a reconectarse.',
     confirm_restart:'¿Reiniciar FlowStation?\nTodas las llamadas activas se interrumpirán.',
     confirm_shutdown:'¿Apagar FlowStation?\nEl servicio se detendrá y deberá reiniciarse manualmente.',
+    confirm_logout:'¿Cerrar sesión?',
     saved:'✓ Guardado — reinicia para aplicar.',save_fail:'✗ Error al guardar',conn_error:'Error de conexión.',
     update:'⬆ Update',update_title:'Actualización OTA — github.com/razvanzeces/flowstation',
     update_confirm:'¿Obtener la última versión de main y recompilar?\nEl servicio se reiniciará automáticamente.',
@@ -1309,6 +1421,7 @@ const LANGS={
     confirm_kick:'ISSI {issi} kizárása?\nA terminál törlésre kerül és újra kell csatlakoznia.',
     confirm_restart:'Újraindítja a FlowStation-t?\nAz összes aktív hívás megszakad.',
     confirm_shutdown:'Leállítja a FlowStation-t?\nA szolgáltatást kézzel kell újraindítani.',
+    confirm_logout:'Kijelentkezik?',
     saved:'✓ Mentve — újraindítás szükséges az alkalmazáshoz.',save_fail:'✗ Mentési hiba',conn_error:'Kapcsolódási hiba.',
     update:'⬆ Frissítés',update_title:'OTA frissítés — github.com/razvanzeces/flowstation',
     update_confirm:'Letölti a legújabb verziót a main ágból és újraépíti?\nA szolgáltatás automatikusan újraindul.',
@@ -1322,6 +1435,54 @@ const LANGS={
     sys_active_badge:'AKTÍV',sys_no_profiles:'Nem található .toml profil a könyvtárban.',
     sys_activate_confirm:'Váltás a(z) "{name}" profilra és újraindítás?\nAz aktuális konfig mentésre kerül.',
     sys_bts:'BTS kapcsolat',
+  },
+  zh:{
+    bts_ip:'BTS IP',offline:'离线',online:'在线',
+    brew_online:'在线',brew_offline:'离线',
+    stations:'终端',calls:'通话',lastheard:'最近通话',log:'日志',config:'配置',
+    terminals:'终端',registered:'已注册',
+    active_calls:'活跃通话',circuits:'占用信道',
+    registered_terminals:'已注册终端',
+    no_terminals:'暂无终端注册',no_calls:'无活跃通话',
+    live_log:'实时日志',autoscroll:'自动滚动',filter_all:'全部',
+    clear:'清除',restart:'⟳ 重启',shutdown:'⏻ 关机',save:'保存',
+    sds_title:'⬡ 发送 SDS 短消息',sds_dest:'目标 ISSI',
+    live_sds_desc:'向本小区所有终端广播文本消息，按 Home Mode Display 间隔重复发送。直到删除或达到重复次数为止。',
+    live_sds_text:'消息内容（最多 251 字符）',live_sds_repeat:'重复次数 (0=无限)',live_sds_send:'📢 广播',
+    live_sds_clear_all:'清除全部',live_sds_empty:'暂无广播任务。',
+    live_sds_sent:'已发送',live_sds_times:'次',live_sds_forever:'∞',live_sds_delete:'删除',
+    fallback_title:'⚠ 正在使用后备配置 — 主配置加载失败',
+    sds_msg_label:'消息内容',cancel:'取消',send:'发送',
+    th_issi:'ISSI',th_groups:'群组',th_ee:'EE',th_signal:'信号',
+    th_status:'状态',th_last_seen:'最后在线',th_actions:'操作',
+    th_id:'ID',th_type:'类型',th_caller:'主叫',
+    th_dest:'被叫',th_speaker:'讲话者',th_duration:'时长',
+    th_time:'时间',th_activity:'活动',
+    last_heard_title:'最近通话记录',no_activity:'暂无活动记录',
+    act_call_group:'组呼',act_call_individual:'点对点',act_sds:'SDS',
+    online_badge:'在线',kick:'踢下线',sds:'SDS',
+    call_group:'组呼',call_p2p_s:'P2P-S',call_p2p_d:'P2P-D',
+    confirm_kick:'确定踢下 ISSI {issi}？\n终端将被注销并强制重新注册。',
+    confirm_restart:'确定重启 FlowStation？\n所有正在进行的通话将被中断。',
+    confirm_shutdown:'确定关闭 FlowStation？\n服务将停止，需要手动重启。',
+    confirm_logout:'确定注销吗？',
+    saved:'✓ 已保存 — 重启后生效',save_fail:'✗ 保存失败',conn_error:'连接错误',
+    update:'⬆ 更新',update_title:'OTA 在线更新 — github.com/razvanzeces/flowstation',
+    update_confirm:'是否从 main 分支拉取最新代码并重新构建？\n服务将自动重启。',
+    update_running:'正在更新… 请不要关闭此窗口',
+    update_done_ok:'✓ 更新完成，正在重启…',
+    update_done_err:'✗ 更新失败，请查看上方日志',
+    update_close:'关闭',
+    system:'系统',sys_info:'系统信息',sys_hostname:'主机名',sys_uptime:'运行时间',
+    sys_version:'FS 版本',sys_os:'操作系统',sys_config:'当前配置',
+    sys_cpu:'CPU',sys_cpu_load:'CPU 负载',sys_ram:'内存',sys_temp:'CPU 温度',
+    sys_rf:'RF 硬件 (SoapySDR)',sys_autorefresh:'自动刷新 5秒',
+    profile_edit_title:'编辑配置文件',profile_edit_btn:'编辑',
+    profile_edit_save_ok:'✓ 已保存',profile_edit_save_fail:'✗ 保存失败',
+    sys_profiles:'配置文件',sys_activate:'激活并重启',
+    sys_active_badge:'当前使用',sys_no_profiles:'配置目录中未找到 .toml 配置文件。',
+    sys_activate_confirm:'切换到配置文件 "{name}" 并重启？\n当前配置将被备份。',
+    sys_bts:'BTS 连接',
   },
 };
 
@@ -1669,10 +1830,10 @@ function renderStations(){
     const ls=m._last_seen_ts?Math.floor((Date.now()-m._last_seen_ts)/1000):m.last_seen_secs_ago;
     return`<tr>
       <td><code>${m.issi}</code></td><td>${grps}</td>
-      <td style="text-align:center">${eeLabel(m.energy_saving_mode||0)}</td>
+      <td class="col-mobile-hide" style="text-align:center">${eeLabel(m.energy_saving_mode||0)}</td>
       <td><div class="rssi-bar"><div class="rssi-track"><div class="rssi-fill" style="width:${pct}%;background:${col}"></div></div><span class="rssi-val" style="color:${col}">${rL}</span></div></td>
       <td><span class="badge badge-green">${t('online_badge')}</span></td>
-      <td>${lastSeenLabel(ls)}</td>
+      <td class="col-mobile-hide">${lastSeenLabel(ls)}</td>
       <td><button class="btn btn-sm" onclick="openSds(${m.issi})">${t('sds')}</button> <button class="btn btn-sm btn-danger" onclick="kickMs(${m.issi})">${t('kick')}</button></td>
     </tr>`;
   }).join('');
@@ -1689,7 +1850,7 @@ function renderCalls(){
     const label=c.call_type==='group'?t('call_group'):(c.simplex?t('call_p2p_s'):t('call_p2p_d'));
     const to=c.call_type==='group'?`GSSI ${c.gssi}`:`ISSI ${c.called_issi}`;
     const spk=c.active_speaker?`<code>${c.active_speaker}</code>`:'<span style="color:var(--text3)">—</span>';
-    return`<tr><td><code>${c.call_id}</code></td><td><span class="badge ${badge}">${label}</span></td><td>${c.caller_issi?`<code>${c.caller_issi}</code>`:'—'}</td><td>${to}</td><td>${spk}</td><td style="font-family:var(--mono);font-size:12px;color:var(--accent2);font-weight:600">${mm}:${ss}</td></tr>`;
+    return`<tr><td class="col-mobile-hide"><code>${c.call_id}</code></td><td><span class="badge ${badge}">${label}</span></td><td>${c.caller_issi?`<code>${c.caller_issi}</code>`:'—'}</td><td>${to}</td><td>${spk}</td><td style="font-family:var(--mono);font-size:12px;color:var(--accent2);font-weight:600">${mm}:${ss}</td></tr>`;
   }).join('');
 }
 
@@ -1782,6 +1943,21 @@ async function loadSystemInfo(){
     document.getElementById('sysVersion').textContent=sysData.stack_version||'—';
     document.getElementById('sysOs').textContent=sysData.os||'—';
     document.getElementById('sysConfigPath').textContent=sysData.config_path||'—';
+
+    // SDR badge in topbar — populated from auto-detected hardware on first /api/system fetch.
+    // Hidden when the value is unknown or absent (e.g. file backend in tests).
+    const sdrBadge = document.getElementById('sdr-badge');
+    const sdrLabel = document.getElementById('sdr-badge-label');
+    if (sdrBadge && sdrLabel) {
+      const name = sysData.sdr_name;
+      if (name && name !== 'unknown' && name.length > 0) {
+        sdrLabel.textContent = name;
+        sdrBadge.style.display = 'flex';
+        sdrBadge.title = 'Detected SDR hardware: ' + name;
+      } else {
+        sdrBadge.style.display = 'none';
+      }
+    }
 
     // CPU
     const cpuEl=document.getElementById('sysCpu');
@@ -2035,8 +2211,253 @@ setInterval(()=>{
 if(sidebarCollapsed)document.getElementById('sidebar').classList.add('collapsed');
 setLang(currentLang);
 setTheme(currentTheme);
+
+// Logout: hits /api/logout (clears the session cookie server-side) and navigates
+// to /login. We surface the button only when auth is actually in effect — detected
+// by whether the fs_session cookie is present.
+function doLogout(){
+  if(!confirm(t('confirm_logout')||'Log out?'))return;
+  fetch('/api/logout',{method:'POST',credentials:'same-origin'})
+    .finally(()=>{ window.location='/login'; });
+}
+// Heuristic: if the fs_auth marker cookie is set, auth is in effect on this server
+// (the actual session token is fs_session which is HttpOnly and not readable here).
+if(document.cookie.split(';').some(c=>c.trim().startsWith('fs_auth='))){
+  const lb=document.getElementById('logout-btn');
+  if(lb) lb.style.display='flex';
+}
+
 connect();
 </script>
 </body>
 </html>
 "#;
+
+/// Standalone login page. Served at GET /login by the dashboard when auth is
+/// configured. Keeps the visual language of the dashboard (same dark palette, mono
+/// title type) but is self-contained: a single document, no external deps, no
+/// font downloads. Form posts to POST /api/login as JSON via fetch().
+pub const LOGIN_HTML: &str = r##"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#0a1118">
+<title>FlowStation — Login</title>
+<style>
+:root{
+  --bg:#0a1118;--bg2:#0f1820;--bg3:#172230;--bg4:#1d2a3a;
+  --border:#243244;--border2:#2a3a52;
+  --text:#e8edf3;--text2:#b5c0d0;--text3:#7a8a9c;
+  --accent:#00d4a8;--accent2:#4da6ff;--danger:#ff4d5e;
+  --mono:'ui-monospace','Cascadia Code','Consolas','Liberation Mono','Menlo',monospace;
+  --sans: 'ui-sans-serif', system-ui, -apple-system, 'Segoe UI', 'Microsoft YaHei', 'Noto Sans SC', 'PingFang SC', 'Hiragino Sans GB', 'WenQuanYi Micro Hei', sans-serif;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;height:100%;}
+body{
+  font-family:var(--sans);background:var(--bg);color:var(--text);
+  display:flex;align-items:center;justify-content:center;
+  min-height:100vh;min-height:100dvh;
+  padding:20px;
+  /* Subtle gradient backdrop so the card pops without distracting */
+  background:
+    radial-gradient(circle at 20% 10%, rgba(77,166,255,0.10), transparent 50%),
+    radial-gradient(circle at 80% 90%, rgba(0,212,168,0.10), transparent 50%),
+    var(--bg);
+  -webkit-tap-highlight-color:transparent;
+}
+
+.login-card{
+  width:100%;max-width:380px;
+  background:var(--bg2);border:1px solid var(--border2);
+  border-radius:14px;
+  box-shadow:0 20px 50px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.02);
+  padding:36px 32px 32px;
+  position:relative;overflow:hidden;
+}
+/* Top accent bar */
+.login-card::before{
+  content:"";position:absolute;top:0;left:0;right:0;height:3px;
+  background:linear-gradient(90deg, var(--accent) 0%, var(--accent2) 100%);
+}
+
+.logo-wrap{display:flex;flex-direction:column;align-items:center;gap:14px;margin-bottom:26px;}
+/* Tower / antenna mark — SVG inlined so there's no extra request */
+.logo-mark{
+  width:64px;height:64px;
+  border-radius:14px;
+  background:linear-gradient(135deg, rgba(0,212,168,0.15) 0%, rgba(77,166,255,0.15) 100%);
+  border:1px solid rgba(0,212,168,0.3);
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 0 24px rgba(0,212,168,0.15);
+}
+.logo-mark svg{width:36px;height:36px;}
+
+.logo-title{
+  font-family:var(--mono);font-size:13px;font-weight:700;
+  letter-spacing:0.18em;text-transform:uppercase;
+  color:var(--text);
+  display:flex;align-items:center;gap:8px;
+}
+.logo-title .accent{color:var(--accent);}
+.logo-sub{
+  font-family:var(--mono);font-size:10px;font-weight:500;
+  letter-spacing:0.1em;text-transform:uppercase;
+  color:var(--text3);
+}
+
+form{display:flex;flex-direction:column;gap:14px;}
+.field-label{
+  display:block;font-family:var(--mono);font-size:10px;font-weight:600;
+  letter-spacing:0.1em;text-transform:uppercase;color:var(--text3);
+  margin-bottom:6px;
+}
+input[type="text"],input[type="password"]{
+  width:100%;
+  background:var(--bg3);border:1px solid var(--border2);
+  color:var(--text);
+  padding:12px 14px;border-radius:8px;
+  font-family:var(--mono);font-size:14px;
+  outline:none;transition:border-color 0.15s, background 0.15s;
+  -webkit-appearance:none;appearance:none;
+}
+input:focus{border-color:var(--accent2);background:var(--bg4);}
+/* iOS Safari respects the 16px rule to skip the auto-zoom; we set 14px on desktop
+   and bump back up on mobile via the @media block below. */
+
+.btn-login{
+  width:100%;
+  background:linear-gradient(180deg, var(--accent) 0%, #00b893 100%);
+  color:#06231d;font-weight:700;letter-spacing:0.04em;
+  border:none;border-radius:8px;
+  padding:13px 16px;font-family:var(--sans);font-size:14px;
+  cursor:pointer;
+  margin-top:6px;
+  transition:transform 0.05s, box-shadow 0.15s, filter 0.15s;
+  box-shadow:0 4px 14px rgba(0,212,168,0.3);
+}
+.btn-login:hover{filter:brightness(1.05);}
+.btn-login:active{transform:translateY(1px);}
+.btn-login:disabled{opacity:0.6;cursor:not-allowed;}
+
+.err{
+  min-height:18px;font-family:var(--mono);font-size:11px;
+  color:var(--danger);text-align:center;margin-top:4px;
+  letter-spacing:0.05em;
+}
+
+.footer{
+  margin-top:22px;text-align:center;
+  font-family:var(--mono);font-size:10px;color:var(--text3);
+  letter-spacing:0.06em;
+}
+.footer a{color:var(--text3);text-decoration:none;}
+.footer a:hover{color:var(--accent2);}
+
+@media(max-width:500px){
+  body{padding:14px;}
+  .login-card{padding:28px 22px;border-radius:12px;}
+  .logo-mark{width:56px;height:56px;}
+  .logo-mark svg{width:30px;height:30px;}
+  /* Bigger inputs on mobile: prevents iOS zoom-on-focus, easier tap target. */
+  input[type="text"],input[type="password"]{font-size:16px;padding:14px 14px;}
+  .btn-login{font-size:15px;padding:14px 16px;min-height:48px;}
+}
+</style>
+</head>
+<body>
+<div class="login-card">
+  <div class="logo-wrap">
+    <div class="logo-mark">
+      <!-- Stylised antenna tower with radio waves -->
+      <svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent)">
+        <!-- Tower legs -->
+        <path d="M14 28 L16 8 L18 28" />
+        <!-- Cross braces -->
+        <line x1="14.6" y1="22" x2="17.4" y2="22"/>
+        <line x1="14.9" y1="17" x2="17.1" y2="17"/>
+        <line x1="15.2" y1="13" x2="16.8" y2="13"/>
+        <!-- Tip antenna -->
+        <line x1="16" y1="8" x2="16" y2="4"/>
+        <circle cx="16" cy="3" r="1" fill="currentColor"/>
+        <!-- Radio waves -->
+        <path d="M9 8 Q6 11 6 16" style="color:var(--accent2)" opacity="0.7"/>
+        <path d="M23 8 Q26 11 26 16" style="color:var(--accent2)" opacity="0.7"/>
+        <path d="M11 6 Q7 9 7 14" style="color:var(--accent2)" opacity="0.4"/>
+        <path d="M21 6 Q25 9 25 14" style="color:var(--accent2)" opacity="0.4"/>
+      </svg>
+    </div>
+    <div style="text-align:center">
+      <div class="logo-title"><span>Flow</span><span class="accent">Station</span></div>
+      <div class="logo-sub">TETRA Base Station</div>
+    </div>
+  </div>
+
+  <form id="login-form" autocomplete="on">
+    <div>
+      <label class="field-label" for="username">Username</label>
+      <input type="text" id="username" name="username" autocomplete="username"
+             autocapitalize="none" autocorrect="off" spellcheck="false"
+             required>
+    </div>
+    <div>
+      <label class="field-label" for="password">Password</label>
+      <input type="password" id="password" name="password" autocomplete="current-password"
+             required>
+    </div>
+    <button type="submit" class="btn-login" id="submit-btn">Sign In</button>
+    <div class="err" id="err"></div>
+  </form>
+
+  <div class="footer">
+    github.com/razvanzeces/<a href="https://github.com/razvanzeces/flowstation" target="_blank">flowstation</a>
+  </div>
+</div>
+
+<script>
+const form = document.getElementById('login-form');
+const errBox = document.getElementById('err');
+const btn = document.getElementById('submit-btn');
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  errBox.textContent = '';
+  btn.disabled = true;
+  btn.textContent = 'Signing in…';
+
+  const user = document.getElementById('username').value;
+  const password = document.getElementById('password').value;
+
+  try {
+    const r = await fetch('/api/login', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({user, password}),
+      credentials: 'same-origin',
+    });
+    if (r.ok) {
+      // Session cookie has been set by the server; navigate to dashboard.
+      window.location = '/';
+      return;
+    }
+    if (r.status === 401) {
+      errBox.textContent = 'Invalid credentials';
+    } else {
+      errBox.textContent = 'Login failed (' + r.status + ')';
+    }
+  } catch (e) {
+    errBox.textContent = 'Network error: ' + e.message;
+  }
+  btn.disabled = false;
+  btn.textContent = 'Sign In';
+});
+
+// Auto-focus username on desktop; mobile keyboards open virtually so we don't on small screens.
+if (window.innerWidth > 600) {
+  document.getElementById('username').focus();
+}
+</script>
+</body>
+</html>
+"##;

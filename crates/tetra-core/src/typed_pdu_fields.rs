@@ -11,8 +11,10 @@ pub struct Type4FieldGeneric {
 pub struct Type3FieldGeneric {
     pub field_id: u64,
     pub len: usize,
-    /// Up to 64 bits of data (later bits are discarded)
-    pub data: u64,
+    /// Up to 128 bits of data (later bits are discarded).
+    /// Sized to fit External Subscriber Number (up to 96 bits = 24 BCD digits)
+    /// and any future long IEs without further refactor.
+    pub data: u128,
 }
 
 /// Helper functions for dealing with type2, type3 and type4 fields for MLE, CMCE, MM and SNDCP PDUs.
@@ -223,20 +225,45 @@ pub mod typed {
                 });
             }
         };
-        let read_bits = if len_bits > 64 { 64 } else { len_bits };
-        let data = match buffer.read_bits(read_bits) {
-            Some(x) => x,
-            None => {
-                return Err(PduParseErr::BufferEnded {
-                    field: Some("parse_type3_generic data"),
-                });
-            }
+
+        // Read up to 128 bits of payload. BitBuffer::read_bits is u64-only, so for
+        // lengths over 64 we split into two reads (high half first, then low half).
+        let read_bits = if len_bits > 128 { 128 } else { len_bits };
+        let data: u128 = if read_bits <= 64 {
+            let v = match buffer.read_bits(read_bits) {
+                Some(x) => x,
+                None => {
+                    return Err(PduParseErr::BufferEnded {
+                        field: Some("parse_type3_generic data"),
+                    });
+                }
+            };
+            v as u128
+        } else {
+            let hi_bits = read_bits - 64;
+            let hi = match buffer.read_bits(hi_bits) {
+                Some(x) => x,
+                None => {
+                    return Err(PduParseErr::BufferEnded {
+                        field: Some("parse_type3_generic data (high)"),
+                    });
+                }
+            };
+            let lo = match buffer.read_bits(64) {
+                Some(x) => x,
+                None => {
+                    return Err(PduParseErr::BufferEnded {
+                        field: Some("parse_type3_generic data (low)"),
+                    });
+                }
+            };
+            ((hi as u128) << 64) | (lo as u128)
         };
 
-        // Seek forward to end of element, if larger than 64 bits
-        if len_bits > 64 {
-            tracing::warn!("Type3 element {} length {} exceeds 64 bits, data truncated", id, len_bits);
-            buffer.seek_rel(len_bits as isize - 64);
+        // Seek forward past any bits beyond what we stored (>128 bits).
+        if len_bits > 128 {
+            tracing::warn!("Type3 element {} length {} exceeds 128 bits, data truncated", id, len_bits);
+            buffer.seek_rel(len_bits as isize - 128);
         }
 
         Ok(Some(Type3FieldGeneric {
@@ -387,7 +414,17 @@ pub mod typed {
             // Write mbit and 4-bit field ID, then write length, then the element itself
             write_type34_header_generic(buffer, id);
             buffer.write_bits(elem.len as u64, 11);
-            buffer.write_bits(elem.data, elem.len);
+            // BitBuffer::write_bits accepts u64. For payloads up to 64 bits we cast
+            // directly; for longer payloads we split into high-half + low-half writes.
+            if elem.len <= 64 {
+                buffer.write_bits(elem.data as u64, elem.len);
+            } else {
+                let hi_bits = elem.len - 64;
+                let hi = (elem.data >> 64) as u64;
+                let lo = elem.data as u64;
+                buffer.write_bits(hi, hi_bits);
+                buffer.write_bits(lo, 64);
+            }
         } else {
             // Don't write anything (no mbit)
             tracing::trace!("write_type3_generic no_field {}", buffer.dump_bin());
