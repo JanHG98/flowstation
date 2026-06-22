@@ -199,7 +199,7 @@ pub fn from_toml_str(toml_str: &str) -> Result<StackConfig, Box<dyn std::error::
         cell: cell_cfg,
         brew: None,
         asterisk: apply_asterisk_patch(root.asterisk.unwrap_or_default())?,
-        dapnet: apply_dapnet_patch(root.dapnet.unwrap_or_default()),
+        dapnet: apply_dapnet_patch(root.dapnet.unwrap_or_default())?,
         tpg2200_action: apply_tpg2200_action_patch(root.tpg2200_action.unwrap_or_default())?,
         dashboard: None,
         telemetry: None,
@@ -405,7 +405,7 @@ realm = "asterisk"
 
 [dapnet]
 enabled = true
-api_url = "https://www.hampager.de/api/messages"
+api_url = "https://hampager.de/api/calls"
 username = "dl1abc"
 password = "example"
 poll_interval_secs = 30
@@ -415,6 +415,7 @@ forward_telegram = true
 sds_source_issi = 9999
 sds_dest_issi = 1234567
 sds_dest_is_group = false
+ric_issi_routes = { "0632585" = 2632585, "0x9A70A" = 2632586 }
 callout_source_issi = 9999
 callout_dest_issi = 1234567
 callout_incident_base = 2
@@ -472,6 +473,8 @@ sds_queue_critical = 128
         assert!(cfg.dapnet.enabled);
         assert!(cfg.dapnet.rwth_core_enabled);
         assert_eq!(cfg.dapnet.callout_incident_base, 2);
+        assert_eq!(cfg.dapnet.ric_issi_routes.get(&632585), Some(&2632585));
+        assert_eq!(cfg.dapnet.ric_issi_routes.get(&632586), Some(&2632586));
     }
 
     fn minimal_toml(extra_cell: &str) -> String {

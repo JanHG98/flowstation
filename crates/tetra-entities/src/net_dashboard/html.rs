@@ -2434,7 +2434,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
             <input type="number" id="dap-limit" class="form-input" min="1" placeholder="100">
 
             <label style="color:var(--muted);font-size:13px">Hampager API URL</label>
-            <input type="text" id="dap-api-url" class="form-input" placeholder="https://www.hampager.de/api/messages" style="grid-column:1 / -1;min-width:0">
+            <input type="text" id="dap-api-url" class="form-input" placeholder="https://hampager.de/api/calls" style="grid-column:1 / -1;min-width:0">
 
             <label style="color:var(--muted);font-size:13px">API username</label>
             <input type="text" id="dap-username" class="form-input" autocomplete="off" spellcheck="false">
@@ -2478,6 +2478,8 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
                 <input type="number" id="dap-sds-dest" class="form-input" min="0" max="16777215" placeholder="ISSI or GSSI">
                 <label style="color:var(--muted);font-size:13px">Destination is group</label>
                 <label style="display:flex;align-items:center;gap:10px"><span class="sw"><input type="checkbox" id="dap-sds-group"><i></i></span><span style="color:var(--muted);font-size:12px">GSSI</span></label>
+                <label style="color:var(--muted);font-size:13px;align-self:flex-start;padding-top:8px">RIC → ISSI</label>
+                <textarea id="dap-ric-routes" class="form-input" rows="3" placeholder="0632585=2632585"></textarea>
               </div>
             </div>
 
@@ -2523,7 +2525,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
             <label style="color:var(--muted);font-size:13px">Emergency</label>
             <label style="display:flex;align-items:center;gap:10px"><span class="sw"><input type="checkbox" id="dap-out-emergency"><i></i></span><span style="color:var(--muted);font-size:12px">Set emergency flag</span></label>
             <label style="color:var(--muted);font-size:13px;align-self:flex-start;padding-top:8px">Message</label>
-            <textarea id="dap-out-text" class="form-input" rows="3" maxlength="240" placeholder="Message text"></textarea>
+            <textarea id="dap-out-text" class="form-input" rows="3" maxlength="80" placeholder="Message text"></textarea>
           </div>
           <div class="config-msg" id="dap-send-msg"></div>
         </div>
@@ -4555,6 +4557,24 @@ function dapNum(id,def,min,max){
   return Math.max(min,Math.min(max,n));
 }
 function dapList(id){return dapVal(id).split(/[\s,]+/).map(s=>s.trim()).filter(Boolean);}
+function dapRicRoutesText(routes){
+  return Object.keys(routes||{}).sort().map(k=>`${k}=${routes[k]}`).join('\n');
+}
+function dapRicRoutesBody(){
+  const raw=dapVal('dap-ric-routes');
+  const out={};
+  if(!raw)return out;
+  for(const lineRaw of raw.split(/\n+/)){
+    const line=lineRaw.trim();
+    if(!line||line.startsWith('#'))continue;
+    const m=line.match(/^([0-9A-Fa-fxX]+)\s*=\s*([0-9]+)$/);
+    if(!m){setDapMsg('Invalid RIC route: '+line,false);return null;}
+    const issi=parseInt(m[2],10);
+    if(!Number.isFinite(issi)||issi<1||issi>16777215){setDapMsg('Invalid ISSI in RIC route: '+line,false);return null;}
+    out[m[1]]=issi;
+  }
+  return out;
+}
 function dapPaths(paths){
   const p=paths||[];
   if(!p.length)return '<span class="sds-empty">—</span>';
@@ -4598,6 +4618,7 @@ async function loadDapnet(){
     dapSet('dap-sds-source',d.sds_source_issi||9999);
     dapSet('dap-sds-dest',d.sds_dest_issi||0);
     dapCheck('dap-sds-group',d.sds_dest_is_group);
+    dapSet('dap-ric-routes',dapRicRoutesText(d.ric_issi_routes));
     dapSet('dap-callout-source',d.callout_source_issi||9999);
     dapSet('dap-callout-dest',d.callout_dest_issi||0);
     dapSet('dap-callout-incident',d.callout_incident_base||2);
@@ -4607,6 +4628,8 @@ async function loadDapnet(){
   }catch{setDapMsg(t('conn_error'),false);}
 }
 async function saveDapnet(){
+  const ricRoutes=dapRicRoutesBody();
+  if(ricRoutes===null)return;
   const body={
     enabled:document.getElementById('dap-enabled').checked,
     rwth_core_enabled:document.getElementById('dap-rwth-enabled').checked,
@@ -4625,6 +4648,7 @@ async function saveDapnet(){
     sds_source_issi:dapNum('dap-sds-source',9999,1,16777215),
     sds_dest_issi:dapNum('dap-sds-dest',0,0,16777215),
     sds_dest_is_group:document.getElementById('dap-sds-group').checked,
+    ric_issi_routes:ricRoutes,
     callout_source_issi:dapNum('dap-callout-source',9999,1,16777215),
     callout_dest_issi:dapNum('dap-callout-dest',0,0,16777215),
     callout_incident_base:dapNum('dap-callout-incident',2,1,256),

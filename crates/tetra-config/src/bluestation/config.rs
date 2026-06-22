@@ -337,6 +337,7 @@ impl SharedConfig {
                 sds_source_issi: o.sds_source_issi,
                 sds_dest_issi: o.sds_dest_issi,
                 sds_dest_is_group: o.sds_dest_is_group,
+                ric_issi_routes: o.ric_issi_routes.clone(),
                 callout_source_issi: o.callout_source_issi,
                 callout_dest_issi: o.callout_dest_issi,
                 callout_incident_base: o.callout_incident_base.clamp(1, 256),

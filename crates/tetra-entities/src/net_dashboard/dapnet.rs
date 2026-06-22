@@ -30,6 +30,18 @@ pub fn write_dapnet_to_toml(
     ov: &DapnetRuntimeOverride,
 ) -> std::io::Result<()> {
     let original = std::fs::read_to_string(config_path)?;
+    let ric_routes = ov
+        .ric_issi_routes
+        .iter()
+        .map(|(ric, issi)| {
+            format!(
+                "\"{}\" = {}",
+                tetra_config::bluestation::format_ric_route_key(*ric),
+                issi
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(", ");
     let section = format!(
         "[dapnet]\n\
          enabled = {}\n\
@@ -42,7 +54,8 @@ pub fn write_dapnet_to_toml(
          forward_telegram = {}\n\n\
          sds_source_issi = {}\n\
          sds_dest_issi = {}\n\
-         sds_dest_is_group = {}\n\n\
+         sds_dest_is_group = {}\n\
+         ric_issi_routes = {{{}}}\n\n\
          callout_source_issi = {}\n\
          callout_dest_issi = {}\n\
          callout_incident_base = {}\n\
@@ -67,6 +80,7 @@ pub fn write_dapnet_to_toml(
         ov.sds_source_issi,
         ov.sds_dest_issi,
         ov.sds_dest_is_group,
+        ric_routes,
         ov.callout_source_issi,
         ov.callout_dest_issi,
         ov.callout_incident_base.clamp(1, 256),

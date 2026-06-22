@@ -488,7 +488,7 @@ voice_service = true
 #
 # [dapnet]
 # enabled = false
-# api_url = "https://www.hampager.de/api/messages"
+# api_url = "https://hampager.de/api/calls"
 # username = ""
 # password = ""
 # poll_interval_secs = 30
@@ -500,6 +500,7 @@ voice_service = true
 # sds_source_issi = 9999
 # sds_dest_issi = 0
 # sds_dest_is_group = false
+# ric_issi_routes = { "0632585" = 2632585 }
 #
 # callout_source_issi = 9999
 # callout_dest_issi = 0

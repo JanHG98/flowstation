@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::{Arc, Mutex, RwLock};
@@ -2747,6 +2747,8 @@ fn dapnet_text_acceptable(s: &str) -> bool {
     s.chars().all(|c| !c.is_control())
 }
 
+const DAPNET_API_TEXT_MAX_CHARS: usize = 80;
+
 fn dapnet_as_bool(json: &serde_json::Value, key: &str, default: bool) -> bool {
     json.get(key).and_then(|x| x.as_bool()).unwrap_or(default)
 }
@@ -2783,6 +2785,63 @@ fn dapnet_as_string(json: &serde_json::Value, key: &str, default: &str) -> Strin
         .unwrap_or_else(|| default.to_string())
 }
 
+fn dapnet_ric_routes_as_json(routes: &BTreeMap<u32, u32>) -> serde_json::Value {
+    let mut map = serde_json::Map::new();
+    for (ric, issi) in routes {
+        map.insert(
+            tetra_config::bluestation::format_ric_route_key(*ric),
+            serde_json::json!(issi),
+        );
+    }
+    serde_json::Value::Object(map)
+}
+
+fn dapnet_ric_routes_from_json(
+    json: &serde_json::Value,
+    current: &BTreeMap<u32, u32>,
+) -> Result<BTreeMap<u32, u32>, String> {
+    let Some(value) = json.get("ric_issi_routes") else {
+        return Ok(current.clone());
+    };
+    let mut routes = BTreeMap::new();
+    match value {
+        serde_json::Value::Object(map) => {
+            for (raw_ric, raw_issi) in map {
+                let ric = tetra_config::bluestation::parse_ric_route_key(raw_ric)?;
+                let Some(issi) = raw_issi.as_u64() else {
+                    return Err(format!("RIC route {raw_ric}: ISSI must be a number"));
+                };
+                if issi == 0 || issi > 16_777_215 {
+                    return Err(format!("RIC route {raw_ric}: ISSI out of range"));
+                }
+                routes.insert(ric, issi as u32);
+            }
+        }
+        serde_json::Value::String(text) => {
+            for line in text.lines() {
+                let line = line.trim();
+                if line.is_empty() || line.starts_with('#') {
+                    continue;
+                }
+                let Some((raw_ric, raw_issi)) = line.split_once('=') else {
+                    return Err(format!("RIC route line '{line}' must be RIC=ISSI"));
+                };
+                let ric = tetra_config::bluestation::parse_ric_route_key(raw_ric)?;
+                let issi = raw_issi
+                    .trim()
+                    .parse::<u32>()
+                    .map_err(|_| format!("RIC route line '{line}' has invalid ISSI"))?;
+                if issi == 0 || issi > 16_777_215 {
+                    return Err(format!("RIC route line '{line}' has ISSI out of range"));
+                }
+                routes.insert(ric, issi);
+            }
+        }
+        _ => return Err("ric_issi_routes must be an object or text lines".to_string()),
+    }
+    Ok(routes)
+}
+
 /// GET /api/dapnet — return effective DAPNET settings as JSON. Secrets are masked and are never
 /// echoed in the clear.
 fn serve_dapnet_get(
@@ -2808,6 +2867,7 @@ fn serve_dapnet_get(
         "sds_source_issi": dapnet.sds_source_issi,
         "sds_dest_issi": dapnet.sds_dest_issi,
         "sds_dest_is_group": dapnet.sds_dest_is_group,
+        "ric_issi_routes": dapnet_ric_routes_as_json(&dapnet.ric_issi_routes),
         "callout_source_issi": dapnet.callout_source_issi,
         "callout_dest_issi": dapnet.callout_dest_issi,
         "callout_incident_base": dapnet.callout_incident_base,
@@ -2852,6 +2912,13 @@ fn serve_dapnet_post(
     let cur = cfg.effective_dapnet();
     let password = dapnet_resolve_secret(&json, "password", cur.password.as_ref());
     let rwth_core_authkey = dapnet_resolve_secret(&json, "rwth_core_authkey", cur.rwth_core_authkey.as_ref());
+    let ric_issi_routes = match dapnet_ric_routes_from_json(&json, &cur.ric_issi_routes) {
+        Ok(routes) => routes,
+        Err(err) => {
+            http_response(stream, 400, &format!("Invalid DAPNET RIC route: {err}"));
+            return;
+        }
+    };
 
     let ov = DapnetRuntimeOverride {
         enabled: dapnet_as_bool(&json, "enabled", cur.enabled),
@@ -2865,6 +2932,7 @@ fn serve_dapnet_post(
         sds_source_issi: dapnet_as_u32(&json, "sds_source_issi", cur.sds_source_issi).max(1),
         sds_dest_issi: dapnet_as_u32(&json, "sds_dest_issi", cur.sds_dest_issi),
         sds_dest_is_group: dapnet_as_bool(&json, "sds_dest_is_group", cur.sds_dest_is_group),
+        ric_issi_routes,
         callout_source_issi: dapnet_as_u32(&json, "callout_source_issi", cur.callout_source_issi).max(1),
         callout_dest_issi: dapnet_as_u32(&json, "callout_dest_issi", cur.callout_dest_issi),
         callout_incident_base: dapnet_as_u16(&json, "callout_incident_base", cur.callout_incident_base).clamp(1, 256),
@@ -2940,6 +3008,37 @@ fn dapnet_string_list(json: &serde_json::Value, keys: &[&str]) -> Vec<String> {
     Vec::new()
 }
 
+fn normalize_dapnet_api_url(api_url: &str) -> String {
+    let mut url = api_url.trim().trim_end_matches('/').to_string();
+    if let Some(rest) = url.strip_prefix("https://www.hampager.de") {
+        url = format!("https://hampager.de{rest}");
+    } else if let Some(rest) = url.strip_prefix("http://www.hampager.de") {
+        url = format!("http://hampager.de{rest}");
+    }
+    if let Some(base) = url.strip_suffix("/api/messages") {
+        return format!("{base}/api/calls");
+    }
+    if let Some(base) = url.strip_suffix("/messages")
+        && base.ends_with("/api") {
+            return format!("{base}/calls");
+        }
+    url
+}
+
+fn build_dapnet_call_payload(
+    text: &str,
+    callsigns: Vec<String>,
+    groups: Vec<String>,
+    emergency: bool,
+) -> serde_json::Value {
+    serde_json::json!({
+        "text": text,
+        "callSignNames": callsigns,
+        "transmitterGroupNames": groups,
+        "emergency": emergency,
+    })
+}
+
 fn push_dapnet_log_and_broadcast(
     state: &DashboardState,
     clients: &WsClients,
@@ -3013,7 +3112,11 @@ fn serve_dapnet_send(
         http_json_response(stream, 200, "{\"ok\":false,\"error\":\"Message contains control characters\"}");
         return;
     }
-    let api_url = dapnet.api_url.trim();
+    if text.chars().count() > DAPNET_API_TEXT_MAX_CHARS {
+        http_json_response(stream, 200, "{\"ok\":false,\"error\":\"DAPNET message text exceeds 80 characters\"}");
+        return;
+    }
+    let api_url = normalize_dapnet_api_url(&dapnet.api_url);
     if api_url.is_empty() {
         http_json_response(stream, 200, "{\"ok\":false,\"error\":\"DAPNET api_url is empty\"}");
         return;
@@ -3025,12 +3128,7 @@ fn serve_dapnet_send(
         return;
     }
     let emergency = json.get("emergency").and_then(|v| v.as_bool()).unwrap_or(false);
-    let req_body = serde_json::json!({
-        "text": text.clone(),
-        "callSignNames": callsigns,
-        "transmitterGroupNames": groups,
-        "emergency": emergency,
-    });
+    let req_body = build_dapnet_call_payload(&text, callsigns, groups, emergency);
 
     let client = match reqwest::blocking::Client::builder()
         .timeout(std::time::Duration::from_secs(15))
@@ -3042,7 +3140,7 @@ fn serve_dapnet_send(
             return;
         }
     };
-    let mut request = client.post(api_url).json(&req_body);
+    let mut request = client.post(&api_url).json(&req_body);
     if !dapnet.username.trim().is_empty() {
         request = request.basic_auth(dapnet.username.trim().to_string(), Some(dapnet.password.as_ref().to_string()));
     }
@@ -3738,9 +3836,11 @@ fn serve_login_page(mut stream: TcpStream) {
 #[cfg(test)]
 mod tests {
     use super::{
-        binary_built_from, is_tpg2200_action_request, query_params, truncate_action_text,
+        binary_built_from, build_dapnet_call_payload, dapnet_ric_routes_from_json,
+        is_tpg2200_action_request, normalize_dapnet_api_url, query_params, truncate_action_text,
         DashboardServer,
     };
+    use std::collections::BTreeMap;
     use crate::net_telemetry::TelemetryEvent;
     use crate::tpg2200::{build_tpg2200_callout_payload, parse_hex_payload, tpg2200_incident_byte};
 
@@ -3856,5 +3956,50 @@ mod tests {
 
         assert_eq!(truncate_action_text("ABCDE", 3), ("ABC".to_string(), true));
         assert_eq!(truncate_action_text("ABC", 3), ("ABC".to_string(), false));
+    }
+
+    #[test]
+    fn dapnet_api_url_normalizes_known_hampager_variants() {
+        assert_eq!(
+            normalize_dapnet_api_url("https://www.hampager.de/api/messages"),
+            "https://hampager.de/api/calls"
+        );
+        assert_eq!(
+            normalize_dapnet_api_url("https://www.hampager.de/api/calls/"),
+            "https://hampager.de/api/calls"
+        );
+        assert_eq!(
+            normalize_dapnet_api_url("https://hampager.de/api/calls"),
+            "https://hampager.de/api/calls"
+        );
+    }
+
+    #[test]
+    fn dapnet_call_payload_uses_hampager_call_format() {
+        let payload = build_dapnet_call_payload(
+            "Probe",
+            vec!["DJ2TH".to_string()],
+            vec!["dl-all".to_string()],
+            false,
+        );
+        assert_eq!(payload["text"], "Probe");
+        assert_eq!(payload["callSignNames"][0], "DJ2TH");
+        assert_eq!(payload["transmitterGroupNames"][0], "dl-all");
+        assert_eq!(payload["emergency"], false);
+        assert!(payload.get("data").is_none());
+        assert!(payload.get("recipients").is_none());
+    }
+
+    #[test]
+    fn dapnet_ric_routes_parse_decimal_and_hex_keys() {
+        let json = serde_json::json!({
+            "ric_issi_routes": {
+                "0632585": 2632585,
+                "0x9A70A": 2632586
+            }
+        });
+        let routes = dapnet_ric_routes_from_json(&json, &BTreeMap::new()).unwrap();
+        assert_eq!(routes.get(&632585), Some(&2632585));
+        assert_eq!(routes.get(&632586), Some(&2632586));
     }
 }

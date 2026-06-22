@@ -1,4 +1,5 @@
 use serde::Deserialize;
+use std::collections::{BTreeMap, HashMap};
 
 use crate::bluestation::SecretField;
 
@@ -22,6 +23,11 @@ pub struct CfgDapnet {
     pub sds_source_issi: u32,
     pub sds_dest_issi: u32,
     pub sds_dest_is_group: bool,
+    /// Optional incoming DAPNET RIC/CAP-code to TETRA ISSI routes.
+    ///
+    /// Config keys may use decimal RICs with leading zeros (e.g. "0632585") or hex with a
+    /// `0x` prefix. Internally the key is normalized to the numeric RIC received from the core.
+    pub ric_issi_routes: BTreeMap<u32, u32>,
 
     pub callout_source_issi: u32,
     pub callout_dest_issi: u32,
@@ -44,7 +50,7 @@ impl Default for CfgDapnet {
     fn default() -> Self {
         CfgDapnet {
             enabled: false,
-            api_url: "https://www.hampager.de/api/messages".to_string(),
+            api_url: default_api_url(),
             username: String::new(),
             password: SecretField::from(String::new()),
             poll_interval_secs: 30,
@@ -56,6 +62,7 @@ impl Default for CfgDapnet {
             sds_source_issi: 9999,
             sds_dest_issi: 0,
             sds_dest_is_group: false,
+            ric_issi_routes: BTreeMap::new(),
 
             callout_source_issi: 9999,
             callout_dest_issi: 0,
@@ -112,6 +119,8 @@ pub struct CfgDapnetDto {
     pub sds_dest_issi: u32,
     #[serde(default)]
     pub sds_dest_is_group: bool,
+    #[serde(default)]
+    pub ric_issi_routes: HashMap<String, u32>,
 
     #[serde(default = "default_source_issi")]
     pub callout_source_issi: u32,
@@ -160,6 +169,7 @@ impl Default for CfgDapnetDto {
             sds_source_issi: default_source_issi(),
             sds_dest_issi: 0,
             sds_dest_is_group: false,
+            ric_issi_routes: HashMap::new(),
             callout_source_issi: default_source_issi(),
             callout_dest_issi: 0,
             callout_incident_base: default_callout_incident_base(),
@@ -183,7 +193,7 @@ fn default_true() -> bool {
 }
 
 fn default_api_url() -> String {
-    "https://www.hampager.de/api/messages".to_string()
+    "https://hampager.de/api/calls".to_string()
 }
 
 fn default_poll_interval_secs() -> u64 {
@@ -222,8 +232,8 @@ fn default_rwth_messages_limit() -> usize {
     100
 }
 
-pub fn apply_dapnet_patch(dto: CfgDapnetDto) -> CfgDapnet {
-    CfgDapnet {
+pub fn apply_dapnet_patch(dto: CfgDapnetDto) -> Result<CfgDapnet, String> {
+    Ok(CfgDapnet {
         enabled: dto.enabled,
         api_url: dto.api_url,
         username: dto.username,
@@ -235,6 +245,7 @@ pub fn apply_dapnet_patch(dto: CfgDapnetDto) -> CfgDapnet {
         sds_source_issi: dto.sds_source_issi,
         sds_dest_issi: dto.sds_dest_issi,
         sds_dest_is_group: dto.sds_dest_is_group,
+        ric_issi_routes: normalize_ric_issi_routes(dto.ric_issi_routes)?,
         callout_source_issi: dto.callout_source_issi,
         callout_dest_issi: dto.callout_dest_issi,
         callout_incident_base: dto.callout_incident_base.clamp(1, 256),
@@ -248,5 +259,43 @@ pub fn apply_dapnet_patch(dto: CfgDapnetDto) -> CfgDapnet {
         rwth_core_callsign: dto.rwth_core_callsign,
         rwth_core_authkey: SecretField::from(dto.rwth_core_authkey),
         rwth_messages_limit: dto.rwth_messages_limit.max(1),
+    })
+}
+
+pub fn parse_ric_route_key(raw: &str) -> Result<u32, String> {
+    let key = raw.trim();
+    if key.is_empty() {
+        return Err("empty RIC route key".to_string());
     }
+    if let Some(hex) = key.strip_prefix("0x").or_else(|| key.strip_prefix("0X")) {
+        return u32::from_str_radix(hex, 16)
+            .map_err(|_| format!("invalid hex RIC route key '{raw}'"));
+    }
+    if key.chars().all(|c| c.is_ascii_digit()) {
+        return key
+            .parse::<u32>()
+            .map_err(|_| format!("invalid decimal RIC route key '{raw}'"));
+    }
+    Err(format!("invalid RIC route key '{raw}'"))
+}
+
+pub fn format_ric_route_key(ric: u32) -> String {
+    format!("{ric:07}")
+}
+
+fn normalize_ric_issi_routes(routes: HashMap<String, u32>) -> Result<BTreeMap<u32, u32>, String> {
+    let mut out = BTreeMap::new();
+    for (raw_ric, issi) in routes {
+        let ric = parse_ric_route_key(&raw_ric)?;
+        if issi == 0 {
+            return Err(format!("dapnet.ric_issi_routes: ISSI for RIC {raw_ric} cannot be 0"));
+        }
+        if issi > 16_777_215 {
+            return Err(format!(
+                "dapnet.ric_issi_routes: ISSI for RIC {raw_ric} exceeds 16777215"
+            ));
+        }
+        out.insert(ric, issi);
+    }
+    Ok(out)
 }

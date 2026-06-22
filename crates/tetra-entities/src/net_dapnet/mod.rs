@@ -191,7 +191,7 @@ impl DapnetWorker {
     fn write_login(&self, stream: &mut TcpStream, dapnet: &CfgDapnet) -> Result<(), String> {
         let device = non_empty_or(&dapnet.rwth_core_device, "FlowStation");
         let version = dapnet_version(&dapnet.rwth_core_version);
-        let callsign = dapnet.rwth_core_callsign.trim().to_ascii_lowercase();
+        let callsign = dapnet.rwth_core_callsign.trim();
         let authkey = dapnet.rwth_core_authkey.as_ref().trim();
         let login = format!("[{} {} {} {}]\r\n", device, version, callsign, authkey);
         write_wire(stream, &login)
@@ -225,6 +225,7 @@ impl DapnetWorker {
         }
         if let Some(schedule) = line.strip_prefix("4:") {
             tracing::info!("DAPNET: RWTH core schedule received ({})", schedule);
+            write_wire(stream, "+\r\n")?;
             return Ok(());
         }
         if line.starts_with('7') {
@@ -253,10 +254,9 @@ impl DapnetWorker {
                 return Ok(());
             }
         };
-        let ack_id = msg_id.wrapping_add(1);
         match parse_rwth_message(line) {
             Ok(message) => {
-                write_wire(stream, &format!("#{ack_id:02X} +\r\n"))?;
+                write_wire(stream, &rwth_ack_line(msg_id, true))?;
                 if message.msg_type != 6 {
                     tracing::debug!(
                         "DAPNET: ignoring non-text RWTH core message id={} type={}",
@@ -274,7 +274,7 @@ impl DapnetWorker {
             }
             Err(err) => {
                 tracing::warn!("DAPNET: malformed RWTH core message: {}", err);
-                write_wire(stream, &format!("#{ack_id:02X} -\r\n"))
+                write_wire(stream, &rwth_ack_line(msg_id, false))
             }
         }
     }
@@ -343,19 +343,24 @@ impl DapnetWorker {
     }
 
     fn forward_sds(&self, dapnet: &CfgDapnet, msg: &DapnetMessage) -> Result<(), String> {
-        if dapnet.sds_dest_issi == 0 {
-            return Err("sds_dest_issi is 0".to_string());
-        }
+        let (dest_ssi, dest_is_group, route_label) = resolve_sds_destination(dapnet, msg)?;
         let Some(tx) = &self.cmce_cmd_tx else {
             return Err("CMCE control sender unavailable".to_string());
         };
         let text = format_plain_message(&msg.callsign, &msg.text);
         let (len_bits, payload) = build_sds_text_payload(&text);
+        tracing::debug!(
+            "DAPNET: SDS route id={} {} dest={} group={}",
+            msg.id,
+            route_label,
+            dest_ssi,
+            dest_is_group
+        );
         tx.send(ControlCommand::SendSds {
             handle: 0,
             source_ssi: dapnet.sds_source_issi,
-            dest_ssi: dapnet.sds_dest_issi,
-            dest_is_group: dapnet.sds_dest_is_group,
+            dest_ssi,
+            dest_is_group,
             len_bits,
             payload,
         })
@@ -444,6 +449,45 @@ fn rwth_line_id(line: &str) -> Option<u8> {
     u8::from_str_radix(id, 16).ok()
 }
 
+fn rwth_ack_line(msg_id: u8, ok: bool) -> String {
+    let ack_id = msg_id.wrapping_add(1);
+    let status = if ok { "+" } else { "-" };
+    format!("#{ack_id:02x} {status}\r\n")
+}
+
+fn resolve_sds_destination(
+    dapnet: &CfgDapnet,
+    msg: &DapnetMessage,
+) -> Result<(u32, bool, String), String> {
+    if let Some(ric) = msg.ric {
+        if let Some(issi) = dapnet.ric_issi_routes.get(&ric) {
+            return Ok((
+                *issi,
+                false,
+                format!(
+                    "ric:{}",
+                    tetra_config::bluestation::format_ric_route_key(ric)
+                ),
+            ));
+        }
+    }
+    if dapnet.sds_dest_issi != 0 {
+        return Ok((
+            dapnet.sds_dest_issi,
+            dapnet.sds_dest_is_group,
+            "default".to_string(),
+        ));
+    }
+    if let Some(ric) = msg.ric {
+        Err(format!(
+            "no ISSI route for RIC {} and sds_dest_issi is 0",
+            tetra_config::bluestation::format_ric_route_key(ric)
+        ))
+    } else {
+        Err("message has no RIC and sds_dest_issi is 0".to_string())
+    }
+}
+
 fn parse_rwth_message(line: &str) -> Result<DapnetMessage, String> {
     let msg_id = rwth_line_id(line).ok_or_else(|| "invalid message id".to_string())?;
     let body = line
@@ -464,8 +508,16 @@ fn parse_rwth_message(line: &str) -> Result<DapnetMessage, String> {
         return Err("empty message text".to_string());
     }
     let recipient = match (ric, function) {
-        (Some(ric), Some(function)) => format!("RIC {ric} / func {function}"),
-        (Some(ric), None) => format!("RIC {ric}"),
+        (Some(ric), Some(function)) => {
+            format!(
+                "RIC {} / func {}",
+                tetra_config::bluestation::format_ric_route_key(ric),
+                function
+            )
+        }
+        (Some(ric), None) => {
+            format!("RIC {}", tetra_config::bluestation::format_ric_route_key(ric))
+        }
         _ => parts[2].to_string(),
     };
     let callsign = extract_callsign(&text).unwrap_or_else(|| recipient.clone());
@@ -552,8 +604,9 @@ fn sanitize_log_line(line: &str) -> String {
 mod tests {
     use super::{
         dapnet_version, extract_callsign, format_plain_message, parse_rwth_message, prefixed_text,
-        truncate_chars,
+        resolve_sds_destination, rwth_ack_line, truncate_chars,
     };
+    use tetra_config::bluestation::CfgDapnet;
 
     #[test]
     fn parse_rwth_text_message_normalizes_fields() {
@@ -563,7 +616,7 @@ mod tests {
         assert_eq!(msg.ric, Some(0x3EC));
         assert_eq!(msg.function, Some(3));
         assert_eq!(msg.callsign, "EA5FIV");
-        assert_eq!(msg.recipient, "RIC 1004 / func 3");
+        assert_eq!(msg.recipient, "RIC 0001004 / func 3");
         assert!(msg.id.starts_with("rwth:00:"));
     }
 
@@ -581,5 +634,27 @@ mod tests {
         assert_eq!(format_plain_message("DL1ABC", "Hallo"), "DL1ABC - Hallo");
         assert_eq!(prefixed_text("DAPNET", "Alarm"), "DAPNET Alarm");
         assert_eq!(truncate_chars("äöü", 2), ("äö".to_string(), true));
+    }
+
+    #[test]
+    fn rwth_ack_line_increments_8bit_counter_and_uses_wire_format() {
+        assert_eq!(rwth_ack_line(0x00, true), "#01 +\r\n");
+        assert_eq!(rwth_ack_line(0x09, true), "#0a +\r\n");
+        assert_eq!(rwth_ack_line(0xff, true), "#00 +\r\n");
+        assert_eq!(rwth_ack_line(0x09, false), "#0a -\r\n");
+    }
+
+    #[test]
+    fn sds_destination_prefers_ric_route_over_static_destination() {
+        let msg = parse_rwth_message("#00 6:1:9A709:3:Alarm DJ2TH").unwrap();
+        let mut dapnet = CfgDapnet::default();
+        dapnet.sds_dest_issi = 9999999;
+        dapnet.sds_dest_is_group = true;
+        dapnet.ric_issi_routes.insert(632585, 2632585);
+
+        let (dest, is_group, route) = resolve_sds_destination(&dapnet, &msg).unwrap();
+        assert_eq!(dest, 2632585);
+        assert!(!is_group);
+        assert_eq!(route, "ric:0632585");
     }
 }
