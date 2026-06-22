@@ -38,6 +38,8 @@ const ECHOLINK_RTP_HEADER: usize = 12;
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
 const KEEPALIVE_INTERVAL: Duration = Duration::from_secs(10);
 const DIRECTORY_TIMEOUT: Duration = Duration::from_secs(3);
+const DIRECTORY_REFRESH_INTERVAL: Duration = Duration::from_secs(5 * 60);
+const DIRECTORY_DESCRIPTION_MAX_CHARS: usize = 27;
 
 #[derive(Debug, Clone)]
 pub enum EcholinkCommand {
@@ -93,6 +95,7 @@ pub struct EcholinkEntity {
     dialog_by_ts: std::collections::HashMap<u8, usize>,
     last_enabled: Option<bool>,
     last_directory_status: String,
+    next_directory_refresh: Option<Instant>,
     last_rx: Option<String>,
     last_tx: Option<String>,
     last_error: Option<String>,
@@ -109,6 +112,7 @@ impl EcholinkEntity {
             dialog_by_ts: std::collections::HashMap::new(),
             last_enabled: None,
             last_directory_status: "disabled".to_string(),
+            next_directory_refresh: None,
             last_rx: None,
             last_tx: None,
             last_error: None,
@@ -819,6 +823,7 @@ impl EcholinkEntity {
             return Ok(ip);
         }
         self.directory_make_online(cfg)?;
+        self.next_directory_refresh = Some(Instant::now() + DIRECTORY_REFRESH_INTERVAL);
         let stations = self.directory_get_calls(cfg)?;
         let target_upper = normalize_echolink_target(target);
         let station = if let Ok(node_id) = target_upper.parse::<u32>() {
@@ -836,6 +841,7 @@ impl EcholinkEntity {
     fn directory_make_online(&mut self, cfg: &CfgEcholink) -> Result<(), String> {
         let mut stream = self.directory_connect(cfg)?;
         let time = chrono::Local::now().format("%H:%M").to_string();
+        let description = directory_description(&cfg.status_text);
         let mut cmd = Vec::new();
         cmd.push(b'l');
         cmd.extend_from_slice(cfg.callsign.as_bytes());
@@ -844,7 +850,7 @@ impl EcholinkEntity {
         cmd.extend_from_slice(b"\rONLINE3.38(");
         cmd.extend_from_slice(time.as_bytes());
         cmd.extend_from_slice(b")\r");
-        cmd.extend_from_slice(cfg.status_text.as_bytes());
+        cmd.extend_from_slice(description.as_bytes());
         cmd.extend_from_slice(b"\r");
         stream
             .write_all(&cmd)
@@ -859,6 +865,32 @@ impl EcholinkEntity {
             Ok(())
         } else {
             Err(format!("directory ONLINE rejected: {}", reply.trim()))
+        }
+    }
+
+    fn maybe_refresh_directory_registration(&mut self, cfg: &CfgEcholink) {
+        let now = Instant::now();
+        if self
+            .next_directory_refresh
+            .map(|next| now < next)
+            .unwrap_or(false)
+        {
+            return;
+        }
+
+        match self.directory_make_online(cfg) {
+            Ok(()) => {
+                self.next_directory_refresh = Some(now + DIRECTORY_REFRESH_INTERVAL);
+                self.last_error = None;
+                self.last_tx = Some(format!("directory ONLINE refreshed for {}", cfg.callsign));
+                tracing::info!("EchoLink: directory ONLINE refreshed for {}", cfg.callsign);
+            }
+            Err(err) => {
+                self.last_directory_status = "directory error".to_string();
+                self.next_directory_refresh =
+                    Some(now + Duration::from_secs(cfg.reconnect_interval_secs));
+                self.set_error(err);
+            }
         }
     }
 
@@ -981,6 +1013,7 @@ impl TetraEntityTrait for EcholinkEntity {
             self.disconnect_all(queue, false);
             self.release_ports();
             self.last_directory_status = "disabled".to_string();
+            self.next_directory_refresh = None;
             self.refresh_status();
             return;
         }
@@ -995,6 +1028,7 @@ impl TetraEntityTrait for EcholinkEntity {
                 cfg.control_port
             );
             self.last_enabled = Some(true);
+            self.next_directory_refresh = None;
         }
 
         match self.ensure_ports(&cfg) {
@@ -1002,6 +1036,7 @@ impl TetraEntityTrait for EcholinkEntity {
                 if self.last_directory_status == "disabled" {
                     self.last_directory_status = "ports ready".to_string();
                 }
+                self.maybe_refresh_directory_registration(&cfg);
                 self.handle_dashboard_commands(queue, &cfg);
                 self.poll_control(queue, &cfg);
                 self.poll_audio(queue);
@@ -1042,6 +1077,15 @@ fn route_label(cfg: &CfgEcholink) -> Option<String> {
         cfg.default_tetra_dest_issi,
         cfg.default_tetra_source_issi
     ))
+}
+
+fn directory_description(status_text: &str) -> String {
+    status_text
+        .trim()
+        .chars()
+        .map(|ch| if ch == '\r' || ch == '\n' { ' ' } else { ch })
+        .take(DIRECTORY_DESCRIPTION_MAX_CHARS)
+        .collect()
 }
 
 fn build_audio_packet(seq: u16, payload: &[u8]) -> Vec<u8> {
