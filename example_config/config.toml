@@ -606,3 +606,33 @@ voice_service = true
 # (only local_ssi_ranges rejects inbound). If left commented, all calls outside
 # local_ssi_ranges are forwarded to Brew.
 # whitelisted_ssis = [91]
+
+###############################################################################
+
+# OPTIONAL: Asterisk SIP/RTP bridge — parallel to Brew, not a replacement.
+# Only destinations listed in service_numbers are routed to Asterisk; everything else
+# stays on the normal local/Brew path.
+#
+# Example: a TETRA dial string 91600 with outbound_prefix="91" and strip=true becomes
+# SIP user 600, but only because "600" is listed below.
+
+# [asterisk]
+# enabled = true
+# outbound_prefix = "91"
+# strip_outbound_prefix = true
+# inbound_prefix = "T"
+# register = true
+# codec = "PCMU"
+# service_numbers = ["600", "601"]
+# rtp_port_min = 30000
+# rtp_port_max = 30100
+# bind_addr = "0.0.0.0"
+# bind_port = 5062
+# remote_host = "127.0.0.1"
+# remote_port = 5060
+# contact_host = "127.0.0.1"
+# from_domain = "127.0.0.1"
+# local_user = "flowstation"
+# auth_user = "flowstation"
+# password = ""
+# realm = "asterisk"

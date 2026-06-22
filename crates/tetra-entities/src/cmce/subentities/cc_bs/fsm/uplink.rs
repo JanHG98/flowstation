@@ -46,7 +46,7 @@ impl CcBsSubentity {
         if let Some(call) = self.individual_calls.get(&call_id).cloned() {
             // For simplex PTT individual calls: MS released PTT.
             // Send D-TX-CEASED to the sender (confirms floor released),
-            // then grant floor to the peer via D-TX-GRANTED so they can speak immediately.
+            // then grant floor to a local peer via D-TX-GRANTED so they can speak immediately.
             // Radios with GrantedToOtherUser in D-CONNECT need an explicit D-TX-GRANTED
             // to enable their PTT button — D-TX-CEASED alone is not sufficient.
             if !call.is_active() {
@@ -58,11 +58,21 @@ impl CcBsSubentity {
             } else {
                 (call.called_ts, call.called_usage, call.calling_addr, call.calling_ts, call.calling_usage)
             };
-            tracing::info!("U-TX CEASED (individual) call_id={} from ISSI {} -> sending D-TX-CEASED to sender, D-TX-GRANTED to peer ISSI {}", call_id, sender.ssi, peer_addr.ssi);
+            let peer_is_network = call.is_network_party(peer_addr);
+            if peer_is_network {
+                tracing::info!(
+                    "U-TX CEASED (individual) call_id={} from ISSI {} -> sending D-TX-CEASED to sender, peer is network side",
+                    call_id,
+                    sender.ssi
+                );
+            } else {
+                tracing::info!("U-TX CEASED (individual) call_id={} from ISSI {} -> sending D-TX-CEASED to sender, D-TX-GRANTED to peer ISSI {}", call_id, sender.ssi, peer_addr.ssi);
+            }
 
-            // Update floor_holder: after TX-CEASED the peer gets the floor.
+            // Update floor_holder: after TX-CEASED a local peer gets the floor. Network peers
+            // are handled by the RTP bridge, not by TETRA FACCH peer signalling.
             if let Some(c) = self.individual_calls.get_mut(&call_id) {
-                c.floor_holder = Some(peer_addr.ssi);
+                c.floor_holder = if peer_is_network { None } else { Some(peer_addr.ssi) };
             }
 
             // 1) D-TX-CEASED to sender so it knows floor was released and resets PTT state.
@@ -81,6 +91,10 @@ impl CcBsSubentity {
             // Former speaker becomes listener: DL-only so they receive the peer's audio.
             let ceased_msg = Self::build_sapmsg_stealing_ul_dl(ceased_sdu, sender, sender_ts, Some(sender_usage), UlDlAssignment::Dl);
             queue.push_back(ceased_msg);
+
+            if peer_is_network {
+                return;
+            }
 
             // 2) D-TX-GRANTED(Granted) to peer so it immediately gets the floor and can press PTT.
             // Without this explicit grant, radios that received GrantedToOtherUser in D-CONNECT
@@ -226,7 +240,16 @@ impl CcBsSubentity {
             } else {
                 (call.calling_addr, call.calling_ts, call.calling_usage)
             };
-            tracing::info!("U-TX DEMAND (individual) call_id={} from ISSI {} -> granting floor, notifying peer ISSI {}", call_id, requesting_party.ssi, peer_addr.ssi);
+            let peer_is_network = call.is_network_party(peer_addr);
+            if peer_is_network {
+                tracing::info!(
+                    "U-TX DEMAND (individual) call_id={} from ISSI {} -> granting floor, peer is network side",
+                    call_id,
+                    requesting_party.ssi
+                );
+            } else {
+                tracing::info!("U-TX DEMAND (individual) call_id={} from ISSI {} -> granting floor, notifying peer ISSI {}", call_id, requesting_party.ssi, peer_addr.ssi);
+            }
 
             // Update floor_holder so UL inactivity timeout knows who owns the floor.
             if let Some(c) = self.individual_calls.get_mut(&call_id) {
@@ -259,6 +282,10 @@ impl CcBsSubentity {
             // Requester now owns the floor: give UL-only assignment so they transmit.
             let dtg_req_msg = Self::build_sapmsg_stealing_ul_dl(dtg_req_sdu, requesting_party, req_ts, Some(req_usage), UlDlAssignment::Ul);
             queue.push_back(dtg_req_msg);
+
+            if peer_is_network {
+                return;
+            }
 
             // D-TX-GRANTED to peer (GrantedToOtherUser) — they must listen.
             // ETSI 14.8.43: permission=false means "allowed to request transmission".
@@ -319,12 +346,12 @@ impl CcBsSubentity {
         };
 
         if !call.called_over_brew && !call.calling_over_brew {
-            tracing::trace!("U-INFO call_id={} is local individual call, no Brew forwarding", call_id);
+            tracing::trace!("U-INFO call_id={} is local individual call, no network forwarding", call_id);
             return;
         }
 
         let Some(brew_uuid) = call.brew_uuid else {
-            tracing::warn!("U-INFO call_id={} marked Brew-routed but missing brew_uuid", call_id);
+            tracing::warn!("U-INFO call_id={} marked network-routed but missing brew_uuid", call_id);
             return;
         };
 
@@ -394,7 +421,8 @@ impl CcBsSubentity {
         }
 
         tracing::info!(
-            "U-INFO (individual Brew) call_id={} uuid={} dtmf_kind={:?} digits='{}' dtmf_bits={} dtmf_bytes={}",
+            "U-INFO (individual {:?}) call_id={} uuid={} dtmf_kind={:?} digits='{}' dtmf_bits={} dtmf_bytes={}",
+            call.network_entity(),
             call_id,
             brew_uuid,
             decoded.kind,
@@ -409,7 +437,7 @@ impl CcBsSubentity {
             queue.push_back(SapMsg {
                 sap: Sap::Control,
                 src: TetraEntity::Cmce,
-                dest: TetraEntity::Brew,
+                dest: call.network_entity(),
                 msg: SapMsgInner::CmceCallControl(CallControl::NetworkCircuitDtmf {
                     brew_uuid,
                     length_bits: 8,

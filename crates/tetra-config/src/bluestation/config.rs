@@ -2,7 +2,10 @@ use serde::Deserialize;
 use std::sync::{Arc, RwLock};
 use tetra_core::freqs::FreqInfo;
 
-use crate::bluestation::{CfgCellInfo, CfgControl, CfgEmergency, CfgHealth, CfgNetInfo, CfgPhyIo, CfgRecovery, CfgSecurity, CfgWxService, PhyBackend, StackState};
+use crate::bluestation::{
+    CfgAsterisk, CfgCellInfo, CfgControl, CfgEmergency, CfgHealth, CfgNetInfo, CfgPhyIo, CfgRecovery, CfgSecurity, CfgWxService, PhyBackend,
+    StackState,
+};
 
 use super::sec_dashboard::CfgDashboard;
 use super::sec_brew::CfgBrew;
@@ -71,6 +74,9 @@ pub struct StackConfig {
 
     /// Brew protocol (TetraPack/BrandMeister) configuration
     pub brew: Option<CfgBrew>,
+
+    /// Asterisk SIP/RTP bridge configuration.
+    pub asterisk: CfgAsterisk,
 
     /// Dashboard HTTP server configuration (None = disabled)
     pub dashboard: Option<CfgDashboard>,

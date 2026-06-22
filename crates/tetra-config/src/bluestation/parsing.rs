@@ -6,10 +6,13 @@ use std::path::Path;
 use serde::Deserialize;
 use toml::Value;
 
-use crate::bluestation::{CellInfoDto, CfgControlDto, NetInfoDto, apply_control_patch, cell_dto_to_cfg, net_dto_to_cfg};
+use crate::bluestation::{
+    CellInfoDto, CfgControlDto, NetInfoDto, apply_control_patch, cell_dto_to_cfg, net_dto_to_cfg,
+};
 use crate::bluestation::sec_cell::{CfgNeighborCellCa, SdsCommandControlDto};
 
 use super::config::{StackConfig, StackMode};
+use super::sec_asterisk::{CfgAsteriskDto, apply_asterisk_patch};
 use super::sec_brew::{CfgBrewDto, apply_brew_patch};
 use super::sec_dashboard::{CfgDashboardDto, apply_dashboard_patch};
 use super::sec_security::{CfgSecurityDto, apply_security_patch};
@@ -114,6 +117,12 @@ pub fn from_toml_str(toml_str: &str) -> Result<StackConfig, Box<dyn std::error::
             return Err(format!("Unrecognized fields in brew config: {:?}", sorted_keys(&brew.extra)).into());
         }
 
+    // Optional asterisk section
+    if let Some(ref asterisk) = root.asterisk
+        && !asterisk.extra.is_empty() {
+            return Err(format!("Unrecognized fields in asterisk config: {:?}", sorted_keys(&asterisk.extra)).into());
+        }
+
     // Optional telemetry section
     if let Some(ref telemetry) = root.telemetry
         && !telemetry.extra.is_empty() {
@@ -173,6 +182,7 @@ pub fn from_toml_str(toml_str: &str) -> Result<StackConfig, Box<dyn std::error::
         net: net_dto_to_cfg(root.net_info),
         cell: cell_cfg,
         brew: None,
+        asterisk: apply_asterisk_patch(root.asterisk.unwrap_or_default())?,
         dashboard: None,
         telemetry: None,
         control: None,
@@ -244,6 +254,7 @@ struct TomlConfigRoot {
     cell_info: CellInfoDto,
 
     brew: Option<CfgBrewDto>,
+    asterisk: Option<CfgAsteriskDto>,
     dashboard: Option<CfgDashboardDto>,
     telemetry: Option<CfgTelemetryDto>,
     command: Option<CfgControlDto>,
@@ -351,6 +362,27 @@ ca_cert = "/tmp/ca.der"
 username = "station"
 password = "x"
 
+[asterisk]
+enabled = true
+outbound_prefix = "91"
+strip_outbound_prefix = true
+inbound_prefix = "T"
+register = true
+codec = "PCMU"
+service_numbers = ["600", "601"]
+rtp_port_min = 30000
+rtp_port_max = 30100
+bind_addr = "0.0.0.0"
+bind_port = 5062
+remote_host = "127.0.0.1"
+remote_port = 5060
+contact_host = "127.0.0.1"
+from_domain = "127.0.0.1"
+local_user = "flowstation"
+auth_user = "flowstation"
+password = ""
+realm = "asterisk"
+
 [recovery]
 enabled = true
 issi_allowlist = []
@@ -378,6 +410,8 @@ sds_queue_critical = 128
         assert_eq!(cfg.recovery.max_replay_attempts, 150);
         assert!(cfg.health.enabled);
         assert_eq!(cfg.health.core_stall_secs, 10);
+        assert!(cfg.asterisk.enabled);
+        assert_eq!(cfg.asterisk.service_numbers, vec!["600".to_string(), "601".to_string()]);
     }
 
     fn minimal_toml(extra_cell: &str) -> String {

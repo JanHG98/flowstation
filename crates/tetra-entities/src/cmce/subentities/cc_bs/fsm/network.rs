@@ -5,13 +5,15 @@ impl CcBsSubentity {
     pub(in crate::cmce::subentities::cc_bs) fn fsm_on_network_circuit_setup_request(
         &mut self,
         queue: &mut MessageQueue,
+        network_entity: TetraEntity,
         brew_uuid: uuid::Uuid,
         call: NetworkCircuitCall,
     ) {
         let called_addr = TetraAddress::new(call.destination, SsiType::Issi);
         if call.destination == 0 {
             tracing::info!(
-                "CMCE: rejecting Brew setup request uuid={} src={} dst=0 number='{}' (missing called ISSI)",
+                "CMCE: rejecting {:?} setup request uuid={} src={} dst=0 number='{}' (missing called ISSI)",
+                network_entity,
                 brew_uuid,
                 call.source_issi,
                 call.number
@@ -19,7 +21,7 @@ impl CcBsSubentity {
             queue.push_back(SapMsg {
                 sap: Sap::Control,
                 src: TetraEntity::Cmce,
-                dest: TetraEntity::Brew,
+                dest: network_entity,
                 msg: SapMsgInner::CmceCallControl(CallControl::NetworkCircuitSetupReject {
                     brew_uuid,
                     cause: DisconnectCause::CalledPartyNotReachable.into_raw() as u8,
@@ -30,7 +32,8 @@ impl CcBsSubentity {
 
         if !self.subscriber_groups.contains_key(&called_addr.ssi) {
             tracing::info!(
-                "CMCE: rejecting Brew setup request uuid={} src={} dst={} number='{}' (called ISSI not registered locally)",
+                "CMCE: rejecting {:?} setup request uuid={} src={} dst={} number='{}' (called ISSI not registered locally)",
+                network_entity,
                 brew_uuid,
                 call.source_issi,
                 call.destination,
@@ -39,7 +42,7 @@ impl CcBsSubentity {
             queue.push_back(SapMsg {
                 sap: Sap::Control,
                 src: TetraEntity::Cmce,
-                dest: TetraEntity::Brew,
+                dest: network_entity,
                 msg: SapMsgInner::CmceCallControl(CallControl::NetworkCircuitSetupReject {
                     brew_uuid,
                     cause: DisconnectCause::CalledPartyNotReachable.into_raw() as u8,
@@ -50,7 +53,8 @@ impl CcBsSubentity {
 
         if let Some((active_call_id, state)) = self.find_individual_call_by_issi(called_addr.ssi) {
             tracing::info!(
-                "CMCE: rejecting Brew setup request uuid={} src={} dst={} number='{}' (called ISSI busy in call_id={} state={:?})",
+                "CMCE: rejecting {:?} setup request uuid={} src={} dst={} number='{}' (called ISSI busy in call_id={} state={:?})",
+                network_entity,
                 brew_uuid,
                 call.source_issi,
                 call.destination,
@@ -61,7 +65,7 @@ impl CcBsSubentity {
             queue.push_back(SapMsg {
                 sap: Sap::Control,
                 src: TetraEntity::Cmce,
-                dest: TetraEntity::Brew,
+                dest: network_entity,
                 msg: SapMsgInner::CmceCallControl(CallControl::NetworkCircuitSetupReject {
                     brew_uuid,
                     cause: DisconnectCause::CalledPartyBusy.into_raw() as u8,
@@ -71,7 +75,19 @@ impl CcBsSubentity {
         }
 
         let communication = CommunicationType::try_from(call.communication as u64).unwrap_or(CommunicationType::P2p);
-        let simplex_duplex = call.duplex != 0;
+        let network_requested_duplex = call.duplex != 0;
+        let ms_duplex_capable = self.config.state_read().subscribers.duplex_capable(called_addr.ssi);
+        let simplex_duplex = network_requested_duplex && ms_duplex_capable.unwrap_or(false);
+        if network_requested_duplex && ms_duplex_capable != Some(true) {
+            tracing::info!(
+                "CMCE: downgrading inbound {:?} setup uuid={} dst={} to simplex (ms_duplex_capable={:?}, number='{}')",
+                network_entity,
+                brew_uuid,
+                call.destination,
+                ms_duplex_capable,
+                call.number
+            );
+        }
 
         let circuit_called = {
             let mut state = self.config.state_write();
@@ -82,7 +98,8 @@ impl CcBsSubentity {
                 Ok(circuit) => circuit.clone(),
                 Err(e) => {
                     tracing::info!(
-                        "CMCE: rejecting Brew setup request uuid={} src={} dst={} (allocation failed: {:?})",
+                        "CMCE: rejecting {:?} setup request uuid={} src={} dst={} (allocation failed: {:?})",
+                        network_entity,
                         brew_uuid,
                         call.source_issi,
                         call.destination,
@@ -91,7 +108,7 @@ impl CcBsSubentity {
                     queue.push_back(SapMsg {
                         sap: Sap::Control,
                         src: TetraEntity::Cmce,
-                        dest: TetraEntity::Brew,
+                        dest: network_entity,
                         msg: SapMsgInner::CmceCallControl(CallControl::NetworkCircuitSetupReject {
                             brew_uuid,
                             cause: DisconnectCause::CongestionInInfrastructure.into_raw() as u8,
@@ -107,10 +124,16 @@ impl CcBsSubentity {
         let usage = circuit_called.usage;
         let call_timeout = CallTimeout::try_from(call.timeout as u64).unwrap_or(CallTimeout::T5m);
         let circuit_mode = CircuitModeType::try_from(call.mode as u64).unwrap_or(CircuitModeType::TchS);
-        let external_subscriber_number = Self::encode_external_subscriber_number(&call.number);
+        let external_number = if call.number.trim().is_empty() && call.source_issi != 0 {
+            call.source_issi.to_string()
+        } else {
+            call.number.clone()
+        };
+        let external_subscriber_number = Self::encode_external_subscriber_number(&external_number);
 
         tracing::info!(
-            "CMCE: accepting Brew setup request uuid={} call_id={} src={} dst={} ts={} duplex={} number='{}'",
+            "CMCE: accepting {:?} setup request uuid={} call_id={} src={} dst={} ts={} duplex={} number='{}'",
+            network_entity,
             brew_uuid,
             call_id,
             call.source_issi,
@@ -124,7 +147,7 @@ impl CcBsSubentity {
         queue.push_back(SapMsg {
             sap: Sap::Control,
             src: TetraEntity::Cmce,
-            dest: TetraEntity::Brew,
+            dest: network_entity,
             msg: SapMsgInner::CmceCallControl(CallControl::NetworkCircuitSetupAccept { brew_uuid }),
         });
 
@@ -145,7 +168,7 @@ impl CcBsSubentity {
             call_priority: call.priority,
             notification_indicator: None,
             temporary_address: None,
-            calling_party_address_ssi: Some(call.source_issi),
+            calling_party_address_ssi: None,
             calling_party_extension: None,
             external_subscriber_number,
             facility: None,
@@ -174,7 +197,7 @@ impl CcBsSubentity {
         if let Err(err) = self.fsm_individual_create_setup_call(
             call_id,
             IndividualCall {
-                calling_addr: TetraAddress::new(call.source_issi, SsiType::Issi),
+                calling_addr: TetraAddress::new(0, SsiType::Unknown),
                 called_addr,
                 calling_handle: 0,
                 calling_link_id: 0,
@@ -196,7 +219,11 @@ impl CcBsSubentity {
                 called_over_brew: false,
                 calling_over_brew: true,
                 brew_uuid: Some(brew_uuid),
-                network_call: Some(call),
+                network_entity: Some(network_entity),
+                network_call: Some(NetworkCircuitCall {
+                    duplex: simplex_duplex as u8,
+                    ..call
+                }),
                 connect_request_sent: false,
                 floor_holder: None,
             },
@@ -228,13 +255,15 @@ impl CcBsSubentity {
         call_info: NetworkCircuitCall,
     ) {
         let Some((call_id, call)) = self.find_brew_individual_call(brew_uuid) else {
-            tracing::debug!("CMCE: Brew connect request for unknown uuid={}", brew_uuid);
+            tracing::debug!("CMCE: network connect request for unknown uuid={}", brew_uuid);
             return;
         };
+        let network_entity = call.network_entity();
 
         if call.calling_over_brew {
             tracing::warn!(
-                "CMCE: unexpected Brew CONNECT_REQUEST for Brew-originated call uuid={} call_id={}, treating as CONNECT_CONFIRM",
+                "CMCE: unexpected {:?} CONNECT_REQUEST for network-originated call uuid={} call_id={}, treating as CONNECT_CONFIRM",
+                network_entity,
                 brew_uuid,
                 call_id
             );
@@ -243,12 +272,13 @@ impl CcBsSubentity {
         }
 
         if call.is_active() {
-            tracing::trace!("CMCE: Brew connect request for active call_id={}, ignoring", call_id);
+            tracing::trace!("CMCE: {:?} connect request for active call_id={}, ignoring", network_entity, call_id);
             return;
         }
 
         tracing::info!(
-            "CMCE: Brew connect request uuid={} call_id={} dst={} number='{}'",
+            "CMCE: {:?} connect request uuid={} call_id={} dst={} number='{}'",
+            network_entity,
             brew_uuid,
             call_id,
             call_info.destination,
@@ -258,11 +288,12 @@ impl CcBsSubentity {
         if let Err(err) = self.fsm_individual_set_network_call(call_id, call_info.clone()) {
             match err {
                 IndividualTransitionError::UnknownCall(_) => {
-                    tracing::warn!("CMCE: Brew connect request state update unknown call_id={}", call_id);
+                    tracing::warn!("CMCE: {:?} connect request state update unknown call_id={}", network_entity, call_id);
                 }
                 IndividualTransitionError::InvalidTransition { state, .. } => {
                     tracing::warn!(
-                        "CMCE: Brew connect request state update rejected call_id={} from state {:?}",
+                        "CMCE: {:?} connect request state update rejected call_id={} from state {:?}",
+                        network_entity,
                         call_id,
                         state
                     );
@@ -343,11 +374,12 @@ impl CcBsSubentity {
         if let Err(err) = self.fsm_individual_transition_to_active(call_id) {
             match err {
                 IndividualTransitionError::UnknownCall(_) => {
-                    tracing::warn!("CMCE: Brew connect request activation unknown call_id={}", call_id);
+                    tracing::warn!("CMCE: {:?} connect request activation unknown call_id={}", network_entity, call_id);
                 }
                 IndividualTransitionError::InvalidTransition { state, .. } => {
                     tracing::warn!(
-                        "CMCE: Brew connect request activation rejected call_id={} from state {:?}",
+                        "CMCE: {:?} connect request activation rejected call_id={} from state {:?}",
+                        network_entity,
                         call_id,
                         state
                     );
@@ -362,7 +394,7 @@ impl CcBsSubentity {
         queue.push_back(SapMsg {
             sap: Sap::Control,
             src: TetraEntity::Cmce,
-            dest: TetraEntity::Brew,
+            dest: network_entity,
             msg: SapMsgInner::CmceCallControl(CallControl::NetworkCircuitConnectConfirm {
                 brew_uuid,
                 grant: 0,
@@ -373,7 +405,7 @@ impl CcBsSubentity {
         queue.push_back(SapMsg {
             sap: Sap::Control,
             src: TetraEntity::Cmce,
-            dest: TetraEntity::Brew,
+            dest: network_entity,
             msg: SapMsgInner::CmceCallControl(CallControl::NetworkCircuitMediaReady {
                 brew_uuid,
                 call_id,
@@ -399,6 +431,7 @@ impl CcBsSubentity {
             );
             return;
         };
+        let network_entity = call.network_entity();
 
         if !call.calling_over_brew {
             tracing::trace!(
@@ -410,7 +443,7 @@ impl CcBsSubentity {
         }
 
         if call.is_active() {
-            tracing::trace!("CMCE: Brew connect confirm for active call_id={}, ignoring", call_id);
+            tracing::trace!("CMCE: {:?} connect confirm for active call_id={}, ignoring", network_entity, call_id);
             return;
         }
 
@@ -418,7 +451,8 @@ impl CcBsSubentity {
             (call.called_handle, call.called_link_id, call.called_endpoint_id)
         else {
             tracing::warn!(
-                "CMCE: Brew connect confirm uuid={} call_id={} before local U-CONNECT context is known",
+                "CMCE: {:?} connect confirm uuid={} call_id={} before local U-CONNECT context is known",
+                network_entity,
                 brew_uuid,
                 call_id
             );
@@ -426,7 +460,8 @@ impl CcBsSubentity {
         };
 
         tracing::info!(
-            "CMCE: Brew connect confirm uuid={} call_id={} grant={} permission={}",
+            "CMCE: {:?} connect confirm uuid={} call_id={} grant={} permission={}",
+            network_entity,
             brew_uuid,
             call_id,
             grant,
@@ -510,11 +545,12 @@ impl CcBsSubentity {
         if let Err(err) = self.fsm_individual_transition_to_active(call_id) {
             match err {
                 IndividualTransitionError::UnknownCall(_) => {
-                    tracing::warn!("CMCE: Brew connect confirm activation unknown call_id={}", call_id);
+                    tracing::warn!("CMCE: {:?} connect confirm activation unknown call_id={}", network_entity, call_id);
                 }
                 IndividualTransitionError::InvalidTransition { state, .. } => {
                     tracing::warn!(
-                        "CMCE: Brew connect confirm activation rejected call_id={} from state {:?}",
+                        "CMCE: {:?} connect confirm activation rejected call_id={} from state {:?}",
+                        network_entity,
                         call_id,
                         state
                     );
@@ -529,7 +565,7 @@ impl CcBsSubentity {
         queue.push_back(SapMsg {
             sap: Sap::Control,
             src: TetraEntity::Cmce,
-            dest: TetraEntity::Brew,
+            dest: network_entity,
             msg: SapMsgInner::CmceCallControl(CallControl::NetworkCircuitMediaReady {
                 brew_uuid,
                 call_id,

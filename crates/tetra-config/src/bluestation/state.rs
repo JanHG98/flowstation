@@ -31,6 +31,8 @@ pub struct Subscriber {
     pub issi: u32,
     // Set of attached GSSIs
     pub attached_groups: HashSet<u32>,
+    /// Last reported MS class duplex capability.
+    pub duplex_capable: Option<bool>,
 }
 
 /// Centralized subscriber registry tracking locally registered ISSIs and their group affiliations.
@@ -68,6 +70,7 @@ impl SubscriberRegistry {
             Subscriber {
                 issi,
                 attached_groups: HashSet::new(),
+                duplex_capable: None,
             },
         );
     }
@@ -77,7 +80,20 @@ impl SubscriberRegistry {
         self.subscribers.entry(issi).or_insert_with(|| Subscriber {
             issi,
             attached_groups: HashSet::new(),
+            duplex_capable: None,
         })
+    }
+
+    /// Update the last reported MS class duplex capability.
+    pub fn set_duplex_capable(&mut self, issi: u32, duplex_capable: Option<bool>) {
+        if let Some(subscriber) = self.subscribers.get_mut(&issi) {
+            subscriber.duplex_capable = duplex_capable;
+        }
+    }
+
+    /// Return the last reported MS class duplex capability, if known.
+    pub fn duplex_capable(&self, issi: u32) -> Option<bool> {
+        self.subscribers.get(&issi).and_then(|s| s.duplex_capable)
     }
 
     /// Deregister an ISSI, removing it from the registry and cleaning up any group affiliations
@@ -177,6 +193,39 @@ pub struct TelegramRuntimeOverride {
     pub alert_critical_logs: bool,
 }
 
+#[derive(Debug, Clone)]
+pub struct AsteriskRuntimeStatus {
+    pub configured: bool,
+    pub enabled: bool,
+    pub register_status: String,
+    pub sip_listen: String,
+    pub remote: String,
+    pub rtp_port_range: String,
+    pub codec: String,
+    pub active_dialogs: usize,
+    pub last_rx: Option<String>,
+    pub last_tx: Option<String>,
+    pub last_error: Option<String>,
+}
+
+impl Default for AsteriskRuntimeStatus {
+    fn default() -> Self {
+        Self {
+            configured: false,
+            enabled: false,
+            register_status: "disabled".to_string(),
+            sip_listen: String::new(),
+            remote: String::new(),
+            rtp_port_range: String::new(),
+            codec: "PCMU".to_string(),
+            active_dialogs: 0,
+            last_rx: None,
+            last_tx: None,
+            last_error: None,
+        }
+    }
+}
+
 /// Mutable, stack-editable state (mutex-protected).
 #[derive(Debug, Clone)]
 pub struct StackState {
@@ -201,6 +250,8 @@ pub struct StackState {
     pub wx_override: Option<WxRuntimeOverride>,
     /// Runtime override for Telegram alerts (dashboard editing). See TelegramRuntimeOverride.
     pub telegram_override: Option<TelegramRuntimeOverride>,
+    /// Runtime Asterisk SIP/RTP bridge status for `/api/asterisk/status` and the dashboard tab.
+    pub asterisk_status: AsteriskRuntimeStatus,
     /// Live map "identity currently reachable on a traffic channel" → (DL timeslot, usage_marker),
     /// republished every tick by CMCE call control from the live call tables (so it is never
     /// stale). Keyed by GSSI for active group calls and by each participant ISSI for connected
@@ -279,13 +330,30 @@ mod tests {
         let mut reg = SubscriberRegistry::new();
         reg.register(1001);
         reg.affiliate(1001, 91);
+        reg.set_duplex_capable(1001, Some(false));
         assert!(reg.has_group_members(91));
+        assert_eq!(reg.duplex_capable(1001), Some(false));
 
         reg.register(1001);
 
         assert!(reg.is_registered(1001));
+        assert_eq!(reg.duplex_capable(1001), None);
         reg.deaffiliate(1001, 91);
         assert!(!reg.has_group_members(91));
+    }
+
+    #[test]
+    fn test_duplex_capability_is_per_subscriber() {
+        let mut reg = SubscriberRegistry::new();
+        reg.register(1001);
+        reg.register(1002);
+
+        reg.set_duplex_capable(1001, Some(false));
+        reg.set_duplex_capable(1002, Some(true));
+
+        assert_eq!(reg.duplex_capable(1001), Some(false));
+        assert_eq!(reg.duplex_capable(1002), Some(true));
+        assert_eq!(reg.duplex_capable(1003), None);
     }
 
     #[test]
@@ -316,6 +384,7 @@ impl Default for StackState {
             issi_whitelist_override: None,
             wx_override: None,
             telegram_override: None,
+            asterisk_status: AsteriskRuntimeStatus::default(),
             active_call_ts: std::collections::HashMap::new(),
             ee_monitoring_windows: std::collections::HashMap::new(),
         }

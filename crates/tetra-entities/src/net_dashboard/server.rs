@@ -1486,6 +1486,10 @@ fn handle_connection(
             if line == "\r\n" || line.is_empty() || line == "\n" { break; }
         }
         serve_bts_info(buf.into_inner(), &shared_config);
+    } else if req_line.contains("GET /api/asterisk/status") {
+        let mut s = stream;
+        drain_http_headers(&mut s);
+        serve_asterisk_status(s, &shared_config);
     } else if req_line.contains("GET /api/whitelist") {
         let mut buf = BufReader::new(stream);
         loop {
@@ -2088,6 +2092,66 @@ fn serve_bts_info(
     );
     let _ = stream.write_all(header.as_bytes());
     let _ = stream.write_all(body.as_bytes());
+}
+
+/// GET /api/asterisk/status — config + runtime status for the Asterisk SIP bridge.
+fn serve_asterisk_status(
+    stream: TcpStream,
+    shared_config: &Option<tetra_config::bluestation::SharedConfig>,
+) {
+    let body = match shared_config {
+        Some(cfg) => {
+            let c = cfg.config();
+            let runtime = cfg.state_read().asterisk_status.clone();
+            serde_json::json!({
+                "config": {
+                    "configured": true,
+                    "enabled": c.asterisk.enabled,
+                    "register": c.asterisk.register,
+                    "sip_listen": format!("{}:{}", c.asterisk.bind_addr, c.asterisk.bind_port),
+                    "remote": format!("{}:{}", c.asterisk.remote_host, c.asterisk.remote_port),
+                    "rtp_port_range": format!("{}-{}", c.asterisk.rtp_port_min, c.asterisk.rtp_port_max),
+                    "codec": c.asterisk.codec.clone(),
+                    "outbound_prefix": c.asterisk.outbound_prefix.clone(),
+                    "strip_outbound_prefix": c.asterisk.strip_outbound_prefix,
+                    "service_numbers": c.asterisk.service_numbers.clone(),
+                    "local_user": c.asterisk.local_user.clone(),
+                    "auth_user": c.asterisk.auth_user.clone(),
+                    "realm": c.asterisk.realm.clone(),
+                },
+                "runtime": {
+                    "configured": runtime.configured,
+                    "enabled": runtime.enabled,
+                    "register_status": runtime.register_status,
+                    "sip_listen": runtime.sip_listen,
+                    "remote": runtime.remote,
+                    "rtp_port_range": runtime.rtp_port_range,
+                    "codec": runtime.codec,
+                    "active_dialogs": runtime.active_dialogs,
+                    "last_rx": runtime.last_rx,
+                    "last_tx": runtime.last_tx,
+                    "last_error": runtime.last_error,
+                }
+            })
+        }
+        None => serde_json::json!({
+            "config": { "configured": false, "enabled": false },
+            "runtime": {
+                "configured": false,
+                "enabled": false,
+                "register_status": "disabled",
+                "sip_listen": "",
+                "remote": "",
+                "rtp_port_range": "",
+                "codec": "PCMU",
+                "active_dialogs": 0,
+                "last_rx": null,
+                "last_tx": null,
+                "last_error": null,
+            }
+        }),
+    };
+    http_json_response(stream, 200, &body.to_string());
 }
 
 fn serve_whitelist_get(

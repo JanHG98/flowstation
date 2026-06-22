@@ -670,6 +670,7 @@ impl MmBs {
         }
 
         // Store and log class_of_ms
+        let duplex_capable = pdu.class_of_ms.as_ref().map(|class| class.freq_simplex_duplex);
         if let Some(ref class) = pdu.class_of_ms {
             tracing::info!("MS {} class_of_ms: {}", issi, class);
         }
@@ -688,6 +689,7 @@ impl MmBs {
         });
 
         let _ = self.client_mgr.set_client_class_of_ms(issi, pdu.class_of_ms);
+        self.config.state_write().subscribers.set_duplex_capable(issi, duplex_capable);
 
         // Reset periodic registration timer on every successful registration.
         self.client_mgr.reset_registration_timer(issi);

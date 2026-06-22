@@ -626,6 +626,39 @@ impl CcBsSubentity {
             || pdu.called_party_short_number_address.is_some()
     }
 
+    pub(super) fn asterisk_route_number(&self, network_call: &NetworkCircuitCall) -> Option<String> {
+        let cfg = &self.config.config().asterisk;
+        if !cfg.enabled || cfg.service_numbers.is_empty() {
+            return None;
+        }
+
+        let raw = if !network_call.number.trim().is_empty() {
+            network_call.number.trim().to_string()
+        } else if network_call.destination != 0 {
+            network_call.destination.to_string()
+        } else {
+            return None;
+        };
+
+        let mut routed = raw.as_str();
+        if !cfg.outbound_prefix.is_empty() && raw.starts_with(&cfg.outbound_prefix) {
+            if cfg.strip_outbound_prefix {
+                routed = &raw[cfg.outbound_prefix.len()..];
+            }
+        }
+
+        let routed = routed.trim();
+        if routed.is_empty() {
+            return None;
+        }
+
+        if cfg.service_numbers.iter().any(|n| n == routed) {
+            Some(routed.to_string())
+        } else {
+            None
+        }
+    }
+
     /// Notify UMAC to open a traffic circuit (ETSI §21 circuit management).
     /// `peer_ts` is Some only for full-duplex calls where UL of one MS feeds DL of the other.
     pub(super) fn signal_umac_circuit_open(
@@ -1021,7 +1054,7 @@ impl CcBsSubentity {
                 queue.push_back(SapMsg {
                     sap: Sap::Control,
                     src: TetraEntity::Cmce,
-                    dest: TetraEntity::Brew,
+                    dest: call.network_entity(),
                     msg: SapMsgInner::CmceCallControl(CallControl::NetworkCircuitRelease {
                         brew_uuid,
                         cause: disconnect_cause.into_raw() as u8,
@@ -1058,8 +1091,12 @@ impl CcBsSubentity {
         // During setup/alerting they are still reachable on the MCCH, so leave them out.
         for call in self.individual_calls.values() {
             if call.is_active() {
-                map.insert(call.calling_addr.ssi, (call.calling_ts, call.calling_usage));
-                map.insert(call.called_addr.ssi, (call.called_ts, call.called_usage));
+                if !call.calling_over_brew {
+                    map.insert(call.calling_addr.ssi, (call.calling_ts, call.calling_usage));
+                }
+                if !call.called_over_brew {
+                    map.insert(call.called_addr.ssi, (call.called_ts, call.called_usage));
+                }
             }
         }
         self.config.state_write().active_call_ts = map;
@@ -1158,6 +1195,58 @@ impl CcBsSubentity {
 #[cfg(test)]
 mod tests {
     use super::CcBsSubentity;
+    use tetra_config::bluestation::{SharedConfig, parsing};
+    use tetra_saps::control::call_control::NetworkCircuitCall;
+
+    fn asterisk_test_cc() -> CcBsSubentity {
+        let toml = r#"
+config_version = "0.6"
+stack_mode = "Bs"
+
+[phy_io]
+backend = "None"
+
+[net_info]
+mcc = 901
+mnc = 9999
+
+[cell_info]
+main_carrier = 1584
+freq_band = 4
+freq_offset = 0
+duplex_spacing = 4
+reverse_operation = false
+location_area = 1
+
+[asterisk]
+enabled = true
+outbound_prefix = "91"
+strip_outbound_prefix = true
+codec = "PCMU"
+service_numbers = ["600", "601"]
+"#;
+        let cfg = parsing::from_toml_str(toml).expect("asterisk test config must parse");
+        CcBsSubentity::new(SharedConfig::from_parts(cfg, None))
+    }
+
+    fn network_call(destination: u32, number: &str) -> NetworkCircuitCall {
+        NetworkCircuitCall {
+            source_issi: 1000001,
+            destination,
+            number: number.to_string(),
+            priority: 0,
+            service: 0,
+            mode: 0,
+            duplex: 0,
+            method: 0,
+            communication: 0,
+            grant: 0,
+            permission: 0,
+            timeout: 0,
+            ownership: 0,
+            queued: 0,
+        }
+    }
 
     #[test]
     fn external_subscriber_number_supports_16_digits() {
@@ -1191,5 +1280,22 @@ mod tests {
         let field = CcBsSubentity::encode_external_subscriber_number(number).expect("field should be generated");
         assert_eq!(field.len, 128);
         assert_eq!(CcBsSubentity::decode_external_subscriber_number(&field), "12345678901234567890123456789012");
+    }
+
+    #[test]
+    fn asterisk_route_strips_prefix_for_configured_service_numbers() {
+        let cc = asterisk_test_cc();
+
+        assert_eq!(cc.asterisk_route_number(&network_call(91600, "")), Some("600".to_string()));
+        assert_eq!(cc.asterisk_route_number(&network_call(91601, "")), Some("601".to_string()));
+    }
+
+    #[test]
+    fn asterisk_route_uses_dialed_number_and_leaves_non_matches_for_brew() {
+        let cc = asterisk_test_cc();
+
+        assert_eq!(cc.asterisk_route_number(&network_call(0, "91600")), Some("600".to_string()));
+        assert_eq!(cc.asterisk_route_number(&network_call(91602, "")), None);
+        assert_eq!(cc.asterisk_route_number(&network_call(0, "91234")), None);
     }
 }

@@ -1782,6 +1782,10 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
     </div>
 
     <div class="nav-section-label" data-i18n-section="manage">MANAGE</div>
+    <div class="nav-item" onclick="showPage('asterisk',this)" id="nav-asterisk">
+      <span class="nav-icon">☎</span>
+      <span class="nav-label" data-i18n="asterisk">Asterisk SIP</span>
+    </div>
     <div class="nav-item" onclick="showPage('config',this)" id="nav-config">
       <span class="nav-icon">⚙</span>
       <span class="nav-label" data-i18n="config">CONFIG</span>
@@ -2338,6 +2342,41 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
 
     </div>
 
+    <!-- ── ASTERISK SIP ── -->
+    <div class="page" id="page-asterisk">
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title" data-i18n="asterisk_title">Asterisk SIP</div>
+          <div class="card-actions">
+            <button class="btn btn-sm" onclick="loadAsteriskStatus()" data-i18n="refresh">⟳ Refresh</button>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="stat-grid" style="margin-bottom:14px">
+            <div class="stat-card">
+              <div class="stat-label" data-i18n="ast_configured">Configured</div>
+              <div class="stat-value" id="ast-configured">—</div>
+              <div class="stat-sub" id="ast-enabled">—</div>
+            </div>
+            <div class="stat-card blue">
+              <div class="stat-label" data-i18n="ast_register">REGISTER</div>
+              <div class="stat-value blue" id="ast-register">—</div>
+              <div class="stat-sub" id="ast-dialogs">—</div>
+            </div>
+          </div>
+          <div class="info-grid">
+            <div class="info-row"><div class="info-key" data-i18n="ast_sip_listen">SIP listen</div><div class="info-val" id="ast-sip-listen">—</div></div>
+            <div class="info-row"><div class="info-key" data-i18n="ast_remote">Remote Asterisk</div><div class="info-val" id="ast-remote">—</div></div>
+            <div class="info-row"><div class="info-key" data-i18n="ast_rtp">RTP ports</div><div class="info-val" id="ast-rtp">—</div></div>
+            <div class="info-row"><div class="info-key" data-i18n="ast_codec">Codec</div><div class="info-val" id="ast-codec">—</div></div>
+            <div class="info-row"><div class="info-key" data-i18n="ast_last_rx">Last RX</div><div class="info-val" id="ast-last-rx">—</div></div>
+            <div class="info-row"><div class="info-key" data-i18n="ast_last_tx">Last TX</div><div class="info-val" id="ast-last-tx">—</div></div>
+            <div class="info-row"><div class="info-key" data-i18n="ast_last_error">Last error</div><div class="info-val" id="ast-last-error">—</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- ── CONFIG ── -->
     <div class="page" id="page-config">
       <div class="card">
@@ -2873,7 +2912,7 @@ const LANGS={
   en:{
     bts_ip:'BTS IP',offline:'OFFLINE',online:'ONLINE',
     brew_online:'ONLINE',brew_offline:'OFFLINE',
-    stations:'Radios',calls:'Calls',lastheard:'Last Heard',log:'Log',rf:'RF',config:'Config',
+    stations:'Radios',calls:'Calls',lastheard:'Last Heard',log:'Log',rf:'RF',asterisk:'Asterisk SIP',config:'Config',
     sdslog:'SDS Log',th_dir:'Dir',th_from:'From',th_to:'To',th_message:'Message',no_sds:'No SDS messages yet',sds_refresh:'⟳ Refresh',
     rf_freq:'Center freq',rf_rate:'Sample rate',rf_rms:'RMS',rf_peak:'Peak',rf_age:'Snapshot',
     rf_waiting:'waiting…',rf_live:'live',rf_stale:'stale',
@@ -2888,6 +2927,9 @@ const LANGS={
     rf_temp_cold:'cold',rf_temp_nominal:'nominal',rf_temp_warm:'warm',rf_temp_hot:'hot',rf_temp_na:'no sensor',
     rf_no_gains:'unavailable',rf_just_now:'just now',
 
+    asterisk_title:'Asterisk SIP',ast_configured:'Configured',ast_register:'REGISTER',ast_sip_listen:'SIP listen',
+    ast_remote:'Remote Asterisk',ast_rtp:'RTP ports',ast_codec:'Codec',ast_last_rx:'Last RX',
+    ast_last_tx:'Last TX',ast_last_error:'Last error',
     terminals:'Radios',registered:'registered',
     active_calls:'Active Calls',circuits:'circuits in use',
     registered_terminals:'Registered Radios',
@@ -3072,7 +3114,7 @@ const LANGS={
   de:{
     bts_ip:'BTS-IP',offline:'OFFLINE',online:'ONLINE',
     brew_online:'ONLINE',brew_offline:'OFFLINE',
-    stations:'Radios',calls:'Anrufe',lastheard:'Zuletzt Gehört',log:'Log',rf:'RF',config:'Config',
+    stations:'Radios',calls:'Anrufe',lastheard:'Zuletzt Gehört',log:'Log',rf:'RF',asterisk:'Asterisk SIP',config:'Config',
     sdslog:'SDS-Log',th_dir:'Ri.',th_from:'Von',th_to:'An',th_message:'Nachricht',no_sds:'Noch keine SDS-Nachrichten',sds_refresh:'⟳ Aktualisieren',
     rf_freq:'Mittenfrequenz',rf_rate:'Abtastrate',rf_rms:'RMS',rf_peak:'Spitze',rf_age:'Aufnahme',
     rf_waiting:'wartet…',rf_live:'live',rf_stale:'veraltet',
@@ -3087,6 +3129,9 @@ const LANGS={
     rf_temp_cold:'kalt',rf_temp_nominal:'nominal',rf_temp_warm:'warm',rf_temp_hot:'heiß',rf_temp_na:'kein Sensor',
     rf_no_gains:'nicht verfügbar',rf_just_now:'gerade eben',
 
+    asterisk_title:'Asterisk SIP',ast_configured:'Konfiguriert',ast_register:'REGISTER',ast_sip_listen:'SIP hört auf',
+    ast_remote:'Remote Asterisk',ast_rtp:'RTP-Ports',ast_codec:'Codec',ast_last_rx:'Letztes RX',
+    ast_last_tx:'Letztes TX',ast_last_error:'Letzter Fehler',
     terminals:'Radios',registered:'registriert',
     active_calls:'Aktive Anrufe',circuits:'Schaltkreise aktiv',
     registered_terminals:'Registrierte Radios',
@@ -3442,7 +3487,7 @@ function closeMobileSidebar(){
 }
 
 // ── Page navigation ───────────────────────────────────────────────────────
-const PAGE_TITLES={stations:'stations',calls:'calls',lastheard:'lastheard',log:'log',sdslog:'sdslog',rf:'rf',config:'config',system:'system'};
+const PAGE_TITLES={stations:'stations',calls:'calls',lastheard:'lastheard',log:'log',sdslog:'sdslog',rf:'rf',asterisk:'asterisk',config:'config',system:'system'};
 function showPage(name,el){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
@@ -3452,6 +3497,7 @@ function showPage(name,el){
   document.getElementById('topbar-title').textContent=t(name)||name;
   if(name==='stations'){loadBtsInfo();}
   if(name==='sdslog'){loadSdsLog();}
+  if(name==='asterisk'){loadAsteriskStatus();}
   if(name==='config'){loadConfig();loadWhitelist();loadWx();}
   if(name==='telegram'){loadTelegram();}
   if(name==='system'){loadSystemInfo();loadConfigProfiles();loadLiveSds();loadBrightness();}
@@ -4311,6 +4357,31 @@ function exportLog(){
   a.download=`flowstation-log-${stamp}.log`;
   document.body.appendChild(a);a.click();
   setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},0);
+}
+
+// ── Asterisk SIP ───────────────────────────────────────────────────────────
+async function loadAsteriskStatus(){
+  const set=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=(v===null||v===undefined||v==='')?'—':v;};
+  try{
+    const r=await fetch('/api/asterisk/status');
+    if(!r.ok)throw new Error('http '+r.status);
+    const d=await r.json();
+    const c=d.config||{}, rt=d.runtime||{};
+    set('ast-configured', (c.configured||rt.configured)?'YES':'NO');
+    set('ast-enabled', (c.enabled||rt.enabled)?'enabled':'disabled');
+    set('ast-register', rt.register_status||'—');
+    set('ast-dialogs', (rt.active_dialogs??0)+' active dialogs');
+    set('ast-sip-listen', rt.sip_listen||c.sip_listen);
+    set('ast-remote', rt.remote||c.remote);
+    set('ast-rtp', rt.rtp_port_range||c.rtp_port_range);
+    set('ast-codec', rt.codec||c.codec);
+    set('ast-last-rx', rt.last_rx);
+    set('ast-last-tx', rt.last_tx);
+    set('ast-last-error', rt.last_error);
+  }catch(e){
+    set('ast-configured','—');set('ast-enabled','status unavailable');set('ast-register','—');
+    set('ast-last-error',t('conn_error'));
+  }
 }
 
 // ── Config ────────────────────────────────────────────────────────────────

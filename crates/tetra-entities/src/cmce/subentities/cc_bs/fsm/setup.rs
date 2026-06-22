@@ -240,9 +240,9 @@ impl CcBsSubentity {
             };
 
         let is_issi_address = pdu.called_party_type_identifier == tetra_pdus::cmce::enums::party_type_identifier::PartyTypeIdentifier::Ssi || pdu.called_party_type_identifier == tetra_pdus::cmce::enums::party_type_identifier::PartyTypeIdentifier::Tsi;
-        if !is_issi_address && !net_brew::is_active(&self.config) {
+        if !is_issi_address && !net_brew::is_active(&self.config) && !self.config.config().asterisk.enabled {
             tracing::warn!(
-                "U-SETUP P2P with non-ISSI called_party_type_identifier={} (rejecting, Brew disabled)",
+                "U-SETUP P2P with non-ISSI called_party_type_identifier={} (rejecting, Brew/Asterisk disabled)",
                 pdu.called_party_type_identifier
             );
             return;
@@ -463,6 +463,7 @@ impl CcBsSubentity {
                 called_over_brew: false,
                 calling_over_brew: false,
                 brew_uuid: None,
+                network_entity: None,
                 network_call: None,
                 connect_request_sent: false,
                 floor_holder: None,
@@ -511,49 +512,70 @@ impl CcBsSubentity {
             network_call.duplex = 0;
         }
 
-        if !net_brew::is_active(&self.config) {
+        let asterisk_number = self.asterisk_route_number(&network_call);
+        let network_entity = if asterisk_number.is_some() { TetraEntity::Asterisk } else { TetraEntity::Brew };
+        if let Some(number) = asterisk_number {
             tracing::info!(
-                "CMCE: rejecting U-SETUP P2P from ISSI {} (Brew disabled, called_ssi={})",
+                "CMCE: routing U-SETUP src={} dialed='{}' to Asterisk SIP number='{}'",
                 calling_party.ssi,
-                called_addr.ssi
+                network_call.number,
+                number
             );
-            let call_id = self.circuits.get_next_call_id();
-            let sdu = Self::build_d_release(call_id, DisconnectCause::RequestedServiceNotAvailable);
-            let msg = Self::build_sapmsg_direct(sdu, calling_party, prim.handle, prim.link_id, prim.endpoint_id);
-            queue.push_back(msg);
-            return;
-        }
+            network_call.number = number;
+            network_call.destination = 0;
+            network_call.duplex = 0;
+        } else {
+            if !net_brew::is_active(&self.config) {
+                tracing::info!(
+                    "CMCE: rejecting U-SETUP P2P from ISSI {} (Brew disabled, called_ssi={})",
+                    calling_party.ssi,
+                    called_addr.ssi
+                );
+                let call_id = self.circuits.get_next_call_id();
+                let sdu = Self::build_d_release(call_id, DisconnectCause::RequestedServiceNotAvailable);
+                let msg = Self::build_sapmsg_direct(sdu, calling_party, prim.handle, prim.link_id, prim.endpoint_id);
+                queue.push_back(msg);
+                return;
+            }
 
-        if !self.config.state_read().network_connected {
-            tracing::info!(
-                "CMCE: rejecting U-SETUP over Brew src={} dst={} (backhaul disconnected)",
-                calling_party.ssi,
-                called_addr.ssi
-            );
-            let call_id = self.circuits.get_next_call_id();
-            let sdu = Self::build_d_release(call_id, DisconnectCause::RequestedServiceNotAvailable);
-            let msg = Self::build_sapmsg_direct(sdu, calling_party, prim.handle, prim.link_id, prim.endpoint_id);
-            queue.push_back(msg);
-            return;
-        }
+            if !self.config.state_read().network_connected {
+                tracing::info!(
+                    "CMCE: rejecting U-SETUP over Brew src={} dst={} (backhaul disconnected)",
+                    calling_party.ssi,
+                    called_addr.ssi
+                );
+                let call_id = self.circuits.get_next_call_id();
+                let sdu = Self::build_d_release(call_id, DisconnectCause::RequestedServiceNotAvailable);
+                let msg = Self::build_sapmsg_direct(sdu, calling_party, prim.handle, prim.link_id, prim.endpoint_id);
+                queue.push_back(msg);
+                return;
+            }
 
-        if !net_brew::is_brew_issi_routable(&self.config, calling_party.ssi) {
-            tracing::info!(
-                "CMCE: rejecting U-SETUP P2P over Brew src={} dst={} (source ISSI not routable)",
-                calling_party.ssi,
-                called_addr.ssi
-            );
-            let call_id = self.circuits.get_next_call_id();
-            let sdu = Self::build_d_release(call_id, DisconnectCause::CalledPartyNotReachable);
-            let msg = Self::build_sapmsg_direct(sdu, calling_party, prim.handle, prim.link_id, prim.endpoint_id);
-            queue.push_back(msg);
-            return;
+            if !net_brew::is_brew_issi_routable(&self.config, calling_party.ssi) {
+                tracing::info!(
+                    "CMCE: rejecting U-SETUP P2P over Brew src={} dst={} (source ISSI not routable)",
+                    calling_party.ssi,
+                    called_addr.ssi
+                );
+                let call_id = self.circuits.get_next_call_id();
+                let sdu = Self::build_d_release(call_id, DisconnectCause::CalledPartyNotReachable);
+                let msg = Self::build_sapmsg_direct(sdu, calling_party, prim.handle, prim.link_id, prim.endpoint_id);
+                queue.push_back(msg);
+                return;
+            }
         }
 
         let has_external_called_party = Self::has_external_called_party(pdu, &network_call);
-        let destination_routable = network_call.destination == 0 || net_brew::is_brew_issi_routable(&self.config, network_call.destination);
+        let destination_routable = network_entity == TetraEntity::Asterisk
+            || network_call.destination == 0
+            || net_brew::is_brew_issi_routable(&self.config, network_call.destination);
+        let called_call_addr = if has_external_called_party || network_call.destination == 0 {
+            TetraAddress::new(0, SsiType::Unknown)
+        } else {
+            called_addr
+        };
 
-        if !has_external_called_party && !destination_routable {
+        if network_entity == TetraEntity::Brew && !has_external_called_party && !destination_routable {
             tracing::info!(
                 "CMCE: rejecting U-SETUP P2P over Brew src={} dst={} (destination ISSI not routable)",
                 calling_party.ssi,
@@ -566,7 +588,7 @@ impl CcBsSubentity {
             return;
         }
 
-        if has_external_called_party && !destination_routable && network_call.destination != 0 {
+        if network_entity == TetraEntity::Brew && has_external_called_party && !destination_routable && network_call.destination != 0 {
             // Only override if the number field is non-empty and destination is not a
             // short service number (< 1_000_000). Short numbers like 600, 000 etc. are
             // service codes on TetraPack and must be forwarded as-is via the number field.
@@ -593,14 +615,18 @@ impl CcBsSubentity {
         // Allocate one bearer for the local MS.
         let circuit_calling = {
             let mut state = self.config.state_write();
-            match self.circuits.allocate_circuit_with_allocator_duplex(Direction::Both, pdu.basic_service_information.communication_type, pdu.simplex_duplex_selection,
+            match self.circuits.allocate_circuit_with_allocator_duplex(
+                Direction::Both,
+                pdu.basic_service_information.communication_type,
+                pdu.simplex_duplex_selection,
                 &mut state.timeslot_alloc,
                 TimeslotOwner::Cmce,
             ) {
                 Ok(circuit) => circuit.clone(),
                 Err(e) => {
                     tracing::info!(
-                        "CMCE: rejecting U-SETUP over Brew src={} dst={} (allocation failed: {:?})",
+                        "CMCE: rejecting U-SETUP over {:?} src={} dst={} (allocation failed: {:?})",
+                        network_entity,
                         calling_party.ssi,
                         called_addr.ssi,
                         e
@@ -620,7 +646,8 @@ impl CcBsSubentity {
         let brew_uuid = uuid::Uuid::new_v4();
 
         tracing::info!(
-            "CMCE: forwarding U-SETUP over Brew call_id={} src={} dst={} ts={} duplex={} number='{}' uuid={}",
+            "CMCE: forwarding U-SETUP over {:?} call_id={} src={} dst={} ts={} duplex={} number='{}' uuid={}",
+            network_entity,
             call_id,
             calling_party.ssi,
             network_call.destination,
@@ -635,7 +662,7 @@ impl CcBsSubentity {
         queue.push_back(SapMsg {
             sap: Sap::Control,
             src: TetraEntity::Cmce,
-            dest: TetraEntity::Brew,
+            dest: network_entity,
             msg: SapMsgInner::CmceCallControl(CallControl::NetworkCircuitSetupRequest {
                 brew_uuid,
                 call: network_call.clone(),
@@ -646,7 +673,7 @@ impl CcBsSubentity {
             call_id,
             IndividualCall {
                 calling_addr: calling_party,
-                called_addr,
+                called_addr: called_call_addr,
                 calling_handle: prim.handle,
                 calling_link_id: prim.link_id,
                 calling_endpoint_id: prim.endpoint_id,
@@ -667,6 +694,7 @@ impl CcBsSubentity {
                 called_over_brew: true,
                 calling_over_brew: false,
                 brew_uuid: Some(brew_uuid),
+                network_entity: Some(network_entity),
                 network_call: Some(network_call),
                 connect_request_sent: false,
                 floor_holder: None,
@@ -829,6 +857,7 @@ impl CcBsSubentity {
             called_over_brew: false,
             calling_over_brew: false,
             brew_uuid: None,
+            network_entity: None,
             network_call: None,
             connect_request_sent: false,
             floor_holder: Some(calling_party.ssi),

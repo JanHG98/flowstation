@@ -19,6 +19,9 @@ pub use sec_phy_soapy::*;
 pub mod sec_brew;
 pub use sec_brew::*;
 
+pub mod sec_asterisk;
+pub use sec_asterisk::*;
+
 pub mod sec_dashboard;
 pub use sec_dashboard::*;
 

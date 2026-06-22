@@ -13,6 +13,7 @@ pub mod umac;
 
 pub mod network;
 
+pub mod net_asterisk;
 pub mod net_brew;
 pub mod net_control;
 pub mod net_dashboard;

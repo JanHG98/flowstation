@@ -1,26 +1,33 @@
 use super::*;
 
 impl CcBsSubentity {
-    pub(super) fn rx_network_circuit_setup_request(&mut self, queue: &mut MessageQueue, brew_uuid: uuid::Uuid, call: NetworkCircuitCall) {
-        self.fsm_on_network_circuit_setup_request(queue, brew_uuid, call);
+    pub(super) fn rx_network_circuit_setup_request(
+        &mut self,
+        queue: &mut MessageQueue,
+        network_entity: TetraEntity,
+        brew_uuid: uuid::Uuid,
+        call: NetworkCircuitCall,
+    ) {
+        self.fsm_on_network_circuit_setup_request(queue, network_entity, brew_uuid, call);
     }
 
     pub(super) fn rx_network_circuit_setup_accept(&mut self, brew_uuid: uuid::Uuid) {
-        if self.find_brew_individual_call(brew_uuid).is_some() {
-            tracing::info!("CMCE: Brew setup accepted uuid={}", brew_uuid);
+        if let Some((_, call)) = self.find_brew_individual_call(brew_uuid) {
+            tracing::info!("CMCE: {:?} setup accepted uuid={}", call.network_entity(), brew_uuid);
         } else {
-            tracing::debug!("CMCE: Brew setup accept for unknown uuid={}", brew_uuid);
+            tracing::debug!("CMCE: network setup accept for unknown uuid={}", brew_uuid);
         }
     }
 
     pub(super) fn rx_network_circuit_setup_reject(&mut self, queue: &mut MessageQueue, brew_uuid: uuid::Uuid, cause: u8) {
-        let Some((call_id, _)) = self.find_brew_individual_call(brew_uuid) else {
-            tracing::debug!("CMCE: Brew setup reject for unknown uuid={} cause={}", brew_uuid, cause);
+        let Some((call_id, call)) = self.find_brew_individual_call(brew_uuid) else {
+            tracing::debug!("CMCE: network setup reject for unknown uuid={} cause={}", brew_uuid, cause);
             return;
         };
         let mapped = DisconnectCause::try_from(cause as u64).unwrap_or(DisconnectCause::RequestedServiceNotAvailable);
         tracing::info!(
-            "CMCE: Brew setup rejected uuid={} call_id={} cause={} ({:?})",
+            "CMCE: {:?} setup rejected uuid={} call_id={} cause={} ({:?})",
+            call.network_entity(),
             brew_uuid,
             call_id,
             cause,
@@ -30,26 +37,28 @@ impl CcBsSubentity {
     }
 
     pub(super) fn rx_network_circuit_alert(&mut self, queue: &mut MessageQueue, brew_uuid: uuid::Uuid) {
-        let Some((call_id, _call)) = self.find_brew_individual_call(brew_uuid) else {
-            tracing::debug!("CMCE: Brew alert for unknown uuid={}", brew_uuid);
+        let Some((call_id, call)) = self.find_brew_individual_call(brew_uuid) else {
+            tracing::debug!("CMCE: network alert for unknown uuid={}", brew_uuid);
             return;
         };
+        let network_entity = call.network_entity();
 
         if let Err(err) = self.fsm_individual_on_alert(queue, call_id, None, CallTimeoutSetupPhase::T60s) {
             match err {
                 IndividualTransitionError::UnknownCall(_) => {
-                    tracing::debug!("CMCE: Brew alert for unknown call_id={} uuid={}", call_id, brew_uuid);
+                    tracing::debug!("CMCE: {:?} alert for unknown call_id={} uuid={}", network_entity, call_id, brew_uuid);
                 }
                 IndividualTransitionError::InvalidTransition { state, .. } => {
                     tracing::trace!(
-                        "CMCE: Brew alert ignored call_id={} uuid={} invalid from state {:?}",
+                        "CMCE: {:?} alert ignored call_id={} uuid={} invalid from state {:?}",
+                        network_entity,
                         call_id,
                         brew_uuid,
                         state
                     );
                 }
                 IndividualTransitionError::MissingBrewUuid(_) => {
-                    tracing::warn!("CMCE: Brew alert missing brew_uuid on call_id={}", call_id);
+                    tracing::warn!("CMCE: {:?} alert missing brew_uuid on call_id={}", network_entity, call_id);
                 }
                 IndividualTransitionError::DuplicateCall(_)
                 | IndividualTransitionError::NotBrewOriginated(_)
@@ -78,13 +87,14 @@ impl CcBsSubentity {
     }
 
     pub(super) fn rx_network_circuit_release(&mut self, queue: &mut MessageQueue, brew_uuid: uuid::Uuid, cause: u8) {
-        let Some((call_id, _)) = self.find_brew_individual_call(brew_uuid) else {
-            tracing::debug!("CMCE: Brew release for unknown uuid={} cause={}", brew_uuid, cause);
+        let Some((call_id, call)) = self.find_brew_individual_call(brew_uuid) else {
+            tracing::debug!("CMCE: network release for unknown uuid={} cause={}", brew_uuid, cause);
             return;
         };
         let mapped = DisconnectCause::try_from(cause as u64).unwrap_or(DisconnectCause::SwmiRequestedDisconnection);
         tracing::info!(
-            "CMCE: Brew release uuid={} call_id={} cause={} ({:?})",
+            "CMCE: {:?} release uuid={} call_id={} cause={} ({:?})",
+            call.network_entity(),
             brew_uuid,
             call_id,
             cause,

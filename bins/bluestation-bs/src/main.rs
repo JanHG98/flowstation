@@ -12,6 +12,7 @@ use tetra_entities::net_control::{
 use tetra_config::bluestation::{PhyBackend, SharedConfig, StackConfig, parsing};
 use tetra_core::{TdmaTime, debug};
 use tetra_entities::MessageRouter;
+use tetra_entities::net_asterisk::entity::AsteriskEntity;
 use tetra_entities::net_brew::entity::BrewEntity;
 use tetra_entities::net_brew::new_websocket_transport;
 use tetra_entities::net_dashboard::DashboardServer;
@@ -258,6 +259,19 @@ fn build_bs_stack(cfg: &mut SharedConfig, config_path: &str) -> (MessageRouter, 
         }
         router.register_entity(Box::new(brew_entity));
         eprintln!(" -> Brew/TetraPack integration enabled");
+    }
+
+    // Register Asterisk SIP/RTP entity if enabled
+    if cfg.config().asterisk.enabled {
+        match AsteriskEntity::new(cfg.clone()) {
+            Ok(asterisk_entity) => {
+                router.register_entity(Box::new(asterisk_entity));
+                eprintln!(" -> Asterisk SIP integration enabled");
+            }
+            Err(err) => {
+                panic!("Failed to start Asterisk SIP integration: {}", err);
+            }
+        }
     }
 
     // Init network time

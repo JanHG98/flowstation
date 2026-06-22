@@ -195,7 +195,7 @@ impl CcBsSubentity {
                                 queue.push_back(SapMsg {
                                     sap: Sap::Control,
                                     src: TetraEntity::Cmce,
-                                    dest: TetraEntity::Brew,
+                                    dest: ind_call.network_entity(),
                                     msg: SapMsgInner::CmceCallControl(CallControl::NetworkCircuitRelease {
                                         brew_uuid,
                                         cause: DisconnectCause::ExpiryOfTimer.into_raw() as u8,
@@ -523,11 +523,19 @@ impl CcBsSubentity {
                     (call.called_addr,  call.called_ts,  call.called_usage,
                      call.calling_addr, call.calling_ts, call.calling_usage)
                 };
+            let peer_is_network = call.is_network_party(peer_addr);
 
-            tracing::warn!(
-                "UL inactivity timeout on ts={} for individual call_id={}, forcing TX-CEASED on ISSI {} and granting floor to peer ISSI {}",
-                ts, call_id, holder_ssi, peer_addr.ssi
-            );
+            if peer_is_network {
+                tracing::warn!(
+                    "UL inactivity timeout on ts={} for individual call_id={}, forcing TX-CEASED on ISSI {}; peer is network side",
+                    ts, call_id, holder_ssi
+                );
+            } else {
+                tracing::warn!(
+                    "UL inactivity timeout on ts={} for individual call_id={}, forcing TX-CEASED on ISSI {} and granting floor to peer ISSI {}",
+                    ts, call_id, holder_ssi, peer_addr.ssi
+                );
+            }
 
             // D-TX-CEASED to floor holder — confirms floor released.
             let ceased_pdu = DTxCeased {
@@ -543,6 +551,10 @@ impl CcBsSubentity {
             ceased_sdu.seek(0);
             let ceased_msg = Self::build_sapmsg_stealing_ul_dl(ceased_sdu, holder_addr, holder_ts, Some(holder_usage), UlDlAssignment::Dl);
             queue.push_back(ceased_msg);
+
+            if peer_is_network {
+                return;
+            }
 
             // D-TX-GRANTED(Granted) to peer — they can now take the floor.
             let granted_pdu = DTxGranted {

@@ -318,6 +318,8 @@ pub(super) struct IndividualCall {
     pub(super) calling_over_brew: bool,
     /// Brew UUID when this call is bridged to TetraPack.
     pub(super) brew_uuid: Option<uuid::Uuid>,
+    /// Network entity handling this bridged individual call.
+    pub(super) network_entity: Option<TetraEntity>,
     /// Cached network call metadata for Brew bridged legs.
     pub(super) network_call: Option<NetworkCircuitCall>,
     /// True once CONNECT_REQUEST has been sent for Brew-originated setup.
@@ -328,6 +330,17 @@ pub(super) struct IndividualCall {
 }
 
 impl IndividualCall {
+    #[inline]
+    pub(super) fn is_network_party(&self, addr: TetraAddress) -> bool {
+        (self.calling_over_brew && addr.ssi == self.calling_addr.ssi)
+            || (self.called_over_brew && addr.ssi == self.called_addr.ssi)
+    }
+
+    #[inline]
+    pub(super) fn network_entity(&self) -> TetraEntity {
+        self.network_entity.unwrap_or(TetraEntity::Brew)
+    }
+
     #[inline]
     pub(super) fn is_alerted(&self) -> bool {
         matches!(

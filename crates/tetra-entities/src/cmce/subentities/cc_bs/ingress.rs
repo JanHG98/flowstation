@@ -36,6 +36,7 @@ impl CcBsSubentity {
     }
 
     pub fn rx_call_control(&mut self, queue: &mut MessageQueue, message: SapMsg) {
+        let source = message.src;
         let SapMsgInner::CmceCallControl(call_control) = message.msg else {
             tracing::error!("rx_call_control: expected CmceCallControl, got unexpected SAP message type");
             return;
@@ -54,7 +55,7 @@ impl CcBsSubentity {
                 self.rx_network_call_end(queue, brew_uuid);
             }
             CallControl::NetworkCircuitSetupRequest { brew_uuid, call } => {
-                self.rx_network_circuit_setup_request(queue, brew_uuid, call);
+                self.rx_network_circuit_setup_request(queue, source, brew_uuid, call);
             }
             CallControl::NetworkCircuitSetupAccept { brew_uuid } => {
                 self.rx_network_circuit_setup_accept(brew_uuid);
