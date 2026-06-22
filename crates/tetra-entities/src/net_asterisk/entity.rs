@@ -56,6 +56,8 @@ struct SipDialog {
     state: DialogState,
     rtp: RtpSession,
     media_ready: Option<(u16, u8)>,
+    inbound: bool,
+    request_context: Option<SipRequestContext>,
 }
 
 #[derive(Debug)]
@@ -110,6 +112,14 @@ impl SipMessage {
         }
     }
 
+    fn request_uri(&self) -> Option<&str> {
+        if self.start_line.starts_with("SIP/2.0 ") {
+            None
+        } else {
+            self.start_line.split_whitespace().nth(1)
+        }
+    }
+
     fn cseq_method(&self) -> Option<&str> {
         self.header("CSeq")?.split_whitespace().nth(1)
     }
@@ -117,6 +127,16 @@ impl SipMessage {
     fn call_id(&self) -> Option<&str> {
         self.header("Call-ID")
     }
+}
+
+#[derive(Clone)]
+struct SipRequestContext {
+    via: String,
+    from: String,
+    to: String,
+    call_id: String,
+    cseq: String,
+    addr: SocketAddr,
 }
 
 pub struct AsteriskEntity {
@@ -434,26 +454,95 @@ impl AsteriskEntity {
         self.send_sip(request, format!("{} {}", method, uuid));
     }
 
-    fn answer_request(&mut self, msg: &SipMessage, addr: SocketAddr, code: u16, reason: &str) {
-        let via = msg.header("Via").unwrap_or("");
-        let from = msg.header("From").unwrap_or("");
-        let mut to = msg.header("To").unwrap_or("").to_string();
-        if !to.to_ascii_lowercase().contains(";tag=") {
-            to.push_str(";tag=flowstation");
+    fn tagged_to(to: &str, tag: Option<&str>) -> String {
+        let mut to = to.to_string();
+        if let Some(tag) = tag
+            && !to.to_ascii_lowercase().contains(";tag=")
+        {
+            to.push_str(";tag=");
+            to.push_str(tag);
         }
-        let call_id = msg.header("Call-ID").unwrap_or("");
-        let cseq = msg.header("CSeq").unwrap_or("");
-        let response = format!(
+        to
+    }
+
+    fn build_response(
+        &self,
+        ctx: &SipRequestContext,
+        code: u16,
+        reason: &str,
+        to_tag: Option<&str>,
+        body: Option<(&str, &str)>,
+    ) -> String {
+        let to = Self::tagged_to(&ctx.to, to_tag);
+        let (content_type, body_text) = body.unwrap_or(("", ""));
+        let content_type_line = if content_type.is_empty() {
+            String::new()
+        } else {
+            format!("Content-Type: {}\r\n", content_type)
+        };
+        let contact_line = if code >= 180 {
+            format!(
+                "Contact: <{}>\r\nAllow: INVITE, ACK, CANCEL, OPTIONS, BYE, INFO\r\n",
+                self.contact_uri()
+            )
+        } else {
+            String::new()
+        };
+        format!(
             "SIP/2.0 {} {}\r\n\
              Via: {}\r\n\
              From: {}\r\n\
              To: {}\r\n\
              Call-ID: {}\r\n\
              CSeq: {}\r\n\
-             Content-Length: 0\r\n\r\n",
-            code, reason, via, from, to, call_id, cseq
-        );
+             {}\
+             {}\
+             Content-Length: {}\r\n\r\n{}",
+            code,
+            reason,
+            ctx.via,
+            ctx.from,
+            to,
+            ctx.call_id,
+            ctx.cseq,
+            contact_line,
+            content_type_line,
+            body_text.as_bytes().len(),
+            body_text
+        )
+    }
+
+    fn request_context(msg: &SipMessage, addr: SocketAddr) -> Option<SipRequestContext> {
+        Some(SipRequestContext {
+            via: msg.header("Via")?.to_string(),
+            from: msg.header("From")?.to_string(),
+            to: msg.header("To")?.to_string(),
+            call_id: msg.header("Call-ID")?.to_string(),
+            cseq: msg.header("CSeq")?.to_string(),
+            addr,
+        })
+    }
+
+    fn answer_request(&mut self, msg: &SipMessage, addr: SocketAddr, code: u16, reason: &str) {
+        let Some(ctx) = Self::request_context(msg, addr) else {
+            return;
+        };
+        let tag = (code != 100).then_some("flowstation");
+        let response = self.build_response(&ctx, code, reason, tag, None);
         self.send_sip_to(response, addr, format!("{} {}", code, reason));
+    }
+
+    fn send_invite_response(&mut self, uuid: Uuid, code: u16, reason: &str, body: Option<String>) {
+        let Some((ctx, tag)) = self
+            .dialogs
+            .get(&uuid)
+            .and_then(|dialog| dialog.request_context.clone().map(|ctx| (ctx, dialog.local_tag.clone())))
+        else {
+            return;
+        };
+        let body_ref = body.as_deref().map(|b| ("application/sdp", b));
+        let response = self.build_response(&ctx, code, reason, Some(&tag), body_ref);
+        self.send_sip_to(response, ctx.addr, format!("{} {} {}", code, reason, uuid));
     }
 
     fn authorization_header(&self, method: &str, uri: &str, challenge: &DigestChallenge) -> String {
@@ -532,6 +621,50 @@ impl AsteriskEntity {
         })
     }
 
+    fn sip_uri_user(value: &str) -> Option<String> {
+        let trimmed = value.trim();
+        let after_scheme = if let Some(idx) = trimmed.to_ascii_lowercase().find("sip:") {
+            &trimmed[idx + 4..]
+        } else {
+            trimmed
+        };
+        let user = after_scheme
+            .split(|c| matches!(c, '@' | ';' | '?' | '>'))
+            .next()?
+            .trim()
+            .trim_matches('"');
+        (!user.is_empty()).then(|| user.to_string())
+    }
+
+    fn inbound_destination_issi(&self, msg: &SipMessage) -> Option<u32> {
+        let prefix = self.asterisk_config.inbound_prefix.trim();
+        [msg.request_uri(), msg.header("To")]
+            .into_iter()
+            .flatten()
+            .filter_map(Self::sip_uri_user)
+            .find_map(|user| {
+                let digits = if !prefix.is_empty() {
+                    user.strip_prefix(prefix).unwrap_or(&user)
+                } else {
+                    user.as_str()
+                };
+                digits
+                    .chars()
+                    .all(|c| c.is_ascii_digit())
+                    .then(|| digits.parse::<u32>().ok())
+                    .flatten()
+            })
+    }
+
+    fn inbound_caller_number(msg: &SipMessage) -> String {
+        ["P-Asserted-Identity", "Remote-Party-ID", "From"]
+            .into_iter()
+            .filter_map(|header| msg.header(header))
+            .filter_map(Self::sip_uri_user)
+            .next()
+            .unwrap_or_else(|| "0".to_string())
+    }
+
     fn parse_sdp_remote(&self, body: &str) -> Option<SocketAddr> {
         let mut ip: Option<IpAddr> = None;
         let mut port: Option<u16> = None;
@@ -579,6 +712,171 @@ impl AsteriskEntity {
         Err(io::Error::new(io::ErrorKind::AddrNotAvailable, "no RTP port available"))
     }
 
+    fn start_inbound_call(&mut self, queue: &mut MessageQueue, msg: &SipMessage, addr: SocketAddr) {
+        let Some(ctx) = Self::request_context(msg, addr) else {
+            return;
+        };
+        let Some(destination) = self.inbound_destination_issi(msg) else {
+            tracing::info!("AsteriskEntity: rejecting inbound INVITE without TETRA destination: {}", msg.start_line);
+            let response = self.build_response(&ctx, 404, "Not Found", Some("flowstation"), None);
+            self.send_sip_to(response, addr, "404 Not Found");
+            return;
+        };
+        if self.find_dialog_by_call_id(Some(ctx.call_id.as_str())).is_some() {
+            tracing::info!("AsteriskEntity: rejecting duplicate inbound INVITE call-id={}", ctx.call_id);
+            let response = self.build_response(&ctx, 486, "Busy Here", Some("flowstation"), None);
+            self.send_sip_to(response, addr, "486 Busy Here");
+            return;
+        }
+
+        let Some(remote_rtp) = self.parse_sdp_remote(&msg.body) else {
+            tracing::info!("AsteriskEntity: rejecting inbound INVITE to {} without usable SDP", destination);
+            let response = self.build_response(&ctx, 488, "Not Acceptable Here", Some("flowstation"), None);
+            self.send_sip_to(response, addr, "488 Not Acceptable Here");
+            return;
+        };
+
+        let mut rtp = match self.allocate_rtp() {
+            Ok(rtp) => rtp,
+            Err(err) => {
+                self.set_error(format!("RTP allocation failed for inbound INVITE to {}: {}", destination, err));
+                let response = self.build_response(&ctx, 503, "Service Unavailable", Some("flowstation"), None);
+                self.send_sip_to(response, addr, "503 Service Unavailable");
+                return;
+            }
+        };
+        rtp.remote = Some(remote_rtp);
+
+        let uuid = Uuid::new_v4();
+        let caller_number = Self::inbound_caller_number(msg);
+        let call = NetworkCircuitCall {
+            source_issi: 0,
+            destination,
+            number: caller_number.clone(),
+            priority: 0,
+            service: 0,
+            mode: 0,
+            duplex: 0,
+            method: 0,
+            communication: 0,
+            grant: 0,
+            permission: 0,
+            timeout: 7,
+            ownership: 0,
+            queued: 0,
+        };
+        let local_tag = format!("flow{}", &uuid.to_string()[..8]);
+        let remote_tag = Self::parse_to_tag(msg.header("From"));
+        let dialog = SipDialog {
+            uuid,
+            call: call.clone(),
+            number: caller_number,
+            call_id_header: ctx.call_id.clone(),
+            local_tag,
+            remote_tag,
+            cseq: 1,
+            auth: None,
+            auth_retry_sent: false,
+            state: DialogState::Inviting,
+            rtp,
+            media_ready: None,
+            inbound: true,
+            request_context: Some(ctx.clone()),
+        };
+        self.dialogs.insert(uuid, dialog);
+
+        let response = self.build_response(&ctx, 100, "Trying", None, None);
+        self.send_sip_to(response, addr, format!("100 Trying {}", uuid));
+        tracing::info!(
+            "AsteriskEntity: inbound INVITE uuid={} caller='{}' -> ISSI {}",
+            uuid,
+            Self::inbound_caller_number(msg),
+            destination
+        );
+        queue.push_back(SapMsg {
+            sap: Sap::Control,
+            src: TetraEntity::Asterisk,
+            dest: TetraEntity::Cmce,
+            msg: SapMsgInner::CmceCallControl(CallControl::NetworkCircuitSetupRequest {
+                brew_uuid: uuid,
+                call,
+            }),
+        });
+    }
+
+    fn handle_inbound_setup_accept(&mut self, uuid: Uuid) {
+        if self.dialogs.get(&uuid).is_some_and(|dialog| dialog.inbound) {
+            tracing::info!("AsteriskEntity: inbound setup accepted by CMCE uuid={}", uuid);
+        }
+    }
+
+    fn handle_inbound_setup_reject(&mut self, uuid: Uuid, cause: u8) {
+        let Some(inbound) = self.dialogs.get(&uuid).map(|dialog| dialog.inbound) else {
+            return;
+        };
+        if !inbound {
+            return;
+        }
+        let (code, reason) = match cause {
+            2 => (486, "Busy Here"),
+            3 => (404, "Not Found"),
+            5 => (503, "Service Unavailable"),
+            _ => (480, "Temporarily Unavailable"),
+        };
+        tracing::info!(
+            "AsteriskEntity: inbound setup rejected by CMCE uuid={} cause={} -> SIP {} {}",
+            uuid,
+            cause,
+            code,
+            reason
+        );
+        self.send_invite_response(uuid, code, reason, None);
+        self.release_dialog(uuid, false);
+    }
+
+    fn handle_inbound_alert(&mut self, uuid: Uuid) {
+        let Some(dialog) = self.dialogs.get_mut(&uuid) else {
+            return;
+        };
+        if !dialog.inbound {
+            return;
+        }
+        dialog.state = DialogState::Ringing;
+        tracing::info!("AsteriskEntity: inbound call ringing uuid={}", uuid);
+        self.send_invite_response(uuid, 180, "Ringing", None);
+    }
+
+    fn handle_inbound_connect_request(&mut self, queue: &mut MessageQueue, uuid: Uuid, call: NetworkCircuitCall) {
+        let Some((inbound, rtp_port)) = self
+            .dialogs
+            .get(&uuid)
+            .map(|dialog| (dialog.inbound, dialog.rtp.local_port))
+        else {
+            return;
+        };
+        if !inbound {
+            return;
+        }
+
+        let body = self.build_sdp(rtp_port);
+        if let Some(dialog) = self.dialogs.get_mut(&uuid) {
+            dialog.call = call;
+            dialog.state = DialogState::Established;
+        }
+        tracing::info!("AsteriskEntity: inbound call answered uuid={} -> SIP 200 OK", uuid);
+        self.send_invite_response(uuid, 200, "OK", Some(body));
+        queue.push_back(SapMsg {
+            sap: Sap::Control,
+            src: TetraEntity::Asterisk,
+            dest: TetraEntity::Cmce,
+            msg: SapMsgInner::CmceCallControl(CallControl::NetworkCircuitConnectConfirm {
+                brew_uuid: uuid,
+                grant: 0,
+                permission: 0,
+            }),
+        });
+    }
+
     fn start_outbound_call(&mut self, queue: &mut MessageQueue, brew_uuid: Uuid, call: NetworkCircuitCall) {
         let number = call.number.trim().to_string();
         if number.is_empty() {
@@ -608,6 +906,8 @@ impl AsteriskEntity {
             state: DialogState::Inviting,
             rtp,
             media_ready: None,
+            inbound: false,
+            request_context: None,
         };
         self.dialogs.insert(brew_uuid, dialog);
         self.send_setup_accept(queue, brew_uuid);
@@ -659,15 +959,25 @@ impl AsteriskEntity {
     }
 
     fn release_dialog(&mut self, brew_uuid: Uuid, from_cmce: bool) {
-        let Some((cancel, media_ready)) = self
+        let Some((cancel, media_ready, inbound)) = self
             .dialogs
             .get(&brew_uuid)
-            .map(|dialog| (!matches!(dialog.state, DialogState::Established), dialog.media_ready))
+            .map(|dialog| {
+                (
+                    !matches!(dialog.state, DialogState::Established),
+                    dialog.media_ready,
+                    dialog.inbound,
+                )
+            })
         else {
             return;
         };
         if from_cmce {
-            self.send_bye_or_cancel(brew_uuid, cancel);
+            if inbound && cancel {
+                self.send_invite_response(brew_uuid, 480, "Temporarily Unavailable", None);
+            } else {
+                self.send_bye_or_cancel(brew_uuid, cancel);
+            }
         }
         if let Some((_, ts)) = media_ready {
             self.rtp_by_ts.remove(&ts);
@@ -770,6 +1080,7 @@ impl AsteriskEntity {
     fn handle_sip_message(&mut self, queue: &mut MessageQueue, msg: SipMessage, addr: SocketAddr) {
         if let Some(method) = msg.method() {
             match method {
+                "INVITE" => self.start_inbound_call(queue, &msg, addr),
                 "OPTIONS" => self.answer_request(&msg, addr, 200, "OK"),
                 "BYE" => {
                     self.answer_request(&msg, addr, 200, "OK");
@@ -999,6 +1310,19 @@ impl TetraEntityTrait for AsteriskEntity {
             SapMsgInner::CmceCallControl(CallControl::NetworkCircuitSetupRequest { brew_uuid, call }) => {
                 self.start_outbound_call(queue, brew_uuid, call);
             }
+            SapMsgInner::CmceCallControl(CallControl::NetworkCircuitSetupAccept { brew_uuid }) => {
+                self.handle_inbound_setup_accept(brew_uuid);
+            }
+            SapMsgInner::CmceCallControl(CallControl::NetworkCircuitSetupReject { brew_uuid, cause }) => {
+                self.handle_inbound_setup_reject(brew_uuid, cause);
+            }
+            SapMsgInner::CmceCallControl(CallControl::NetworkCircuitAlert { brew_uuid }) => {
+                self.handle_inbound_alert(brew_uuid);
+            }
+            SapMsgInner::CmceCallControl(CallControl::NetworkCircuitConnectRequest { brew_uuid, call }) => {
+                self.handle_inbound_connect_request(queue, brew_uuid, call);
+            }
+            SapMsgInner::CmceCallControl(CallControl::NetworkCircuitConnectConfirm { .. }) => {}
             SapMsgInner::CmceCallControl(CallControl::NetworkCircuitMediaReady { brew_uuid, call_id, ts }) => {
                 self.mark_media_ready(brew_uuid, call_id, ts);
             }

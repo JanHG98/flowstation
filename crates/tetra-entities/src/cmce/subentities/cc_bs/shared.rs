@@ -628,7 +628,7 @@ impl CcBsSubentity {
 
     pub(super) fn asterisk_route_number(&self, network_call: &NetworkCircuitCall) -> Option<String> {
         let cfg = &self.config.config().asterisk;
-        if !cfg.enabled || cfg.service_numbers.is_empty() {
+        if !cfg.enabled {
             return None;
         }
 
@@ -649,6 +649,13 @@ impl CcBsSubentity {
 
         let routed = routed.trim();
         if routed.is_empty() {
+            return None;
+        }
+
+        if cfg.service_numbers.is_empty() {
+            if !cfg.outbound_prefix.is_empty() && raw.starts_with(&cfg.outbound_prefix) {
+                return Some(routed.to_string());
+            }
             return None;
         }
 
@@ -1229,6 +1236,36 @@ service_numbers = ["600", "601"]
         CcBsSubentity::new(SharedConfig::from_parts(cfg, None))
     }
 
+    fn asterisk_open_prefix_test_cc() -> CcBsSubentity {
+        let toml = r#"
+config_version = "0.6"
+stack_mode = "Bs"
+
+[phy_io]
+backend = "None"
+
+[net_info]
+mcc = 901
+mnc = 9999
+
+[cell_info]
+main_carrier = 1584
+freq_band = 4
+freq_offset = 0
+duplex_spacing = 4
+reverse_operation = false
+location_area = 1
+
+[asterisk]
+enabled = true
+outbound_prefix = "91"
+strip_outbound_prefix = true
+codec = "PCMU"
+"#;
+        let cfg = parsing::from_toml_str(toml).expect("asterisk open-prefix test config must parse");
+        CcBsSubentity::new(SharedConfig::from_parts(cfg, None))
+    }
+
     fn network_call(destination: u32, number: &str) -> NetworkCircuitCall {
         NetworkCircuitCall {
             source_issi: 1000001,
@@ -1297,5 +1334,14 @@ service_numbers = ["600", "601"]
         assert_eq!(cc.asterisk_route_number(&network_call(0, "91600")), Some("600".to_string()));
         assert_eq!(cc.asterisk_route_number(&network_call(91602, "")), None);
         assert_eq!(cc.asterisk_route_number(&network_call(0, "91234")), None);
+    }
+
+    #[test]
+    fn asterisk_route_accepts_prefixed_numbers_when_service_list_is_empty() {
+        let cc = asterisk_open_prefix_test_cc();
+
+        assert_eq!(cc.asterisk_route_number(&network_call(91601, "")), Some("601".to_string()));
+        assert_eq!(cc.asterisk_route_number(&network_call(0, "91601")), Some("601".to_string()));
+        assert_eq!(cc.asterisk_route_number(&network_call(601, "")), None);
     }
 }
