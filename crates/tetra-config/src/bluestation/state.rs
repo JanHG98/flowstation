@@ -263,6 +263,41 @@ impl Default for AsteriskRuntimeStatus {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct DapnetRuntimeStatus {
+    pub configured: bool,
+    pub enabled: bool,
+    pub rwth_core_enabled: bool,
+    pub rwth_core_status: String,
+    pub endpoint: String,
+    pub callsign: String,
+    pub forward_sds: bool,
+    pub forward_callout: bool,
+    pub forward_telegram: bool,
+    pub seen_messages: usize,
+    pub last_rx: Option<String>,
+    pub last_error: Option<String>,
+}
+
+impl Default for DapnetRuntimeStatus {
+    fn default() -> Self {
+        Self {
+            configured: false,
+            enabled: false,
+            rwth_core_enabled: false,
+            rwth_core_status: "disabled".to_string(),
+            endpoint: String::new(),
+            callsign: String::new(),
+            forward_sds: false,
+            forward_callout: false,
+            forward_telegram: false,
+            seen_messages: 0,
+            last_rx: None,
+            last_error: None,
+        }
+    }
+}
+
 /// Mutable, stack-editable state (mutex-protected).
 #[derive(Debug, Clone)]
 pub struct StackState {
@@ -293,6 +328,8 @@ pub struct StackState {
     pub tpg2200_action_next_incident: Option<u16>,
     /// Runtime Asterisk SIP/RTP bridge status for `/api/asterisk/status` and the dashboard tab.
     pub asterisk_status: AsteriskRuntimeStatus,
+    /// Runtime DAPNET receiver/forwarding status for `/api/dapnet` and the Health tab.
+    pub dapnet_status: DapnetRuntimeStatus,
     /// Live map "identity currently reachable on a traffic channel" → (DL timeslot, usage_marker),
     /// republished every tick by CMCE call control from the live call tables (so it is never
     /// stale). Keyed by GSSI for active group calls and by each participant ISSI for connected
@@ -428,6 +465,7 @@ impl Default for StackState {
             dapnet_override: None,
             tpg2200_action_next_incident: None,
             asterisk_status: AsteriskRuntimeStatus::default(),
+            dapnet_status: DapnetRuntimeStatus::default(),
             active_call_ts: std::collections::HashMap::new(),
             ee_monitoring_windows: std::collections::HashMap::new(),
         }

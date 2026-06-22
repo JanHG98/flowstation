@@ -2852,6 +2852,10 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
           </div>
         </div>
         <div id="health-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px"></div>
+        <div style="margin-top:18px;font-size:13px;font-weight:700;color:var(--text);letter-spacing:.04em;text-transform:uppercase">Integrations</div>
+        <div id="health-integrations-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px;margin-top:10px">
+          <div class="sds-empty" style="padding:12px 0">Loading integration health…</div>
+        </div>
         <div style="margin-top:16px;font-size:12px;color:var(--text2,#9aa4b2);line-height:1.6">
           Auto-refreshes every few seconds. Levels:
           <b style="color:#3fb950">OK</b> · <b style="color:var(--warn)">DEGRADED</b> · <b style="color:var(--danger)">CRITICAL</b>.
@@ -3116,7 +3120,7 @@ const LANGS={
   en:{
     bts_ip:'BTS IP',offline:'OFFLINE',online:'ONLINE',
     brew_online:'ONLINE',brew_offline:'OFFLINE',
-    stations:'Radios',calls:'Calls',lastheard:'Last Heard',log:'Log',rf:'RF',asterisk:'Asterisk SIP',dapnet:'DAPNET',config:'Config',
+    stations:'Radios',calls:'Calls',lastheard:'Last Heard',log:'Log',rf:'RF',health:'Health',asterisk:'Asterisk SIP',dapnet:'DAPNET',config:'Config',
     sdslog:'SDS Log',th_dir:'Dir',th_from:'From',th_to:'To',th_message:'Message',no_sds:'No SDS messages yet',sds_refresh:'⟳ Refresh',
     rf_freq:'Center freq',rf_rate:'Sample rate',rf_rms:'RMS',rf_peak:'Peak',rf_age:'Snapshot',
     rf_waiting:'waiting…',rf_live:'live',rf_stale:'stale',
@@ -3226,7 +3230,7 @@ const LANGS={
   ro:{
     bts_ip:'IP BTS',offline:'DECONECTAT',online:'CONECTAT',
     brew_online:'ONLINE',brew_offline:'OFFLINE',
-    stations:'Radiouri',calls:'Apeluri',lastheard:'Ultima Activitate',log:'Log',rf:'RF',config:'Config',
+    stations:'Radiouri',calls:'Apeluri',lastheard:'Ultima Activitate',log:'Log',rf:'RF',health:'Health',config:'Config',
     sdslog:'Jurnal SDS',th_dir:'Dir',th_from:'De la',th_to:'Către',th_message:'Mesaj',no_sds:'Niciun mesaj SDS încă',sds_refresh:'⟳ Reîmprospătează',
     rf_freq:'Frecvență centru',rf_rate:'Rată eșantion',rf_rms:'RMS',rf_peak:'Vârf',rf_age:'Captură',
     rf_waiting:'în așteptare…',rf_live:'live',rf_stale:'expirat',
@@ -3325,7 +3329,7 @@ const LANGS={
   de:{
     bts_ip:'BTS-IP',offline:'OFFLINE',online:'ONLINE',
     brew_online:'ONLINE',brew_offline:'OFFLINE',
-    stations:'Radios',calls:'Anrufe',lastheard:'Zuletzt Gehört',log:'Log',rf:'RF',asterisk:'Asterisk SIP',dapnet:'DAPNET',config:'Config',
+    stations:'Radios',calls:'Anrufe',lastheard:'Zuletzt Gehört',log:'Log',rf:'RF',health:'Health',asterisk:'Asterisk SIP',dapnet:'DAPNET',config:'Config',
     sdslog:'SDS-Log',th_dir:'Ri.',th_from:'Von',th_to:'An',th_message:'Nachricht',no_sds:'Noch keine SDS-Nachrichten',sds_refresh:'⟳ Aktualisieren',
     rf_freq:'Mittenfrequenz',rf_rate:'Abtastrate',rf_rms:'RMS',rf_peak:'Spitze',rf_age:'Aufnahme',
     rf_waiting:'wartet…',rf_live:'live',rf_stale:'veraltet',
@@ -3406,7 +3410,7 @@ const LANGS={
   es:{
     bts_ip:'IP BTS',offline:'SIN CONEXIÓN',online:'EN LÍNEA',
     brew_online:'EN LÍNEA',brew_offline:'SIN CONEXIÓN',
-    stations:'Radios',calls:'Llamadas',lastheard:'Última Actividad',log:'Log',rf:'RF',config:'Config',
+    stations:'Radios',calls:'Llamadas',lastheard:'Última Actividad',log:'Log',rf:'RF',health:'Health',config:'Config',
     sdslog:'Registro SDS',th_dir:'Dir',th_from:'De',th_to:'Para',th_message:'Mensaje',no_sds:'Aún no hay mensajes SDS',sds_refresh:'⟳ Actualizar',
     rf_freq:'Frecuencia central',rf_rate:'Tasa de muestreo',rf_rms:'RMS',rf_peak:'Pico',rf_age:'Captura',
     rf_waiting:'esperando…',rf_live:'en vivo',rf_stale:'obsoleto',
@@ -3477,7 +3481,7 @@ const LANGS={
   hu:{
     bts_ip:'BTS IP',offline:'OFFLINE',online:'ONLINE',
     brew_online:'ONLINE',brew_offline:'OFFLINE',
-    stations:'Rádiók',calls:'Hívások',lastheard:'Utoljára Hallott',log:'Napló',rf:'RF',config:'Konfig',
+    stations:'Rádiók',calls:'Hívások',lastheard:'Utoljára Hallott',log:'Napló',rf:'RF',health:'Health',config:'Konfig',
     sdslog:'SDS Napló',th_dir:'Irány',th_from:'Feladó',th_to:'Címzett',th_message:'Üzenet',no_sds:'Még nincs SDS üzenet',sds_refresh:'⟳ Frissítés',
     rf_freq:'Központi frekvencia',rf_rate:'Mintavételezési ráta',rf_rms:'RMS',rf_peak:'Csúcs',rf_age:'Pillanatkép',
     rf_waiting:'várakozás…',rf_live:'élő',rf_stale:'elavult',
@@ -3540,7 +3544,7 @@ const LANGS={
   zh:{
     bts_ip:'BTS IP',offline:'离线',online:'在线',
     brew_online:'在线',brew_offline:'离线',
-    stations:'终端',calls:'通话',lastheard:'最近通话',log:'日志',rf:'RF',config:'配置',
+    stations:'终端',calls:'通话',lastheard:'最近通话',log:'日志',rf:'RF',health:'Health',config:'配置',
     sdslog:'SDS日志',th_dir:'方向',th_from:'发件',th_to:'收件',th_message:'消息',no_sds:'暂无SDS消息',sds_refresh:'⟳ 刷新',
     rf_freq:'中心频率',rf_rate:'采样率',rf_rms:'RMS',rf_peak:'峰值',rf_age:'快照',
     rf_waiting:'等待中…',rf_live:'实时',rf_stale:'已过期',
@@ -3705,7 +3709,7 @@ function closeMobileSidebar(){
 }
 
 // ── Page navigation ───────────────────────────────────────────────────────
-const PAGE_TITLES={stations:'stations',calls:'calls',lastheard:'lastheard',log:'log',sdslog:'sdslog',rf:'rf',asterisk:'asterisk',dapnet:'dapnet',config:'config',system:'system'};
+const PAGE_TITLES={stations:'stations',calls:'calls',lastheard:'lastheard',log:'log',sdslog:'sdslog',rf:'rf',health:'health',asterisk:'asterisk',dapnet:'dapnet',config:'config',system:'system'};
 function showPage(name,el){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
@@ -3715,6 +3719,7 @@ function showPage(name,el){
   document.getElementById('topbar-title').textContent=t(name)||name;
   if(name==='stations'){loadBtsInfo();}
   if(name==='sdslog'){loadSdsLog();}
+  if(name==='health'){loadHealthIntegrations();}
   if(name==='asterisk'){loadAsteriskStatus();}
   if(name==='dapnet'){loadDapnet();loadDapnetLog();}
   if(name==='config'){loadConfig();loadWhitelist();loadWx();}
@@ -5743,6 +5748,91 @@ function renderHealthTab(h){
   });
 }
 
+let healthIntegrationState={asterisk:null,dapnet:null,lastLoad:0};
+function integrationHealthCard(title,icon,level,detail,extra){
+  const col=healthColor(level);
+  const card=document.createElement('div');
+  card.style.cssText='border:1px solid var(--border,#2a2f3a);border-left:4px solid '+col+';border-radius:12px;padding:14px 16px;background:var(--bg2,#161a22)';
+  card.innerHTML=
+    '<div style="display:flex;align-items:center;gap:8px">'
+      + '<span style="font-size:18px">'+icon+'</span>'
+      + '<span style="font-weight:700;color:var(--text);flex:1">'+escHtml(title)+'</span>'
+      + '<span style="font-size:11px;font-weight:700;letter-spacing:.5px;color:'+col+';border:1px solid '+col+';border-radius:6px;padding:2px 8px">'+level.toUpperCase()+'</span>'
+    + '</div>'
+    + '<div style="margin-top:8px;font-size:13px;color:var(--text2,#9aa4b2)"><span style="opacity:.6">Status:</span> '+escHtml(detail||'')+'</div>'
+    + (extra?'<div style="margin-top:6px;font-size:13px;color:var(--text2,#9aa4b2);line-height:1.5">'+escHtml(extra)+'</div>':'');
+  return card;
+}
+function classifyAsteriskHealth(data){
+  const c=(data&&data.config)||{},rt=(data&&data.runtime)||{};
+  const enabled=!!(c.enabled||rt.enabled);
+  if(!enabled)return {level:'ok',detail:'disabled',extra:'SIP bridge is configured but not active.'};
+  const reg=String(rt.register_status||'').toLowerCase();
+  const dialogs=rt.active_dialogs??0;
+  const err=rt.last_error||'';
+  let level='ok';
+  if(err)level='degraded';
+  if(c.register && reg && !/(registered|reachable|ok|disabled)/.test(reg))level='degraded';
+  const detail=(rt.register_status||'enabled')+' · '+dialogs+' active dialog(s)';
+  const extra=err?('Last error: '+err):('Remote '+(rt.remote||c.remote||'—')+' · codec '+(rt.codec||c.codec||'—'));
+  return {level,detail,extra};
+}
+function classifyDapnetHealth(data){
+  if(!data||!data.enabled)return {level:'ok',detail:'disabled',extra:'DAPNET worker is not active.'};
+  const rt=data.runtime||{};
+  const paths=[];
+  if(data.forward_sds||rt.forward_sds)paths.push('SDS');
+  if(data.forward_callout||rt.forward_callout)paths.push('TPG2200');
+  if(data.forward_telegram||rt.forward_telegram)paths.push('Telegram');
+  let level='ok';
+  const notes=[];
+  const rwthStatus=String(rt.rwth_core_status||'').toLowerCase();
+  const lastError=rt.last_error||'';
+  if(data.rwth_core_enabled){
+    if(!data.rwth_core_callsign)notes.push('RWTH callsign missing');
+    if(!data.rwth_core_authkey_set)notes.push('RWTH authkey missing');
+    if(lastError)notes.push('Last error: '+lastError);
+    if(rwthStatus && !/(logged in|connected)/.test(rwthStatus))notes.push('RWTH status '+rt.rwth_core_status);
+  } else {
+    notes.push('RWTH receive feed disabled');
+  }
+  if(!paths.length)notes.push('no forwarding path enabled');
+  if(notes.length)level='degraded';
+  const status=rt.rwth_core_status||(data.rwth_core_enabled?'enabled':'disabled');
+  const detail='RWTH '+status+' · '+(paths.length?paths.join(', '):'no forwarding');
+  const extra=notes.length?notes.join(' · '):('Host '+(rt.endpoint||((data.rwth_core_host||'—')+':'+(data.rwth_core_port||'—')))+' · seen '+(rt.seen_messages??0)+(rt.last_rx?' · last RX '+rt.last_rx:''));
+  return {level,detail,extra};
+}
+function renderHealthIntegrations(){
+  const grid=document.getElementById('health-integrations-grid');
+  if(!grid)return;
+  grid.innerHTML='';
+  if(healthIntegrationState.asterisk){
+    const a=classifyAsteriskHealth(healthIntegrationState.asterisk);
+    grid.appendChild(integrationHealthCard('Asterisk SIP','☎',a.level,a.detail,a.extra));
+  } else {
+    grid.appendChild(integrationHealthCard('Asterisk SIP','☎','degraded','status unavailable','Open the Asterisk SIP page or wait for the next refresh.'));
+  }
+  if(healthIntegrationState.dapnet){
+    const d=classifyDapnetHealth(healthIntegrationState.dapnet);
+    grid.appendChild(integrationHealthCard('DAPNET','📟',d.level,d.detail,d.extra));
+  } else {
+    grid.appendChild(integrationHealthCard('DAPNET','📟','degraded','status unavailable','Open the DAPNET page or wait for the next refresh.'));
+  }
+}
+async function loadHealthIntegrations(){
+  healthIntegrationState.lastLoad=Date.now();
+  try{
+    const [ast,dap]=await Promise.all([
+      fetch('/api/asterisk/status').then(r=>r.ok?r.json():null).catch(()=>null),
+      fetch('/api/dapnet').then(r=>r.ok?r.json():null).catch(()=>null)
+    ]);
+    healthIntegrationState.asterisk=ast;
+    healthIntegrationState.dapnet=dap;
+  }catch{}
+  renderHealthIntegrations();
+}
+
 function handleHealth(h){
   // Topbar station-health badge: colour + label by overall level, details in the tooltip.
   const badge = document.getElementById('health-badge');
@@ -5763,6 +5853,9 @@ function handleHealth(h){
   badge.title = tip;
   // Also refresh the full Health "Looking Glass" tab.
   renderHealthTab(h);
+  if(document.getElementById('page-health')?.classList.contains('active') && Date.now()-healthIntegrationState.lastLoad>10000){
+    loadHealthIntegrations();
+  }
 }
 
 function handleSysHealth(msg){

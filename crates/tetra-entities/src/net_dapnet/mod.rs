@@ -10,7 +10,7 @@ use std::net::TcpStream;
 use std::thread;
 use std::time::Duration;
 
-use tetra_config::bluestation::{CfgDapnet, SharedConfig};
+use tetra_config::bluestation::{CfgDapnet, DapnetRuntimeStatus, SharedConfig};
 
 use crate::net_control::commands::ControlCommand;
 use crate::net_telegram::TelegramAlertSink;
@@ -87,12 +87,38 @@ impl DapnetWorker {
         }
     }
 
+    fn refresh_status(
+        &self,
+        dapnet: &CfgDapnet,
+        rwth_core_status: impl Into<String>,
+        last_rx: Option<String>,
+        last_error: Option<String>,
+    ) {
+        let mut state = self.cfg.state_write();
+        let previous_last_rx = state.dapnet_status.last_rx.clone();
+        state.dapnet_status = DapnetRuntimeStatus {
+            configured: true,
+            enabled: dapnet.enabled,
+            rwth_core_enabled: dapnet.rwth_core_enabled,
+            rwth_core_status: rwth_core_status.into(),
+            endpoint: format!("{}:{}", dapnet.rwth_core_host, dapnet.rwth_core_port),
+            callsign: dapnet.rwth_core_callsign.clone(),
+            forward_sds: dapnet.forward_sds,
+            forward_callout: dapnet.forward_callout,
+            forward_telegram: dapnet.forward_telegram,
+            seen_messages: self.seen.len(),
+            last_rx: last_rx.or(previous_last_rx),
+            last_error,
+        };
+    }
+
     fn run(&mut self) {
         loop {
             let dapnet = self.cfg.effective_dapnet();
             let sleep = Duration::from_secs(dapnet.effective_poll_interval_secs());
 
             if !dapnet.enabled {
+                self.refresh_status(&dapnet, "disabled", None, None);
                 if self.last_enabled != Some(false) {
                     tracing::info!("DAPNET integration disabled");
                     self.last_enabled = Some(false);
@@ -121,14 +147,17 @@ impl DapnetWorker {
             }
 
             if dapnet.rwth_core_enabled {
+                self.refresh_status(&dapnet, "connecting", None, None);
                 if let Err(err) = self.run_rwth_core(&dapnet) {
                     tracing::warn!("DAPNET: RWTH core receive failed: {}", err);
+                    self.refresh_status(&dapnet, "error", None, Some(err));
                 }
             } else {
                 tracing::warn!(
                     "DAPNET: enabled, but rwth_core_enabled=false; no inbound receiver is active (api_url={})",
                     dapnet.api_url
                 );
+                self.refresh_status(&dapnet, "receive disabled", None, None);
             }
 
             thread::sleep(sleep);
@@ -152,6 +181,7 @@ impl DapnetWorker {
         let addr = format!("{}:{}", host, dapnet.rwth_core_port);
         tracing::info!("DAPNET: connecting to RWTH core {} as {}", addr, callsign);
         let mut stream = TcpStream::connect(&addr).map_err(|e| format!("connect {} failed: {}", addr, e))?;
+        self.refresh_status(dapnet, "connected", None, None);
         if let Err(err) = stream.set_read_timeout(Some(TCP_READ_TIMEOUT)) {
             tracing::warn!("DAPNET: could not set TCP read timeout: {}", err);
         }
@@ -215,6 +245,7 @@ impl DapnetWorker {
             if !*logged_in {
                 tracing::info!("DAPNET: logged into RWTH core");
                 *logged_in = true;
+                self.refresh_status(dapnet, "logged in", None, None);
             }
             write_wire(stream, &format!("{line}:0000\r\n+\r\n"))?;
             return Ok(());
@@ -269,6 +300,12 @@ impl DapnetWorker {
                     tracing::debug!("DAPNET: duplicate message id={} ignored", message.id);
                     return Ok(());
                 }
+                self.refresh_status(
+                    dapnet,
+                    "logged in",
+                    Some(format!("{} from {}", message.id, message.recipient)),
+                    None,
+                );
                 self.forward_message(dapnet, &message);
                 Ok(())
             }
