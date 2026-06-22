@@ -501,6 +501,10 @@ voice_service = true
 # sds_dest_issi = 0
 # sds_dest_is_group = false
 # ric_issi_routes = { "0632585" = 2632585 }
+# ric_gssi_routes = { "0004520" = 80 }
+# sds_allowed_rics = []
+# callout_allowed_rics = []
+# telegram_allowed_rics = []
 #
 # callout_source_issi = 9999
 # callout_dest_issi = 0

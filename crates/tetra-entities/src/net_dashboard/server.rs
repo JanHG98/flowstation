@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::{Arc, Mutex, RwLock};
@@ -2796,11 +2796,69 @@ fn dapnet_ric_routes_as_json(routes: &BTreeMap<u32, u32>) -> serde_json::Value {
     serde_json::Value::Object(map)
 }
 
-fn dapnet_ric_routes_from_json(
+fn dapnet_ric_set_as_json(rics: &BTreeSet<u32>) -> serde_json::Value {
+    serde_json::Value::Array(
+        rics.iter()
+            .map(|ric| {
+                serde_json::Value::String(tetra_config::bluestation::format_ric_route_key(*ric))
+            })
+            .collect(),
+    )
+}
+
+fn dapnet_parse_ric_json_value(value: &serde_json::Value, label: &str) -> Result<u32, String> {
+    if let Some(s) = value.as_str() {
+        return tetra_config::bluestation::parse_ric_route_key(s);
+    }
+    if let Some(n) = value.as_u64() {
+        if n <= u32::MAX as u64 {
+            return Ok(n as u32);
+        }
+    }
+    Err(format!("{label}: RIC must be a string or positive integer"))
+}
+
+fn dapnet_ric_set_from_json(
     json: &serde_json::Value,
+    key: &str,
+    current: &BTreeSet<u32>,
+) -> Result<BTreeSet<u32>, String> {
+    let Some(value) = json.get(key) else {
+        return Ok(current.clone());
+    };
+    let mut rics = BTreeSet::new();
+    match value {
+        serde_json::Value::Array(items) => {
+            for item in items {
+                rics.insert(dapnet_parse_ric_json_value(item, key)?);
+            }
+        }
+        serde_json::Value::String(text) => {
+            for line_raw in text.lines() {
+                let line = line_raw.split('#').next().unwrap_or("").trim();
+                if line.is_empty() {
+                    continue;
+                }
+                for part in line.split(|c: char| c == ',' || c.is_whitespace()) {
+                    let part = part.trim();
+                    if part.is_empty() {
+                        continue;
+                    }
+                    rics.insert(tetra_config::bluestation::parse_ric_route_key(part)?);
+                }
+            }
+        }
+        _ => return Err(format!("{key} must be an array or text list")),
+    }
+    Ok(rics)
+}
+
+fn dapnet_ric_routes_from_json_key(
+    json: &serde_json::Value,
+    key: &str,
     current: &BTreeMap<u32, u32>,
 ) -> Result<BTreeMap<u32, u32>, String> {
-    let Some(value) = json.get("ric_issi_routes") else {
+    let Some(value) = json.get(key) else {
         return Ok(current.clone());
     };
     let mut routes = BTreeMap::new();
@@ -2837,9 +2895,31 @@ fn dapnet_ric_routes_from_json(
                 routes.insert(ric, issi);
             }
         }
-        _ => return Err("ric_issi_routes must be an object or text lines".to_string()),
+        _ => return Err(format!("{key} must be an object or text lines")),
     }
     Ok(routes)
+}
+
+fn dapnet_ric_routes_from_json(
+    json: &serde_json::Value,
+    current: &BTreeMap<u32, u32>,
+) -> Result<BTreeMap<u32, u32>, String> {
+    dapnet_ric_routes_from_json_key(json, "ric_issi_routes", current)
+}
+
+fn dapnet_validate_route_conflicts(
+    issi_routes: &BTreeMap<u32, u32>,
+    gssi_routes: &BTreeMap<u32, u32>,
+) -> Result<(), String> {
+    for ric in issi_routes.keys() {
+        if gssi_routes.contains_key(ric) {
+            return Err(format!(
+                "RIC {} is configured as both ISSI and GSSI route",
+                tetra_config::bluestation::format_ric_route_key(*ric)
+            ));
+        }
+    }
+    Ok(())
 }
 
 /// GET /api/dapnet — return effective DAPNET settings as JSON. Secrets are masked and are never
@@ -2868,6 +2948,10 @@ fn serve_dapnet_get(
         "sds_dest_issi": dapnet.sds_dest_issi,
         "sds_dest_is_group": dapnet.sds_dest_is_group,
         "ric_issi_routes": dapnet_ric_routes_as_json(&dapnet.ric_issi_routes),
+        "ric_gssi_routes": dapnet_ric_routes_as_json(&dapnet.ric_gssi_routes),
+        "sds_allowed_rics": dapnet_ric_set_as_json(&dapnet.sds_allowed_rics),
+        "callout_allowed_rics": dapnet_ric_set_as_json(&dapnet.callout_allowed_rics),
+        "telegram_allowed_rics": dapnet_ric_set_as_json(&dapnet.telegram_allowed_rics),
         "callout_source_issi": dapnet.callout_source_issi,
         "callout_dest_issi": dapnet.callout_dest_issi,
         "callout_incident_base": dapnet.callout_incident_base,
@@ -2919,6 +3003,42 @@ fn serve_dapnet_post(
             return;
         }
     };
+    let ric_gssi_routes =
+        match dapnet_ric_routes_from_json_key(&json, "ric_gssi_routes", &cur.ric_gssi_routes) {
+            Ok(routes) => routes,
+            Err(err) => {
+                http_response(stream, 400, &format!("Invalid DAPNET group RIC route: {err}"));
+                return;
+            }
+        };
+    if let Err(err) = dapnet_validate_route_conflicts(&ric_issi_routes, &ric_gssi_routes) {
+        http_response(stream, 400, &format!("Invalid DAPNET RIC route: {err}"));
+        return;
+    }
+    let sds_allowed_rics =
+        match dapnet_ric_set_from_json(&json, "sds_allowed_rics", &cur.sds_allowed_rics) {
+            Ok(rics) => rics,
+            Err(err) => {
+                http_response(stream, 400, &format!("Invalid SDS RIC filter: {err}"));
+                return;
+            }
+        };
+    let callout_allowed_rics =
+        match dapnet_ric_set_from_json(&json, "callout_allowed_rics", &cur.callout_allowed_rics) {
+            Ok(rics) => rics,
+            Err(err) => {
+                http_response(stream, 400, &format!("Invalid Call-Out RIC filter: {err}"));
+                return;
+            }
+        };
+    let telegram_allowed_rics =
+        match dapnet_ric_set_from_json(&json, "telegram_allowed_rics", &cur.telegram_allowed_rics) {
+            Ok(rics) => rics,
+            Err(err) => {
+                http_response(stream, 400, &format!("Invalid Telegram RIC filter: {err}"));
+                return;
+            }
+        };
 
     let ov = DapnetRuntimeOverride {
         enabled: dapnet_as_bool(&json, "enabled", cur.enabled),
@@ -2933,9 +3053,23 @@ fn serve_dapnet_post(
         sds_dest_issi: dapnet_as_u32(&json, "sds_dest_issi", cur.sds_dest_issi),
         sds_dest_is_group: dapnet_as_bool(&json, "sds_dest_is_group", cur.sds_dest_is_group),
         ric_issi_routes,
-        callout_source_issi: dapnet_as_u32(&json, "callout_source_issi", cur.callout_source_issi).max(1),
+        ric_gssi_routes,
+        sds_allowed_rics,
+        callout_allowed_rics,
+        telegram_allowed_rics,
+        callout_source_issi: dapnet_as_u32(
+            &json,
+            "callout_source_issi",
+            cur.callout_source_issi,
+        )
+        .max(1),
         callout_dest_issi: dapnet_as_u32(&json, "callout_dest_issi", cur.callout_dest_issi),
-        callout_incident_base: dapnet_as_u16(&json, "callout_incident_base", cur.callout_incident_base).clamp(1, 256),
+        callout_incident_base: dapnet_as_u16(
+            &json,
+            "callout_incident_base",
+            cur.callout_incident_base,
+        )
+        .clamp(1, 256),
         callout_text_prefix: dapnet_as_string(&json, "callout_text_prefix", &cur.callout_text_prefix),
         telegram_prefix: dapnet_as_string(&json, "telegram_prefix", &cur.telegram_prefix),
         rwth_core_enabled: dapnet_as_bool(&json, "rwth_core_enabled", cur.rwth_core_enabled),
@@ -3837,8 +3971,8 @@ fn serve_login_page(mut stream: TcpStream) {
 mod tests {
     use super::{
         binary_built_from, build_dapnet_call_payload, dapnet_ric_routes_from_json,
-        is_tpg2200_action_request, normalize_dapnet_api_url, query_params, truncate_action_text,
-        DashboardServer,
+        dapnet_ric_routes_from_json_key, dapnet_ric_set_from_json, is_tpg2200_action_request,
+        normalize_dapnet_api_url, query_params, truncate_action_text, DashboardServer,
     };
     use std::collections::BTreeMap;
     use crate::net_telemetry::TelemetryEvent;
@@ -4001,5 +4135,32 @@ mod tests {
         let routes = dapnet_ric_routes_from_json(&json, &BTreeMap::new()).unwrap();
         assert_eq!(routes.get(&632585), Some(&2632585));
         assert_eq!(routes.get(&632586), Some(&2632586));
+    }
+
+    #[test]
+    fn dapnet_group_routes_and_ric_filters_parse() {
+        let json = serde_json::json!({
+            "ric_gssi_routes": {
+                "0004520": 80
+            },
+            "sds_allowed_rics": ["0004520", "0xD0"],
+            "callout_allowed_rics": "0000200, 0000216",
+            "telegram_allowed_rics": ["0001063"]
+        });
+        let group_routes =
+            dapnet_ric_routes_from_json_key(&json, "ric_gssi_routes", &BTreeMap::new()).unwrap();
+        assert_eq!(group_routes.get(&4520), Some(&80));
+
+        let empty = std::collections::BTreeSet::new();
+        let sds = dapnet_ric_set_from_json(&json, "sds_allowed_rics", &empty).unwrap();
+        assert!(sds.contains(&4520));
+        assert!(sds.contains(&208));
+
+        let callout = dapnet_ric_set_from_json(&json, "callout_allowed_rics", &empty).unwrap();
+        assert!(callout.contains(&200));
+        assert!(callout.contains(&216));
+
+        let telegram = dapnet_ric_set_from_json(&json, "telegram_allowed_rics", &empty).unwrap();
+        assert!(telegram.contains(&1063));
     }
 }

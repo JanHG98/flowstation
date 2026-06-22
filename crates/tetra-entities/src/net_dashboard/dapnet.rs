@@ -24,24 +24,38 @@ fn toml_escape(s: &str) -> String {
     s.replace('\\', "\\\\").replace('"', "\\\"")
 }
 
+fn ric_set_toml(rics: &std::collections::BTreeSet<u32>) -> String {
+    rics.iter()
+        .map(|ric| format!("\"{}\"", tetra_config::bluestation::format_ric_route_key(*ric)))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+fn ric_routes_toml(routes: &std::collections::BTreeMap<u32, u32>) -> String {
+    routes
+        .iter()
+        .map(|(ric, ssi)| {
+            format!(
+                "\"{}\" = {}",
+                tetra_config::bluestation::format_ric_route_key(*ric),
+                ssi
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
 /// Rewrite (or insert) the `[dapnet]` section in the TOML file. A `.dapnet.bak` backup is made.
 pub fn write_dapnet_to_toml(
     config_path: &str,
     ov: &DapnetRuntimeOverride,
 ) -> std::io::Result<()> {
     let original = std::fs::read_to_string(config_path)?;
-    let ric_routes = ov
-        .ric_issi_routes
-        .iter()
-        .map(|(ric, issi)| {
-            format!(
-                "\"{}\" = {}",
-                tetra_config::bluestation::format_ric_route_key(*ric),
-                issi
-            )
-        })
-        .collect::<Vec<_>>()
-        .join(", ");
+    let ric_issi_routes = ric_routes_toml(&ov.ric_issi_routes);
+    let ric_gssi_routes = ric_routes_toml(&ov.ric_gssi_routes);
+    let sds_allowed_rics = ric_set_toml(&ov.sds_allowed_rics);
+    let callout_allowed_rics = ric_set_toml(&ov.callout_allowed_rics);
+    let telegram_allowed_rics = ric_set_toml(&ov.telegram_allowed_rics);
     let section = format!(
         "[dapnet]\n\
          enabled = {}\n\
@@ -55,7 +69,11 @@ pub fn write_dapnet_to_toml(
          sds_source_issi = {}\n\
          sds_dest_issi = {}\n\
          sds_dest_is_group = {}\n\
-         ric_issi_routes = {{{}}}\n\n\
+         ric_issi_routes = {{{}}}\n\
+         ric_gssi_routes = {{{}}}\n\
+         sds_allowed_rics = [{}]\n\
+         callout_allowed_rics = [{}]\n\
+         telegram_allowed_rics = [{}]\n\n\
          callout_source_issi = {}\n\
          callout_dest_issi = {}\n\
          callout_incident_base = {}\n\
@@ -80,7 +98,11 @@ pub fn write_dapnet_to_toml(
         ov.sds_source_issi,
         ov.sds_dest_issi,
         ov.sds_dest_is_group,
-        ric_routes,
+        ric_issi_routes,
+        ric_gssi_routes,
+        sds_allowed_rics,
+        callout_allowed_rics,
+        telegram_allowed_rics,
         ov.callout_source_issi,
         ov.callout_dest_issi,
         ov.callout_incident_base.clamp(1, 256),

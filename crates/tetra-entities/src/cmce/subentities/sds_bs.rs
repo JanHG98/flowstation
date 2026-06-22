@@ -846,7 +846,7 @@ impl SdsBsSubentity {
     /// LIP/APRS position beacons (PID 0x0A) are decoded only when their binary payload exposes a
     /// plausible WGS84 position; otherwise they still fall back to "[LIP position]". Any OTHER
     /// protocol identifier is treated as non-text and yields an empty string so binary payloads do
-    /// not show up as mojibake. Returns an ASCII string (best-effort).
+    /// not show up as mojibake. Returns a best-effort Unicode string.
     fn extract_sds_text(data: &SdsUserData) -> String {
         let bytes = data.to_arr();
         if bytes.first() == Some(&SDS_PROTOCOL_LIP) {
@@ -856,21 +856,48 @@ impl SdsBsSubentity {
                 .unwrap_or_default();
         }
 
-        // SDS-TL text messaging PIDs: 0x82 (text), 0x80/0x8A (text w/ variants). When the
-        // first byte is one of these and there is a 4-byte header, skip it. A bare text-coding-
-        // scheme byte (0x01..=0x03) is followed directly by text. Everything else is binary.
-        let payload: &[u8] = match bytes.first() {
-            Some(0x82) | Some(0x80) | Some(0x8A) if bytes.len() > 4 => &bytes[4..],
-            Some(0x01..=0x03) if bytes.len() > 1 => &bytes[1..],
+        // SDS-TL text messaging PIDs: 0x82/0x89 plus known variants. These carry
+        // [pid, msg_type, message_ref, coding_scheme, text...]. Older terminals also send
+        // bare text under PID 0x02/0x09; in that case the byte after the PID may be a coding
+        // scheme, or it may already be the first text byte.
+        let (scheme, payload): (Option<u8>, &[u8]) = match bytes.first() {
+            Some(0x82) | Some(0x80) | Some(0x8A) | Some(0x89) if bytes.len() > 4 => {
+                (Some(bytes[3]), &bytes[4..])
+            }
+            Some(0x02) | Some(0x09)
+                if bytes.len() > 2 && matches!(bytes[1], 0x01..=0x03 | 0x1A) =>
+            {
+                (Some(bytes[1]), &bytes[2..])
+            }
+            Some(0x02) | Some(0x09) if bytes.len() > 1 => (None, &bytes[1..]),
+            Some(0x01..=0x03) | Some(0x1A) if bytes.len() > 1 => (Some(bytes[0]), &bytes[1..]),
             _ => return String::new(),
         };
-        payload
-            .iter()
-            .filter(|&&b| b == b'\t' || (0x20..=0x7E).contains(&b))
-            .map(|&b| b as char)
-            .collect::<String>()
-            .trim()
-            .to_string()
+        Self::decode_sds_text_bytes(scheme, payload)
+    }
+
+    fn decode_sds_text_bytes(scheme: Option<u8>, payload: &[u8]) -> String {
+        match scheme {
+            Some(0x02) | Some(0x1A) => {
+                let words = payload
+                    .chunks_exact(2)
+                    .map(|chunk| u16::from_be_bytes([chunk[0], chunk[1]]))
+                    .collect::<Vec<_>>();
+                String::from_utf16_lossy(&words)
+                    .chars()
+                    .filter(|c| !c.is_control() || *c == '\t')
+                    .collect::<String>()
+                    .trim()
+                    .to_string()
+            }
+            _ => payload
+                .iter()
+                .filter_map(|&b| char::from_u32(b as u32))
+                .filter(|c| !c.is_control() || *c == '\t')
+                .collect::<String>()
+                .trim()
+                .to_string(),
+        }
     }
 
     fn read_lip_bits(bytes: &[u8], total_bits: usize, offset: usize, len: usize) -> Option<u32> {
@@ -1452,6 +1479,32 @@ mod tests {
         assert_eq!(
             SdsBsSubentity::extract_sds_text(&SdsUserData::Type4(16, vec![SDS_PROTOCOL_LIP, 0x00])),
             ""
+        );
+    }
+
+    #[test]
+    fn sds_text_pid_09_decodes_plain_and_coded_text() {
+        assert_eq!(
+            SdsBsSubentity::extract_sds_text(&SdsUserData::Type4(24, vec![0x09, b'O', b'K'])),
+            "OK"
+        );
+        assert_eq!(
+            SdsBsSubentity::extract_sds_text(&SdsUserData::Type4(
+                40,
+                vec![0x09, 0x01, b'H', b'i', b'!']
+            )),
+            "Hi!"
+        );
+    }
+
+    #[test]
+    fn sds_tl_text_pid_89_decodes_utf16_payload() {
+        assert_eq!(
+            SdsBsSubentity::extract_sds_text(&SdsUserData::Type4(
+                48,
+                vec![0x89, 0x04, 0x22, 0x02, 0x00, b'A']
+            )),
+            "A"
         );
     }
 }

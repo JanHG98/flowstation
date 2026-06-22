@@ -294,30 +294,56 @@ impl DapnetWorker {
 
     fn forward_message(&mut self, dapnet: &CfgDapnet, msg: &DapnetMessage) {
         let mut paths: Vec<&str> = Vec::new();
+        let mut filtered: Vec<&str> = Vec::new();
 
         if dapnet.forward_sds {
-            match self.forward_sds(dapnet, msg) {
-                Ok(()) => paths.push("sds"),
-                Err(err) => tracing::warn!("DAPNET: SDS forward failed for id={}: {}", msg.id, err),
+            if ric_allowed(&dapnet.sds_allowed_rics, msg) {
+                match self.forward_sds(dapnet, msg) {
+                    Ok(()) => paths.push("sds"),
+                    Err(err) => tracing::warn!("DAPNET: SDS forward failed for id={}: {}", msg.id, err),
+                }
+            } else {
+                filtered.push("sds");
             }
         }
 
         if dapnet.forward_callout {
-            match self.forward_callout(dapnet, msg) {
-                Ok(()) => paths.push("callout"),
-                Err(err) => tracing::warn!("DAPNET: Call-Out forward failed for id={}: {}", msg.id, err),
+            if ric_allowed(&dapnet.callout_allowed_rics, msg) {
+                match self.forward_callout(dapnet, msg) {
+                    Ok(()) => paths.push("callout"),
+                    Err(err) => tracing::warn!("DAPNET: Call-Out forward failed for id={}: {}", msg.id, err),
+                }
+            } else {
+                filtered.push("callout");
             }
         }
 
         if dapnet.forward_telegram {
-            match self.forward_telegram(dapnet, msg) {
-                Ok(()) => paths.push("telegram"),
-                Err(err) => tracing::warn!("DAPNET: Telegram forward failed for id={}: {}", msg.id, err),
+            if ric_allowed(&dapnet.telegram_allowed_rics, msg) {
+                match self.forward_telegram(dapnet, msg) {
+                    Ok(()) => paths.push("telegram"),
+                    Err(err) => tracing::warn!("DAPNET: Telegram forward failed for id={}: {}", msg.id, err),
+                }
+            } else {
+                filtered.push("telegram");
             }
         }
 
         if paths.is_empty() {
-            tracing::info!("DAPNET: received id={} recipient={} with no successful forwarding target", msg.id, msg.recipient);
+            if filtered.is_empty() {
+                tracing::info!(
+                    "DAPNET: received id={} recipient={} with no successful forwarding target",
+                    msg.id,
+                    msg.recipient
+                );
+            } else {
+                tracing::debug!(
+                    "DAPNET: received id={} recipient={} filtered out for paths={}",
+                    msg.id,
+                    msg.recipient,
+                    filtered.join(",")
+                );
+            }
         } else {
             tracing::info!(
                 "DAPNET: forwarded id={} recipient={} callsign={} paths={} timestamp={} priority={:?}",
@@ -460,6 +486,16 @@ fn resolve_sds_destination(
     msg: &DapnetMessage,
 ) -> Result<(u32, bool, String), String> {
     if let Some(ric) = msg.ric {
+        if let Some(gssi) = dapnet.ric_gssi_routes.get(&ric) {
+            return Ok((
+                *gssi,
+                true,
+                format!(
+                    "ric-group:{}",
+                    tetra_config::bluestation::format_ric_route_key(ric)
+                ),
+            ));
+        }
         if let Some(issi) = dapnet.ric_issi_routes.get(&ric) {
             return Ok((
                 *issi,
@@ -488,6 +524,16 @@ fn resolve_sds_destination(
     }
 }
 
+fn ric_allowed(allowed_rics: &std::collections::BTreeSet<u32>, msg: &DapnetMessage) -> bool {
+    if allowed_rics.is_empty() {
+        return true;
+    }
+    match msg.ric {
+        Some(ric) => allowed_rics.contains(&ric),
+        None => false,
+    }
+}
+
 fn parse_rwth_message(line: &str) -> Result<DapnetMessage, String> {
     let msg_id = rwth_line_id(line).ok_or_else(|| "invalid message id".to_string())?;
     let body = line
@@ -503,7 +549,7 @@ fn parse_rwth_message(line: &str) -> Result<DapnetMessage, String> {
     let speed = parts[1].parse::<u8>().ok();
     let ric = u32::from_str_radix(parts[2], 16).ok();
     let function = parts[3].parse::<u8>().ok();
-    let text = normalize_text(parts[4]);
+    let text = decode_dapnet_text(&normalize_text(parts[4]));
     if text.is_empty() {
         return Err("empty message text".to_string());
     }
@@ -547,6 +593,91 @@ fn normalize_text(text: &str) -> String {
         .collect::<String>()
         .trim()
         .to_string()
+}
+
+fn decode_dapnet_text(text: &str) -> String {
+    let decoded = rot1_decode(text);
+    if should_decode_rot1(text, &decoded) {
+        clean_rot1_text(&decoded)
+    } else {
+        text.to_string()
+    }
+}
+
+fn rot1_decode(text: &str) -> String {
+    text.chars()
+        .map(|c| {
+            if ('!'..='~').contains(&c) {
+                ((c as u8) - 1) as char
+            } else {
+                c
+            }
+        })
+        .collect()
+}
+
+fn clean_rot1_text(decoded: &str) -> String {
+    let stripped = strip_skyper_rubric_prefix(decoded.trim()).unwrap_or_else(|| decoded.trim());
+    skyper_charset_to_unicode(stripped.trim())
+}
+
+fn strip_skyper_rubric_prefix(text: &str) -> Option<&str> {
+    let mut chars = text.char_indices();
+    let (_, first) = chars.next()?;
+    let (_, second) = chars.next()?;
+    let (third_idx, third) = chars.next()?;
+
+    if !third.is_ascii_alphanumeric() {
+        return None;
+    }
+
+    if first == ':' && second == ' ' {
+        return Some(&text[third_idx..]);
+    }
+    if first.is_ascii_punctuation()
+        && (second.is_ascii_punctuation() || second.is_ascii_whitespace() || second.is_ascii_digit())
+    {
+        return Some(&text[third_idx..]);
+    }
+    if matches!(first, 'Q' | 'q' | 'Y' | 'y' | 'N' | 'n')
+        && (second.is_ascii_punctuation() || second.is_ascii_whitespace())
+    {
+        return Some(&text[third_idx..]);
+    }
+    None
+}
+
+fn skyper_charset_to_unicode(text: &str) -> String {
+    text.chars()
+        .map(|c| match c {
+            '[' => 'Ä',
+            '\\' => 'Ö',
+            ']' => 'Ü',
+            '{' => 'ä',
+            '|' => 'ö',
+            '}' => 'ü',
+            '~' => 'ß',
+            _ => c,
+        })
+        .collect()
+}
+
+fn should_decode_rot1(raw: &str, decoded: &str) -> bool {
+    if raw.is_empty() {
+        return false;
+    }
+    let raw_spaces = raw.chars().filter(|&c| c == ' ').count();
+    let encoded_spaces = raw.chars().filter(|&c| c == '!').count();
+    let encoded_punctuation = raw.chars().filter(|&c| matches!(c, ';' | '/' | '{' | '}')).count();
+    let decoded_spaces = decoded.chars().filter(|&c| c == ' ').count();
+
+    // DAPNET/Skyper rubrics are ROT-1 encrypted: spaces appear as '!', ':' as ';',
+    // and '.' as '/'. Plain DAPNET messages from the core already contain normal spaces
+    // and must stay untouched.
+    encoded_spaces >= 2
+        && encoded_spaces > raw_spaces
+        && decoded_spaces >= encoded_spaces
+        && encoded_punctuation > 0
 }
 
 fn extract_callsign(text: &str) -> Option<String> {
@@ -603,8 +734,9 @@ fn sanitize_log_line(line: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        dapnet_version, extract_callsign, format_plain_message, parse_rwth_message, prefixed_text,
-        resolve_sds_destination, rwth_ack_line, truncate_chars,
+        dapnet_version, decode_dapnet_text, extract_callsign, format_plain_message,
+        parse_rwth_message, prefixed_text, resolve_sds_destination, ric_allowed, rwth_ack_line,
+        truncate_chars,
     };
     use tetra_config::bluestation::CfgDapnet;
 
@@ -624,6 +756,40 @@ mod tests {
     fn parse_rwth_message_keeps_colons_in_text() {
         let msg = parse_rwth_message("#01 6:1:3EC:3:Alarm: Pumpe: Test").unwrap();
         assert_eq!(msg.text, "Alarm: Pumpe: Test");
+    }
+
+    #[test]
+    fn dapnet_text_decodes_skyper_rot1_but_keeps_plain_text() {
+        let darc_70mhz =
+            ";#EBSD;!Cvoeftsbut.Esvdltbdif!efgjojfsu!jo!Gvopuf!Sfdiutsbinfo!g~s!81.NI{.Cfusjfc";
+        let nordsee =
+            "\\&Opsetff;!33/17/37!27;41!Ifmhpmboe!Cjoofoibgfo!679/1dn!NOX;vocflboou";
+
+        assert_eq!(
+            decode_dapnet_text("Tfu!pg!JTT!bu!19;67!VUD/"),
+            "Set of ISS at 08:56 UTC."
+        );
+        assert_eq!(
+            decode_dapnet_text("R#Tfu!pg!JTT!bu!19;67!VUD/"),
+            "Set of ISS at 08:56 UTC."
+        );
+        assert_eq!(
+            decode_dapnet_text(";!EBSD;!SUUZ.Uifnfobcfoe"),
+            "DARC: RTTY-Themenabend"
+        );
+        assert_eq!(
+            decode_dapnet_text(darc_70mhz),
+            "DARC: Bundesrats-Drucksache definiert in Funote Rechtsrahmen für 70-MHz-Betrieb"
+        );
+        assert_eq!(
+            decode_dapnet_text(nordsee),
+            "Nordsee: 22.06.26 16:30 Helgoland Binnenhafen 568.0cm MNW:unbekannt"
+        );
+        assert_eq!(
+            decode_dapnet_text("5357.0 EA5FIV von DL4MFF um 1933z"),
+            "5357.0 EA5FIV von DL4MFF um 1933z"
+        );
+        assert_eq!(decode_dapnet_text("XTIME=1702220626"), "XTIME=1702220626");
     }
 
     #[test]
@@ -656,5 +822,23 @@ mod tests {
         assert_eq!(dest, 2632585);
         assert!(!is_group);
         assert_eq!(route, "ric:0632585");
+    }
+
+    #[test]
+    fn sds_destination_can_route_dapnet_ric_to_tetra_group() {
+        let msg = parse_rwth_message("#00 6:1:11A8:3:Rubric alarm").unwrap();
+        let mut dapnet = CfgDapnet::default();
+        dapnet.sds_dest_issi = 9999999;
+        dapnet.ric_gssi_routes.insert(4520, 80);
+        dapnet.sds_allowed_rics.insert(4520);
+
+        let (dest, is_group, route) = resolve_sds_destination(&dapnet, &msg).unwrap();
+        assert_eq!(dest, 80);
+        assert!(is_group);
+        assert_eq!(route, "ric-group:0004520");
+        assert!(ric_allowed(&dapnet.sds_allowed_rics, &msg));
+
+        let other = parse_rwth_message("#01 6:1:D0:3:Time sync").unwrap();
+        assert!(!ric_allowed(&dapnet.sds_allowed_rics, &other));
     }
 }

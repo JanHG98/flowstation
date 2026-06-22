@@ -2480,6 +2480,10 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
                 <label style="display:flex;align-items:center;gap:10px"><span class="sw"><input type="checkbox" id="dap-sds-group"><i></i></span><span style="color:var(--muted);font-size:12px">GSSI</span></label>
                 <label style="color:var(--muted);font-size:13px;align-self:flex-start;padding-top:8px">RIC → ISSI</label>
                 <textarea id="dap-ric-routes" class="form-input" rows="3" placeholder="0632585=2632585"></textarea>
+                <label style="color:var(--muted);font-size:13px;align-self:flex-start;padding-top:8px">RIC → GSSI</label>
+                <textarea id="dap-ric-group-routes" class="form-input" rows="3" placeholder="0004520=80"></textarea>
+                <label style="color:var(--muted);font-size:13px;align-self:flex-start;padding-top:8px">SDS RIC filter</label>
+                <textarea id="dap-sds-rics" class="form-input" rows="3" placeholder="0004520&#10;0000200"></textarea>
               </div>
             </div>
 
@@ -2494,6 +2498,8 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
                 <input type="number" id="dap-callout-incident" class="form-input" min="1" max="256" placeholder="2">
                 <label style="color:var(--muted);font-size:13px">Text prefix</label>
                 <input type="text" id="dap-callout-prefix" class="form-input" placeholder="DAPNET">
+                <label style="color:var(--muted);font-size:13px;align-self:flex-start;padding-top:8px">Call-Out RIC filter</label>
+                <textarea id="dap-callout-rics" class="form-input" rows="3" placeholder="0004520"></textarea>
               </div>
             </div>
 
@@ -2502,6 +2508,8 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
               <div style="display:grid;grid-template-columns:130px 1fr;gap:10px;align-items:center;margin-top:10px">
                 <label style="color:var(--muted);font-size:13px">Telegram prefix</label>
                 <input type="text" id="dap-telegram-prefix" class="form-input" placeholder="DAPNET">
+                <label style="color:var(--muted);font-size:13px;align-self:flex-start;padding-top:8px">Telegram RIC filter</label>
+                <textarea id="dap-telegram-rics" class="form-input" rows="3" placeholder="0004520"></textarea>
               </div>
               <div class="help-text" style="margin-top:10px">Uses the existing Telegram alert configuration and recipients.</div>
             </div>
@@ -4560,18 +4568,40 @@ function dapList(id){return dapVal(id).split(/[\s,]+/).map(s=>s.trim()).filter(B
 function dapRicRoutesText(routes){
   return Object.keys(routes||{}).sort().map(k=>`${k}=${routes[k]}`).join('\n');
 }
-function dapRicRoutesBody(){
-  const raw=dapVal('dap-ric-routes');
+function dapRicRoutesBody(id,label){
+  const raw=dapVal(id);
   const out={};
   if(!raw)return out;
   for(const lineRaw of raw.split(/\n+/)){
     const line=lineRaw.trim();
     if(!line||line.startsWith('#'))continue;
     const m=line.match(/^([0-9A-Fa-fxX]+)\s*=\s*([0-9]+)$/);
-    if(!m){setDapMsg('Invalid RIC route: '+line,false);return null;}
+    if(!m){setDapMsg(`Invalid ${label} route: ${line}`,false);return null;}
     const issi=parseInt(m[2],10);
-    if(!Number.isFinite(issi)||issi<1||issi>16777215){setDapMsg('Invalid ISSI in RIC route: '+line,false);return null;}
+    if(!Number.isFinite(issi)||issi<1||issi>16777215){setDapMsg(`Invalid SSI in ${label} route: ${line}`,false);return null;}
     out[m[1]]=issi;
+  }
+  return out;
+}
+function dapRicListText(rics){
+  if(!rics)return '';
+  if(Array.isArray(rics))return rics.join('\n');
+  return Object.keys(rics).sort().join('\n');
+}
+function dapRicListBody(id,label){
+  const raw=dapVal(id);
+  const out=[];
+  if(!raw)return out;
+  const seen=new Set();
+  for(const lineRaw of raw.split(/\n+/)){
+    const line=lineRaw.split('#')[0].trim();
+    if(!line)continue;
+    for(const partRaw of line.split(/[\s,]+/)){
+      const part=partRaw.trim();
+      if(!part)continue;
+      if(!/^(?:0x[0-9a-f]+|[0-9]+)$/i.test(part)){setDapMsg(`Invalid ${label} RIC: ${part}`,false);return null;}
+      if(!seen.has(part)){seen.add(part);out.push(part);}
+    }
   }
   return out;
 }
@@ -4619,17 +4649,29 @@ async function loadDapnet(){
     dapSet('dap-sds-dest',d.sds_dest_issi||0);
     dapCheck('dap-sds-group',d.sds_dest_is_group);
     dapSet('dap-ric-routes',dapRicRoutesText(d.ric_issi_routes));
+    dapSet('dap-ric-group-routes',dapRicRoutesText(d.ric_gssi_routes));
+    dapSet('dap-sds-rics',dapRicListText(d.sds_allowed_rics));
     dapSet('dap-callout-source',d.callout_source_issi||9999);
     dapSet('dap-callout-dest',d.callout_dest_issi||0);
     dapSet('dap-callout-incident',d.callout_incident_base||2);
     dapSet('dap-callout-prefix',d.callout_text_prefix||'DAPNET');
+    dapSet('dap-callout-rics',dapRicListText(d.callout_allowed_rics));
     dapSet('dap-telegram-prefix',d.telegram_prefix||'DAPNET');
+    dapSet('dap-telegram-rics',dapRicListText(d.telegram_allowed_rics));
     setDapMsg('',true);
   }catch{setDapMsg(t('conn_error'),false);}
 }
 async function saveDapnet(){
-  const ricRoutes=dapRicRoutesBody();
+  const ricRoutes=dapRicRoutesBody('dap-ric-routes','RIC to ISSI');
   if(ricRoutes===null)return;
+  const ricGroupRoutes=dapRicRoutesBody('dap-ric-group-routes','RIC to GSSI');
+  if(ricGroupRoutes===null)return;
+  const sdsRics=dapRicListBody('dap-sds-rics','SDS');
+  if(sdsRics===null)return;
+  const calloutRics=dapRicListBody('dap-callout-rics','Call-Out');
+  if(calloutRics===null)return;
+  const telegramRics=dapRicListBody('dap-telegram-rics','Telegram');
+  if(telegramRics===null)return;
   const body={
     enabled:document.getElementById('dap-enabled').checked,
     rwth_core_enabled:document.getElementById('dap-rwth-enabled').checked,
@@ -4649,11 +4691,15 @@ async function saveDapnet(){
     sds_dest_issi:dapNum('dap-sds-dest',0,0,16777215),
     sds_dest_is_group:document.getElementById('dap-sds-group').checked,
     ric_issi_routes:ricRoutes,
+    ric_gssi_routes:ricGroupRoutes,
+    sds_allowed_rics:sdsRics,
     callout_source_issi:dapNum('dap-callout-source',9999,1,16777215),
     callout_dest_issi:dapNum('dap-callout-dest',0,0,16777215),
     callout_incident_base:dapNum('dap-callout-incident',2,1,256),
     callout_text_prefix:dapVal('dap-callout-prefix')||'DAPNET',
-    telegram_prefix:dapVal('dap-telegram-prefix')||'DAPNET'
+    callout_allowed_rics:calloutRics,
+    telegram_prefix:dapVal('dap-telegram-prefix')||'DAPNET',
+    telegram_allowed_rics:telegramRics
   };
   if(dapPasswordDirty)body.password=dapVal('dap-password');
   if(dapAuthDirty)body.rwth_core_authkey=dapVal('dap-rwth-authkey');

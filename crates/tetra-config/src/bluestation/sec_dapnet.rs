@@ -1,5 +1,5 @@
 use serde::Deserialize;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use crate::bluestation::SecretField;
 
@@ -28,6 +28,12 @@ pub struct CfgDapnet {
     /// Config keys may use decimal RICs with leading zeros (e.g. "0632585") or hex with a
     /// `0x` prefix. Internally the key is normalized to the numeric RIC received from the core.
     pub ric_issi_routes: BTreeMap<u32, u32>,
+    /// Optional incoming DAPNET RIC/CAP-code to TETRA group GSSI routes.
+    pub ric_gssi_routes: BTreeMap<u32, u32>,
+    /// Optional per-path RIC allowlists. Empty means "allow all RICs" for that path.
+    pub sds_allowed_rics: BTreeSet<u32>,
+    pub callout_allowed_rics: BTreeSet<u32>,
+    pub telegram_allowed_rics: BTreeSet<u32>,
 
     pub callout_source_issi: u32,
     pub callout_dest_issi: u32,
@@ -63,6 +69,10 @@ impl Default for CfgDapnet {
             sds_dest_issi: 0,
             sds_dest_is_group: false,
             ric_issi_routes: BTreeMap::new(),
+            ric_gssi_routes: BTreeMap::new(),
+            sds_allowed_rics: BTreeSet::new(),
+            callout_allowed_rics: BTreeSet::new(),
+            telegram_allowed_rics: BTreeSet::new(),
 
             callout_source_issi: 9999,
             callout_dest_issi: 0,
@@ -121,6 +131,14 @@ pub struct CfgDapnetDto {
     pub sds_dest_is_group: bool,
     #[serde(default)]
     pub ric_issi_routes: HashMap<String, u32>,
+    #[serde(default)]
+    pub ric_gssi_routes: HashMap<String, u32>,
+    #[serde(default)]
+    pub sds_allowed_rics: Vec<toml::Value>,
+    #[serde(default)]
+    pub callout_allowed_rics: Vec<toml::Value>,
+    #[serde(default)]
+    pub telegram_allowed_rics: Vec<toml::Value>,
 
     #[serde(default = "default_source_issi")]
     pub callout_source_issi: u32,
@@ -170,6 +188,10 @@ impl Default for CfgDapnetDto {
             sds_dest_issi: 0,
             sds_dest_is_group: false,
             ric_issi_routes: HashMap::new(),
+            ric_gssi_routes: HashMap::new(),
+            sds_allowed_rics: Vec::new(),
+            callout_allowed_rics: Vec::new(),
+            telegram_allowed_rics: Vec::new(),
             callout_source_issi: default_source_issi(),
             callout_dest_issi: 0,
             callout_incident_base: default_callout_incident_base(),
@@ -233,6 +255,9 @@ fn default_rwth_messages_limit() -> usize {
 }
 
 pub fn apply_dapnet_patch(dto: CfgDapnetDto) -> Result<CfgDapnet, String> {
+    let ric_issi_routes = normalize_ric_ssi_routes("dapnet.ric_issi_routes", dto.ric_issi_routes)?;
+    let ric_gssi_routes = normalize_ric_ssi_routes("dapnet.ric_gssi_routes", dto.ric_gssi_routes)?;
+    ensure_no_route_conflicts(&ric_issi_routes, &ric_gssi_routes)?;
     Ok(CfgDapnet {
         enabled: dto.enabled,
         api_url: dto.api_url,
@@ -245,7 +270,20 @@ pub fn apply_dapnet_patch(dto: CfgDapnetDto) -> Result<CfgDapnet, String> {
         sds_source_issi: dto.sds_source_issi,
         sds_dest_issi: dto.sds_dest_issi,
         sds_dest_is_group: dto.sds_dest_is_group,
-        ric_issi_routes: normalize_ric_issi_routes(dto.ric_issi_routes)?,
+        ric_issi_routes,
+        ric_gssi_routes,
+        sds_allowed_rics: normalize_ric_value_list(
+            "dapnet.sds_allowed_rics",
+            dto.sds_allowed_rics,
+        )?,
+        callout_allowed_rics: normalize_ric_value_list(
+            "dapnet.callout_allowed_rics",
+            dto.callout_allowed_rics,
+        )?,
+        telegram_allowed_rics: normalize_ric_value_list(
+            "dapnet.telegram_allowed_rics",
+            dto.telegram_allowed_rics,
+        )?,
         callout_source_issi: dto.callout_source_issi,
         callout_dest_issi: dto.callout_dest_issi,
         callout_incident_base: dto.callout_incident_base.clamp(1, 256),
@@ -283,19 +321,51 @@ pub fn format_ric_route_key(ric: u32) -> String {
     format!("{ric:07}")
 }
 
-fn normalize_ric_issi_routes(routes: HashMap<String, u32>) -> Result<BTreeMap<u32, u32>, String> {
+fn normalize_ric_ssi_routes(
+    field: &str,
+    routes: HashMap<String, u32>,
+) -> Result<BTreeMap<u32, u32>, String> {
     let mut out = BTreeMap::new();
     for (raw_ric, issi) in routes {
         let ric = parse_ric_route_key(&raw_ric)?;
         if issi == 0 {
-            return Err(format!("dapnet.ric_issi_routes: ISSI for RIC {raw_ric} cannot be 0"));
+            return Err(format!("{field}: SSI for RIC {raw_ric} cannot be 0"));
         }
         if issi > 16_777_215 {
-            return Err(format!(
-                "dapnet.ric_issi_routes: ISSI for RIC {raw_ric} exceeds 16777215"
-            ));
+            return Err(format!("{field}: SSI for RIC {raw_ric} exceeds 16777215"));
         }
         out.insert(ric, issi);
     }
     Ok(out)
+}
+
+fn normalize_ric_value_list(
+    field: &str,
+    values: Vec<toml::Value>,
+) -> Result<BTreeSet<u32>, String> {
+    let mut out = BTreeSet::new();
+    for value in values {
+        let ric = match value {
+            toml::Value::String(s) => parse_ric_route_key(&s)?,
+            toml::Value::Integer(n) if n >= 0 && n <= u32::MAX as i64 => n as u32,
+            _ => return Err(format!("{field}: RIC values must be strings or positive integers")),
+        };
+        out.insert(ric);
+    }
+    Ok(out)
+}
+
+fn ensure_no_route_conflicts(
+    issi_routes: &BTreeMap<u32, u32>,
+    gssi_routes: &BTreeMap<u32, u32>,
+) -> Result<(), String> {
+    for ric in issi_routes.keys() {
+        if gssi_routes.contains_key(ric) {
+            return Err(format!(
+                "dapnet RIC {} is configured as both ISSI and GSSI route",
+                format_ric_route_key(*ric)
+            ));
+        }
+    }
+    Ok(())
 }

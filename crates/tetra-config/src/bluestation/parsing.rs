@@ -416,6 +416,10 @@ sds_source_issi = 9999
 sds_dest_issi = 1234567
 sds_dest_is_group = false
 ric_issi_routes = { "0632585" = 2632585, "0x9A70A" = 2632586 }
+ric_gssi_routes = { "0004520" = 80 }
+sds_allowed_rics = ["0632585", "0004520"]
+callout_allowed_rics = ["0004520"]
+telegram_allowed_rics = ["0000200", "0x1C40"]
 callout_source_issi = 9999
 callout_dest_issi = 1234567
 callout_incident_base = 2
@@ -475,6 +479,12 @@ sds_queue_critical = 128
         assert_eq!(cfg.dapnet.callout_incident_base, 2);
         assert_eq!(cfg.dapnet.ric_issi_routes.get(&632585), Some(&2632585));
         assert_eq!(cfg.dapnet.ric_issi_routes.get(&632586), Some(&2632586));
+        assert_eq!(cfg.dapnet.ric_gssi_routes.get(&4520), Some(&80));
+        assert!(cfg.dapnet.sds_allowed_rics.contains(&632585));
+        assert!(cfg.dapnet.sds_allowed_rics.contains(&4520));
+        assert!(cfg.dapnet.callout_allowed_rics.contains(&4520));
+        assert!(cfg.dapnet.telegram_allowed_rics.contains(&200));
+        assert!(cfg.dapnet.telegram_allowed_rics.contains(&0x1C40));
     }
 
     fn minimal_toml(extra_cell: &str) -> String {
