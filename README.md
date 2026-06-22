@@ -254,6 +254,7 @@ Available at `http://<bts-ip>:8080` when `[dashboard]` is configured.
 
 ## Credits
 
+- **Mihajlo YU4MSH** ([misadeks](https://github.com/misadeks)) for contributions to full-duplex (P2P) calls and the Home Mode Display feature + all the continued support.
 - **Harald Welte** and the **osmocom** team for foundational osmocom-tetra work
 - **Tatu Peltola** for rust-soapysdr timestamping and the native Rust Viterbi encoder/decoder used in LMAC
 - **MidnightBlueLabs** for [tetra-bluestation](https://github.com/MidnightBlueLabs/tetra-bluestation), the base this project builds on
