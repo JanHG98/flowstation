@@ -166,8 +166,16 @@ impl EcholinkAudioTranscoder {
             let mut coded_a = [0u8; TETRA_CODED_BYTES_PER_FRAME];
             let mut coded_b = [0u8; TETRA_CODED_BYTES_PER_FRAME];
             unsafe {
-                tetra_encode(self.tetra_encoder.ptr.as_ptr(), pcm_a.as_ptr(), coded_a.as_mut_ptr());
-                tetra_encode(self.tetra_encoder.ptr.as_ptr(), pcm_b.as_ptr(), coded_b.as_mut_ptr());
+                tetra_encode(
+                    self.tetra_encoder.ptr.as_ptr(),
+                    pcm_a.as_ptr(),
+                    coded_a.as_mut_ptr(),
+                );
+                tetra_encode(
+                    self.tetra_encoder.ptr.as_ptr(),
+                    pcm_b.as_ptr(),
+                    coded_b.as_mut_ptr(),
+                );
             }
             out.push(join_codec_frames_to_tmd_block(&coded_a, &coded_b));
         }
@@ -175,7 +183,9 @@ impl EcholinkAudioTranscoder {
     }
 }
 
-fn split_tmd_block_to_codec_frames(data: &[u8]) -> Option<[[u8; TETRA_CODED_BYTES_PER_FRAME]; 2]> {
+fn split_tmd_block_to_codec_frames(
+    data: &[u8],
+) -> Option<[[u8; TETRA_CODED_BYTES_PER_FRAME]; 2]> {
     let packed = if data.len() == TETRA_TMD_PACKED_BYTES + 1 {
         Some(&data[1..])
     } else if data.len() == TETRA_TMD_PACKED_BYTES {
@@ -234,5 +244,42 @@ fn get_packed_bit(data: &[u8], bit_idx: usize) -> u8 {
 fn set_packed_bit(data: &mut [u8], bit_idx: usize, bit: u8) {
     if bit & 1 != 0 {
         data[bit_idx / 8] |= 1 << (7 - (bit_idx % 8));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn codec_frames_pack_to_tmd_block_and_split_back() {
+        let mut frame_a = [0u8; TETRA_CODED_BYTES_PER_FRAME];
+        let mut frame_b = [0u8; TETRA_CODED_BYTES_PER_FRAME];
+        for bit_idx in 0..TETRA_CODED_BITS_PER_FRAME {
+            set_packed_bit(&mut frame_a, bit_idx, (bit_idx % 2) as u8);
+            set_packed_bit(&mut frame_b, bit_idx, ((bit_idx + 1) % 3 == 0) as u8);
+        }
+
+        let packed = join_codec_frames_to_tmd_block(&frame_a, &frame_b);
+        assert_eq!(packed.len(), TETRA_TMD_PACKED_BYTES);
+        let split = split_tmd_block_to_codec_frames(&packed).expect("packed block must split");
+
+        assert_eq!(split[0], frame_a);
+        assert_eq!(split[1], frame_b);
+    }
+
+    #[test]
+    fn split_accepts_tmd_block_with_leading_marker_byte() {
+        let mut packed = vec![0xaa];
+        packed.extend(join_codec_frames_to_tmd_block(
+            &[0xffu8; TETRA_CODED_BYTES_PER_FRAME],
+            &[0u8; TETRA_CODED_BYTES_PER_FRAME],
+        ));
+
+        let split = split_tmd_block_to_codec_frames(&packed).expect("marked block must split");
+        for bit_idx in 0..TETRA_CODED_BITS_PER_FRAME {
+            assert_eq!(get_packed_bit(&split[0], bit_idx), 1);
+        }
+        assert!(split[1].iter().all(|bit| *bit == 0));
     }
 }

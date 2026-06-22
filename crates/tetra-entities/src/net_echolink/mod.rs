@@ -50,7 +50,11 @@ pub enum EcholinkCommand {
 
 #[derive(Debug)]
 enum EcholinkDirectoryEvent {
-    Online { generation: u64, callsign: String },
+    Online {
+        generation: u64,
+        callsign: String,
+        stations: Vec<DirectoryStation>,
+    },
     Error { generation: u64, message: String },
 }
 
@@ -98,14 +102,18 @@ pub struct EcholinkEntity {
     cmd_rx: EcholinkCmdReceiver,
     audio_socket: Option<UdpSocket>,
     control_socket: Option<UdpSocket>,
+    audio_bind: Option<String>,
+    control_bind: Option<String>,
     dialogs: Vec<EcholinkDialog>,
     dialog_by_ts: std::collections::HashMap<u8, usize>,
     last_enabled: Option<bool>,
     last_directory_status: String,
+    directory_stations: Vec<DirectoryStation>,
     directory_event_tx: crossbeam_channel::Sender<EcholinkDirectoryEvent>,
     directory_event_rx: crossbeam_channel::Receiver<EcholinkDirectoryEvent>,
     directory_stop_tx: Option<crossbeam_channel::Sender<()>>,
     directory_generation: u64,
+    directory_config_key: Option<String>,
     last_rx: Option<String>,
     last_tx: Option<String>,
     last_error: Option<String>,
@@ -119,14 +127,18 @@ impl EcholinkEntity {
             cmd_rx,
             audio_socket: None,
             control_socket: None,
+            audio_bind: None,
+            control_bind: None,
             dialogs: Vec::new(),
             dialog_by_ts: std::collections::HashMap::new(),
             last_enabled: None,
             last_directory_status: "disabled".to_string(),
+            directory_stations: Vec::new(),
             directory_event_tx,
             directory_event_rx,
             directory_stop_tx: None,
             directory_generation: 0,
+            directory_config_key: None,
             last_rx: None,
             last_tx: None,
             last_error: None,
@@ -182,23 +194,33 @@ impl EcholinkEntity {
     }
 
     fn ensure_ports(&mut self, cfg: &CfgEcholink) -> Result<(), String> {
+        let audio_bind = format!("{}:{}", cfg.bind_addr, cfg.audio_port);
+        if self.audio_bind.as_deref() != Some(audio_bind.as_str()) {
+            self.audio_socket = None;
+            self.audio_bind = None;
+        }
         if self.audio_socket.is_none() {
-            let bind = format!("{}:{}", cfg.bind_addr, cfg.audio_port);
-            let socket = UdpSocket::bind(&bind)
-                .map_err(|e| format!("audio UDP bind {} failed: {}", bind, e))?;
+            let socket = UdpSocket::bind(&audio_bind)
+                .map_err(|e| format!("audio UDP bind {} failed: {}", audio_bind, e))?;
             socket
                 .set_nonblocking(true)
                 .map_err(|e| format!("audio UDP nonblocking failed: {}", e))?;
             self.audio_socket = Some(socket);
+            self.audio_bind = Some(audio_bind);
+        }
+        let control_bind = format!("{}:{}", cfg.bind_addr, cfg.control_port);
+        if self.control_bind.as_deref() != Some(control_bind.as_str()) {
+            self.control_socket = None;
+            self.control_bind = None;
         }
         if self.control_socket.is_none() {
-            let bind = format!("{}:{}", cfg.bind_addr, cfg.control_port);
-            let socket = UdpSocket::bind(&bind)
-                .map_err(|e| format!("control UDP bind {} failed: {}", bind, e))?;
+            let socket = UdpSocket::bind(&control_bind)
+                .map_err(|e| format!("control UDP bind {} failed: {}", control_bind, e))?;
             socket
                 .set_nonblocking(true)
                 .map_err(|e| format!("control UDP nonblocking failed: {}", e))?;
             self.control_socket = Some(socket);
+            self.control_bind = Some(control_bind);
         }
         Ok(())
     }
@@ -206,6 +228,8 @@ impl EcholinkEntity {
     fn release_ports(&mut self) {
         self.audio_socket = None;
         self.control_socket = None;
+        self.audio_bind = None;
+        self.control_bind = None;
     }
 
     fn handle_dashboard_commands(&mut self, queue: &mut MessageQueue, cfg: &CfgEcholink) {
@@ -832,74 +856,45 @@ impl EcholinkEntity {
             .position(|d| d.state != QsoState::Released && d.remote_ip == ip)
     }
 
-    fn resolve_target(&mut self, cfg: &CfgEcholink, target: &str) -> Result<IpAddr, String> {
+    fn resolve_target(&mut self, _cfg: &CfgEcholink, target: &str) -> Result<IpAddr, String> {
         if let Ok(ip) = target.parse::<IpAddr>() {
             return Ok(ip);
         }
-        self.directory_make_online(cfg)?;
-        let stations = self.directory_get_calls(cfg)?;
+        if self.directory_stations.is_empty() {
+            return Err("EchoLink directory station list is not ready yet".to_string());
+        }
         let target_upper = normalize_echolink_target(target);
         let station = if let Ok(node_id) = target_upper.parse::<u32>() {
-            stations.into_iter().find(|s| s.id == node_id)
+            self.directory_stations.iter().find(|s| s.id == node_id)
         } else {
-            stations
-                .into_iter()
-                .find(|s| s.callsign.eq_ignore_ascii_case(&target_upper))
+            self.directory_stations
+                .iter()
+                .find(|s| station_matches_target(&s.callsign, &target_upper))
         };
         station
             .map(|s| s.ip)
             .ok_or_else(|| format!("EchoLink target {target_upper} not found in directory"))
     }
 
-    fn directory_make_online(&mut self, cfg: &CfgEcholink) -> Result<(), String> {
-        directory_make_online_request(cfg)?;
-        self.last_directory_status = "online".to_string();
-        self.last_error = None;
-        Ok(())
-    }
-
-    fn directory_get_calls(&mut self, cfg: &CfgEcholink) -> Result<Vec<DirectoryStation>, String> {
-        let mut stream = directory_connect(cfg)?;
-        stream
-            .write_all(b"s")
-            .map_err(|e| format!("directory list write failed: {}", e))?;
-        let mut buf = Vec::new();
-        let mut chunk = [0u8; 4096];
-        loop {
-            match stream.read(&mut chunk) {
-                Ok(0) => break,
-                Ok(len) => {
-                    buf.extend_from_slice(&chunk[..len]);
-                    if buf.windows(3).any(|w| w == b"+++") {
-                        break;
-                    }
-                }
-                Err(err)
-                    if matches!(
-                        err.kind(),
-                        std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
-                    ) && !buf.is_empty() =>
-                {
-                    break;
-                }
-                Err(err) => return Err(format!("directory list read failed: {}", err)),
-            }
-        }
-        let text = String::from_utf8_lossy(&buf);
-        let stations = parse_directory_list(&text)?;
-        self.last_directory_status = format!("online; {} stations", stations.len());
-        Ok(stations)
-    }
-
     fn start_directory_worker(&mut self) {
         self.stop_directory_worker();
 
         let config = self.config.clone();
+        let cfg = config.effective_echolink();
+        let config_key = directory_config_key(&cfg);
         let event_tx = self.directory_event_tx.clone();
         let (stop_tx, stop_rx) = crossbeam_channel::bounded(1);
         self.directory_generation = self.directory_generation.wrapping_add(1);
         let generation = self.directory_generation;
         self.directory_stop_tx = Some(stop_tx);
+        self.directory_config_key = Some(config_key);
+        self.last_directory_status = "registering".to_string();
+        tracing::info!(
+            "EchoLink: directory registration worker starting for {} via {}:{}",
+            cfg.callsign,
+            cfg.directory_servers.join(","),
+            cfg.directory_port
+        );
 
         let spawn = thread::Builder::new()
             .name("flow-echolink-directory".to_string())
@@ -912,10 +907,26 @@ impl EcholinkEntity {
 
                     let wait = match directory_make_online_request(&cfg) {
                         Ok(()) => {
-                            let _ = event_tx.send(EcholinkDirectoryEvent::Online {
-                                generation,
-                                callsign: cfg.callsign.clone(),
-                            });
+                            match directory_get_calls_request(&cfg) {
+                                Ok(stations) => {
+                                    let _ = event_tx.send(EcholinkDirectoryEvent::Online {
+                                        generation,
+                                        callsign: cfg.callsign.clone(),
+                                        stations,
+                                    });
+                                }
+                                Err(err) => {
+                                    let _ = event_tx.send(EcholinkDirectoryEvent::Online {
+                                        generation,
+                                        callsign: cfg.callsign.clone(),
+                                        stations: Vec::new(),
+                                    });
+                                    let _ = event_tx.send(EcholinkDirectoryEvent::Error {
+                                        generation,
+                                        message: format!("directory list after ONLINE failed: {}", err),
+                                    });
+                                }
+                            }
                             DIRECTORY_REFRESH_INTERVAL
                         }
                         Err(err) => {
@@ -938,6 +949,7 @@ impl EcholinkEntity {
 
         if let Err(err) = spawn {
             self.directory_stop_tx = None;
+            self.directory_config_key = None;
             self.set_error(format!("directory worker start failed: {}", err));
         }
     }
@@ -947,6 +959,17 @@ impl EcholinkEntity {
             let _ = stop_tx.send(());
             self.directory_generation = self.directory_generation.wrapping_add(1);
         }
+        self.directory_config_key = None;
+        self.directory_stations.clear();
+    }
+
+    fn ensure_directory_worker(&mut self, cfg: &CfgEcholink) {
+        let key = directory_config_key(cfg);
+        if self.directory_stop_tx.is_none()
+            || self.directory_config_key.as_deref() != Some(key.as_str())
+        {
+            self.start_directory_worker();
+        }
     }
 
     fn poll_directory_events(&mut self) {
@@ -955,11 +978,21 @@ impl EcholinkEntity {
                 EcholinkDirectoryEvent::Online {
                     generation,
                     callsign,
+                    stations,
                 } if generation == self.directory_generation => {
-                    self.last_directory_status = "online".to_string();
+                    let station_count = stations.len();
+                    self.directory_stations = stations;
+                    self.last_directory_status = format!("online; {} stations", station_count);
                     self.last_error = None;
-                    self.last_tx = Some(format!("directory ONLINE refreshed for {}", callsign));
-                    tracing::info!("EchoLink: directory ONLINE refreshed for {}", callsign);
+                    self.last_tx = Some(format!(
+                        "directory ONLINE refreshed for {} ({} stations)",
+                        callsign, station_count
+                    ));
+                    tracing::info!(
+                        "EchoLink: directory ONLINE refreshed for {} ({} stations)",
+                        callsign,
+                        station_count
+                    );
                 }
                 EcholinkDirectoryEvent::Error {
                     generation,
@@ -1058,9 +1091,7 @@ impl TetraEntityTrait for EcholinkEntity {
                 if self.last_directory_status == "disabled" {
                     self.last_directory_status = "ports ready".to_string();
                 }
-                if self.directory_stop_tx.is_none() {
-                    self.start_directory_worker();
-                }
+                self.ensure_directory_worker(&cfg);
                 self.poll_directory_events();
                 self.handle_dashboard_commands(queue, &cfg);
                 self.poll_control(queue, &cfg);
@@ -1083,7 +1114,7 @@ fn target_allowed(cfg: &CfgEcholink, target: &str) -> bool {
     if cfg.allowed_callsigns.is_empty() && cfg.allowed_node_ids.is_empty() {
         return true;
     }
-    if cfg.allowed_callsigns.iter().any(|c| c.eq_ignore_ascii_case(target)) {
+    if cfg.allowed_callsigns.iter().any(|c| station_matches_target(c, target)) {
         return true;
     }
     target
@@ -1091,6 +1122,15 @@ fn target_allowed(cfg: &CfgEcholink, target: &str) -> bool {
         .ok()
         .map(|id| cfg.allowed_node_ids.contains(&id))
         .unwrap_or(false)
+}
+
+fn station_matches_target(station: &str, target: &str) -> bool {
+    if station.eq_ignore_ascii_case(target) {
+        return true;
+    }
+    station
+        .trim_matches('*')
+        .eq_ignore_ascii_case(target.trim_matches('*'))
 }
 
 fn route_label(cfg: &CfgEcholink) -> Option<String> {
@@ -1112,6 +1152,20 @@ fn directory_description(status_text: &str) -> String {
         .map(|ch| if ch == '\r' || ch == '\n' { ' ' } else { ch })
         .take(DIRECTORY_DESCRIPTION_MAX_CHARS)
         .collect()
+}
+
+fn directory_config_key(cfg: &CfgEcholink) -> String {
+    format!(
+        "{}\u{1f}{}\u{1f}{}\u{1f}{}\u{1f}{}\u{1f}{}:{}:{}",
+        cfg.callsign,
+        cfg.password.as_ref(),
+        cfg.status_text,
+        cfg.directory_servers.join("\u{1e}"),
+        cfg.directory_port,
+        cfg.bind_addr,
+        cfg.audio_port,
+        cfg.control_port
+    )
 }
 
 fn directory_make_online_request(cfg: &CfgEcholink) -> Result<(), String> {
@@ -1141,6 +1195,37 @@ fn directory_make_online_request(cfg: &CfgEcholink) -> Result<(), String> {
     } else {
         Err(format!("directory ONLINE rejected: {}", reply.trim()))
     }
+}
+
+fn directory_get_calls_request(cfg: &CfgEcholink) -> Result<Vec<DirectoryStation>, String> {
+    let mut stream = directory_connect(cfg)?;
+    stream
+        .write_all(b"s")
+        .map_err(|e| format!("directory list write failed: {}", e))?;
+    let mut buf = Vec::new();
+    let mut chunk = [0u8; 4096];
+    loop {
+        match stream.read(&mut chunk) {
+            Ok(0) => break,
+            Ok(len) => {
+                buf.extend_from_slice(&chunk[..len]);
+                if buf.windows(3).any(|w| w == b"+++") {
+                    break;
+                }
+            }
+            Err(err)
+                if matches!(
+                    err.kind(),
+                    std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+                ) && !buf.is_empty() =>
+            {
+                break;
+            }
+            Err(err) => return Err(format!("directory list read failed: {}", err)),
+        }
+    }
+    let text = String::from_utf8_lossy(&buf);
+    parse_directory_list(&text)
 }
 
 fn directory_connect(cfg: &CfgEcholink) -> Result<TcpStream, String> {
@@ -1336,4 +1421,16 @@ fn parse_directory_list(text: &str) -> Result<Vec<DirectoryStation>, String> {
         }
     }
     Ok(stations)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn echolink_conference_targets_match_with_or_without_stars() {
+        assert!(station_matches_target("*ECHOTEST*", "ECHOTEST"));
+        assert!(station_matches_target("ECHOTEST", "*ECHOTEST*"));
+        assert!(station_matches_target("*ECHOTEST*", "*ECHOTEST*"));
+    }
 }
