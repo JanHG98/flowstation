@@ -69,6 +69,12 @@ impl CmceBs {
                     cep.respond(ControlResponse::SendSdsResponse { handle, success });
                 }
             }
+            ControlCommand::SendRawSdsType4 { handle, .. } => {
+                let success = sds.rx_sds_from_control(queue, cmd);
+                if let Some(cep) = responder {
+                    cep.respond(ControlResponse::SendSdsResponse { handle, success });
+                }
+            }
             ControlCommand::KickMs { issi } => {
                 let groups: Vec<u32> = cc.subscriber_groups_for(issi);
                 if !groups.is_empty() {

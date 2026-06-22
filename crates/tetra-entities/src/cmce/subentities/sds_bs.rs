@@ -138,6 +138,10 @@ impl SdsBsSubentity {
         }
     }
 
+    fn format_hex_bytes(bytes: &[u8]) -> String {
+        bytes.iter().map(|b| format!("{:02X}", b)).collect::<Vec<_>>().join(", ")
+    }
+
     // ── Emergency state (status-based) ──────────────────────────────────────────
     //
     // A radio signals emergency with a U-STATUS (pre-coded status Emergency, status 0), re-sent
@@ -353,11 +357,14 @@ impl SdsBsSubentity {
         let dest_ssi = dest_ssi_raw as u32;
         let source_ssi = calling_party.ssi;
 
+        let payload = pdu.user_defined_data.to_arr();
         tracing::info!(
-            "SDS: U-SDS-DATA from ISSI {} to ISSI {}, type={}",
+            "SDS: U-SDS-DATA from ISSI {} to ISSI {}, type={}, {} bits, [{}]",
             source_ssi,
             dest_ssi,
-            pdu.user_defined_data.type_identifier()
+            pdu.user_defined_data.type_identifier(),
+            pdu.user_defined_data.length_bits(),
+            Self::format_hex_bytes(&payload)
         );
 
         // Record every inbound SDS-DATA in the dashboard SDS Log, regardless of how it is
@@ -478,18 +485,58 @@ impl SdsBsSubentity {
 
     /// Handle incoming SDS data from Control entity (network-originated SDS)
     pub fn rx_sds_from_control(&mut self, queue: &mut MessageQueue, message: ControlCommand) -> bool {
-        let ControlCommand::SendSds {
-            handle,
-            source_ssi,
-            dest_ssi,
-            dest_is_group,
-            len_bits,
-            payload,
-        } = message
-        else {
-            tracing::error!("SDS: rx_sds_from_control expected SendSds command, got unexpected command type");
-            return false;
+        let (handle, source_ssi, dest_ssi, dest_is_group, len_bits, payload, raw_type4) = match message {
+            ControlCommand::SendRawSdsType4 {
+                handle,
+                source_ssi,
+                dest_ssi,
+                dest_is_group,
+                len_bits,
+                payload,
+            } => (handle, source_ssi, dest_ssi, dest_is_group, len_bits, payload, true),
+            ControlCommand::SendSds {
+                handle,
+                source_ssi,
+                dest_ssi,
+                dest_is_group,
+                len_bits,
+                payload,
+            } => (handle, source_ssi, dest_ssi, dest_is_group, len_bits, payload, false),
+            other => {
+                tracing::error!(
+                    "SDS: rx_sds_from_control expected SDS command, got unexpected command type {:?}",
+                    other
+                );
+                return false;
+            }
         };
+
+        if raw_type4 {
+            tracing::info!(
+                "SDS: RAW Type4 from Control {}: {} -> {}, type={}, {} bits, [{}]",
+                handle,
+                source_ssi,
+                dest_ssi,
+                if dest_is_group { "GSSI" } else { "ISSI" },
+                len_bits,
+                Self::format_hex_bytes(&payload)
+            );
+
+            let sds_data = SdsUserData::Type4(len_bits, payload);
+
+            // Log the dashboard-originated raw SDS before sending it downlink.
+            self.log_sds("tx", source_ssi, dest_ssi, dest_is_group, &sds_data);
+
+            self.send_d_sds_data(
+                queue,
+                source_ssi,
+                dest_ssi,
+                if dest_is_group { SsiType::Gssi } else { SsiType::Issi },
+                sds_data,
+            );
+
+            return true;
+        }
 
         tracing::info!(
             "SDS: received from Control {}: {} -> {}, type={}, {} bits",

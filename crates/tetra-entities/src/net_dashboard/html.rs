@@ -2863,6 +2863,33 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
       <label class="form-label" data-i18n="sds_msg_label">Message</label>
       <input type="text" id="sds-msg" class="form-input" placeholder="..." maxlength="160">
     </div>
+    <div class="form-row">
+      <label class="form-label" style="display:flex;align-items:center;gap:8px">
+        <input type="checkbox" id="sds-callout" onchange="toggleSdsCallout()">
+        <span data-i18n="sds_callout_enable">TPG2200 Call-Out / Alarm senden</span>
+      </label>
+    </div>
+    <div id="sds-callout-fields" style="display:none">
+      <div class="form-row">
+        <label class="form-label" data-i18n="sds_callout_source">Source ISSI</label>
+        <input type="number" id="sds-callout-source" class="form-input" value="9999" min="1">
+      </div>
+      <div class="form-row">
+        <label class="form-label" data-i18n="sds_callout_incident">Vorfallnummer</label>
+        <input type="number" id="sds-callout-incident" class="form-input" value="1" min="1" max="256">
+      </div>
+      <div class="form-row">
+        <label class="form-label" data-i18n="sds_callout_text">Alarmtext</label>
+        <input type="text" id="sds-callout-text" class="form-input" value="ALARM" maxlength="120">
+      </div>
+      <div class="form-row">
+        <label class="form-label" data-i18n="sds_callout_raw">Raw Hex Payload optional</label>
+        <input type="text" id="sds-callout-raw" class="form-input" placeholder="C3 00 09 0D 10 11 27 0F 02 30 8D 41 4C 41 52 4D">
+      </div>
+      <div class="form-row" style="font-size:12px;color:var(--muted);line-height:1.45" data-i18n="sds_callout_help">
+        Vorfall 1-15 use the confirmed byte formula (N &lt;&lt; 4) | 0x01: 1=11, 2=21, 3=31, 4=41. Vorfall 16-256 use the extended one-byte selector. Raw Hex overrides automatic payload generation.
+      </div>
+    </div>
     <div class="modal-actions">
       <button class="btn" onclick="closeSdsModal()" data-i18n="cancel">Cancel</button>
       <button class="btn btn-primary" onclick="sendSds()" data-i18n="send">Send</button>
@@ -2948,6 +2975,12 @@ const LANGS={
     wx_periodic_icao:'Station ICAO',wx_periodic_dest:'Destination',wx_periodic_isgroup:'Destination is group',wx_periodic_isgroup_hint:'(GSSI instead of individual ISSI)',
     wx_periodic_interval:'Interval (seconds)',wx_interval_hint:'Minimum 300 s (5 min) to avoid hammering the weather API.',wx_periodic_incomplete:'Set both station ICAO and destination for periodic mode.',
     sds_title:'⬡ Send SDS Message',sds_dest:'Destination ISSI',
+    sds_callout_enable:'TPG2200 Call-Out / Send alarm',
+    sds_callout_source:'Source ISSI',
+    sds_callout_incident:'Incident number',
+    sds_callout_text:'Alarm text',
+    sds_callout_raw:'Raw Hex Payload optional',
+    sds_callout_help:'Incidents 1-15 use the confirmed byte formula (N << 4) | 0x01: 1=11, 2=21, 3=31, 4=41. Incidents 16-256 use the extended one-byte selector. Raw Hex overrides automatic payload generation.',
     live_sds_desc:'Broadcast a text message to all radios on the cell, repeating at the Home Mode Display interval. Repeats until deleted or the repeat count is reached.',
     live_sds_text:'Message text (max 251 chars)',live_sds_repeat:'Repeat (0=∞)',live_sds_send:'📢 Broadcast',
     live_sds_clear_all:'Clear All',live_sds_empty:'No active broadcasts.',
@@ -3151,6 +3184,12 @@ const LANGS={
     live_sds_sent:'gesendet',live_sds_times:'×',live_sds_forever:'∞',live_sds_delete:'✕',
     fallback_title:'⚠ FALLBACK-KONFIGURATION AKTIV — Primäre Konfiguration konnte nicht geladen werden',
     sds_title:'⬡ SDS-Nachricht senden',sds_dest:'Ziel-ISSI',
+    sds_callout_enable:'TPG2200 Call-Out / Alarm senden',
+    sds_callout_source:'Source ISSI',
+    sds_callout_incident:'Vorfallnummer',
+    sds_callout_text:'Alarmtext',
+    sds_callout_raw:'Raw Hex Payload optional',
+    sds_callout_help:'Vorfall 1-15 nutzen die bestätigte Byte-Formel (N << 4) | 0x01: 1=11, 2=21, 3=31, 4=41. Vorfall 16-256 nutzen den erweiterten Ein-Byte-Selector. Raw Hex überschreibt die automatische Payload.',
     sds_msg_label:'Nachricht',cancel:'Abbrechen',send:'Senden',
     th_issi:'ISSI',th_groups:'Gruppen',th_ee:'Energiesparen',th_signal:'Signal',
     th_status:'Status',th_last_seen:'Zuletzt',th_actions:'Aktionen',
@@ -4589,9 +4628,11 @@ function wsSend(msg){if(ws&&ws.readyState===WebSocket.OPEN){ws.send(JSON.stringi
 async function restartService(){if(!confirm(t('confirm_restart')))return;wsSend({type:'restart'});}
 async function shutdownService(){if(!confirm(t('confirm_shutdown')))return;wsSend({type:'shutdown'});}
 function kickMs(issi){if(!confirm(t('confirm_kick',{issi})))return;wsSend({type:'kick',issi});}
-function openSds(issi){sdsDest=issi;document.getElementById('sds-dest').value=issi;document.getElementById('sds-msg').value='';document.getElementById('sds-modal').classList.add('open');}
+function toggleSdsCallout(){const on=document.getElementById('sds-callout').checked;document.getElementById('sds-callout-fields').style.display=on?'block':'none';}
+function resetSdsCallout(){document.getElementById('sds-callout').checked=false;document.getElementById('sds-callout-source').value='9999';document.getElementById('sds-callout-incident').value='1';document.getElementById('sds-callout-text').value='ALARM';document.getElementById('sds-callout-raw').value='';toggleSdsCallout();}
+function openSds(issi){sdsDest=issi;document.getElementById('sds-dest').value=issi;document.getElementById('sds-msg').value='';resetSdsCallout();document.getElementById('sds-modal').classList.add('open');}
 function closeSdsModal(){document.getElementById('sds-modal').classList.remove('open');}
-function sendSds(){const dest=parseInt(document.getElementById('sds-dest').value),msg=document.getElementById('sds-msg').value.trim();if(!dest||!msg)return;wsSend({type:'sds',dest_issi:dest,message:msg});closeSdsModal();}
+function sendSds(){const dest=parseInt(document.getElementById('sds-dest').value);if(!dest)return;if(document.getElementById('sds-callout').checked){const source=parseInt(document.getElementById('sds-callout-source').value)||9999;const incident=Math.max(1,Math.min(256,parseInt(document.getElementById('sds-callout-incident').value)||1));const alarmText=document.getElementById('sds-callout-text').value.trim()||'ALARM';const rawhex=document.getElementById('sds-callout-raw').value.trim();wsSend({type:'sds_callout',dest_issi:dest,source_issi:source,incident,message:alarmText,raw_hex:rawhex});closeSdsModal();return;}const msg=document.getElementById('sds-msg').value.trim();if(!msg)return;wsSend({type:'sds',dest_issi:dest,message:msg});closeSdsModal();}
 function openDgna(issi){document.getElementById('dgna-issi').value=issi;document.getElementById('dgna-gssi').value='';const cur=document.getElementById('dgna-current');const gl=(state.ms[issi]&&state.ms[issi].groups)||[];cur.innerHTML=gl.length?gl.slice().sort((a,b)=>a-b).map(g=>`<span class="badge badge-blue" style="font-size:10px">${g}</span>`).join(''):'<span class="badge badge-dim">—</span>';document.getElementById('dgna-modal').classList.add('open');}
 function closeDgnaModal(){document.getElementById('dgna-modal').classList.remove('open');}
 function sendDgna(attach){const issi=parseInt(document.getElementById('dgna-issi').value),gssi=parseInt(document.getElementById('dgna-gssi').value);if(!issi||!gssi)return;wsSend({type:'dgna',issi,gssi,attach});closeDgnaModal();}

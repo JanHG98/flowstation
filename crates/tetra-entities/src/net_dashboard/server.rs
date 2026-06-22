@@ -1845,6 +1845,84 @@ fn handle_ws(stream: TcpStream, state: DashboardState, clients: WsClients,
     }
 }
 
+fn format_hex_bytes(bytes: &[u8]) -> String {
+    bytes
+        .iter()
+        .map(|b| format!("{:02X}", b))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+fn parse_dashboard_hex_payload(raw: &str) -> Result<Vec<u8>, String> {
+    let normalized: String = raw
+        .chars()
+        .map(|c| {
+            if c.is_ascii_whitespace() || matches!(c, ',' | ';' | ':' | '-') {
+                ' '
+            } else {
+                c
+            }
+        })
+        .collect();
+    let mut bytes = Vec::new();
+    for token in normalized.split_whitespace() {
+        let hex = token
+            .strip_prefix("0x")
+            .or_else(|| token.strip_prefix("0X"))
+            .unwrap_or(token);
+        if hex.is_empty() {
+            return Err(format!("hex token '{}' has no digits", token));
+        }
+        if hex.len() % 2 != 0 {
+            return Err(format!("hex token '{}' has an odd number of digits", token));
+        }
+        for pos in (0..hex.len()).step_by(2) {
+            let pair = &hex[pos..pos + 2];
+            let byte = u8::from_str_radix(pair, 16).map_err(|_| format!("invalid hex byte '{}'", pair))?;
+            bytes.push(byte);
+        }
+    }
+    Ok(bytes)
+}
+
+fn iso_8859_1_or_ascii_bytes(text: &str) -> Vec<u8> {
+    text.chars()
+        .map(|c| {
+            let code = c as u32;
+            if code <= 0xFF { code as u8 } else { b'?' }
+        })
+        .collect()
+}
+
+fn tpg2200_incident_byte(incident: u16) -> u8 {
+    let incident = incident.clamp(1, 256);
+    // Confirmed on-air: 1..15 map to 0x11, 0x21, ... 0xF1. The extended range
+    // keeps those values and walks the second nibble so all 256 selector bytes
+    // are reachable; Raw Hex remains available for exact protocol experiments.
+    let zero_based = incident - 1;
+    let major = ((zero_based + 1) & 0x0F) as u8;
+    let minor = (((zero_based / 16) + 1) & 0x0F) as u8;
+    (major << 4) | minor
+}
+
+fn build_tpg2200_callout_payload(incident: u16, message: &str) -> Vec<u8> {
+    let mut payload = vec![
+        0xC3,
+        0x00,
+        0x09,
+        0x0D,
+        0x10,
+        tpg2200_incident_byte(incident),
+        0x27,
+        0x0F,
+        0x02,
+        0x30,
+        0x8D,
+    ];
+    payload.extend_from_slice(&iso_8859_1_or_ascii_bytes(message));
+    payload
+}
+
 fn handle_ws_command(text: &str, state: &DashboardState, cmd_tx: &Arc<Mutex<Option<CmdSender>>>, update_state: &SharedUpdateState) {
     let Ok(v) = serde_json::from_str::<serde_json::Value>(text) else { return };
 
@@ -1927,6 +2005,84 @@ fn handle_ws_command(text: &str, state: &DashboardState, cmd_tx: &Arc<Mutex<Opti
             });
             let mut s = state.write().unwrap();
             s.push_log("INFO", format!("SDS sent to {}: {}", dest, msg_text));
+        }
+        Some("sds_callout") => {
+            let dest = v.get("dest_issi").and_then(|i| i.as_u64()).unwrap_or(0) as u32;
+            if dest == 0 { return; }
+            let source_issi = match v.get("source_issi").and_then(|i| i.as_u64()) {
+                Some(0) | None => 9999,
+                Some(source) => source.min(u32::MAX as u64) as u32,
+            };
+            let incident = v
+                .get("incident")
+                .and_then(|i| i.as_u64())
+                .unwrap_or(1)
+                .clamp(1, 256) as u16;
+            let message_input = v
+                .get("message")
+                .and_then(|m| m.as_str())
+                .unwrap_or("ALARM")
+                .trim();
+            let alarm_text = if message_input.is_empty() {
+                "ALARM".to_string()
+            } else {
+                message_input.to_string()
+            };
+            let raw_hex = v.get("raw_hex").and_then(|m| m.as_str()).unwrap_or("").trim();
+
+            let payload = if raw_hex.is_empty() {
+                build_tpg2200_callout_payload(incident, &alarm_text)
+            } else {
+                match parse_dashboard_hex_payload(raw_hex) {
+                    Ok(payload) => payload,
+                    Err(e) => {
+                        tracing::warn!("Dashboard: invalid TPG2200 raw hex payload: {}", e);
+                        let mut s = state.write().unwrap();
+                        s.push_log("WARN", format!("TPG2200 Call-Out not sent: invalid raw hex ({})", e));
+                        return;
+                    }
+                }
+            };
+            if payload.is_empty() {
+                tracing::warn!("Dashboard: TPG2200 Call-Out not sent: empty payload");
+                let mut s = state.write().unwrap();
+                s.push_log("WARN", "TPG2200 Call-Out not sent: empty payload".to_string());
+                return;
+            }
+            if payload.len() > (u16::MAX as usize / 8) {
+                tracing::warn!("Dashboard: TPG2200 Call-Out payload too large: {} bytes", payload.len());
+                let mut s = state.write().unwrap();
+                s.push_log(
+                    "WARN",
+                    format!("TPG2200 Call-Out not sent: payload too large ({} bytes)", payload.len()),
+                );
+                return;
+            }
+            let len_bits = (payload.len() * 8) as u16;
+            tracing::info!(
+                "Dashboard: TPG2200 Call-Out to {} incident={} source={} text={:?} payload=[{}]",
+                dest,
+                incident,
+                source_issi,
+                alarm_text,
+                format_hex_bytes(&payload)
+            );
+
+            if !send_cmd(ControlCommand::SendRawSdsType4 {
+                handle: 0,
+                source_ssi: source_issi,
+                dest_ssi: dest,
+                dest_is_group: false,
+                len_bits,
+                payload,
+            }) {
+                tracing::warn!("Dashboard: no control dispatcher for TPG2200 Call-Out");
+            }
+            let mut s = state.write().unwrap();
+            s.push_log(
+                "INFO",
+                format!("TPG2200 Call-Out sent to {}: incident {} text {}", dest, incident, alarm_text),
+            );
         }
         Some("dgna") => {
             let issi = v.get("issi").and_then(|i| i.as_u64()).unwrap_or(0) as u32;
@@ -3125,7 +3281,10 @@ fn serve_login_page(mut stream: TcpStream) {
 
 #[cfg(test)]
 mod tests {
-    use super::{binary_built_from, DashboardServer};
+    use super::{
+        binary_built_from, build_tpg2200_callout_payload, parse_dashboard_hex_payload,
+        tpg2200_incident_byte, DashboardServer,
+    };
     use crate::net_telemetry::TelemetryEvent;
 
     /// FH-BUG (brew shown as v0): the transport reports version 0 ("unknown") on every (re)connect
@@ -3136,15 +3295,27 @@ mod tests {
         let server = DashboardServer::new("/tmp/fs_brew_ver_test_config.toml".to_string());
         let v = || server.state.read().unwrap().brew_version;
 
-        server.handle_telemetry(TelemetryEvent::BrewConnected { connected: true, server_version: 0 });
+        server.handle_telemetry(TelemetryEvent::BrewConnected {
+            connected: true,
+            server_version: 0,
+        });
         assert_eq!(v(), 0, "initial connect reports unknown");
 
-        server.handle_telemetry(TelemetryEvent::BrewConnected { connected: true, server_version: 1 });
+        server.handle_telemetry(TelemetryEvent::BrewConnected {
+            connected: true,
+            server_version: 1,
+        });
         assert_eq!(v(), 1, "a v1 group call raises it to v1");
 
         // Disconnect then reconnect, transport again reports 0 — must NOT downgrade.
-        server.handle_telemetry(TelemetryEvent::BrewConnected { connected: false, server_version: 0 });
-        server.handle_telemetry(TelemetryEvent::BrewConnected { connected: true, server_version: 0 });
+        server.handle_telemetry(TelemetryEvent::BrewConnected {
+            connected: false,
+            server_version: 0,
+        });
+        server.handle_telemetry(TelemetryEvent::BrewConnected {
+            connected: true,
+            server_version: 0,
+        });
         assert_eq!(v(), 1, "reconnect reporting v0 must not downgrade a confirmed v1");
     }
 
@@ -3160,5 +3331,47 @@ mod tests {
         // No usable hash baked in -> cannot tell.
         assert_eq!(binary_built_from("unknown", head), None);
         assert_eq!(binary_built_from("", head), None);
+    }
+
+    #[test]
+    fn tpg2200_incident_byte_preserves_confirmed_values_and_covers_256_ids() {
+        assert_eq!(tpg2200_incident_byte(1), 0x11);
+        assert_eq!(tpg2200_incident_byte(2), 0x21);
+        assert_eq!(tpg2200_incident_byte(3), 0x31);
+        assert_eq!(tpg2200_incident_byte(4), 0x41);
+        assert_eq!(tpg2200_incident_byte(15), 0xF1);
+        assert_eq!(tpg2200_incident_byte(16), 0x01);
+        assert_eq!(tpg2200_incident_byte(256), 0x00);
+
+        let selectors = (1..=256)
+            .map(tpg2200_incident_byte)
+            .collect::<std::collections::HashSet<_>>();
+        assert_eq!(selectors.len(), 256);
+    }
+
+    #[test]
+    fn parse_dashboard_hex_payload_accepts_common_separators_and_prefixes() {
+        assert_eq!(
+            parse_dashboard_hex_payload("C3 00,0x09;0D:10-21").unwrap(),
+            vec![0xC3, 0x00, 0x09, 0x0D, 0x10, 0x21]
+        );
+        assert_eq!(
+            parse_dashboard_hex_payload("C300090D").unwrap(),
+            vec![0xC3, 0x00, 0x09, 0x0D]
+        );
+        assert!(parse_dashboard_hex_payload("C3 0X").is_err());
+        assert!(parse_dashboard_hex_payload("C3 0").is_err());
+    }
+
+    #[test]
+    fn build_tpg2200_callout_payload_matches_known_alarm_shape() {
+        assert_eq!(
+            build_tpg2200_callout_payload(1, "ALARM"),
+            vec![
+                0xC3, 0x00, 0x09, 0x0D, 0x10, 0x11, 0x27, 0x0F, 0x02, 0x30, 0x8D, 0x41,
+                0x4C, 0x41, 0x52, 0x4D
+            ]
+        );
+        assert_eq!(build_tpg2200_callout_payload(2, "ALARM")[5], 0x21);
     }
 }
