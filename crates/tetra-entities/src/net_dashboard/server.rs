@@ -10,6 +10,7 @@ use crate::net_dashboard::html::DASHBOARD_HTML;
 use crate::net_dashboard::state::{DashboardState, DashboardStateInner, MsEntry, CallEntry};
 use crate::net_telemetry::TelemetryEvent;
 use crate::net_control::commands::ControlCommand;
+use crate::tpg2200::{build_sds_text_payload, build_tpg2200_callout_payload, format_hex_bytes, parse_hex_payload};
 
 type CmdSender = crossbeam_channel::Sender<ControlCommand>;
 
@@ -1845,84 +1846,6 @@ fn handle_ws(stream: TcpStream, state: DashboardState, clients: WsClients,
     }
 }
 
-fn format_hex_bytes(bytes: &[u8]) -> String {
-    bytes
-        .iter()
-        .map(|b| format!("{:02X}", b))
-        .collect::<Vec<_>>()
-        .join(", ")
-}
-
-fn parse_dashboard_hex_payload(raw: &str) -> Result<Vec<u8>, String> {
-    let normalized: String = raw
-        .chars()
-        .map(|c| {
-            if c.is_ascii_whitespace() || matches!(c, ',' | ';' | ':' | '-') {
-                ' '
-            } else {
-                c
-            }
-        })
-        .collect();
-    let mut bytes = Vec::new();
-    for token in normalized.split_whitespace() {
-        let hex = token
-            .strip_prefix("0x")
-            .or_else(|| token.strip_prefix("0X"))
-            .unwrap_or(token);
-        if hex.is_empty() {
-            return Err(format!("hex token '{}' has no digits", token));
-        }
-        if hex.len() % 2 != 0 {
-            return Err(format!("hex token '{}' has an odd number of digits", token));
-        }
-        for pos in (0..hex.len()).step_by(2) {
-            let pair = &hex[pos..pos + 2];
-            let byte = u8::from_str_radix(pair, 16).map_err(|_| format!("invalid hex byte '{}'", pair))?;
-            bytes.push(byte);
-        }
-    }
-    Ok(bytes)
-}
-
-fn iso_8859_1_or_ascii_bytes(text: &str) -> Vec<u8> {
-    text.chars()
-        .map(|c| {
-            let code = c as u32;
-            if code <= 0xFF { code as u8 } else { b'?' }
-        })
-        .collect()
-}
-
-fn tpg2200_incident_byte(incident: u16) -> u8 {
-    let incident = incident.clamp(1, 256);
-    // Confirmed on-air: 1..15 map to 0x11, 0x21, ... 0xF1. The extended range
-    // keeps those values and walks the second nibble so all 256 selector bytes
-    // are reachable; Raw Hex remains available for exact protocol experiments.
-    let zero_based = incident - 1;
-    let major = ((zero_based + 1) & 0x0F) as u8;
-    let minor = (((zero_based / 16) + 1) & 0x0F) as u8;
-    (major << 4) | minor
-}
-
-fn build_tpg2200_callout_payload(incident: u16, message: &str) -> Vec<u8> {
-    let mut payload = vec![
-        0xC3,
-        0x00,
-        0x09,
-        0x0D,
-        0x10,
-        tpg2200_incident_byte(incident),
-        0x27,
-        0x0F,
-        0x02,
-        0x30,
-        0x8D,
-    ];
-    payload.extend_from_slice(&iso_8859_1_or_ascii_bytes(message));
-    payload
-}
-
 fn handle_ws_command(text: &str, state: &DashboardState, cmd_tx: &Arc<Mutex<Option<CmdSender>>>, update_state: &SharedUpdateState) {
     let Ok(v) = serde_json::from_str::<serde_json::Value>(text) else { return };
 
@@ -1976,24 +1899,7 @@ fn handle_ws_command(text: &str, state: &DashboardState, cmd_tx: &Arc<Mutex<Opti
             if dest == 0 || msg_text.is_empty() { return; }
             tracing::info!("Dashboard: SDS to {} = {}", dest, msg_text);
 
-            // Encode text for SDS-TL TRANSFER:
-            //   - If all characters are in ISO-8859-1 range → coding scheme 0x01 (LATIN), 1 byte/char
-            //   - Otherwise → coding scheme 0x02 (UTF-16BE), 2 bytes/char (handles CJK, Arabic, etc.)
-            // First byte of payload is the text coding scheme identifier per ETSI EN 300 392-2.
-            let all_latin = msg_text.chars().all(|c| c as u32 <= 0xFF);
-            let (coding_scheme, text_bytes): (u8, Vec<u8>) = if all_latin {
-                let bytes: Vec<u8> = msg_text.chars().map(|c| c as u8).collect();
-                (0x01, bytes)
-            } else {
-                // UTF-16BE encoding
-                let bytes: Vec<u8> = msg_text.encode_utf16()
-                    .flat_map(|u| u.to_be_bytes())
-                    .collect();
-                (0x02, bytes)
-            };
-            let mut payload = vec![coding_scheme];
-            payload.extend_from_slice(&text_bytes);
-            let len_bits = (payload.len() * 8) as u16;
+            let (len_bits, payload) = build_sds_text_payload(&msg_text);
 
             send_cmd(ControlCommand::SendSds {
                 handle: 0,
@@ -2033,7 +1939,7 @@ fn handle_ws_command(text: &str, state: &DashboardState, cmd_tx: &Arc<Mutex<Opti
             let payload = if raw_hex.is_empty() {
                 build_tpg2200_callout_payload(incident, &alarm_text)
             } else {
-                match parse_dashboard_hex_payload(raw_hex) {
+                match parse_hex_payload(raw_hex) {
                     Ok(payload) => payload,
                     Err(e) => {
                         tracing::warn!("Dashboard: invalid TPG2200 raw hex payload: {}", e);
@@ -3281,11 +3187,9 @@ fn serve_login_page(mut stream: TcpStream) {
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        binary_built_from, build_tpg2200_callout_payload, parse_dashboard_hex_payload,
-        tpg2200_incident_byte, DashboardServer,
-    };
+    use super::{binary_built_from, DashboardServer};
     use crate::net_telemetry::TelemetryEvent;
+    use crate::tpg2200::{build_tpg2200_callout_payload, parse_hex_payload, tpg2200_incident_byte};
 
     /// FH-BUG (brew shown as v0): the transport reports version 0 ("unknown") on every (re)connect
     /// and v1 is learned lazily from a v1 group call. A confirmed v1 must never be downgraded by a
@@ -3350,17 +3254,17 @@ mod tests {
     }
 
     #[test]
-    fn parse_dashboard_hex_payload_accepts_common_separators_and_prefixes() {
+    fn parse_hex_payload_accepts_common_separators_and_prefixes() {
         assert_eq!(
-            parse_dashboard_hex_payload("C3 00,0x09;0D:10-21").unwrap(),
+            parse_hex_payload("C3 00,0x09;0D:10-21").unwrap(),
             vec![0xC3, 0x00, 0x09, 0x0D, 0x10, 0x21]
         );
         assert_eq!(
-            parse_dashboard_hex_payload("C300090D").unwrap(),
+            parse_hex_payload("C300090D").unwrap(),
             vec![0xC3, 0x00, 0x09, 0x0D]
         );
-        assert!(parse_dashboard_hex_payload("C3 0X").is_err());
-        assert!(parse_dashboard_hex_payload("C3 0").is_err());
+        assert!(parse_hex_payload("C3 0X").is_err());
+        assert!(parse_hex_payload("C3 0").is_err());
     }
 
     #[test]

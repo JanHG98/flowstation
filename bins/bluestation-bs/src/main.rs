@@ -15,8 +15,9 @@ use tetra_entities::MessageRouter;
 use tetra_entities::net_asterisk::entity::AsteriskEntity;
 use tetra_entities::net_brew::entity::BrewEntity;
 use tetra_entities::net_brew::new_websocket_transport;
+use tetra_entities::net_dapnet::spawn_dapnet_worker;
 use tetra_entities::net_dashboard::DashboardServer;
-use tetra_entities::net_telegram::{TelegramAlerter, telegram_alert_channel};
+use tetra_entities::net_telegram::{TelegramAlertSink, TelegramAlerter, telegram_alert_channel};
 use tetra_entities::net_telemetry::worker::TelemetryWorker;
 use tetra_entities::net_telemetry::{
     TELEMETRY_HEARTBEAT_INTERVAL, TELEMETRY_HEARTBEAT_TIMEOUT, TELEMETRY_PROTOCOL_VERSION, TelemetrySource, telemetry_channel,
@@ -344,6 +345,10 @@ fn main() {
     }
 
     let (mut router, tsource, cdispatchers) = build_bs_stack(&mut cfg, &args.config);
+    let dapnet_cmd_tx = cdispatchers
+        .get(&TetraEntity::Cmce)
+        .map(|dispatcher| dispatcher.clone_sender());
+    let mut dapnet_telegram_sink: Option<TelegramAlertSink> = None;
 
     // Start Telemetry and Control threads, if enabled
     // If dashboard is also enabled, tee the telemetry events to both.
@@ -365,6 +370,7 @@ fn main() {
         } else {
             None
         };
+        dapnet_telegram_sink = alert_sink.clone();
 
         // Optional dashboard HTTP server.
         let dashboard: Option<std::sync::Arc<DashboardServer>> = if has_dashboard {
@@ -497,6 +503,8 @@ fn main() {
     if cfg.config().control.is_some() {
         start_control_worker(cfg.clone(), cdispatchers);
     };
+
+    spawn_dapnet_worker(cfg.clone(), dapnet_cmd_tx, dapnet_telegram_sink);
 
     // Set up Ctrl+C handler for graceful shutdown.
     // Also installs lifecycle control so RestartService / ShutdownService commands

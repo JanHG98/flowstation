@@ -19,11 +19,13 @@ pub mod net_control;
 pub mod net_dashboard;
 pub mod net_telegram;
 pub mod net_telemetry;
+pub mod net_dapnet;
 
 pub mod backlight;
 pub mod health;
 pub mod service_control;
 pub mod sys_telemetry;
+pub mod tpg2200;
 pub mod wifi;
 
 // Re-export commonly used items from router

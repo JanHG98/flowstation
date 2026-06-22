@@ -14,6 +14,7 @@ use crate::bluestation::sec_cell::{CfgNeighborCellCa, SdsCommandControlDto};
 use super::config::{StackConfig, StackMode};
 use super::sec_asterisk::{CfgAsteriskDto, apply_asterisk_patch};
 use super::sec_brew::{CfgBrewDto, apply_brew_patch};
+use super::sec_dapnet::{CfgDapnetDto, apply_dapnet_patch};
 use super::sec_dashboard::{CfgDashboardDto, apply_dashboard_patch};
 use super::sec_security::{CfgSecurityDto, apply_security_patch};
 use super::sec_wx::{CfgWxServiceDto, apply_wx_service_patch};
@@ -123,6 +124,12 @@ pub fn from_toml_str(toml_str: &str) -> Result<StackConfig, Box<dyn std::error::
             return Err(format!("Unrecognized fields in asterisk config: {:?}", sorted_keys(&asterisk.extra)).into());
         }
 
+    // Optional dapnet section
+    if let Some(ref dapnet) = root.dapnet
+        && !dapnet.extra.is_empty() {
+            return Err(format!("Unrecognized fields in dapnet config: {:?}", sorted_keys(&dapnet.extra)).into());
+        }
+
     // Optional telemetry section
     if let Some(ref telemetry) = root.telemetry
         && !telemetry.extra.is_empty() {
@@ -183,6 +190,7 @@ pub fn from_toml_str(toml_str: &str) -> Result<StackConfig, Box<dyn std::error::
         cell: cell_cfg,
         brew: None,
         asterisk: apply_asterisk_patch(root.asterisk.unwrap_or_default())?,
+        dapnet: apply_dapnet_patch(root.dapnet.unwrap_or_default()),
         dashboard: None,
         telemetry: None,
         control: None,
@@ -255,6 +263,7 @@ struct TomlConfigRoot {
 
     brew: Option<CfgBrewDto>,
     asterisk: Option<CfgAsteriskDto>,
+    dapnet: Option<CfgDapnetDto>,
     dashboard: Option<CfgDashboardDto>,
     telemetry: Option<CfgTelemetryDto>,
     command: Option<CfgControlDto>,
@@ -383,6 +392,32 @@ auth_user = "flowstation"
 password = ""
 realm = "asterisk"
 
+[dapnet]
+enabled = true
+api_url = "https://www.hampager.de/api/messages"
+username = "dl1abc"
+password = "example"
+poll_interval_secs = 30
+forward_sds = true
+forward_callout = true
+forward_telegram = true
+sds_source_issi = 9999
+sds_dest_issi = 1234567
+sds_dest_is_group = false
+callout_source_issi = 9999
+callout_dest_issi = 1234567
+callout_incident_base = 2
+callout_text_prefix = "DAPNET"
+telegram_prefix = "DAPNET"
+rwth_core_enabled = true
+rwth_core_host = "dapnet.afu.rwth-aachen.de"
+rwth_core_port = 43434
+rwth_core_device = "FlowStation"
+rwth_core_version = "1.0"
+rwth_core_callsign = "DL1ABC"
+rwth_core_authkey = "example"
+rwth_messages_limit = 100
+
 [recovery]
 enabled = true
 issi_allowlist = []
@@ -412,6 +447,9 @@ sds_queue_critical = 128
         assert_eq!(cfg.health.core_stall_secs, 10);
         assert!(cfg.asterisk.enabled);
         assert_eq!(cfg.asterisk.service_numbers, vec!["600".to_string(), "601".to_string()]);
+        assert!(cfg.dapnet.enabled);
+        assert!(cfg.dapnet.rwth_core_enabled);
+        assert_eq!(cfg.dapnet.callout_incident_base, 2);
     }
 
     fn minimal_toml(extra_cell: &str) -> String {

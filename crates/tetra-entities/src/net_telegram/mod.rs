@@ -31,6 +31,12 @@ pub enum TelegramAlertMsg {
     Event(TelemetryEvent),
     /// A captured stack log line at WARN or ERROR level (the "critical status" catch-all).
     CriticalLog { level: String, message: String },
+    /// A DAPNET message forwarded through the existing Telegram alert delivery path.
+    Dapnet {
+        prefix: String,
+        callsign: String,
+        text: String,
+    },
 }
 
 /// Cloneable, push-only handle. Cloned into the telemetry-tee and dashboard-log threads.
@@ -51,6 +57,12 @@ impl TelegramAlertSink {
     #[inline]
     pub fn send_log(&self, level: String, message: String) {
         let _ = self.tx.send(TelegramAlertMsg::CriticalLog { level, message });
+    }
+
+    /// Forward a DAPNET message to the alerter for Telegram delivery.
+    #[inline]
+    pub fn send_dapnet(&self, prefix: String, callsign: String, text: String) {
+        let _ = self.tx.send(TelegramAlertMsg::Dapnet { prefix, callsign, text });
     }
 }
 

@@ -102,6 +102,7 @@ impl TelegramAlerter {
             match self.source.recv_timeout(POLL) {
                 Ok(TelegramAlertMsg::Event(event)) => self.handle_event(event),
                 Ok(TelegramAlertMsg::CriticalLog { level, message }) => self.handle_log(level, message),
+                Ok(TelegramAlertMsg::Dapnet { prefix, callsign, text }) => self.handle_dapnet(prefix, callsign, text),
                 Err(RecvTimeoutError::Timeout) => {}
                 Err(RecvTimeoutError::Disconnected) => break,
             }
@@ -205,6 +206,14 @@ impl TelegramAlerter {
             self.log_buffer.push((level, message));
         } else {
             self.log_dropped += 1;
+        }
+    }
+
+    fn handle_dapnet(&self, prefix: String, callsign: String, text: String) {
+        let tg = self.cfg.effective_telegram();
+        if tg.is_deliverable() {
+            let html = format::dapnet(&self.station, &prefix, &callsign, &text);
+            self.send_all(&tg, &html);
         }
     }
 

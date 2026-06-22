@@ -3,8 +3,8 @@ use std::sync::{Arc, RwLock};
 use tetra_core::freqs::FreqInfo;
 
 use crate::bluestation::{
-    CfgAsterisk, CfgCellInfo, CfgControl, CfgEmergency, CfgHealth, CfgNetInfo, CfgPhyIo, CfgRecovery, CfgSecurity, CfgWxService, PhyBackend,
-    StackState,
+    CfgAsterisk, CfgCellInfo, CfgControl, CfgDapnet, CfgEmergency, CfgHealth, CfgNetInfo, CfgPhyIo, CfgRecovery, CfgSecurity,
+    CfgWxService, PhyBackend, StackState,
 };
 
 use super::sec_dashboard::CfgDashboard;
@@ -77,6 +77,9 @@ pub struct StackConfig {
 
     /// Asterisk SIP/RTP bridge configuration.
     pub asterisk: CfgAsterisk,
+
+    /// DAPNET inbound-message forwarding configuration.
+    pub dapnet: CfgDapnet,
 
     /// Dashboard HTTP server configuration (None = disabled)
     pub dashboard: Option<CfgDashboard>,
