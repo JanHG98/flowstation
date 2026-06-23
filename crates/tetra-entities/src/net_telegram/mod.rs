@@ -43,6 +43,12 @@ pub enum TelegramAlertMsg {
         src: String,
         text: String,
     },
+    /// A GeoAlarm geofence event forwarded through the existing Telegram alert delivery path.
+    Geoalarm {
+        prefix: String,
+        source: String,
+        text: String,
+    },
 }
 
 /// Cloneable, push-only handle. Cloned into the telemetry-tee and dashboard-log threads.
@@ -75,6 +81,12 @@ impl TelegramAlertSink {
     #[inline]
     pub fn send_meshcom(&self, prefix: String, src: String, text: String) {
         let _ = self.tx.send(TelegramAlertMsg::Meshcom { prefix, src, text });
+    }
+
+    /// Forward a GeoAlarm event to the alerter for Telegram delivery.
+    #[inline]
+    pub fn send_geoalarm(&self, prefix: String, source: String, text: String) {
+        let _ = self.tx.send(TelegramAlertMsg::Geoalarm { prefix, source, text });
     }
 }
 

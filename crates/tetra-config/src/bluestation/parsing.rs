@@ -16,6 +16,7 @@ use super::sec_asterisk::{CfgAsteriskDto, apply_asterisk_patch};
 use super::sec_brew::{CfgBrewDto, apply_brew_patch};
 use super::sec_dapnet::{CfgDapnetDto, apply_dapnet_patch};
 use super::sec_echolink::{CfgEcholinkDto, apply_echolink_patch};
+use super::sec_geoalarm::{CfgGeoalarmDto, apply_geoalarm_patch};
 use super::sec_meshcom::{CfgMeshcomDto, apply_meshcom_patch};
 use super::sec_tpg2200_action::{
     CfgTpg2200ActionDto, apply_tpg2200_action_patch,
@@ -148,6 +149,12 @@ pub fn from_toml_str(toml_str: &str) -> Result<StackConfig, Box<dyn std::error::
             return Err(format!("Unrecognized fields in meshcom config: {:?}", sorted_keys(&meshcom.extra)).into());
         }
 
+    // Optional geoalarm section
+    if let Some(ref geoalarm) = root.geoalarm
+        && !geoalarm.extra.is_empty() {
+            return Err(format!("Unrecognized fields in geoalarm config: {:?}", sorted_keys(&geoalarm.extra)).into());
+        }
+
     // Optional tpg2200_action section
     if let Some(ref action) = root.tpg2200_action
         && !action.extra.is_empty() {
@@ -223,6 +230,7 @@ pub fn from_toml_str(toml_str: &str) -> Result<StackConfig, Box<dyn std::error::
         dapnet: apply_dapnet_patch(root.dapnet.unwrap_or_default())?,
         echolink: apply_echolink_patch(root.echolink.unwrap_or_default())?,
         meshcom: apply_meshcom_patch(root.meshcom.unwrap_or_default())?,
+        geoalarm: apply_geoalarm_patch(root.geoalarm.unwrap_or_default())?,
         tpg2200_action: apply_tpg2200_action_patch(root.tpg2200_action.unwrap_or_default())?,
         snom_notify: apply_snom_notify_patch(root.snom_notify.unwrap_or_default())?,
         dashboard: None,
@@ -300,6 +308,7 @@ struct TomlConfigRoot {
     dapnet: Option<CfgDapnetDto>,
     echolink: Option<CfgEcholinkDto>,
     meshcom: Option<CfgMeshcomDto>,
+    geoalarm: Option<CfgGeoalarmDto>,
     tpg2200_action: Option<CfgTpg2200ActionDto>,
     snom_notify: Option<CfgSnomNotifyDto>,
     dashboard: Option<CfgDashboardDto>,

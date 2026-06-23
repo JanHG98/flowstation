@@ -1,6 +1,7 @@
 pub mod callsign;
 pub mod dapnet;
 pub mod echolink;
+pub mod geoalarm;
 pub mod html;
 pub mod meshcom;
 pub mod radioid;

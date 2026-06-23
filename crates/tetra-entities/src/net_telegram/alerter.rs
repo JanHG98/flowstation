@@ -113,6 +113,7 @@ impl TelegramAlerter {
                 Ok(TelegramAlertMsg::CriticalLog { level, message }) => self.handle_log(level, message),
                 Ok(TelegramAlertMsg::Dapnet { prefix, callsign, text }) => self.handle_dapnet(prefix, callsign, text),
                 Ok(TelegramAlertMsg::Meshcom { prefix, src, text }) => self.handle_dapnet(prefix, src, text),
+                Ok(TelegramAlertMsg::Geoalarm { prefix, source, text }) => self.handle_dapnet(prefix, source, text),
                 Err(RecvTimeoutError::Timeout) => {}
                 Err(RecvTimeoutError::Disconnected) => break,
             }

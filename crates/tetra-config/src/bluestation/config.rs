@@ -4,8 +4,8 @@ use tetra_core::freqs::FreqInfo;
 
 use crate::bluestation::{
     CfgAsterisk, CfgCellInfo, CfgControl, CfgDapnet, CfgEcholink, CfgEmergency, CfgHealth,
-    CfgMeshcom, CfgNetInfo, CfgPhyIo, CfgRecovery, CfgSecurity, CfgSnomNotify, CfgTpg2200Action,
-    CfgWxService, PhyBackend, StackState,
+    CfgGeoalarm, CfgMeshcom, CfgNetInfo, CfgPhyIo, CfgRecovery, CfgSecurity, CfgSnomNotify,
+    CfgTpg2200Action, CfgWxService, PhyBackend, StackState,
 };
 
 use super::sec_dashboard::CfgDashboard;
@@ -87,6 +87,9 @@ pub struct StackConfig {
 
     /// MeshCom external UDP bridge configuration.
     pub meshcom: CfgMeshcom,
+
+    /// Geo-fence alarm configuration for TETRA/MeshCom positions.
+    pub geoalarm: CfgGeoalarm,
 
     /// Token-protected ActionURL trigger for Motorola TPG2200 Call-Out.
     pub tpg2200_action: CfgTpg2200Action,
@@ -431,6 +434,47 @@ impl SharedConfig {
                 sip_allowed_sources: o.sip_allowed_sources.clone(),
                 telegram_prefix: o.telegram_prefix.clone(),
                 telegram_allowed_sources: o.telegram_allowed_sources.clone(),
+            }
+        } else {
+            base
+        }
+    }
+
+    /// Effective GeoAlarm settings: the dashboard runtime override if present, otherwise the
+    /// config file values. Returns an owned [`CfgGeoalarm`] so callers don't hold the state lock.
+    pub fn effective_geoalarm(&self) -> crate::bluestation::CfgGeoalarm {
+        let base = self.cfg.geoalarm.clone();
+        if let Some(o) = self.state_read().geoalarm_override.as_ref() {
+            crate::bluestation::CfgGeoalarm {
+                enabled: o.enabled,
+                flowstation_lat: o.flowstation_lat,
+                flowstation_lon: o.flowstation_lon,
+                radius_m: if o.radius_m.is_finite() && o.radius_m > 0.0 {
+                    o.radius_m
+                } else {
+                    base.radius_m
+                },
+                cooldown_secs: o.cooldown_secs.clamp(1, 86_400),
+                trigger_tetra: o.trigger_tetra,
+                trigger_meshcom: o.trigger_meshcom,
+                forward_tpg2200: o.forward_tpg2200,
+                forward_sds: o.forward_sds,
+                forward_sip: o.forward_sip,
+                forward_telegram: o.forward_telegram,
+                tetra_issi_whitelist: o.tetra_issi_whitelist.clone(),
+                tetra_issi_blacklist: o.tetra_issi_blacklist.clone(),
+                meshcom_source_whitelist: o.meshcom_source_whitelist.clone(),
+                meshcom_source_blacklist: o.meshcom_source_blacklist.clone(),
+                sds_source_issi: o.sds_source_issi.max(1),
+                sds_dest_issi: o.sds_dest_issi,
+                sds_dest_is_group: o.sds_dest_is_group,
+                tpg2200_source_issi: o.tpg2200_source_issi.max(1),
+                tpg2200_dest_issi: o.tpg2200_dest_issi,
+                tpg2200_incident_base: o.tpg2200_incident_base.clamp(1, 256),
+                tpg2200_text_prefix: o.tpg2200_text_prefix.clone(),
+                tpg2200_max_text_chars: o.tpg2200_max_text_chars.clamp(8, 160),
+                sip_title_prefix: o.sip_title_prefix.clone(),
+                telegram_prefix: o.telegram_prefix.clone(),
             }
         } else {
             base

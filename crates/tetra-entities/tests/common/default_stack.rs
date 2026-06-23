@@ -1,6 +1,6 @@
 use tetra_config::bluestation::{
-    CfgAsterisk, CfgCellInfo, CfgDapnet, CfgEcholink, CfgEmergency, CfgHealth, CfgMeshcom,
-    CfgNetInfo, CfgPhyIo, CfgRecovery, CfgSecurity, CfgSnomNotify, CfgTpg2200Action,
+    CfgAsterisk, CfgCellInfo, CfgDapnet, CfgEcholink, CfgEmergency, CfgGeoalarm, CfgHealth,
+    CfgMeshcom, CfgNetInfo, CfgPhyIo, CfgRecovery, CfgSecurity, CfgSnomNotify, CfgTpg2200Action,
     CfgWxService, PhyBackend,
     StackConfig, StackMode,
 };
@@ -27,6 +27,7 @@ pub fn default_test_config_bs() -> StackConfig {
         dapnet: CfgDapnet::default(),
         echolink: CfgEcholink::default(),
         meshcom: CfgMeshcom::default(),
+        geoalarm: CfgGeoalarm::default(),
         tpg2200_action: CfgTpg2200Action::default(),
         snom_notify: CfgSnomNotify::default(),
         dashboard: None,

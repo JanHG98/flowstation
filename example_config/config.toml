@@ -623,6 +623,48 @@ voice_service = true
 
 ###############################################################################
 
+# OPTIONAL: GeoAlarm radius alerts
+#
+# Watches decoded TETRA LIP SDS positions and MeshCom position packets. When an
+# allowed device enters the configured radius around FlowStation, alarms can be
+# forwarded through the existing TPG2200, SDS, Snom/SIP and Telegram paths.
+# Empty whitelists mean "all"; blacklists always win.
+#
+# [geoalarm]
+# enabled = false
+# flowstation_lat = 0.0
+# flowstation_lon = 0.0
+# radius_m = 500.0
+# cooldown_secs = 300
+#
+# trigger_tetra = true
+# trigger_meshcom = true
+#
+# forward_tpg2200 = false
+# forward_sds = false
+# forward_sip = false
+# forward_telegram = false
+#
+# tetra_issi_whitelist = []            # empty = every TETRA ISSI
+# tetra_issi_blacklist = []
+# meshcom_source_whitelist = []        # empty = every MeshCom source
+# meshcom_source_blacklist = []
+#
+# sds_source_issi = 9999
+# sds_dest_issi = 0                    # 0 = not configured
+# sds_dest_is_group = false
+#
+# tpg2200_source_issi = 9999
+# tpg2200_dest_issi = 0                # TPG2200 ISSI
+# tpg2200_incident_base = 1            # cycles 1..=256
+# tpg2200_text_prefix = "GeoAlarm"
+# tpg2200_max_text_chars = 80
+#
+# sip_title_prefix = "GeoAlarm"
+# telegram_prefix = "GeoAlarm"
+
+###############################################################################
+
 # OPTIONAL: Emergency-state handling (FlowStation)
 #
 # A radio signals emergency with a U-STATUS PDU (pre_coded_status = Emergency, status 0,

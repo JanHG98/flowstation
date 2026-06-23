@@ -53,7 +53,8 @@ Built in Rust on top of [tetra-bluestation](https://github.com/MidnightBlueLabs/
 | Emergency status alarm (U-STATUS) — persistent dashboard banner + Telegram alert, LOCAL-only | ✅ |
 | DAPNET receive/forward to SDS, TPG2200 Call-Out, Telegram | ✅ |
 | MeshCom extUDP messages with forwarding to SDS, SIP/Snom, Telegram | ✅ |
-| Snom XML display notifications for SDS, DAPNET, Telegram, MeshCom | ✅ |
+| GeoAlarm radius alerts from TETRA LIP and MeshCom positions to TPG2200, SDS, SIP/Snom, Telegram | ✅ |
+| Snom XML display notifications for SDS, DAPNET, Telegram, MeshCom, GeoAlarm | ✅ |
 | SDS and DAPNET log paging, clear, text export | ✅ |
 
 ### Network & Interconnect
@@ -64,6 +65,7 @@ Built in Rust on top of [tetra-bluestation](https://github.com/MidnightBlueLabs/
 | DAPNET RWTH core receive path + Hampager API send endpoint | ✅ |
 | EchoLink directory/QSO integration | ✅ |
 | MeshCom external UDP bridge | ✅ |
+| GeoAlarm geofence worker for TETRA and MeshCom coordinates | ✅ |
 | UTC time broadcast (D-NWRK-BROADCAST) | ✅ |
 | Neighbor cell broadcast | ✅ |
 | T351 periodic re-registration | ✅ |
@@ -91,8 +93,8 @@ Built in Rust on top of [tetra-bluestation](https://github.com/MidnightBlueLabs/
 | Remote control via U-STATUS from radio (restart, shutdown, kick_all) | ✅ |
 | OTA update (pull latest, rebuild, restart — one button) | ✅ |
 | System tab: uptime, CPU, RAM, temperature, RF hardware info | ✅ |
-| Integration pages: Asterisk SIP, DAPNET, EchoLink, MeshCom, Telegram | ✅ |
-| Health view for Brew, Asterisk, DAPNET, EchoLink, MeshCom | ✅ |
+| Integration pages: Asterisk SIP, DAPNET, EchoLink, MeshCom, GeoAlarm, Telegram | ✅ |
+| Health view for Brew, Asterisk, DAPNET, EchoLink, MeshCom, GeoAlarm | ✅ |
 | Restart recovery cache for known radios after BS process restart | ✅ |
 
 ---
@@ -557,6 +559,48 @@ example:
 --extudp on
 ```
 
+### GeoAlarm
+
+GeoAlarm watches decoded TETRA LIP SDS positions and MeshCom position packets.
+When an allowed device enters the configured radius around FlowStation, it can
+trigger TPG2200 Call-Out, normal SDS, Snom/SIP display notification, and
+Telegram forwarding. Blacklists always win; empty whitelists mean "all".
+
+```toml
+[geoalarm]
+enabled = false
+flowstation_lat = 50.775346
+flowstation_lon = 6.083887
+radius_m = 500
+cooldown_secs = 300
+
+trigger_tetra = true
+trigger_meshcom = true
+
+forward_tpg2200 = false
+forward_sds = false
+forward_sip = false
+forward_telegram = false
+
+tetra_issi_whitelist = []       # empty = all TETRA ISSIs
+tetra_issi_blacklist = []
+meshcom_source_whitelist = []   # empty = all MeshCom src values
+meshcom_source_blacklist = []
+
+sds_source_issi = 9999
+sds_dest_issi = 0
+sds_dest_is_group = false
+
+tpg2200_source_issi = 9999
+tpg2200_dest_issi = 0
+tpg2200_incident_base = 1
+tpg2200_text_prefix = "GeoAlarm"
+tpg2200_max_text_chars = 80
+
+sip_title_prefix = "GeoAlarm"
+telegram_prefix = "GeoAlarm"
+```
+
 ### Restart recovery
 
 After a BS process restart, radios may still be RF-camped while FlowStation's
@@ -671,11 +715,15 @@ station list, connect/disconnect controls, and last error.
 **MeshCom** — extUDP receive/transmit settings, live MeshCom node table, message
 log, and forwarding controls for SDS, SIP/Snom, and Telegram.
 
+**GeoAlarm** — radius and center coordinate settings, TETRA/MeshCom source
+filters, forwarding controls for TPG2200, SDS, SIP/Snom and Telegram, plus a
+live event table.
+
 **Telegram** — bot token, chat detection, destination chat IDs, and alert
 category toggles.
 
-**Health** — station health plus Brew, Asterisk, DAPNET, EchoLink, and MeshCom
-integration status.
+**Health** — station health plus Brew, Asterisk, DAPNET, EchoLink, MeshCom, and
+GeoAlarm integration status.
 
 **Config** — edit `config.toml` in-browser. Save, backup, restore. Edit inactive config profiles in a modal without switching them live.
 

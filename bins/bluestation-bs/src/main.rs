@@ -18,6 +18,7 @@ use tetra_entities::net_brew::new_websocket_transport;
 use tetra_entities::net_dapnet::spawn_dapnet_worker;
 use tetra_entities::net_dashboard::DashboardServer;
 use tetra_entities::net_echolink::{EcholinkEntity, echolink_channel};
+use tetra_entities::net_geoalarm::{GeoAlarmSink, spawn_geoalarm_worker};
 use tetra_entities::net_meshcom::spawn_meshcom_worker;
 use tetra_entities::net_snom::{snom_notify_channel, spawn_snom_notify_worker};
 use tetra_entities::net_telegram::{TelegramAlertSink, TelegramAlerter, telegram_alert_channel};
@@ -155,6 +156,7 @@ fn build_bs_stack(
     let needs_telemetry = cfg.config().telemetry.is_some()
         || cfg.config().dashboard.is_some()
         || cfg.config().telegram.is_some()
+        || cfg.config().geoalarm.enabled
         || cfg.effective_snom_notify().enabled;
     let (tsink, tsource) = if needs_telemetry {
         let (a, b) = telemetry_channel();
@@ -364,6 +366,7 @@ fn main() {
         .get(&TetraEntity::Cmce)
         .map(|dispatcher| dispatcher.clone_sender());
     let mut dapnet_telegram_sink: Option<TelegramAlertSink> = None;
+    let mut geoalarm_sink: Option<GeoAlarmSink> = None;
 
     let (snom_sink, snom_source) = snom_notify_channel();
     spawn_snom_notify_worker(cfg.clone(), snom_source);
@@ -402,6 +405,12 @@ fn main() {
             None
         };
         dapnet_telegram_sink = alert_sink.clone();
+        geoalarm_sink = spawn_geoalarm_worker(
+            cfg.clone(),
+            dapnet_cmd_tx.clone(),
+            alert_sink.clone(),
+            snom_notify_sink.clone(),
+        );
 
         // Optional dashboard HTTP server.
         let dashboard: Option<std::sync::Arc<DashboardServer>> = if has_dashboard {
@@ -494,6 +503,7 @@ fn main() {
             let dash = dashboard.clone();
             let alert = alert_sink.clone();
             let snom = snom_notify_sink.clone();
+            let geoalarm = geoalarm_sink.clone();
             thread::Builder::new().name("telemetry-fanout".into()).spawn(move || {
                 use tetra_entities::health::registry as health_registry;
                 use tetra_entities::net_telemetry::TelemetryEvent;
@@ -519,6 +529,19 @@ fn main() {
                                 TelemetryEvent::MsRssi { .. } => health_registry().note_radio_activity(),
                                 _ => {}
                             }
+                            if let Some(g) = &geoalarm
+                                && let TelemetryEvent::SdsLog {
+                                    direction,
+                                    source_issi,
+                                    protocol_id,
+                                    text,
+                                    ..
+                                } = &event
+                                && *protocol_id == 10
+                                && direction == "rx"
+                            {
+                                g.send_tetra_lip(*source_issi, text);
+                            }
                             if let Some(d) = &dash { d.handle_telemetry(event.clone()); }
                             if let Some(s) = &alert { s.send_event(event.clone()); }
                             if let Some(s) = &snom { s.send_event(event.clone()); }
@@ -543,6 +566,7 @@ fn main() {
         dapnet_cmd_tx.clone(),
         dapnet_telegram_sink.clone(),
         snom_notify_sink.clone(),
+        geoalarm_sink.clone(),
     );
     spawn_dapnet_worker(cfg.clone(), dapnet_cmd_tx, dapnet_telegram_sink, dapnet_telemetry_sink);
 

@@ -1801,6 +1801,10 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
       <span class="nav-icon">⌁</span>
       <span class="nav-label" data-i18n="meshcom">MeshCom</span>
     </div>
+    <div class="nav-item" onclick="showPage('geoalarm',this)" id="nav-geoalarm">
+      <span class="nav-icon">◎</span>
+      <span class="nav-label" data-i18n="geoalarm">GeoAlarm</span>
+    </div>
     <div class="nav-item" onclick="showPage('config',this)" id="nav-config">
       <span class="nav-icon">⚙</span>
       <span class="nav-label" data-i18n="config">CONFIG</span>
@@ -2942,6 +2946,163 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
       </div>
     </div>
 
+    <!-- ── GEOALARM ── -->
+    <div class="page" id="page-geoalarm">
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title" data-i18n="geoalarm_title">GeoAlarm</div>
+          <div class="card-actions">
+            <button class="btn btn-sm" onclick="loadGeoalarm()" data-i18n="refresh">⟳ Refresh</button>
+            <button class="btn btn-primary" onclick="saveGeoalarm()" data-i18n="save">Save</button>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="stat-grid" style="margin-bottom:14px">
+            <div class="stat-card">
+              <div class="stat-label">Positions</div>
+              <div class="stat-value" id="geo-seen">0</div>
+              <div class="stat-sub" id="geo-center">—</div>
+            </div>
+            <div class="stat-card blue">
+              <div class="stat-label">Alarms</div>
+              <div class="stat-value blue" id="geo-alarms">0</div>
+              <div class="stat-sub" id="geo-radius">—</div>
+            </div>
+          </div>
+          <div class="info-grid" style="margin-bottom:14px">
+            <div class="info-row"><div class="info-key">Last position</div><div class="info-val" id="geo-last-position">—</div></div>
+            <div class="info-row"><div class="info-key">Last alarm</div><div class="info-val" id="geo-last-alarm">—</div></div>
+            <div class="info-row"><div class="info-key">Last error</div><div class="info-val" id="geo-last-error">—</div></div>
+          </div>
+
+          <label class="sw-row">
+            <span class="sw-text">Enable GeoAlarm</span>
+            <span class="sw"><input type="checkbox" id="geo-enabled"><i></i></span>
+          </label>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;align-items:center;margin-top:14px">
+            <label style="color:var(--muted);font-size:13px">FlowStation latitude</label>
+            <input type="number" id="geo-lat" class="form-input" step="0.000001" min="-90" max="90" placeholder="50.775346">
+            <label style="color:var(--muted);font-size:13px">FlowStation longitude</label>
+            <input type="number" id="geo-lon" class="form-input" step="0.000001" min="-180" max="180" placeholder="6.083887">
+            <label style="color:var(--muted);font-size:13px">Radius / cooldown</label>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+              <input type="number" id="geo-radius-m" class="form-input" min="1" step="1" placeholder="500">
+              <input type="number" id="geo-cooldown" class="form-input" min="1" max="86400" placeholder="300">
+            </div>
+            <label style="color:var(--muted);font-size:13px">Input sources</label>
+            <div style="display:flex;gap:14px;flex-wrap:wrap">
+              <label style="display:flex;align-items:center;gap:8px"><span class="sw"><input type="checkbox" id="geo-trigger-tetra"><i></i></span><span style="color:var(--muted);font-size:12px">TETRA LIP</span></label>
+              <label style="display:flex;align-items:center;gap:8px"><span class="sw"><input type="checkbox" id="geo-trigger-meshcom"><i></i></span><span style="color:var(--muted);font-size:12px">MeshCom</span></label>
+            </div>
+          </div>
+          <div class="help-text" style="margin-top:10px">GeoAlarm fires when an allowed device enters the radius, then suppresses repeated alarms for the cooldown time.</div>
+          <div class="config-msg" id="geo-msg"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title">GeoAlarm Routing</div>
+        </div>
+        <div class="card-body">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px">
+            <div>
+              <label class="sw-row">
+                <span class="sw-text">Alarm → TPG2200</span>
+                <span class="sw"><input type="checkbox" id="geo-forward-tpg"><i></i></span>
+              </label>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
+                <input type="number" id="geo-tpg-source" class="form-input" min="1" max="16777215" placeholder="Source ISSI">
+                <input type="number" id="geo-tpg-dest" class="form-input" min="0" max="16777215" placeholder="TPG ISSI">
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
+                <input type="number" id="geo-tpg-incident" class="form-input" min="1" max="256" placeholder="Incident base">
+                <input type="number" id="geo-tpg-max" class="form-input" min="8" max="160" placeholder="Max chars">
+              </div>
+              <input type="text" id="geo-tpg-prefix" class="form-input" placeholder="TPG text prefix" style="margin-top:10px">
+            </div>
+            <div>
+              <label class="sw-row">
+                <span class="sw-text">Alarm → SDS</span>
+                <span class="sw"><input type="checkbox" id="geo-forward-sds"><i></i></span>
+              </label>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
+                <input type="number" id="geo-sds-source" class="form-input" min="1" max="16777215" placeholder="Source ISSI">
+                <input type="number" id="geo-sds-dest" class="form-input" min="0" max="16777215" placeholder="Destination ISSI/GSSI">
+              </div>
+              <label style="display:flex;align-items:center;gap:10px;margin-top:10px"><span class="sw"><input type="checkbox" id="geo-sds-group"><i></i></span><span style="color:var(--muted);font-size:12px">Destination is group/GSSI</span></label>
+            </div>
+            <div>
+              <label class="sw-row">
+                <span class="sw-text">Alarm → SIP/Snom</span>
+                <span class="sw"><input type="checkbox" id="geo-forward-sip"><i></i></span>
+              </label>
+              <input type="text" id="geo-sip-prefix" class="form-input" placeholder="Snom title prefix" style="margin-top:10px">
+              <label class="sw-row" style="margin-top:14px">
+                <span class="sw-text">Alarm → Telegram</span>
+                <span class="sw"><input type="checkbox" id="geo-forward-telegram"><i></i></span>
+              </label>
+              <input type="text" id="geo-telegram-prefix" class="form-input" placeholder="Telegram prefix" style="margin-top:10px">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title">GeoAlarm Filters</div>
+        </div>
+        <div class="card-body">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px">
+            <div>
+              <label style="color:var(--muted);font-size:13px">TETRA ISSI whitelist</label>
+              <textarea id="geo-tetra-white" class="form-input" rows="4" placeholder="empty = all TETRA ISSIs"></textarea>
+            </div>
+            <div>
+              <label style="color:var(--muted);font-size:13px">TETRA ISSI blacklist</label>
+              <textarea id="geo-tetra-black" class="form-input" rows="4" placeholder="blocked ISSIs"></textarea>
+            </div>
+            <div>
+              <label style="color:var(--muted);font-size:13px">MeshCom source whitelist</label>
+              <textarea id="geo-mesh-white" class="form-input" rows="4" placeholder="empty = all MeshCom sources"></textarea>
+            </div>
+            <div>
+              <label style="color:var(--muted);font-size:13px">MeshCom source blacklist</label>
+              <textarea id="geo-mesh-black" class="form-input" rows="4" placeholder="blocked MeshCom sources"></textarea>
+            </div>
+          </div>
+          <div class="help-text" style="margin-top:10px">Whitelist empty means allow all. Blacklists always win. MeshCom source matching is case-insensitive.</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title">GeoAlarm Events</div>
+        </div>
+        <div class="card-body">
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th data-i18n="th_time">Time</th>
+                <th>Source</th>
+                <th>Device</th>
+                <th>Distance</th>
+                <th>Position</th>
+                <th>Status</th>
+                <th>Paths</th>
+              </tr></thead>
+              <tbody id="geo-events-tbody"></tbody>
+            </table>
+          </div>
+          <div class="log-controls">
+            <button class="btn btn-sm" onclick="geoPrevPage()">‹ Prev</button>
+            <span class="sds-empty" id="geo-events-page">Page 1 / 1</span>
+            <button class="btn btn-sm" onclick="geoNextPage()">Next ›</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- ── CONFIG ── -->
     <div class="page" id="page-config">
       <div class="card">
@@ -3508,7 +3669,7 @@ const LANGS={
   en:{
     bts_ip:'BTS IP',offline:'OFFLINE',online:'ONLINE',
     brew_online:'ONLINE',brew_offline:'OFFLINE',
-    stations:'Radios',calls:'Calls',lastheard:'Last Heard',log:'Log',rf:'RF',health:'Health',asterisk:'Asterisk SIP',dapnet:'DAPNET',echolink:'EchoLink',echolink_title:'EchoLink',meshcom:'MeshCom',meshcom_title:'MeshCom',config:'Config',
+    stations:'Radios',calls:'Calls',lastheard:'Last Heard',log:'Log',rf:'RF',health:'Health',asterisk:'Asterisk SIP',dapnet:'DAPNET',echolink:'EchoLink',echolink_title:'EchoLink',meshcom:'MeshCom',meshcom_title:'MeshCom',geoalarm:'GeoAlarm',geoalarm_title:'GeoAlarm',config:'Config',
     sdslog:'SDS Log',th_dir:'Dir',th_from:'From',th_to:'To',th_message:'Message',no_sds:'No SDS messages yet',sds_refresh:'⟳ Refresh',
     rf_freq:'Center freq',rf_rate:'Sample rate',rf_rms:'RMS',rf_peak:'Peak',rf_age:'Snapshot',
     rf_waiting:'waiting…',rf_live:'live',rf_stale:'stale',
@@ -3717,7 +3878,7 @@ const LANGS={
   de:{
     bts_ip:'BTS-IP',offline:'OFFLINE',online:'ONLINE',
     brew_online:'ONLINE',brew_offline:'OFFLINE',
-    stations:'Radios',calls:'Anrufe',lastheard:'Zuletzt Gehört',log:'Log',rf:'RF',health:'Health',asterisk:'Asterisk SIP',dapnet:'DAPNET',echolink:'EchoLink',echolink_title:'EchoLink',meshcom:'MeshCom',meshcom_title:'MeshCom',config:'Config',
+    stations:'Radios',calls:'Anrufe',lastheard:'Zuletzt Gehört',log:'Log',rf:'RF',health:'Health',asterisk:'Asterisk SIP',dapnet:'DAPNET',echolink:'EchoLink',echolink_title:'EchoLink',meshcom:'MeshCom',meshcom_title:'MeshCom',geoalarm:'GeoAlarm',geoalarm_title:'GeoAlarm',config:'Config',
     sdslog:'SDS-Log',th_dir:'Ri.',th_from:'Von',th_to:'An',th_message:'Nachricht',no_sds:'Noch keine SDS-Nachrichten',sds_refresh:'⟳ Aktualisieren',
     rf_freq:'Mittenfrequenz',rf_rate:'Abtastrate',rf_rms:'RMS',rf_peak:'Spitze',rf_age:'Aufnahme',
     rf_waiting:'wartet…',rf_live:'live',rf_stale:'veraltet',
@@ -4097,7 +4258,7 @@ function closeMobileSidebar(){
 }
 
 // ── Page navigation ───────────────────────────────────────────────────────
-const PAGE_TITLES={stations:'stations',calls:'calls',lastheard:'lastheard',log:'log',sdslog:'sdslog',rf:'rf',health:'health',asterisk:'asterisk',dapnet:'dapnet',echolink:'echolink',meshcom:'meshcom',config:'config',system:'system'};
+const PAGE_TITLES={stations:'stations',calls:'calls',lastheard:'lastheard',log:'log',sdslog:'sdslog',rf:'rf',health:'health',asterisk:'asterisk',dapnet:'dapnet',echolink:'echolink',meshcom:'meshcom',geoalarm:'geoalarm',config:'config',system:'system'};
 function showPage(name,el){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
@@ -4112,6 +4273,7 @@ function showPage(name,el){
   if(name==='dapnet'){loadDapnet();loadDapnetLog();}
   if(name==='echolink'){loadEcholink();}
   if(name==='meshcom'){loadMeshcom();}
+  if(name==='geoalarm'){loadGeoalarm();}
   if(name==='config'){loadConfig();loadWhitelist();loadWx();}
   if(name==='telegram'){loadTelegram();}
   if(name==='system'){loadSystemInfo();loadConfigProfiles();loadLiveSds();loadBrightness();}
@@ -4432,7 +4594,7 @@ async function wifiCall(url, body){
 function escAttr(s){ return String(s).replace(/&/g,'&amp;').replace(/'/g,"&#39;").replace(/"/g,'&quot;'); }
 
 // ── State + WS ────────────────────────────────────────────────────────────
-let ws=null,state={ms:{},calls:{},emergencies:{},lastHeard:[],sdsLog:[],dapnetLog:[],echolinkDirectory:[],echolinkDirectoryStatus:'',meshcomNodes:[],meshcomMessages:[],brewOnline:false,brewVer:0},sdsDest=0;
+let ws=null,state={ms:{},calls:{},emergencies:{},lastHeard:[],sdsLog:[],dapnetLog:[],echolinkDirectory:[],echolinkDirectoryStatus:'',meshcomNodes:[],meshcomMessages:[],geoalarmEvents:[],brewOnline:false,brewVer:0},sdsDest=0;
 
 // ── RadioID callsigns (indicativ) ──────────────────────────────────────────────
 // issi -> {cs:"CALLSIGN", fl:"🇷🇴"} (found; fl is the country flag emoji from the prefix, or "")
@@ -4925,7 +5087,7 @@ function _p2(n){return String(n).padStart(2,'0');}
 // live rows arriving over the WS; rows fetched from /api/sds-log already carry a server stamp.
 function nowStamp(){const d=new Date();return `${d.getFullYear()}-${_p2(d.getMonth()+1)}-${_p2(d.getDate())} ${_p2(d.getHours())}:${_p2(d.getMinutes())}:${_p2(d.getSeconds())}`;}
 const LOG_PAGE_SIZE=50;
-let sdsLogPageIndex=0,dapnetLogPageIndex=0,echolinkDirectoryPageIndex=0,meshNodePageIndex=0,meshMsgPageIndex=0;
+let sdsLogPageIndex=0,dapnetLogPageIndex=0,echolinkDirectoryPageIndex=0,meshNodePageIndex=0,meshMsgPageIndex=0,geoalarmPageIndex=0;
 function setLogPager(id,page,total){
   const el=document.getElementById(id);if(!el)return;
   if(!total){el.textContent='Page 0 / 0 · 0';return;}
@@ -5561,6 +5723,132 @@ async function saveMeshcom(){
     else setMeshMsg(t('save_fail')+': '+await r.text(),false);
   }catch{setMeshMsg(t('conn_error'),false);}
 }
+
+function geoFloat(id,def,min,max){
+  const n=parseFloat(dapVal(id));
+  if(!Number.isFinite(n))return def;
+  return Math.max(min,Math.min(max,n));
+}
+function geoIssiListText(values){
+  return Array.isArray(values)?values.join('\n'):'';
+}
+function geoIssiListBody(id,label){
+  const raw=dapVal(id);
+  if(!raw)return [];
+  const out=[],seen=new Set();
+  for(const part of raw.split(/[\s,]+/).map(v=>v.trim()).filter(Boolean)){
+    const n=Number(part);
+    if(!Number.isInteger(n)||n<0||n>16777215){setGeoMsg(`Invalid ${label} ISSI: ${part}`,false);return null;}
+    if(!seen.has(n)){seen.add(n);out.push(n);}
+  }
+  return out;
+}
+function geoEventRow(e){
+  const status=e.alarmed
+    ? '<span class="badge badge-green" style="font-size:10px">ALARM</span>'
+    : (e.inside_radius?'<span class="badge badge-blue" style="font-size:10px">inside</span>':'<span class="badge" style="font-size:10px">outside</span>');
+  return `<tr>
+    <td class="sds-time">${escHtml(e.ts||'')}</td>
+    <td>${escHtml(e.source||'—')}</td>
+    <td>${escHtml(e.device||'—')}</td>
+    <td class="sds-time">${Number(e.distance_m||0).toFixed(0)} m</td>
+    <td>${meshMapLink(e.lat,e.lon,'map')}</td>
+    <td>${status}</td>
+    <td>${meshPaths(e.paths)}</td>
+  </tr>`;
+}
+function renderGeoalarmEvents(){
+  const tb=document.getElementById('geo-events-tbody');if(!tb)return;
+  const rows=state.geoalarmEvents||[];
+  geoalarmPageIndex=clampLogPage(geoalarmPageIndex,rows.length);
+  setLogPager('geo-events-page',geoalarmPageIndex,rows.length);
+  if(!rows.length){tb.innerHTML=`<tr><td colspan="7" class="sds-empty" style="text-align:center;padding:24px">No GeoAlarm events yet</td></tr>`;return;}
+  const start=geoalarmPageIndex*LOG_PAGE_SIZE;
+  tb.innerHTML=rows.slice(start,start+LOG_PAGE_SIZE).map(geoEventRow).join('');
+}
+function geoPrevPage(){geoalarmPageIndex--;renderGeoalarmEvents();}
+function geoNextPage(){geoalarmPageIndex++;renderGeoalarmEvents();}
+async function loadGeoalarm(){
+  try{
+    const r=await fetch('/api/geoalarm');
+    if(!r.ok){setGeoMsg(t('conn_error'),false);return;}
+    const d=await r.json(),rt=d.runtime||{};
+    dapCheck('geo-enabled',d.enabled);
+    dapSet('geo-lat',d.flowstation_lat??0);
+    dapSet('geo-lon',d.flowstation_lon??0);
+    dapSet('geo-radius-m',d.radius_m||500);
+    dapSet('geo-cooldown',d.cooldown_secs||300);
+    dapCheck('geo-trigger-tetra',d.trigger_tetra);
+    dapCheck('geo-trigger-meshcom',d.trigger_meshcom);
+    dapCheck('geo-forward-tpg',d.forward_tpg2200);
+    dapCheck('geo-forward-sds',d.forward_sds);
+    dapCheck('geo-forward-sip',d.forward_sip);
+    dapCheck('geo-forward-telegram',d.forward_telegram);
+    dapSet('geo-tetra-white',geoIssiListText(d.tetra_issi_whitelist));
+    dapSet('geo-tetra-black',geoIssiListText(d.tetra_issi_blacklist));
+    dapSet('geo-mesh-white',meshSourceListText(d.meshcom_source_whitelist));
+    dapSet('geo-mesh-black',meshSourceListText(d.meshcom_source_blacklist));
+    dapSet('geo-sds-source',d.sds_source_issi||9999);
+    dapSet('geo-sds-dest',d.sds_dest_issi||0);
+    dapCheck('geo-sds-group',d.sds_dest_is_group);
+    dapSet('geo-tpg-source',d.tpg2200_source_issi||9999);
+    dapSet('geo-tpg-dest',d.tpg2200_dest_issi||0);
+    dapSet('geo-tpg-incident',d.tpg2200_incident_base||1);
+    dapSet('geo-tpg-prefix',d.tpg2200_text_prefix||'GeoAlarm');
+    dapSet('geo-tpg-max',d.tpg2200_max_text_chars||80);
+    dapSet('geo-sip-prefix',d.sip_title_prefix||'GeoAlarm');
+    dapSet('geo-telegram-prefix',d.telegram_prefix||'GeoAlarm');
+    dapSet('geo-seen',rt.seen_positions??0);
+    dapSet('geo-alarms',rt.alarm_count??0);
+    dapSet('geo-center',rt.center||`${d.flowstation_lat??0},${d.flowstation_lon??0}`);
+    dapSet('geo-radius',`${Number(rt.radius_m||d.radius_m||0).toFixed(0)} m`);
+    dapSet('geo-last-position',rt.last_position||'—');
+    dapSet('geo-last-alarm',rt.last_alarm||'—');
+    dapSet('geo-last-error',rt.last_error||'—');
+    state.geoalarmEvents=d.events||[];
+    geoalarmPageIndex=0;
+    renderGeoalarmEvents();
+    setGeoMsg('',true);
+  }catch{setGeoMsg(t('conn_error'),false);}
+}
+async function saveGeoalarm(){
+  const tetraWhite=geoIssiListBody('geo-tetra-white','whitelist');
+  if(tetraWhite===null)return;
+  const tetraBlack=geoIssiListBody('geo-tetra-black','blacklist');
+  if(tetraBlack===null)return;
+  const body={
+    enabled:document.getElementById('geo-enabled').checked,
+    flowstation_lat:geoFloat('geo-lat',0,-90,90),
+    flowstation_lon:geoFloat('geo-lon',0,-180,180),
+    radius_m:dapNum('geo-radius-m',500,1,1000000),
+    cooldown_secs:dapNum('geo-cooldown',300,1,86400),
+    trigger_tetra:document.getElementById('geo-trigger-tetra').checked,
+    trigger_meshcom:document.getElementById('geo-trigger-meshcom').checked,
+    forward_tpg2200:document.getElementById('geo-forward-tpg').checked,
+    forward_sds:document.getElementById('geo-forward-sds').checked,
+    forward_sip:document.getElementById('geo-forward-sip').checked,
+    forward_telegram:document.getElementById('geo-forward-telegram').checked,
+    tetra_issi_whitelist:tetraWhite,
+    tetra_issi_blacklist:tetraBlack,
+    meshcom_source_whitelist:meshSourceListBody('geo-mesh-white'),
+    meshcom_source_blacklist:meshSourceListBody('geo-mesh-black'),
+    sds_source_issi:dapNum('geo-sds-source',9999,1,16777215),
+    sds_dest_issi:dapNum('geo-sds-dest',0,0,16777215),
+    sds_dest_is_group:document.getElementById('geo-sds-group').checked,
+    tpg2200_source_issi:dapNum('geo-tpg-source',9999,1,16777215),
+    tpg2200_dest_issi:dapNum('geo-tpg-dest',0,0,16777215),
+    tpg2200_incident_base:dapNum('geo-tpg-incident',1,1,256),
+    tpg2200_text_prefix:dapVal('geo-tpg-prefix')||'GeoAlarm',
+    tpg2200_max_text_chars:dapNum('geo-tpg-max',80,8,160),
+    sip_title_prefix:dapVal('geo-sip-prefix')||'GeoAlarm',
+    telegram_prefix:dapVal('geo-telegram-prefix')||'GeoAlarm'
+  };
+  try{
+    const r=await fetch('/api/geoalarm',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    if(r.ok){setGeoMsg('✓ Saved',true);setTimeout(loadGeoalarm,500);}
+    else setGeoMsg(t('save_fail')+': '+await r.text(),false);
+  }catch{setGeoMsg(t('conn_error'),false);}
+}
 async function sendMeshcomMessage(){
   const body={dst:dapVal('mesh-out-dst'),msg:dapVal('mesh-out-msg')};
   if(!body.dst){setMeshSendMsg('Destination is empty',false);return;}
@@ -5575,6 +5863,7 @@ async function sendMeshcomMessage(){
 }
 function setMeshMsg(txt,ok){const el=document.getElementById('mesh-msg');if(!el)return;el.textContent=txt;el.style.color=ok?'var(--accent)':'var(--danger)';if(txt)setTimeout(()=>{if(el.textContent===txt)el.textContent='';},5000);}
 function setMeshSendMsg(txt,ok){const el=document.getElementById('mesh-send-msg');if(!el)return;el.textContent=txt;el.style.color=ok?'var(--accent)':'var(--danger)';if(txt)setTimeout(()=>{if(el.textContent===txt)el.textContent='';},5000);}
+function setGeoMsg(txt,ok){const el=document.getElementById('geo-msg');if(!el)return;el.textContent=txt;el.style.color=ok?'var(--accent)':'var(--danger)';if(txt)setTimeout(()=>{if(el.textContent===txt)el.textContent='';},5000);}
 function setElMsg(txt,ok){const el=document.getElementById('el-msg');if(!el)return;el.textContent=txt;el.style.color=ok?'var(--accent)':'var(--danger)';if(txt)setTimeout(()=>{if(el.textContent===txt)el.textContent='';},5000);}
 function setDapMsg(txt,ok){const el=document.getElementById('dap-msg');if(!el)return;el.textContent=txt;el.style.color=ok?'var(--accent)':'var(--danger)';if(txt)setTimeout(()=>{if(el.textContent===txt)el.textContent='';},5000);}
 function setDapSendMsg(txt,ok){const el=document.getElementById('dap-send-msg');if(!el)return;el.textContent=txt;el.style.color=ok?'var(--accent)':'var(--danger)';if(txt)setTimeout(()=>{if(el.textContent===txt)el.textContent='';},5000);}
@@ -6604,7 +6893,7 @@ function renderHealthTab(h){
   });
 }
 
-let healthIntegrationState={asterisk:null,dapnet:null,echolink:null,meshcom:null,lastLoad:0};
+let healthIntegrationState={asterisk:null,dapnet:null,echolink:null,meshcom:null,geoalarm:null,lastLoad:0};
 function integrationHealthCard(title,icon,level,detail,extra){
   const col=healthColor(level);
   const card=document.createElement('div');
@@ -6688,6 +6977,24 @@ function classifyMeshcomHealth(data){
   const extra=err?('Last error: '+err):('Bind '+(rt.bind||((data.bind_addr||'—')+':'+(data.bind_port||'—')))+' · TX '+(rt.tx||((data.tx_host||'—')+':'+(data.tx_port||'—')))+' · routes '+(paths.join(', ')||'none')+(rt.last_rx?' · last RX '+rt.last_rx:''));
   return {level,detail,extra};
 }
+function classifyGeoalarmHealth(data){
+  if(!data||!data.enabled)return {level:'ok',detail:'disabled',extra:'GeoAlarm is not active.'};
+  const rt=data.runtime||{};
+  const err=rt.last_error||'';
+  const paths=[];
+  if(data.forward_tpg2200||rt.forward_tpg2200)paths.push('TPG2200');
+  if(data.forward_sds||rt.forward_sds)paths.push('SDS');
+  if(data.forward_sip||rt.forward_sip)paths.push('SIP');
+  if(data.forward_telegram||rt.forward_telegram)paths.push('Telegram');
+  const notes=[];
+  if(!paths.length)notes.push('no forwarding path enabled');
+  if(!data.trigger_tetra&&!data.trigger_meshcom)notes.push('no input source enabled');
+  if(err)notes.push('Last error: '+err);
+  const level=notes.length?'degraded':'ok';
+  const detail=(rt.seen_positions??0)+' position(s) · '+(rt.alarm_count??0)+' alarm(s)';
+  const extra=notes.length?notes.join(' · '):('Center '+(rt.center||'—')+' · radius '+Number(rt.radius_m||data.radius_m||0).toFixed(0)+' m · routes '+paths.join(', '));
+  return {level,detail,extra};
+}
 function renderHealthIntegrations(){
   const grid=document.getElementById('health-integrations-grid');
   if(!grid)return;
@@ -6716,20 +7023,28 @@ function renderHealthIntegrations(){
   } else {
     grid.appendChild(integrationHealthCard('MeshCom','⌁','degraded','status unavailable','Open the MeshCom page or wait for the next refresh.'));
   }
+  if(healthIntegrationState.geoalarm){
+    const g=classifyGeoalarmHealth(healthIntegrationState.geoalarm);
+    grid.appendChild(integrationHealthCard('GeoAlarm','◎',g.level,g.detail,g.extra));
+  } else {
+    grid.appendChild(integrationHealthCard('GeoAlarm','◎','degraded','status unavailable','Open the GeoAlarm page or wait for the next refresh.'));
+  }
 }
 async function loadHealthIntegrations(){
   healthIntegrationState.lastLoad=Date.now();
   try{
-    const [ast,dap,el,mesh]=await Promise.all([
+    const [ast,dap,el,mesh,geo]=await Promise.all([
       fetch('/api/asterisk/status').then(r=>r.ok?r.json():null).catch(()=>null),
       fetch('/api/dapnet').then(r=>r.ok?r.json():null).catch(()=>null),
       fetch('/api/echolink').then(r=>r.ok?r.json():null).catch(()=>null),
-      fetch('/api/meshcom').then(r=>r.ok?r.json():null).catch(()=>null)
+      fetch('/api/meshcom').then(r=>r.ok?r.json():null).catch(()=>null),
+      fetch('/api/geoalarm').then(r=>r.ok?r.json():null).catch(()=>null)
     ]);
     healthIntegrationState.asterisk=ast;
     healthIntegrationState.dapnet=dap;
     healthIntegrationState.echolink=el;
     healthIntegrationState.meshcom=mesh;
+    healthIntegrationState.geoalarm=geo;
   }catch{}
   renderHealthIntegrations();
 }

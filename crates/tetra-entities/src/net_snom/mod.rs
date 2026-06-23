@@ -29,6 +29,14 @@ pub enum SnomNotifyMsg {
         text: String,
         msg_id: Option<String>,
     },
+    Geoalarm {
+        title: String,
+        source: String,
+        text: String,
+        distance_m: f64,
+        lat: f64,
+        lon: f64,
+    },
 }
 
 #[derive(Clone)]
@@ -62,6 +70,26 @@ impl SnomNotifySink {
             dst,
             text,
             msg_id,
+        });
+    }
+
+    #[inline]
+    pub fn send_geoalarm(
+        &self,
+        title: String,
+        source: String,
+        text: String,
+        distance_m: f64,
+        lat: f64,
+        lon: f64,
+    ) {
+        let _ = self.tx.send(SnomNotifyMsg::Geoalarm {
+            title,
+            source,
+            text,
+            distance_m,
+            lat,
+            lon,
         });
     }
 }
@@ -215,6 +243,25 @@ impl SnomNotifyWorker {
                     lines.push(format!("ID: {msg_id}"));
                 }
                 lines.push(format_message_line("Text", &text, cfg.max_text_chars));
+                Some(SnomNotification {
+                    title: prefixed_title(&cfg.title_prefix, &title),
+                    lines,
+                })
+            }
+            SnomNotifyMsg::Geoalarm {
+                title,
+                source,
+                text,
+                distance_m,
+                lat,
+                lon,
+            } => {
+                let lines = vec![
+                    format!("From: {source}"),
+                    format!("Distance: {:.0} m", distance_m.max(0.0)),
+                    format!("Pos: {:.6}, {:.6}", lat, lon),
+                    format_message_line("Text", &text, cfg.max_text_chars),
+                ];
                 Some(SnomNotification {
                     title: prefixed_title(&cfg.title_prefix, &title),
                     lines,

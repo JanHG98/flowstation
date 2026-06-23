@@ -1823,6 +1823,13 @@ fn handle_connection(
     } else if req_line.contains("POST /api/meshcom") {
         let (inner, body_str) = read_post_body(stream);
         serve_meshcom_post(inner, &shared_config, &config_path, &body_str);
+    } else if req_line.contains("GET /api/geoalarm") {
+        let mut s = stream;
+        drain_http_headers(&mut s);
+        serve_geoalarm_get(s, &shared_config);
+    } else if req_line.contains("POST /api/geoalarm") {
+        let (inner, body_str) = read_post_body(stream);
+        serve_geoalarm_post(inner, &shared_config, &config_path, &body_str);
     } else if req_line.contains("GET /api/config") {
         let mut buf = BufReader::new(stream);
         loop {
@@ -3017,6 +3024,13 @@ fn dapnet_as_u16(json: &serde_json::Value, key: &str, default: u16) -> u16 {
         .unwrap_or(default)
 }
 
+fn dapnet_as_f64(json: &serde_json::Value, key: &str, default: f64) -> f64 {
+    json.get(key)
+        .and_then(|x| x.as_f64().or_else(|| x.as_str().and_then(|s| s.trim().parse::<f64>().ok())))
+        .filter(|v| v.is_finite())
+        .unwrap_or(default)
+}
+
 fn dapnet_as_usize(json: &serde_json::Value, key: &str, default: usize) -> usize {
     json.get(key)
         .and_then(|x| x.as_u64())
@@ -3635,6 +3649,258 @@ fn serve_meshcom_post(
     http_response(stream, 200, "OK");
 }
 
+/// GET /api/geoalarm — return effective GeoAlarm settings and runtime status as JSON.
+fn serve_geoalarm_get(
+    stream: TcpStream,
+    shared_config: &Option<tetra_config::bluestation::SharedConfig>,
+) {
+    let (geoalarm, runtime) = match shared_config {
+        Some(cfg) => (cfg.effective_geoalarm(), cfg.state_read().geoalarm_status.clone()),
+        None => (
+            tetra_config::bluestation::CfgGeoalarm::default(),
+            tetra_config::bluestation::GeoalarmRuntimeStatus::default(),
+        ),
+    };
+    let events = runtime
+        .events
+        .iter()
+        .map(|event| {
+            serde_json::json!({
+                "ts": event.ts.clone(),
+                "source": event.source.clone(),
+                "device": event.device.clone(),
+                "lat": event.lat,
+                "lon": event.lon,
+                "distance_m": event.distance_m,
+                "inside_radius": event.inside_radius,
+                "alarmed": event.alarmed,
+                "paths": event.paths.clone(),
+            })
+        })
+        .collect::<Vec<_>>();
+    let runtime_body = serde_json::json!({
+        "configured": runtime.configured,
+        "enabled": runtime.enabled,
+        "center": runtime.center,
+        "radius_m": runtime.radius_m,
+        "trigger_tetra": runtime.trigger_tetra,
+        "trigger_meshcom": runtime.trigger_meshcom,
+        "forward_tpg2200": runtime.forward_tpg2200,
+        "forward_sds": runtime.forward_sds,
+        "forward_sip": runtime.forward_sip,
+        "forward_telegram": runtime.forward_telegram,
+        "seen_positions": runtime.seen_positions,
+        "alarm_count": runtime.alarm_count,
+        "last_position": runtime.last_position,
+        "last_alarm": runtime.last_alarm,
+        "last_error": runtime.last_error,
+    });
+    let body = serde_json::json!({
+        "enabled": geoalarm.enabled,
+        "flowstation_lat": geoalarm.flowstation_lat,
+        "flowstation_lon": geoalarm.flowstation_lon,
+        "radius_m": geoalarm.radius_m,
+        "cooldown_secs": geoalarm.cooldown_secs,
+        "trigger_tetra": geoalarm.trigger_tetra,
+        "trigger_meshcom": geoalarm.trigger_meshcom,
+        "forward_tpg2200": geoalarm.forward_tpg2200,
+        "forward_sds": geoalarm.forward_sds,
+        "forward_sip": geoalarm.forward_sip,
+        "forward_telegram": geoalarm.forward_telegram,
+        "tetra_issi_whitelist": issi_set_as_json(&geoalarm.tetra_issi_whitelist),
+        "tetra_issi_blacklist": issi_set_as_json(&geoalarm.tetra_issi_blacklist),
+        "meshcom_source_whitelist": meshcom_source_list_as_json(&geoalarm.meshcom_source_whitelist),
+        "meshcom_source_blacklist": meshcom_source_list_as_json(&geoalarm.meshcom_source_blacklist),
+        "sds_source_issi": geoalarm.sds_source_issi,
+        "sds_dest_issi": geoalarm.sds_dest_issi,
+        "sds_dest_is_group": geoalarm.sds_dest_is_group,
+        "tpg2200_source_issi": geoalarm.tpg2200_source_issi,
+        "tpg2200_dest_issi": geoalarm.tpg2200_dest_issi,
+        "tpg2200_incident_base": geoalarm.tpg2200_incident_base,
+        "tpg2200_text_prefix": geoalarm.tpg2200_text_prefix.clone(),
+        "tpg2200_max_text_chars": geoalarm.tpg2200_max_text_chars,
+        "sip_title_prefix": geoalarm.sip_title_prefix.clone(),
+        "telegram_prefix": geoalarm.telegram_prefix.clone(),
+        "runtime": runtime_body,
+        "events": events,
+    });
+    http_json_response(stream, 200, &body.to_string());
+}
+
+/// POST /api/geoalarm — update GeoAlarm settings. Applies immediately through StackState
+/// override and rewrites `[geoalarm]` in config.toml.
+fn serve_geoalarm_post(
+    stream: TcpStream,
+    shared_config: &Option<tetra_config::bluestation::SharedConfig>,
+    config_path: &str,
+    body: &str,
+) {
+    use tetra_config::bluestation::{
+        CfgGeoalarmDto, GeoalarmRuntimeOverride, apply_geoalarm_patch,
+    };
+
+    let json: serde_json::Value = match serde_json::from_str(body.trim()) {
+        Ok(v) => v,
+        Err(e) => {
+            http_response(stream, 400, &format!("Invalid JSON: {e}"));
+            return;
+        }
+    };
+    let Some(cfg) = shared_config else {
+        http_response(stream, 503, "Config not available");
+        return;
+    };
+
+    let cur = cfg.effective_geoalarm();
+    let tetra_issi_whitelist = match snom_issi_set_from_json(
+        &json,
+        "tetra_issi_whitelist",
+        &cur.tetra_issi_whitelist,
+    ) {
+        Ok(v) => v,
+        Err(err) => {
+            http_response(stream, 400, &err);
+            return;
+        }
+    };
+    let tetra_issi_blacklist = match snom_issi_set_from_json(
+        &json,
+        "tetra_issi_blacklist",
+        &cur.tetra_issi_blacklist,
+    ) {
+        Ok(v) => v,
+        Err(err) => {
+            http_response(stream, 400, &err);
+            return;
+        }
+    };
+    let meshcom_source_whitelist = match meshcom_source_list_from_json(
+        &json,
+        "meshcom_source_whitelist",
+        &cur.meshcom_source_whitelist,
+    ) {
+        Ok(v) => v,
+        Err(err) => {
+            http_response(stream, 400, &err);
+            return;
+        }
+    };
+    let meshcom_source_blacklist = match meshcom_source_list_from_json(
+        &json,
+        "meshcom_source_blacklist",
+        &cur.meshcom_source_blacklist,
+    ) {
+        Ok(v) => v,
+        Err(err) => {
+            http_response(stream, 400, &err);
+            return;
+        }
+    };
+
+    let dto = CfgGeoalarmDto {
+        enabled: dapnet_as_bool(&json, "enabled", cur.enabled),
+        flowstation_lat: dapnet_as_f64(&json, "flowstation_lat", cur.flowstation_lat),
+        flowstation_lon: dapnet_as_f64(&json, "flowstation_lon", cur.flowstation_lon),
+        radius_m: dapnet_as_f64(&json, "radius_m", cur.radius_m),
+        cooldown_secs: dapnet_as_u64(&json, "cooldown_secs", cur.cooldown_secs),
+        trigger_tetra: dapnet_as_bool(&json, "trigger_tetra", cur.trigger_tetra),
+        trigger_meshcom: dapnet_as_bool(&json, "trigger_meshcom", cur.trigger_meshcom),
+        forward_tpg2200: dapnet_as_bool(&json, "forward_tpg2200", cur.forward_tpg2200),
+        forward_sds: dapnet_as_bool(&json, "forward_sds", cur.forward_sds),
+        forward_sip: dapnet_as_bool(&json, "forward_sip", cur.forward_sip),
+        forward_telegram: dapnet_as_bool(&json, "forward_telegram", cur.forward_telegram),
+        tetra_issi_whitelist: tetra_issi_whitelist.iter().copied().collect(),
+        tetra_issi_blacklist: tetra_issi_blacklist.iter().copied().collect(),
+        meshcom_source_whitelist,
+        meshcom_source_blacklist,
+        sds_source_issi: dapnet_as_u32(&json, "sds_source_issi", cur.sds_source_issi),
+        sds_dest_issi: dapnet_as_u32(&json, "sds_dest_issi", cur.sds_dest_issi),
+        sds_dest_is_group: dapnet_as_bool(&json, "sds_dest_is_group", cur.sds_dest_is_group),
+        tpg2200_source_issi: dapnet_as_u32(&json, "tpg2200_source_issi", cur.tpg2200_source_issi),
+        tpg2200_dest_issi: dapnet_as_u32(&json, "tpg2200_dest_issi", cur.tpg2200_dest_issi),
+        tpg2200_incident_base: dapnet_as_u16(&json, "tpg2200_incident_base", cur.tpg2200_incident_base),
+        tpg2200_text_prefix: dapnet_as_string(&json, "tpg2200_text_prefix", &cur.tpg2200_text_prefix),
+        tpg2200_max_text_chars: dapnet_as_usize(&json, "tpg2200_max_text_chars", cur.tpg2200_max_text_chars),
+        sip_title_prefix: dapnet_as_string(&json, "sip_title_prefix", &cur.sip_title_prefix),
+        telegram_prefix: dapnet_as_string(&json, "telegram_prefix", &cur.telegram_prefix),
+        extra: HashMap::new(),
+    };
+    let normalized = match apply_geoalarm_patch(dto) {
+        Ok(cfg) => cfg,
+        Err(err) => {
+            http_response(stream, 400, &err);
+            return;
+        }
+    };
+    let text_fields = [
+        normalized.tpg2200_text_prefix.as_str(),
+        normalized.sip_title_prefix.as_str(),
+        normalized.telegram_prefix.as_str(),
+    ];
+    if !text_fields.iter().all(|v| dapnet_text_acceptable(v))
+        || !normalized
+            .meshcom_source_whitelist
+            .iter()
+            .chain(normalized.meshcom_source_blacklist.iter())
+            .all(|v| dapnet_text_acceptable(v))
+    {
+        http_response(stream, 400, "Invalid GeoAlarm setting: control characters are not allowed");
+        return;
+    }
+
+    let ov = GeoalarmRuntimeOverride {
+        enabled: normalized.enabled,
+        flowstation_lat: normalized.flowstation_lat,
+        flowstation_lon: normalized.flowstation_lon,
+        radius_m: normalized.radius_m,
+        cooldown_secs: normalized.cooldown_secs,
+        trigger_tetra: normalized.trigger_tetra,
+        trigger_meshcom: normalized.trigger_meshcom,
+        forward_tpg2200: normalized.forward_tpg2200,
+        forward_sds: normalized.forward_sds,
+        forward_sip: normalized.forward_sip,
+        forward_telegram: normalized.forward_telegram,
+        tetra_issi_whitelist: normalized.tetra_issi_whitelist,
+        tetra_issi_blacklist: normalized.tetra_issi_blacklist,
+        meshcom_source_whitelist: normalized.meshcom_source_whitelist,
+        meshcom_source_blacklist: normalized.meshcom_source_blacklist,
+        sds_source_issi: normalized.sds_source_issi,
+        sds_dest_issi: normalized.sds_dest_issi,
+        sds_dest_is_group: normalized.sds_dest_is_group,
+        tpg2200_source_issi: normalized.tpg2200_source_issi,
+        tpg2200_dest_issi: normalized.tpg2200_dest_issi,
+        tpg2200_incident_base: normalized.tpg2200_incident_base,
+        tpg2200_text_prefix: normalized.tpg2200_text_prefix,
+        tpg2200_max_text_chars: normalized.tpg2200_max_text_chars,
+        sip_title_prefix: normalized.sip_title_prefix,
+        telegram_prefix: normalized.telegram_prefix,
+    };
+
+    {
+        let mut state = cfg.state_write();
+        state.geoalarm_override = Some(ov.clone());
+    }
+
+    if let Err(e) = crate::net_dashboard::geoalarm::write_geoalarm_to_toml(config_path, &ov) {
+        tracing::warn!("Dashboard: GeoAlarm applied at runtime but failed to persist to TOML: {}", e);
+        http_response(stream, 200, "Applied at runtime; failed to write config file (check permissions)");
+        return;
+    }
+
+    tracing::info!(
+        "Dashboard: GeoAlarm updated (enabled={} center={:.6},{:.6} radius={:.0}m routes=tpg2200:{} sds:{} sip:{} telegram:{})",
+        ov.enabled,
+        ov.flowstation_lat,
+        ov.flowstation_lon,
+        ov.radius_m,
+        ov.forward_tpg2200,
+        ov.forward_sds,
+        ov.forward_sip,
+        ov.forward_telegram
+    );
+    http_response(stream, 200, "OK");
+}
+
 /// POST /api/meshcom/send — send one MeshCom text message through the configured UDP target.
 fn serve_meshcom_send(
     stream: TcpStream,
@@ -4074,6 +4340,15 @@ fn meshcom_source_list_as_json(values: &BTreeSet<String>) -> serde_json::Value {
         values
             .iter()
             .map(|value| serde_json::Value::String(value.clone()))
+            .collect(),
+    )
+}
+
+fn issi_set_as_json(values: &BTreeSet<u32>) -> serde_json::Value {
+    serde_json::Value::Array(
+        values
+            .iter()
+            .map(|value| serde_json::json!(*value))
             .collect(),
     )
 }

@@ -16,6 +16,7 @@ use tetra_config::bluestation::{
 };
 
 use crate::net_control::commands::ControlCommand;
+use crate::net_geoalarm::GeoAlarmSink;
 use crate::net_snom::SnomNotifySink;
 use crate::net_telegram::TelegramAlertSink;
 use crate::tpg2200::build_sds_text_payload;
@@ -31,10 +32,11 @@ pub fn spawn_meshcom_worker(
     cmce_cmd_tx: Option<CmdSender>,
     telegram_sink: Option<TelegramAlertSink>,
     snom_sink: Option<SnomNotifySink>,
+    geoalarm_sink: Option<GeoAlarmSink>,
 ) -> Option<thread::JoinHandle<()>> {
     match thread::Builder::new()
         .name("meshcom-worker".into())
-        .spawn(move || MeshcomWorker::new(cfg, cmce_cmd_tx, telegram_sink, snom_sink).run())
+        .spawn(move || MeshcomWorker::new(cfg, cmce_cmd_tx, telegram_sink, snom_sink, geoalarm_sink).run())
     {
         Ok(handle) => Some(handle),
         Err(err) => {
@@ -49,6 +51,7 @@ struct MeshcomWorker {
     cmce_cmd_tx: Option<CmdSender>,
     telegram_sink: Option<TelegramAlertSink>,
     snom_sink: Option<SnomNotifySink>,
+    geoalarm_sink: Option<GeoAlarmSink>,
     socket: Option<UdpSocket>,
     bind_key: String,
     rx_packets: u64,
@@ -63,12 +66,14 @@ impl MeshcomWorker {
         cmce_cmd_tx: Option<CmdSender>,
         telegram_sink: Option<TelegramAlertSink>,
         snom_sink: Option<SnomNotifySink>,
+        geoalarm_sink: Option<GeoAlarmSink>,
     ) -> Self {
         Self {
             cfg,
             cmce_cmd_tx,
             telegram_sink,
             snom_sink,
+            geoalarm_sink,
             socket: None,
             bind_key: String::new(),
             rx_packets: 0,
@@ -204,6 +209,12 @@ impl MeshcomWorker {
             msg.as_deref(),
             msg_id.as_deref(),
         );
+
+        if let (Some(sink), Some(source), Some(lat), Some(lon)) =
+            (&self.geoalarm_sink, src.as_deref(), lat, lon)
+        {
+            sink.send_meshcom_position(source.to_string(), lat, lon);
+        }
 
         self.rx_packets = self.rx_packets.saturating_add(1);
         let event = MeshcomMessageStatus {
