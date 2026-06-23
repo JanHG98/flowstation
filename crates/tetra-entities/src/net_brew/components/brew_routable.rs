@@ -9,10 +9,11 @@ pub fn is_brew_entity(entity: TetraEntity) -> bool {
 }
 
 #[inline]
-pub fn brew_config_for_entity(config: &SharedConfig, entity: TetraEntity) -> Option<&CfgBrew> {
+pub fn brew_config_for_entity(config: &SharedConfig, entity: TetraEntity) -> Option<CfgBrew> {
+    let cfg = config.config();
     match entity {
-        TetraEntity::Brew => config.config().brew.as_ref(),
-        TetraEntity::Brew2 => config.config().brew2.as_ref(),
+        TetraEntity::Brew => cfg.brew.clone(),
+        TetraEntity::Brew2 => cfg.brew2.clone(),
         _ => None,
     }
 }
@@ -146,11 +147,11 @@ pub fn is_brew_issi_routable_for_entity(config: &SharedConfig, entity: TetraEnti
         return false;
     };
 
-    if is_tetrapack_server(brew_config) {
+    if is_tetrapack_server(&brew_config) {
         // 7-digit subscriber ISSIs are always routable.
         // Short ISSIs (< 1_000_000) are service numbers handled by TetraPack Core —
         // let them through so the core can respond (echo test 600, etc.)
-        (issi >= 1_000_000 && issi <= 9_999_999) || issi < 1_000_000 || is_pbx_gateway_issi(brew_config, issi)
+        (issi >= 1_000_000 && issi <= 9_999_999) || issi < 1_000_000 || is_pbx_gateway_issi(&brew_config, issi)
     } else {
         true
     }
