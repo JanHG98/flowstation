@@ -3,9 +3,9 @@ use std::sync::{Arc, RwLock};
 use tetra_core::freqs::FreqInfo;
 
 use crate::bluestation::{
-    CfgAsterisk, CfgCellInfo, CfgControl, CfgDapnet, CfgEcholink, CfgEmergency, CfgHealth, CfgNetInfo,
-    CfgPhyIo, CfgRecovery, CfgSecurity, CfgSnomNotify, CfgTpg2200Action, CfgWxService, PhyBackend,
-    StackState,
+    CfgAsterisk, CfgCellInfo, CfgControl, CfgDapnet, CfgEcholink, CfgEmergency, CfgHealth,
+    CfgMeshcom, CfgNetInfo, CfgPhyIo, CfgRecovery, CfgSecurity, CfgSnomNotify, CfgTpg2200Action,
+    CfgWxService, PhyBackend, StackState,
 };
 
 use super::sec_dashboard::CfgDashboard;
@@ -84,6 +84,9 @@ pub struct StackConfig {
 
     /// EchoLink bridge configuration.
     pub echolink: CfgEcholink,
+
+    /// MeshCom external UDP bridge configuration.
+    pub meshcom: CfgMeshcom,
 
     /// Token-protected ActionURL trigger for Motorola TPG2200 Call-Out.
     pub tpg2200_action: CfgTpg2200Action,
@@ -397,6 +400,37 @@ impl SharedConfig {
                 auto_connect: o.auto_connect.clone(),
                 reconnect_interval_secs: o.reconnect_interval_secs.max(1),
                 max_session_secs: o.max_session_secs.max(1),
+            }
+        } else {
+            base
+        }
+    }
+
+    /// Effective MeshCom settings: the dashboard runtime override if present, otherwise the
+    /// config file values. Returns an owned [`CfgMeshcom`] so callers don't hold the state lock.
+    pub fn effective_meshcom(&self) -> crate::bluestation::CfgMeshcom {
+        let base = self.cfg.meshcom.clone();
+        if let Some(o) = self.state_read().meshcom_override.as_ref() {
+            crate::bluestation::CfgMeshcom {
+                enabled: o.enabled,
+                bind_addr: o.bind_addr.clone(),
+                bind_port: if o.bind_port == 0 { base.bind_port } else { o.bind_port },
+                tx_host: o.tx_host.clone(),
+                tx_port: if o.tx_port == 0 { base.tx_port } else { o.tx_port },
+                allow_broadcast: o.allow_broadcast,
+                max_messages: o.max_messages.clamp(10, 10_000),
+                max_nodes: o.max_nodes.clamp(10, 65_535),
+                forward_sds: o.forward_sds,
+                forward_sip: o.forward_sip,
+                forward_telegram: o.forward_telegram,
+                sds_source_issi: o.sds_source_issi.max(1),
+                sds_dest_issi: o.sds_dest_issi,
+                sds_dest_is_group: o.sds_dest_is_group,
+                sds_allowed_sources: o.sds_allowed_sources.clone(),
+                sip_title_prefix: o.sip_title_prefix.clone(),
+                sip_allowed_sources: o.sip_allowed_sources.clone(),
+                telegram_prefix: o.telegram_prefix.clone(),
+                telegram_allowed_sources: o.telegram_allowed_sources.clone(),
             }
         } else {
             base

@@ -16,6 +16,7 @@ use super::sec_asterisk::{CfgAsteriskDto, apply_asterisk_patch};
 use super::sec_brew::{CfgBrewDto, apply_brew_patch};
 use super::sec_dapnet::{CfgDapnetDto, apply_dapnet_patch};
 use super::sec_echolink::{CfgEcholinkDto, apply_echolink_patch};
+use super::sec_meshcom::{CfgMeshcomDto, apply_meshcom_patch};
 use super::sec_tpg2200_action::{
     CfgTpg2200ActionDto, apply_tpg2200_action_patch,
 };
@@ -141,6 +142,12 @@ pub fn from_toml_str(toml_str: &str) -> Result<StackConfig, Box<dyn std::error::
             return Err(format!("Unrecognized fields in echolink config: {:?}", sorted_keys(&echolink.extra)).into());
         }
 
+    // Optional meshcom section
+    if let Some(ref meshcom) = root.meshcom
+        && !meshcom.extra.is_empty() {
+            return Err(format!("Unrecognized fields in meshcom config: {:?}", sorted_keys(&meshcom.extra)).into());
+        }
+
     // Optional tpg2200_action section
     if let Some(ref action) = root.tpg2200_action
         && !action.extra.is_empty() {
@@ -215,6 +222,7 @@ pub fn from_toml_str(toml_str: &str) -> Result<StackConfig, Box<dyn std::error::
         asterisk: apply_asterisk_patch(root.asterisk.unwrap_or_default())?,
         dapnet: apply_dapnet_patch(root.dapnet.unwrap_or_default())?,
         echolink: apply_echolink_patch(root.echolink.unwrap_or_default())?,
+        meshcom: apply_meshcom_patch(root.meshcom.unwrap_or_default())?,
         tpg2200_action: apply_tpg2200_action_patch(root.tpg2200_action.unwrap_or_default())?,
         snom_notify: apply_snom_notify_patch(root.snom_notify.unwrap_or_default())?,
         dashboard: None,
@@ -291,6 +299,7 @@ struct TomlConfigRoot {
     asterisk: Option<CfgAsteriskDto>,
     dapnet: Option<CfgDapnetDto>,
     echolink: Option<CfgEcholinkDto>,
+    meshcom: Option<CfgMeshcomDto>,
     tpg2200_action: Option<CfgTpg2200ActionDto>,
     snom_notify: Option<CfgSnomNotifyDto>,
     dashboard: Option<CfgDashboardDto>,
@@ -478,6 +487,27 @@ auto_connect = ""
 reconnect_interval_secs = 30
 max_session_secs = 3600
 
+[meshcom]
+enabled = true
+bind_addr = "0.0.0.0"
+bind_port = 1799
+tx_host = "255.255.255.255"
+tx_port = 1799
+allow_broadcast = true
+max_messages = 500
+max_nodes = 1000
+forward_sds = true
+forward_sip = true
+forward_telegram = true
+sds_source_issi = 9999
+sds_dest_issi = 2632585
+sds_dest_is_group = false
+sds_allowed_sources = ["DJ2TH", "OE1ABC-12"]
+sip_title_prefix = "MeshCom"
+sip_allowed_sources = ["DJ2TH"]
+telegram_prefix = "MeshCom"
+telegram_allowed_sources = ["OE1ABC-12"]
+
 [tpg2200_action]
 enabled = true
 token = "example-token"
@@ -558,6 +588,16 @@ sds_queue_critical = 128
         assert!(cfg.dapnet.telegram_allowed_rics.contains(&0x1C40));
         assert!(cfg.echolink.enabled);
         assert_eq!(cfg.echolink.callsign, "DL1ABC-L");
+        assert!(cfg.meshcom.enabled);
+        assert_eq!(cfg.meshcom.bind_port, 1799);
+        assert_eq!(cfg.meshcom.tx_host, "255.255.255.255");
+        assert!(cfg.meshcom.forward_sds);
+        assert!(cfg.meshcom.forward_sip);
+        assert!(cfg.meshcom.forward_telegram);
+        assert_eq!(cfg.meshcom.sds_dest_issi, 2632585);
+        assert!(cfg.meshcom.sds_allowed_sources.contains("DJ2TH"));
+        assert!(cfg.meshcom.sip_allowed_sources.contains("DJ2TH"));
+        assert!(cfg.meshcom.telegram_allowed_sources.contains("OE1ABC-12"));
         assert_eq!(cfg.echolink.routes.get("700"), Some(&"ECHOTEST".to_string()));
         assert_eq!(cfg.echolink.default_tetra_dest_issi, 80);
         assert!(!cfg.echolink.default_tetra_dest_is_group);

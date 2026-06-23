@@ -22,6 +22,13 @@ static ACTION_ID: AtomicU64 = AtomicU64::new(1);
 pub enum SnomNotifyMsg {
     Event(TelemetryEvent),
     TelegramHtml(String),
+    Meshcom {
+        title: String,
+        src: String,
+        dst: Option<String>,
+        text: String,
+        msg_id: Option<String>,
+    },
 }
 
 #[derive(Clone)]
@@ -38,6 +45,24 @@ impl SnomNotifySink {
     #[inline]
     pub fn send_telegram_html(&self, html: String) {
         let _ = self.tx.send(SnomNotifyMsg::TelegramHtml(html));
+    }
+
+    #[inline]
+    pub fn send_meshcom(
+        &self,
+        title: String,
+        src: String,
+        dst: Option<String>,
+        text: String,
+        msg_id: Option<String>,
+    ) {
+        let _ = self.tx.send(SnomNotifyMsg::Meshcom {
+            title,
+            src,
+            dst,
+            text,
+            msg_id,
+        });
     }
 }
 
@@ -173,6 +198,26 @@ impl SnomNotifyWorker {
                 Some(SnomNotification {
                     title: prefixed_title(&cfg.title_prefix, "Telegram"),
                     lines: split_for_snom(&text, cfg.max_text_chars),
+                })
+            }
+            SnomNotifyMsg::Meshcom {
+                title,
+                src,
+                dst,
+                text,
+                msg_id,
+            } => {
+                let mut lines = vec![format!("From: {src}")];
+                if let Some(dst) = dst.filter(|v| !v.trim().is_empty()) {
+                    lines.push(format!("To: {dst}"));
+                }
+                if let Some(msg_id) = msg_id.filter(|v| !v.trim().is_empty()) {
+                    lines.push(format!("ID: {msg_id}"));
+                }
+                lines.push(format_message_line("Text", &text, cfg.max_text_chars));
+                Some(SnomNotification {
+                    title: prefixed_title(&cfg.title_prefix, &title),
+                    lines,
                 })
             }
             _ => None,

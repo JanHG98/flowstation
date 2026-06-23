@@ -2,6 +2,7 @@ pub mod callsign;
 pub mod dapnet;
 pub mod echolink;
 pub mod html;
+pub mod meshcom;
 pub mod radioid;
 pub mod server;
 pub mod snom_notify;

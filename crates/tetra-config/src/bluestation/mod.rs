@@ -28,6 +28,9 @@ pub use sec_dapnet::*;
 pub mod sec_echolink;
 pub use sec_echolink::*;
 
+pub mod sec_meshcom;
+pub use sec_meshcom::*;
+
 pub mod sec_tpg2200_action;
 pub use sec_tpg2200_action::*;
 
