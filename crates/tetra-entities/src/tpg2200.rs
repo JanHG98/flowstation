@@ -53,6 +53,22 @@ pub fn tpg2200_priority_byte(priority: u8) -> u8 {
     priority.min(15)
 }
 
+pub fn tpg2200_incident_byte(incident: u16) -> u8 {
+    let incident = incident.clamp(1, 256);
+    let zero_based = incident - 1;
+    let major = ((zero_based + 1) & 0x0F) as u8;
+    let minor = (((zero_based / 16) + 1) & 0x0F) as u8;
+    (major << 4) | minor
+}
+
+pub fn tpg2200_incident_from_byte(selector: u8) -> u16 {
+    let major = (selector >> 4) as u16;
+    let minor = (selector & 0x0F) as u16;
+    let slot = if major == 0 { 16 } else { major };
+    let block = if minor == 0 { 16 } else { minor };
+    ((block - 1) * 16) + slot
+}
+
 pub fn default_tpg2200_ric() -> u32 {
     0x0009_0D10
 }
@@ -97,7 +113,7 @@ pub fn build_sds_text_payload(text: &str) -> (u16, Vec<u8>) {
 mod tests {
     use super::{
         build_sds_text_payload, build_tpg2200_callout_payload, default_tpg2200_ric, parse_hex_payload, tpg2200_callout_id_byte,
-        tpg2200_priority_byte, tpg2200_ric_bytes,
+        tpg2200_incident_byte, tpg2200_incident_from_byte, tpg2200_priority_byte, tpg2200_ric_bytes,
     };
 
     #[test]
@@ -121,6 +137,25 @@ mod tests {
 
         assert_eq!(default_tpg2200_ric(), 0x0009_0D10);
         assert_eq!(tpg2200_ric_bytes(0x0009_0D10), [0x00, 0x09, 0x0D, 0x10]);
+    }
+
+    #[test]
+    fn tpg2200_incident_selector_preserves_known_values() {
+        assert_eq!(tpg2200_incident_byte(1), 0x11);
+        assert_eq!(tpg2200_incident_byte(2), 0x21);
+        assert_eq!(tpg2200_incident_byte(3), 0x31);
+        assert_eq!(tpg2200_incident_byte(4), 0x41);
+        assert_eq!(tpg2200_incident_byte(15), 0xF1);
+        assert_eq!(tpg2200_incident_byte(16), 0x01);
+        assert_eq!(tpg2200_incident_byte(256), 0x00);
+
+        let selectors = (1..=256).map(tpg2200_incident_byte).collect::<std::collections::HashSet<_>>();
+        assert_eq!(selectors.len(), 256);
+
+        assert_eq!(tpg2200_incident_from_byte(0x11), 1);
+        assert_eq!(tpg2200_incident_from_byte(0x21), 2);
+        assert_eq!(tpg2200_incident_from_byte(0x31), 3);
+        assert_eq!(tpg2200_incident_from_byte(0x00), 256);
     }
 
     #[test]

@@ -548,7 +548,7 @@ telegram_allowed_rics = []
 
 callout_source_issi = 9999
 callout_dest_issi = 0
-callout_tpg_ric = 593168          # 0x00090D10, the tested TPG2200 Call-Out address
+callout_tpg_ric = 0x00090D10      # TPG2200 Call-Out payload address
 callout_id_base = 33              # raw Call-Out ID byte 0..255
 callout_priority = 15             # raw priority/tone byte 0..15
 callout_issi_priorities = {}      # optional: "TPG ISSI" = priority
@@ -572,10 +572,10 @@ Keep `password` and `rwth_core_authkey` private and out of commits.
 ### Motorola TPG2200 ActionURL trigger
 
 FlowStation can expose a token-protected HTTP endpoint so a Snom function key
-can trigger a Motorola TPG2200 Call-Out. The TPG payload uses the tested shape
-`C3 <TPG RIC 4 bytes> <ID> 27 <priority> 02 30 8D <text>`. The Call-Out ID is
-the raw byte `0..255`; priority/tone is the raw byte `0..15`. Every accepted
-request increments the Call-Out ID in memory and wraps from 255 back to 0.
+can trigger a Motorola TPG2200 Call-Out. Without URL parameters it uses the
+same incident sequence as the original implementation: incident `1` sends
+selector byte `0x11`, incident `2` sends `0x21`, incident `3` sends `0x31`, and
+so on. Priority/tone is the raw byte `0..15`.
 
 ```toml
 [tpg2200_action]
@@ -583,13 +583,18 @@ enabled = true
 token = "long-random-token"
 source_issi = 9999
 dest_issi = 2632585
-ric = 593168
-callout_id_base = 17
+tpg_ric = 0x00090D10
+incident_base = 1
 priority = 15
-issi_priorities = { "2632585" = 15 }
-ric_priorities = { "0x00090D10" = 15 }
 default_text = "ALARM"
 max_text_chars = 80
+```
+
+Optional priority overrides for multi-TPG setups:
+
+```toml
+tpg_issi_priorities = { "2632585" = 15 }
+tpg_ric_priorities = { "0x00090D10" = 15 }
 ```
 
 Snom ActionURL examples:
@@ -597,12 +602,14 @@ Snom ActionURL examples:
 ```text
 http://<flowstation>:8080/api/action/tpg2200?token=<token>
 http://<flowstation>:8080/api/action/tpg2200?token=<token>&text=ALARM
-http://<flowstation>:8080/api/action/tpg2200?token=<token>&id=33&priority=12&ric=0x00090D10
+http://<flowstation>:8080/api/action/tpg2200?token=<token>&incident=2&priority=12&tpg_ric=0x00090D10
+http://<flowstation>:8080/api/action/tpg2200?token=<token>&id=33&priority=12&tpg_ric=0x00090D10
 ```
 
-Legacy keys such as `incident_base`, `callout_incident_base`, and
-`tpg2200_incident_base` are still accepted for older config files, but new
-configs should use the explicit `*_callout_id_base` names.
+`incident` uses the TPG incident sequence. `id`/`callout_id`/`raw_id` is an
+expert override for the raw selector byte. Legacy keys such as `ric`,
+`issi_priorities`, `ric_priorities`, `callout_incident_base`, and
+`tpg2200_incident_base` are still accepted for older config files.
 
 ### Snom XML display notifications
 
@@ -750,8 +757,8 @@ sds_dest_is_group = false
 
 tpg2200_source_issi = 9999
 tpg2200_dest_issi = 0
-tpg2200_ric = 593168
-tpg2200_callout_id_base = 17
+tpg2200_ric = 0x00090D10
+tpg2200_callout_id_base = 33   # raw selector byte, e.g. 33 = 0x21
 tpg2200_priority = 15
 tpg2200_issi_priorities = {}
 tpg2200_ric_priorities = {}

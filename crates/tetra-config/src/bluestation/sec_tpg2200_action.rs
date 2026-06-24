@@ -14,13 +14,13 @@ pub struct CfgTpg2200Action {
     pub token: SecretField,
     pub source_issi: u32,
     pub dest_issi: u32,
-    pub ric: u32,
-    /// Raw TPG2200 Call-Out ID byte to start from. The historic field name stays
-    /// for compatibility with older code paths and config files.
+    pub tpg_ric: u32,
+    /// TPG incident number to start from. FlowStation converts this to the TPG selector byte
+    /// sequence used by the existing ActionURL implementation.
     pub incident_base: u16,
     pub priority: u8,
-    pub issi_priorities: BTreeMap<u32, u8>,
-    pub ric_priorities: BTreeMap<u32, u8>,
+    pub tpg_issi_priorities: BTreeMap<u32, u8>,
+    pub tpg_ric_priorities: BTreeMap<u32, u8>,
     pub default_text: String,
     pub max_text_chars: usize,
 }
@@ -32,11 +32,11 @@ impl Default for CfgTpg2200Action {
             token: SecretField::from(String::new()),
             source_issi: 9999,
             dest_issi: 0,
-            ric: default_tpg2200_ric(),
-            incident_base: default_callout_id_base(),
+            tpg_ric: default_tpg2200_ric(),
+            incident_base: default_incident_base(),
             priority: default_priority(),
-            issi_priorities: BTreeMap::new(),
-            ric_priorities: BTreeMap::new(),
+            tpg_issi_priorities: BTreeMap::new(),
+            tpg_ric_priorities: BTreeMap::new(),
             default_text: "ALARM".to_string(),
             max_text_chars: 80,
         }
@@ -53,14 +53,20 @@ pub struct CfgTpg2200ActionDto {
     pub source_issi: u32,
     #[serde(default)]
     pub dest_issi: u32,
-    #[serde(default = "default_tpg2200_ric")]
-    pub ric: u32,
+    #[serde(default)]
+    pub tpg_ric: Option<u32>,
+    #[serde(default)]
+    pub ric: Option<u32>,
     #[serde(default)]
     pub callout_id_base: Option<u16>,
     #[serde(default)]
     pub incident_base: Option<u16>,
     #[serde(default = "default_priority")]
     pub priority: u8,
+    #[serde(default)]
+    pub tpg_issi_priorities: HashMap<String, u8>,
+    #[serde(default)]
+    pub tpg_ric_priorities: HashMap<String, u8>,
     #[serde(default)]
     pub issi_priorities: HashMap<String, u8>,
     #[serde(default)]
@@ -81,10 +87,13 @@ impl Default for CfgTpg2200ActionDto {
             token: String::new(),
             source_issi: default_source_issi(),
             dest_issi: 0,
-            ric: default_tpg2200_ric(),
+            tpg_ric: None,
+            ric: None,
             callout_id_base: None,
             incident_base: None,
             priority: default_priority(),
+            tpg_issi_priorities: HashMap::new(),
+            tpg_ric_priorities: HashMap::new(),
             issi_priorities: HashMap::new(),
             ric_priorities: HashMap::new(),
             default_text: default_text(),
@@ -98,8 +107,8 @@ fn default_source_issi() -> u32 {
     9999
 }
 
-fn default_callout_id_base() -> u16 {
-    0x11
+fn default_incident_base() -> u16 {
+    1
 }
 
 fn default_tpg2200_ric() -> u32 {
@@ -110,19 +119,26 @@ fn default_priority() -> u8 {
     15
 }
 
-fn legacy_incident_selector(incident: u16) -> u16 {
-    let incident = incident.clamp(1, 256);
-    let zero_based = incident - 1;
-    let major = ((zero_based + 1) & 0x0F) as u16;
-    let minor = (((zero_based / 16) + 1) & 0x0F) as u16;
-    (major << 4) | minor
+fn incident_from_selector_byte(selector: u16) -> u16 {
+    let selector = selector.min(255) as u8;
+    let major = (selector >> 4) as u16;
+    let minor = (selector & 0x0F) as u16;
+    let slot = if major == 0 { 16 } else { major };
+    let block = if minor == 0 { 16 } else { minor };
+    ((block - 1) * 16) + slot
 }
 
-fn select_callout_id_base(dto: &CfgTpg2200ActionDto) -> u16 {
-    dto.callout_id_base
-        .map(|id| id.min(255))
-        .or_else(|| dto.incident_base.map(legacy_incident_selector))
-        .unwrap_or_else(default_callout_id_base)
+fn select_incident_base(dto: &CfgTpg2200ActionDto) -> u16 {
+    dto.incident_base
+        .map(|incident| incident.clamp(1, 256))
+        .or_else(|| dto.callout_id_base.map(incident_from_selector_byte))
+        .unwrap_or_else(default_incident_base)
+}
+
+fn merge_priority_maps(legacy: HashMap<String, u8>, preferred: HashMap<String, u8>) -> HashMap<String, u8> {
+    let mut merged = legacy;
+    merged.extend(preferred);
+    merged
 }
 
 fn default_text() -> String {
@@ -134,7 +150,7 @@ fn default_max_text_chars() -> usize {
 }
 
 pub fn apply_tpg2200_action_patch(dto: CfgTpg2200ActionDto) -> Result<CfgTpg2200Action, String> {
-    let callout_id_base = select_callout_id_base(&dto);
+    let incident_base = select_incident_base(&dto);
     if dto.enabled {
         if dto.token.trim().is_empty() {
             return Err("tpg2200_action: token cannot be empty when enabled".to_string());
@@ -149,19 +165,19 @@ pub fn apply_tpg2200_action_patch(dto: CfgTpg2200ActionDto) -> Result<CfgTpg2200
     if dto.token.chars().any(|c| c.is_whitespace() || c.is_control()) {
         return Err("tpg2200_action: token must not contain spaces or control characters".to_string());
     }
-    let issi_priorities = normalize_issi_priorities(dto.issi_priorities)?;
-    let ric_priorities = normalize_ric_priorities(dto.ric_priorities)?;
+    let tpg_issi_priorities = normalize_issi_priorities(merge_priority_maps(dto.issi_priorities, dto.tpg_issi_priorities))?;
+    let tpg_ric_priorities = normalize_ric_priorities(merge_priority_maps(dto.ric_priorities, dto.tpg_ric_priorities))?;
 
     Ok(CfgTpg2200Action {
         enabled: dto.enabled,
         token: SecretField::from(dto.token),
         source_issi: dto.source_issi,
         dest_issi: dto.dest_issi,
-        ric: dto.ric,
-        incident_base: callout_id_base,
+        tpg_ric: dto.tpg_ric.or(dto.ric).unwrap_or_else(default_tpg2200_ric),
+        incident_base,
         priority: dto.priority.min(15),
-        issi_priorities,
-        ric_priorities,
+        tpg_issi_priorities,
+        tpg_ric_priorities,
         default_text: dto.default_text.trim().to_string(),
         max_text_chars: dto.max_text_chars.clamp(1, 240),
     })

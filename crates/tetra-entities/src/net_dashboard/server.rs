@@ -14,7 +14,7 @@ use crate::net_dashboard::html::DASHBOARD_HTML;
 use crate::net_dashboard::state::{CallEntry, DashboardState, DashboardStateInner, MeshcomMessageLogEntry, MeshcomNodeLogEntry, MsEntry};
 use crate::net_echolink::{EcholinkCmdSender, EcholinkCommand};
 use crate::net_telemetry::TelemetryEvent;
-use crate::tpg2200::{build_sds_text_payload, build_tpg2200_callout_payload, format_hex_bytes, parse_hex_payload};
+use crate::tpg2200::{build_sds_text_payload, build_tpg2200_callout_payload, format_hex_bytes, parse_hex_payload, tpg2200_incident_byte};
 use tetra_config::bluestation::CfgBrew;
 use tetra_core::tetra_entities::TetraEntity;
 
@@ -1581,12 +1581,12 @@ fn truncate_action_text(text: &str, max: usize) -> (String, bool) {
     }
 }
 
-fn next_tpg2200_action_callout_id(cfg: &tetra_config::bluestation::SharedConfig, base: u16) -> u16 {
-    let base = base.min(255);
+fn next_tpg2200_action_incident(cfg: &tetra_config::bluestation::SharedConfig, base: u16) -> u16 {
+    let base = base.clamp(1, 256);
     let mut state = cfg.state_write();
-    let callout_id = state.tpg2200_action_next_callout_id.unwrap_or(base).min(255);
-    state.tpg2200_action_next_callout_id = Some(if callout_id >= 255 { 0 } else { callout_id + 1 });
-    callout_id
+    let incident = state.tpg2200_action_next_incident.unwrap_or(base).clamp(1, 256);
+    state.tpg2200_action_next_incident = Some(if incident >= 256 { 1 } else { incident + 1 });
+    incident
 }
 
 fn query_u16(params: &HashMap<String, String>, keys: &[&str], max: u16) -> Option<u16> {
@@ -1696,14 +1696,18 @@ fn serve_tpg2200_action_url(
         return;
     };
 
-    let callout_id =
-        query_u16(&params, &["id", "callout_id"], 255).unwrap_or_else(|| next_tpg2200_action_callout_id(cfg, action.incident_base));
-    let tpg_ric = query_tpg_ric(&params, &["ric", "tpg_ric"]).unwrap_or(action.ric);
+    let incident = query_u16(&params, &["incident", "incident_id"], 256).map(|n| n.clamp(1, 256));
+    let raw_callout_id = query_u16(&params, &["id", "callout_id", "raw_id"], 255);
+    let callout_id = raw_callout_id.unwrap_or_else(|| {
+        let incident = incident.unwrap_or_else(|| next_tpg2200_action_incident(cfg, action.incident_base));
+        tpg2200_incident_byte(incident) as u16
+    });
+    let tpg_ric = query_tpg_ric(&params, &["ric", "tpg_ric"]).unwrap_or(action.tpg_ric);
     let priority = query_u8(&params, &["priority", "prio", "tone"], 15).unwrap_or_else(|| {
         tpg2200_priority_for(
             action.priority,
-            &action.issi_priorities,
-            &action.ric_priorities,
+            &action.tpg_issi_priorities,
+            &action.tpg_ric_priorities,
             action.dest_issi,
             tpg_ric,
         )
@@ -1728,7 +1732,7 @@ fn serve_tpg2200_action_url(
     }
 
     tracing::info!(
-        "TPG2200 ActionURL sent: dest={} source={} tpg_ric={:08X} callout_id={} priority={} text={:?}",
+        "TPG2200 ActionURL sent: dest={} source={} tpg_ric={:08X} selector=0x{:02X} priority={} text={:?}",
         action.dest_issi,
         action.source_issi,
         tpg_ric,
@@ -1740,7 +1744,7 @@ fn serve_tpg2200_action_url(
         s.push_log(
             "INFO",
             format!(
-                "TPG2200 ActionURL sent to {}: callout_id {} priority {} text {}",
+                "TPG2200 ActionURL sent to {}: selector 0x{:02X} priority {} text {}",
                 action.dest_issi, callout_id, priority, message
             ),
         );
@@ -1748,7 +1752,7 @@ fn serve_tpg2200_action_url(
     http_response(
         stream,
         200,
-        &format!("OK ric={tpg_ric:08X} callout_id={callout_id} priority={priority}"),
+        &format!("OK ric={tpg_ric:08X} selector=0x{callout_id:02X} priority={priority}"),
     );
 }
 

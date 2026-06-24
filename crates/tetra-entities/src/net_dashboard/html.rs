@@ -3585,7 +3585,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
                 <label class="h-field"><span class="h-field-label">Max text chars</span><input type="number" id="geo-tpg-max" class="form-input" min="8" max="160" placeholder="80"></label>
               </div>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
-                <label class="h-field"><span class="h-field-label">Call-Out ID base</span><input type="number" id="geo-tpg-id" class="form-input" min="0" max="255" placeholder="17"></label>
+                <label class="h-field"><span class="h-field-label">Call-Out ID base</span><input type="number" id="geo-tpg-id" class="form-input" min="0" max="255" placeholder="33"></label>
                 <label class="h-field"><span class="h-field-label">Priority / tone</span><input type="number" id="geo-tpg-priority" class="form-input" min="0" max="15" placeholder="15"></label>
               </div>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
@@ -4240,7 +4240,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
       </div>
       <div class="form-row">
         <label class="form-label" data-i18n="sds_callout_id">Call-Out ID</label>
-        <input type="number" id="sds-callout-id" class="form-input" value="17" min="0" max="255">
+        <input type="number" id="sds-callout-id" class="form-input" value="33" min="0" max="255">
       </div>
       <div class="form-row">
         <label class="form-label" data-i18n="sds_callout_ric">TPG RIC</label>
@@ -6787,7 +6787,7 @@ async function loadGeoalarm(){
     dapSet('geo-tpg-source',d.tpg2200_source_issi||9999);
     dapSet('geo-tpg-dest',d.tpg2200_dest_issi||0);
     dapSet('geo-tpg-ric',tpgRicText(d.tpg2200_ric??0x00090D10));
-    dapSet('geo-tpg-id',(d.tpg2200_callout_id_base??d.tpg2200_incident_base??17));
+    dapSet('geo-tpg-id',(d.tpg2200_callout_id_base??d.tpg2200_incident_base??33));
     dapSet('geo-tpg-priority',d.tpg2200_priority??15);
     dapSet('geo-tpg-issi-priorities',dapRicRoutesText(d.tpg2200_issi_priorities));
     dapSet('geo-tpg-ric-priorities',dapRicRoutesText(d.tpg2200_ric_priorities));
@@ -6852,7 +6852,7 @@ async function saveGeoalarm(){
     tpg2200_source_issi:dapNum('geo-tpg-source',9999,1,16777215),
     tpg2200_dest_issi:dapNum('geo-tpg-dest',0,0,16777215),
     tpg2200_ric:tpgRicInput('geo-tpg-ric',0x00090D10),
-    tpg2200_callout_id_base:dapNum('geo-tpg-id',17,0,255),
+    tpg2200_callout_id_base:dapNum('geo-tpg-id',33,0,255),
     tpg2200_priority:dapNum('geo-tpg-priority',15,0,15),
     tpg2200_issi_priorities:tpgIssiPriorities,
     tpg2200_ric_priorities:tpgRicPriorities,
@@ -7290,7 +7290,7 @@ async function restartService(){if(!confirm(t('confirm_restart')))return;wsSend(
 async function shutdownService(){if(!confirm(t('confirm_shutdown')))return;wsSend({type:'shutdown'});}
 function kickMs(issi){if(!confirm(t('confirm_kick',{issi})))return;wsSend({type:'kick',issi});}
 function toggleSdsCallout(){const on=document.getElementById('sds-callout').checked;document.getElementById('sds-callout-fields').style.display=on?'block':'none';}
-function resetSdsCallout(){document.getElementById('sds-callout').checked=false;document.getElementById('sds-callout-source').value='9999';document.getElementById('sds-callout-id').value='17';document.getElementById('sds-callout-ric').value='0x00090D10';document.getElementById('sds-callout-priority').value='15';document.getElementById('sds-callout-text').value='ALARM';document.getElementById('sds-callout-raw').value='';toggleSdsCallout();}
+function resetSdsCallout(){document.getElementById('sds-callout').checked=false;document.getElementById('sds-callout-source').value='9999';document.getElementById('sds-callout-id').value='33';document.getElementById('sds-callout-ric').value='0x00090D10';document.getElementById('sds-callout-priority').value='15';document.getElementById('sds-callout-text').value='ALARM';document.getElementById('sds-callout-raw').value='';toggleSdsCallout();}
 function openSds(issi){sdsDest=issi;document.getElementById('sds-dest').value=issi;document.getElementById('sds-msg').value='';resetSdsCallout();document.getElementById('sds-modal').classList.add('open');}
 function closeSdsModal(){document.getElementById('sds-modal').classList.remove('open');}
 function sendSds(){const dest=parseInt(document.getElementById('sds-dest').value);if(!dest)return;if(document.getElementById('sds-callout').checked){const source=parseInt(document.getElementById('sds-callout-source').value)||9999;const calloutId=Math.max(0,Math.min(255,parseInt(document.getElementById('sds-callout-id').value)||0));const tpgRic=tpgRicInput('sds-callout-ric',0x00090D10);const priority=Math.max(0,Math.min(15,parseInt(document.getElementById('sds-callout-priority').value)||0));const alarmText=document.getElementById('sds-callout-text').value.trim()||'ALARM';const rawhex=document.getElementById('sds-callout-raw').value.trim();wsSend({type:'sds_callout',dest_issi:dest,source_issi:source,tpg_ric:tpgRic,callout_id:calloutId,priority,message:alarmText,raw_hex:rawhex});closeSdsModal();return;}const msg=document.getElementById('sds-msg').value.trim();if(!msg)return;wsSend({type:'sds',dest_issi:dest,message:msg});closeSdsModal();}

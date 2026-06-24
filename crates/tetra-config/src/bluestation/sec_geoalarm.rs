@@ -218,7 +218,7 @@ fn default_source_issi() -> u32 {
 }
 
 fn default_tpg2200_callout_id_base() -> u16 {
-    0x11
+    0x21
 }
 
 fn default_tpg2200_ric() -> u32 {

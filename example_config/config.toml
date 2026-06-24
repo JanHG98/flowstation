@@ -519,7 +519,7 @@ voice_service = true
 #
 # callout_source_issi = 9999
 # callout_dest_issi = 0
-# callout_tpg_ric = 593168              # 0x00090D10, the tested TPG2200 Call-Out address bytes
+# callout_tpg_ric = 0x00090D10          # TPG2200 Call-Out payload address bytes
 # callout_id_base = 33                  # raw Call-Out ID byte 0..255; cycles after every alarm
 # callout_priority = 15                 # raw priority/tone byte 0..15
 # callout_issi_priorities = {}          # optional: "TPG ISSI" = priority
@@ -548,11 +548,15 @@ voice_service = true
 #   http://<flowstation>:<dashboard_port>/api/action/tpg2200?token=<token>&text=ALARM
 #
 # Every accepted request sends a Type-4 SDS Call-Out to `dest_issi`.
-# The Call-Out ID starts at `callout_id_base` and increments in memory
-# on every trigger, wrapping from 255 back to 0. Optional URL parameters:
-#   &id=33 or &callout_id=33
+# Without URL parameters, the incident number starts at `incident_base` and
+# increments in memory on every trigger, wrapping from 256 back to 1. FlowStation
+# converts that incident to the TPG selector byte sequence used by the original
+# ActionURL implementation: incident 1 => 0x11, 2 => 0x21, 3 => 0x31, ...
+# Optional URL parameters:
+#   &incident=2
+#   &id=33 or &callout_id=33 or &raw_id=33   # expert raw selector-byte override
 #   &priority=15 or &tone=15
-#   &ric=0x00090D10
+#   &tpg_ric=0x00090D10
 #
 # This endpoint intentionally does not require the dashboard cookie session because phones cannot
 # reliably hold it. Keep `token` long/random and do not expose the dashboard port publicly.
@@ -562,11 +566,11 @@ voice_service = true
 # token = ""
 # source_issi = 9999
 # dest_issi = 0
-# ric = 593168                          # 0x00090D10
-# callout_id_base = 17
+# tpg_ric = 0x00090D10
+# incident_base = 1
 # priority = 15
-# issi_priorities = {}                  # optional: "TPG ISSI" = priority
-# ric_priorities = {}                   # optional: "0x00090D10" = priority
+# tpg_issi_priorities = {}              # optional: "TPG ISSI" = priority
+# tpg_ric_priorities = {}               # optional: "0x00090D10" = priority
 # default_text = "ALARM"
 # max_text_chars = 80
 
@@ -678,8 +682,8 @@ voice_service = true
 #
 # tpg2200_source_issi = 9999
 # tpg2200_dest_issi = 0                # TPG2200 ISSI
-# tpg2200_ric = 593168                 # 0x00090D10
-# tpg2200_callout_id_base = 17         # raw Call-Out ID byte 0..255
+# tpg2200_ric = 0x00090D10
+# tpg2200_callout_id_base = 33         # raw selector byte 0..255, e.g. 33 = 0x21
 # tpg2200_priority = 15                # raw priority/tone byte 0..15
 # tpg2200_issi_priorities = {}         # optional: "TPG ISSI" = priority
 # tpg2200_ric_priorities = {}          # optional: "0x00090D10" = priority

@@ -644,7 +644,8 @@ pub struct StackState {
     /// Runtime override for Snom XML NOTIFY settings. See SnomNotifyRuntimeOverride.
     pub snom_notify_override: Option<SnomNotifyRuntimeOverride>,
     /// Next TPG2200 ActionURL incident number. Initialised lazily from `[tpg2200_action]`.
-    pub tpg2200_action_next_callout_id: Option<u16>,
+    /// The incident is converted to the TPG selector byte immediately before sending.
+    pub tpg2200_action_next_incident: Option<u16>,
     /// Runtime Asterisk SIP/RTP bridge status for `/api/asterisk/status` and the dashboard tab.
     pub asterisk_status: AsteriskRuntimeStatus,
     /// Runtime DAPNET receiver/forwarding status for `/api/dapnet` and the Health tab.
@@ -793,7 +794,7 @@ impl Default for StackState {
             meshcom_override: None,
             geoalarm_override: None,
             snom_notify_override: None,
-            tpg2200_action_next_callout_id: None,
+            tpg2200_action_next_incident: None,
             asterisk_status: AsteriskRuntimeStatus::default(),
             dapnet_status: DapnetRuntimeStatus::default(),
             echolink_status: EcholinkRuntimeStatus::default(),
