@@ -33,14 +33,27 @@ pub enum TelemetryEvent {
     /// Group call started. `priority` is the ETSI call priority (0..=15) from the originating
     /// U-SETUP / network call start; 15 denotes an emergency call (`priority` appended last so
     /// existing leading fields stay wire-stable for the bitcode codec).
-    GroupCallStarted { call_id: u16, gssi: u32, caller_issi: u32, ts: u8, priority: u8 },
+    GroupCallStarted {
+        call_id: u16,
+        gssi: u32,
+        caller_issi: u32,
+        ts: u8,
+        priority: u8,
+    },
     /// Group call ended
     GroupCallEnded { call_id: u16, gssi: u32 },
     /// Speaker changed on active group call
     GroupCallSpeakerChanged { call_id: u16, gssi: u32, speaker_issi: u32 },
     /// Individual (P2P) call started. `priority` is the ETSI call priority (0..=15) from the
     /// originating U-SETUP; 15 denotes an emergency call (appended last for bitcode wire-stability).
-    IndividualCallStarted { call_id: u16, calling_issi: u32, called_issi: u32, simplex: bool, ts: u8, priority: u8 },
+    IndividualCallStarted {
+        call_id: u16,
+        calling_issi: u32,
+        called_issi: u32,
+        simplex: bool,
+        ts: u8,
+        priority: u8,
+    },
     /// Individual call ended
     IndividualCallEnded { call_id: u16 },
     /// Energy saving mode updated for MS (0=StayAlive, 1=Eg1..7=Eg7)
@@ -160,6 +173,41 @@ pub enum TelemetryEvent {
         text: String,
         priority: Option<u8>,
         paths: Vec<String>,
+    },
+    /// MeshCom packet activity for the dashboard MeshCom Messages table. Appended last for
+    /// bitcode wire-stability.
+    MeshcomMessageLog {
+        ts: String,
+        direction: String,
+        msg_type: String,
+        src_type: Option<String>,
+        src: Option<String>,
+        dst: Option<String>,
+        msg: Option<String>,
+        msg_id: Option<String>,
+        paths: Vec<String>,
+        lat: Option<f64>,
+        lon: Option<f64>,
+        alt: Option<f64>,
+        batt: Option<f64>,
+        rssi: Option<i64>,
+        snr: Option<i64>,
+    },
+    /// MeshCom node directory update for the dashboard MeshCom Nodes table. Appended last for
+    /// bitcode wire-stability.
+    MeshcomNodeUpdate {
+        src: String,
+        last_seen: String,
+        last_type: String,
+        lat: Option<f64>,
+        lon: Option<f64>,
+        alt: Option<f64>,
+        batt: Option<f64>,
+        rssi: Option<i64>,
+        snr: Option<i64>,
+        firmware: Option<String>,
+        fw_sub: Option<String>,
+        hw_id: Option<String>,
     },
 }
 

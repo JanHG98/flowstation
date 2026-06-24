@@ -735,6 +735,12 @@ input[type="radio"]{accent-color:var(--accent);}
 /* Page sections */
 .page{display:none;}
 .page.active{display:block;}
+#page-meshcom.active{display:flex;flex-direction:column;}
+#meshcom-messages-card{order:1;}
+#meshcom-nodes-card{order:2;}
+#meshcom-config-card{order:3;}
+#meshcom-routing-card{order:4;}
+#meshcom-send-card{order:5;}
 
 /* ── Stat cards ── */
 .stat-grid{
@@ -3304,7 +3310,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
 
     <!-- ── MESHCOM ── -->
     <div class="page" id="page-meshcom">
-      <div class="card">
+      <div class="card" id="meshcom-config-card">
         <div class="card-head">
           <div class="card-title" data-i18n="meshcom_title">MeshCom</div>
           <div class="card-actions">
@@ -3358,7 +3364,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
         </div>
       </div>
 
-      <div class="card">
+      <div class="card" id="meshcom-routing-card">
         <div class="card-head">
           <div class="card-title">MeshCom Routing</div>
         </div>
@@ -3397,7 +3403,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
         </div>
       </div>
 
-      <div class="card">
+      <div class="card" id="meshcom-send-card">
         <div class="card-head">
           <div class="card-title">Send MeshCom Message</div>
           <div class="card-actions">
@@ -3415,11 +3421,14 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
         </div>
       </div>
 
-      <div class="card">
+      <div class="card" id="meshcom-nodes-card">
         <div class="card-head">
           <div class="card-title">MeshCom Nodes</div>
           <div class="card-actions">
             <input type="text" id="mesh-node-filter" class="form-input" style="width:240px" placeholder="Search node, HW-ID or firmware" oninput="meshNodePageIndex=0;renderMeshcomNodes()">
+            <button class="btn btn-sm" onclick="loadMeshcomNodes()"><span class="btn-icon" data-icon="restart"></span><span data-i18n="refresh">Refresh</span></button>
+            <button class="btn btn-sm" onclick="exportMeshcomNodes()"><span class="btn-icon" data-icon="export"></span><span data-i18n="export">Export</span></button>
+            <button class="btn btn-sm btn-danger" onclick="clearMeshcomNodes()"><span class="btn-icon" data-icon="delete"></span><span data-i18n="clear">Clear</span></button>
           </div>
         </div>
         <div class="card-body">
@@ -3445,9 +3454,14 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
         </div>
       </div>
 
-      <div class="card">
+      <div class="card" id="meshcom-messages-card">
         <div class="card-head">
           <div class="card-title">MeshCom Messages</div>
+          <div class="card-actions">
+            <button class="btn btn-sm" onclick="loadMeshcomMessages()"><span class="btn-icon" data-icon="restart"></span><span data-i18n="refresh">Refresh</span></button>
+            <button class="btn btn-sm" onclick="exportMeshcomMessages()"><span class="btn-icon" data-icon="export"></span><span data-i18n="export">Export</span></button>
+            <button class="btn btn-sm btn-danger" onclick="clearMeshcomMessages()"><span class="btn-icon" data-icon="delete"></span><span data-i18n="clear">Clear</span></button>
+          </div>
         </div>
         <div class="card-body">
           <div class="table-wrap">
@@ -3610,8 +3624,24 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
               <label class="h-flabel">MeshCom source blacklist</label>
               <textarea id="geo-mesh-black" class="form-input" rows="4" placeholder="blocked MeshCom sources"></textarea>
             </div>
+            <div>
+              <label class="h-flabel">Telegram TETRA ISSI whitelist</label>
+              <textarea id="geo-telegram-tetra-white" class="form-input" rows="4" placeholder="empty = all alarmed TETRA ISSIs"></textarea>
+            </div>
+            <div>
+              <label class="h-flabel">Telegram TETRA ISSI blacklist</label>
+              <textarea id="geo-telegram-tetra-black" class="form-input" rows="4" placeholder="do not forward these ISSIs to Telegram"></textarea>
+            </div>
+            <div>
+              <label class="h-flabel">Telegram MeshCom source whitelist</label>
+              <textarea id="geo-telegram-mesh-white" class="form-input" rows="4" placeholder="empty = all alarmed MeshCom sources"></textarea>
+            </div>
+            <div>
+              <label class="h-flabel">Telegram MeshCom source blacklist</label>
+              <textarea id="geo-telegram-mesh-black" class="form-input" rows="4" placeholder="do not forward these MeshCom sources to Telegram"></textarea>
+            </div>
           </div>
-          <div class="help-text" style="margin-top:10px">Whitelist empty means allow all. Blacklists always win. MeshCom source matching is case-insensitive.</div>
+          <div class="help-text" style="margin-top:10px">Whitelist empty means allow all. Blacklists always win. The first four filters decide whether GeoAlarm fires at all; Telegram filters only limit the Telegram forwarding path. MeshCom source matching is case-insensitive.</div>
         </div>
       </div>
 
@@ -5558,6 +5588,14 @@ function handleMsg(msg){
       state.dapnetLog.unshift({ts:nowStamp(),direction:msg.direction,id:msg.id,callsign:msg.callsign,recipient:msg.recipient,text:msg.text,priority:msg.priority,paths:msg.paths||[]});
       if(state.dapnetLog.length>500)state.dapnetLog.pop();
       renderDapnetLog();break;
+    case 'meshcom_message':
+      if(!state.meshcomMessages)state.meshcomMessages=[];
+      state.meshcomMessages.unshift({ts:msg.ts||nowStamp(),direction:msg.direction,msg_type:msg.msg_type,src_type:msg.src_type,src:msg.src,dst:msg.dst,msg:msg.msg,msg_id:msg.msg_id,paths:msg.paths||[],lat:msg.lat,lon:msg.lon,alt:msg.alt,batt:msg.batt,rssi:msg.rssi,snr:msg.snr});
+      if(state.meshcomMessages.length>10000)state.meshcomMessages.pop();
+      renderMeshcomMessages();break;
+    case 'meshcom_node':
+      upsertMeshcomNode(msg);
+      renderMeshcomNodes();break;
     case 'tx_visual':handleTxVisual(msg);break;
     case 'tx_quality':handleTxQuality(msg);break;
     case 'sdr_health':handleSdrHealth(msg);break;
@@ -6378,6 +6416,25 @@ function meshNodeFiltered(){
     String(n.fw_sub||'').toUpperCase().includes(q)
   );
 }
+function upsertMeshcomNode(update){
+  if(!update||!update.src)return;
+  if(!state.meshcomNodes)state.meshcomNodes=[];
+  const idx=state.meshcomNodes.findIndex(n=>n.src===update.src);
+  if(idx>=0){
+    const node=Object.assign({},state.meshcomNodes[idx],{
+      last_seen:update.last_seen,
+      last_type:update.last_type
+    });
+    ['lat','lon','alt','batt','rssi','snr','firmware','fw_sub','hw_id'].forEach(k=>{
+      if(update[k]!==null&&update[k]!==undefined&&update[k]!=='')node[k]=update[k];
+    });
+    state.meshcomNodes.splice(idx,1);
+    state.meshcomNodes.unshift(node);
+  } else {
+    state.meshcomNodes.unshift(update);
+  }
+  if(state.meshcomNodes.length>65535)state.meshcomNodes.pop();
+}
 function meshNodeRow(n){
   const fw=[n.firmware,n.fw_sub].filter(Boolean).join(' / ')||'—';
   return `<tr>
@@ -6401,6 +6458,23 @@ function renderMeshcomNodes(){
 }
 function meshNodePrevPage(){meshNodePageIndex--;renderMeshcomNodes();}
 function meshNodeNextPage(){meshNodePageIndex++;renderMeshcomNodes();}
+async function loadMeshcomNodes(){
+  try{const r=await fetch('/api/meshcom-nodes');if(!r.ok)return;state.meshcomNodes=await r.json();meshNodePageIndex=0;renderMeshcomNodes();}catch{}
+}
+async function clearMeshcomNodes(){
+  if(!confirm('Clear MeshCom Nodes?'))return;
+  try{const r=await fetch('/api/meshcom-nodes',{method:'DELETE'});if(!r.ok)return;state.meshcomNodes=[];meshNodePageIndex=0;renderMeshcomNodes();}catch{}
+}
+function exportMeshcomNodes(){
+  const rows=meshNodeFiltered();
+  const lines=['time\tnode\ttype\tposition\tbattery\trf\tfirmware\thw_id'];
+  rows.forEach(n=>{
+    const pos=(n.lat!==null&&n.lat!==undefined&&n.lon!==null&&n.lon!==undefined)?(`${n.lat},${n.lon}`):'';
+    const fw=[n.firmware,n.fw_sub].filter(Boolean).join(' / ');
+    lines.push([n.last_seen||'',n.src||'',n.last_type||'',pos,meshBatteryText(n.batt),meshRfText(n),fw,n.hw_id||''].join('\t'));
+  });
+  downloadTextFile(`flowstation-meshcom-nodes-${logExportStamp()}.txt`,lines.join('\n')+'\n');
+}
 function meshMsgRow(m){
   const msgText=m.msg?escHtml(m.msg):(m.lat!==null&&m.lat!==undefined&&m.lon!==null&&m.lon!==undefined?'<span class="sds-empty">[position]</span>':'');
   const posRf=[meshMapLink(m.lat,m.lon,'map'),meshRfText(m)].filter(x=>x&&x!=='—').join(' · ')||'—';
@@ -6426,6 +6500,32 @@ function renderMeshcomMessages(){
 }
 function meshMsgPrevPage(){meshMsgPageIndex--;renderMeshcomMessages();}
 function meshMsgNextPage(){meshMsgPageIndex++;renderMeshcomMessages();}
+async function loadMeshcomMessages(){
+  try{const r=await fetch('/api/meshcom-messages');if(!r.ok)return;state.meshcomMessages=await r.json();meshMsgPageIndex=0;renderMeshcomMessages();}catch{}
+}
+async function clearMeshcomMessages(){
+  if(!confirm('Clear MeshCom Messages?'))return;
+  try{const r=await fetch('/api/meshcom-messages',{method:'DELETE'});if(!r.ok)return;state.meshcomMessages=[];meshMsgPageIndex=0;renderMeshcomMessages();}catch{}
+}
+function exportMeshcomMessages(){
+  const rows=state.meshcomMessages||[];
+  const lines=['time\tdir\ttype\tsource\tdestination\tmessage\tpaths\tposition\trf'];
+  rows.forEach(m=>{
+    const pos=(m.lat!==null&&m.lat!==undefined&&m.lon!==null&&m.lon!==undefined)?(`${m.lat},${m.lon}`):'';
+    lines.push([
+      m.ts||'',
+      String(m.direction||'').toUpperCase(),
+      m.msg_type||'',
+      [m.src||'',m.src_type?`(${m.src_type})`:''].filter(Boolean).join(' '),
+      m.dst||'',
+      m.msg||'',
+      Array.isArray(m.paths)?m.paths.join(','):'',
+      pos,
+      meshRfText(m)
+    ].join('\t'));
+  });
+  downloadTextFile(`flowstation-meshcom-messages-${logExportStamp()}.txt`,lines.join('\n')+'\n');
+}
 async function loadMeshcom(){
   try{
     const r=await fetch('/api/meshcom');
@@ -6458,11 +6558,8 @@ async function loadMeshcom(){
     dapSet('mesh-last-rx',rt.last_rx||'—');
     dapSet('mesh-last-tx',rt.last_tx||'—');
     dapSet('mesh-last-error',rt.last_error||'—');
-    state.meshcomNodes=d.nodes||[];
-    state.meshcomMessages=d.messages||[];
-    meshNodePageIndex=0;meshMsgPageIndex=0;
-    renderMeshcomNodes();
-    renderMeshcomMessages();
+    loadMeshcomNodes();
+    loadMeshcomMessages();
     setMeshMsg('',true);
   }catch{setMeshMsg(t('conn_error'),false);}
 }
@@ -6559,6 +6656,10 @@ async function loadGeoalarm(){
     dapSet('geo-tetra-black',geoIssiListText(d.tetra_issi_blacklist));
     dapSet('geo-mesh-white',meshSourceListText(d.meshcom_source_whitelist));
     dapSet('geo-mesh-black',meshSourceListText(d.meshcom_source_blacklist));
+    dapSet('geo-telegram-tetra-white',geoIssiListText(d.telegram_tetra_issi_whitelist));
+    dapSet('geo-telegram-tetra-black',geoIssiListText(d.telegram_tetra_issi_blacklist));
+    dapSet('geo-telegram-mesh-white',meshSourceListText(d.telegram_meshcom_source_whitelist));
+    dapSet('geo-telegram-mesh-black',meshSourceListText(d.telegram_meshcom_source_blacklist));
     dapSet('geo-sds-source',d.sds_source_issi||9999);
     dapSet('geo-sds-dest',d.sds_dest_issi||0);
     dapCheck('geo-sds-group',d.sds_dest_is_group);
@@ -6592,6 +6693,10 @@ async function saveGeoalarm(){
   if(tetraWhite===null)return;
   const tetraBlack=geoIssiListBody('geo-tetra-black','blacklist');
   if(tetraBlack===null)return;
+  const telegramTetraWhite=geoIssiListBody('geo-telegram-tetra-white','Telegram whitelist');
+  if(telegramTetraWhite===null)return;
+  const telegramTetraBlack=geoIssiListBody('geo-telegram-tetra-black','Telegram blacklist');
+  if(telegramTetraBlack===null)return;
   const body={
     enabled:document.getElementById('geo-enabled').checked,
     flowstation_lat:geoFloat('geo-lat',0,-90,90),
@@ -6608,6 +6713,10 @@ async function saveGeoalarm(){
     tetra_issi_blacklist:tetraBlack,
     meshcom_source_whitelist:meshSourceListBody('geo-mesh-white'),
     meshcom_source_blacklist:meshSourceListBody('geo-mesh-black'),
+    telegram_tetra_issi_whitelist:telegramTetraWhite,
+    telegram_tetra_issi_blacklist:telegramTetraBlack,
+    telegram_meshcom_source_whitelist:meshSourceListBody('geo-telegram-mesh-white'),
+    telegram_meshcom_source_blacklist:meshSourceListBody('geo-telegram-mesh-black'),
     sds_source_issi:dapNum('geo-sds-source',9999,1,16777215),
     sds_dest_issi:dapNum('geo-sds-dest',0,0,16777215),
     sds_dest_is_group:document.getElementById('geo-sds-group').checked,
@@ -6633,7 +6742,7 @@ async function sendMeshcomMessage(){
   try{
     const r=await fetch('/api/meshcom/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
     const d=await r.json();
-    if(d.ok){setMeshSendMsg('✓ Sent',true);document.getElementById('mesh-out-msg').value='';setTimeout(loadMeshcom,300);}
+    if(d.ok){setMeshSendMsg('✓ Sent',true);document.getElementById('mesh-out-msg').value='';setTimeout(()=>{loadMeshcom();loadMeshcomMessages();},300);}
     else setMeshSendMsg('✗ '+(d.error||'Send failed'),false);
   }catch{setMeshSendMsg(t('conn_error'),false);}
 }

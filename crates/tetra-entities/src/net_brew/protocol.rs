@@ -41,7 +41,6 @@ pub const FRAME_TYPE_SDS_REPORT: u8 = 2;
 pub const FRAME_TYPE_DTMF_DATA: u8 = 3;
 pub const FRAME_TYPE_PACKET_DATA: u8 = 4;
 
-
 // ─── Circuit/individual call wire format ─────────────────────────
 const CIRCULAR_NUMBER_LEN: usize = 32;
 /// Total wire size of BrewCircularCall payload: source(4)+dest(4)+number(32)+11 single-byte fields
@@ -94,7 +93,7 @@ pub struct BrewGroupTransmission {
 pub struct BrewCircularCall {
     pub source: u32,
     pub destination: u32,
-    pub number: String,  // ASCII, up to 32 bytes, NUL-padded
+    pub number: String, // ASCII, up to 32 bytes, NUL-padded
     pub priority: u8,
     pub service: u8,
     pub mode: u8,
@@ -117,7 +116,6 @@ pub struct BrewCircularGrant {
     pub grant: u8,
     pub permission: u8,
 }
-
 
 /// Call control (0xf1)
 #[derive(Debug, Clone)]
@@ -276,7 +274,6 @@ fn parse_subscriber(msg_type: u8, data: &[u8]) -> Result<BrewMessage, BrewParseE
     }))
 }
 
-
 fn parse_fixed_ascii(bytes: &[u8]) -> String {
     let end = bytes.iter().position(|b| *b == 0).unwrap_or(bytes.len());
     bytes[..end].iter().copied().filter(|b| b.is_ascii()).map(char::from).collect()
@@ -343,7 +340,8 @@ fn parse_call_control(call_state: u8, data: &[u8]) -> Result<BrewMessage, BrewPa
             }
             let mnemonic = if call_state == CALL_STATE_SETUP_REQUEST
                 && payload_data.len() >= CIRCULAR_CALL_LEN + 34
-                && payload_data[CIRCULAR_CALL_LEN + 1] > 0 {
+                && payload_data[CIRCULAR_CALL_LEN + 1] > 0
+            {
                 // byte 0 = coding scheme, byte 1 = length in bits; 0 bits = no mnemonic
                 let mut m = [0u8; 34];
                 m.copy_from_slice(&payload_data[CIRCULAR_CALL_LEN..CIRCULAR_CALL_LEN + 34]);
@@ -578,89 +576,77 @@ pub fn build_dtmf_frame(session_uuid: &Uuid, length_bits: u16, data: &[u8]) -> V
 }
 
 pub fn build_subscriber_register(issi: u32, groups: &[u32]) -> Vec<u8> {
+    build_subscriber_register_with_type(issi, groups, BREW_SUBSCRIBER_REGISTER)
+}
+
+pub fn build_subscriber_register_with_type(issi: u32, groups: &[u32], msg_type: u8) -> Vec<u8> {
+    build_subscriber_message(issi, msg_type, groups)
+}
+
+fn build_subscriber_message(issi: u32, msg_type: u8, groups: &[u32]) -> Vec<u8> {
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default();
 
     let mut buf = Vec::with_capacity(18 + groups.len() * 4);
     buf.push(BREW_CLASS_SUBSCRIBER);
-    buf.push(BREW_SUBSCRIBER_REGISTER);
+    buf.push(msg_type);
     write_u32_le(&mut buf, issi);
     write_u64_le(&mut buf, now.as_secs());
     write_u32_le(&mut buf, now.subsec_nanos());
+    for &gssi in groups {
+        write_u32_le(&mut buf, gssi);
+    }
     buf
 }
 
 /// Build a subscriber re-registration message (for already-registered subscribers)
 pub fn build_subscriber_reregister(issi: u32) -> Vec<u8> {
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default();
+    build_subscriber_reregister_with_type(issi, BREW_SUBSCRIBER_REREGISTER)
+}
 
-    let mut buf = Vec::with_capacity(18);
-    buf.push(BREW_CLASS_SUBSCRIBER);
-    buf.push(BREW_SUBSCRIBER_REREGISTER);
-    write_u32_le(&mut buf, issi);
-    write_u64_le(&mut buf, now.as_secs());
-    write_u32_le(&mut buf, now.subsec_nanos());
-    buf
+pub fn build_subscriber_reregister_with_type(issi: u32, msg_type: u8) -> Vec<u8> {
+    build_subscriber_message(issi, msg_type, &[])
 }
 
 /// Build a subscriber affiliation message
 pub fn build_subscriber_affiliate(issi: u32, groups: &[u32]) -> Vec<u8> {
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default();
+    build_subscriber_affiliate_with_type(issi, groups, BREW_SUBSCRIBER_AFFILIATE)
+}
 
-    let mut buf = Vec::with_capacity(18 + groups.len() * 4);
-    buf.push(BREW_CLASS_SUBSCRIBER);
-    buf.push(BREW_SUBSCRIBER_AFFILIATE);
-    write_u32_le(&mut buf, issi);
-    write_u64_le(&mut buf, now.as_secs());
-    write_u32_le(&mut buf, now.subsec_nanos());
-    for &gssi in groups {
-        write_u32_le(&mut buf, gssi);
-    }
-    buf
+pub fn build_subscriber_affiliate_with_type(issi: u32, groups: &[u32], msg_type: u8) -> Vec<u8> {
+    build_subscriber_message(issi, msg_type, groups)
 }
 
 /// Build a subscriber deaffiliation message
 pub fn build_subscriber_deaffiliate(issi: u32, groups: &[u32]) -> Vec<u8> {
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default();
+    build_subscriber_deaffiliate_with_type(issi, groups, BREW_SUBSCRIBER_DEAFFILIATE)
+}
 
-    let mut buf = Vec::with_capacity(18 + groups.len() * 4);
-    buf.push(BREW_CLASS_SUBSCRIBER);
-    buf.push(BREW_SUBSCRIBER_DEAFFILIATE);
-    write_u32_le(&mut buf, issi);
-    write_u64_le(&mut buf, now.as_secs());
-    write_u32_le(&mut buf, now.subsec_nanos());
-    for &gssi in groups {
-        write_u32_le(&mut buf, gssi);
-    }
-    buf
+pub fn build_subscriber_deaffiliate_with_type(issi: u32, groups: &[u32], msg_type: u8) -> Vec<u8> {
+    build_subscriber_message(issi, msg_type, groups)
 }
 
 /// Build a subscriber deregistration message
 pub fn build_subscriber_deregister(issi: u32) -> Vec<u8> {
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default();
+    build_subscriber_deregister_with_type(issi, BREW_SUBSCRIBER_DEREGISTER)
+}
 
-    let mut buf = Vec::with_capacity(18);
-    buf.push(BREW_CLASS_SUBSCRIBER);
-    buf.push(BREW_SUBSCRIBER_DEREGISTER);
-    write_u32_le(&mut buf, issi);
-    write_u64_le(&mut buf, now.as_secs());
-    write_u32_le(&mut buf, now.subsec_nanos());
-    buf
+pub fn build_subscriber_deregister_with_type(issi: u32, msg_type: u8) -> Vec<u8> {
+    build_subscriber_message(issi, msg_type, &[])
 }
 
 /// Build a group call transmission start message (GROUP_TX)
 /// Sent when a local radio starts transmitting on a subscribed group.
 /// `mnemonic` is the optional SS-TPI talking party name (Brew v1, 34 bytes raw).
-pub fn build_group_tx(session_uuid: &Uuid, source_issi: u32, dest_gssi: u32, priority: u8, service: u16, mnemonic: Option<&[u8; 34]>) -> Vec<u8> {
+pub fn build_group_tx(
+    session_uuid: &Uuid,
+    source_issi: u32,
+    dest_gssi: u32,
+    priority: u8,
+    service: u16,
+    mnemonic: Option<&[u8; 34]>,
+) -> Vec<u8> {
     // v0: kind(1)+type(1)+uuid(16)+source(4)+dest(4)+priority(1)+access(1)+service(2) = 30
     // v1: same + mnemonic(34) = 64
     let cap = if mnemonic.is_some() { 64 } else { 30 };
@@ -792,8 +778,12 @@ mod tests {
             if let BrewCallPayload::GroupTransmission(gt) = cc.payload {
                 assert_eq!(gt.source, 1001);
                 assert!(gt.mnemonic.is_none(), "v0 should have no mnemonic");
-            } else { panic!("Expected GroupTransmission"); }
-        } else { panic!("Expected CallControl"); }
+            } else {
+                panic!("Expected GroupTransmission");
+            }
+        } else {
+            panic!("Expected CallControl");
+        }
     }
 
     #[test]
@@ -809,7 +799,7 @@ mod tests {
         // mnemonic: coding_scheme=0x01 (ISO-8859-1), length=32 bits (4 chars), "TEST"
         let mut mnemonic = [0u8; 34];
         mnemonic[0] = 0x01; // coding scheme
-        mnemonic[1] = 32;   // length in bits
+        mnemonic[1] = 32; // length in bits
         mnemonic[2..6].copy_from_slice(b"TEST");
         data.extend_from_slice(&mnemonic);
 
@@ -820,8 +810,12 @@ mod tests {
                 let m = gt.mnemonic.expect("v1 should have mnemonic");
                 assert_eq!(m[0], 0x01);
                 assert_eq!(&m[2..6], b"TEST");
-            } else { panic!("Expected GroupTransmission"); }
-        } else { panic!("Expected CallControl"); }
+            } else {
+                panic!("Expected GroupTransmission");
+            }
+        } else {
+            panic!("Expected CallControl");
+        }
     }
 
     #[test]
@@ -849,8 +843,12 @@ mod tests {
                 assert_eq!(c.source, 2001);
                 let m = c.mnemonic.expect("v1 SETUP_REQUEST should have mnemonic");
                 assert_eq!(&m[2..7], b"RADIO");
-            } else { panic!("Expected CircularCall"); }
-        } else { panic!("Expected CallControl"); }
+            } else {
+                panic!("Expected CircularCall");
+            }
+        } else {
+            panic!("Expected CallControl");
+        }
     }
 
     #[test]
@@ -870,8 +868,12 @@ mod tests {
                 assert_eq!(gt.source, 9001);
                 let m = gt.mnemonic.unwrap();
                 assert_eq!(&m[2..5], b"YO6");
-            } else { panic!(); }
-        } else { panic!(); }
+            } else {
+                panic!();
+            }
+        } else {
+            panic!();
+        }
     }
 
     #[test]

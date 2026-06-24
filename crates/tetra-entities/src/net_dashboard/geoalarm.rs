@@ -7,11 +7,7 @@ fn toml_escape(s: &str) -> String {
 }
 
 fn u32_set_toml(values: &std::collections::BTreeSet<u32>) -> String {
-    values
-        .iter()
-        .map(|v| v.to_string())
-        .collect::<Vec<_>>()
-        .join(", ")
+    values.iter().map(|v| v.to_string()).collect::<Vec<_>>().join(", ")
 }
 
 fn string_set_toml(values: &std::collections::BTreeSet<String>) -> String {
@@ -23,10 +19,7 @@ fn string_set_toml(values: &std::collections::BTreeSet<String>) -> String {
 }
 
 /// Rewrite (or insert) the `[geoalarm]` section in the TOML file. A `.geoalarm.bak` backup is made.
-pub fn write_geoalarm_to_toml(
-    config_path: &str,
-    ov: &GeoalarmRuntimeOverride,
-) -> std::io::Result<()> {
+pub fn write_geoalarm_to_toml(config_path: &str, ov: &GeoalarmRuntimeOverride) -> std::io::Result<()> {
     let original = std::fs::read_to_string(config_path)?;
     let section = format!(
         "[geoalarm]\n\
@@ -44,7 +37,11 @@ pub fn write_geoalarm_to_toml(
          tetra_issi_whitelist = [{}]\n\
          tetra_issi_blacklist = [{}]\n\
          meshcom_source_whitelist = [{}]\n\
-         meshcom_source_blacklist = [{}]\n\n\
+         meshcom_source_blacklist = [{}]\n\
+         telegram_tetra_issi_whitelist = [{}]\n\
+         telegram_tetra_issi_blacklist = [{}]\n\
+         telegram_meshcom_source_whitelist = [{}]\n\
+         telegram_meshcom_source_blacklist = [{}]\n\n\
          sds_source_issi = {}\n\
          sds_dest_issi = {}\n\
          sds_dest_is_group = {}\n\n\
@@ -70,6 +67,10 @@ pub fn write_geoalarm_to_toml(
         u32_set_toml(&ov.tetra_issi_blacklist),
         string_set_toml(&ov.meshcom_source_whitelist),
         string_set_toml(&ov.meshcom_source_blacklist),
+        u32_set_toml(&ov.telegram_tetra_issi_whitelist),
+        u32_set_toml(&ov.telegram_tetra_issi_blacklist),
+        string_set_toml(&ov.telegram_meshcom_source_whitelist),
+        string_set_toml(&ov.telegram_meshcom_source_blacklist),
         ov.sds_source_issi.max(1),
         ov.sds_dest_issi,
         ov.sds_dest_is_group,

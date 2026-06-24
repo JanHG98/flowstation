@@ -24,6 +24,10 @@ pub struct CfgGeoalarm {
     pub tetra_issi_blacklist: BTreeSet<u32>,
     pub meshcom_source_whitelist: BTreeSet<String>,
     pub meshcom_source_blacklist: BTreeSet<String>,
+    pub telegram_tetra_issi_whitelist: BTreeSet<u32>,
+    pub telegram_tetra_issi_blacklist: BTreeSet<u32>,
+    pub telegram_meshcom_source_whitelist: BTreeSet<String>,
+    pub telegram_meshcom_source_blacklist: BTreeSet<String>,
     pub sds_source_issi: u32,
     pub sds_dest_issi: u32,
     pub sds_dest_is_group: bool,
@@ -54,6 +58,10 @@ impl Default for CfgGeoalarm {
             tetra_issi_blacklist: BTreeSet::new(),
             meshcom_source_whitelist: BTreeSet::new(),
             meshcom_source_blacklist: BTreeSet::new(),
+            telegram_tetra_issi_whitelist: BTreeSet::new(),
+            telegram_tetra_issi_blacklist: BTreeSet::new(),
+            telegram_meshcom_source_whitelist: BTreeSet::new(),
+            telegram_meshcom_source_blacklist: BTreeSet::new(),
             sds_source_issi: default_source_issi(),
             sds_dest_issi: 0,
             sds_dest_is_group: false,
@@ -100,6 +108,14 @@ pub struct CfgGeoalarmDto {
     pub meshcom_source_whitelist: Vec<String>,
     #[serde(default)]
     pub meshcom_source_blacklist: Vec<String>,
+    #[serde(default)]
+    pub telegram_tetra_issi_whitelist: Vec<u32>,
+    #[serde(default)]
+    pub telegram_tetra_issi_blacklist: Vec<u32>,
+    #[serde(default)]
+    pub telegram_meshcom_source_whitelist: Vec<String>,
+    #[serde(default)]
+    pub telegram_meshcom_source_blacklist: Vec<String>,
     #[serde(default = "default_source_issi")]
     pub sds_source_issi: u32,
     #[serde(default)]
@@ -143,6 +159,10 @@ impl Default for CfgGeoalarmDto {
             tetra_issi_blacklist: Vec::new(),
             meshcom_source_whitelist: Vec::new(),
             meshcom_source_blacklist: Vec::new(),
+            telegram_tetra_issi_whitelist: Vec::new(),
+            telegram_tetra_issi_blacklist: Vec::new(),
+            telegram_meshcom_source_whitelist: Vec::new(),
+            telegram_meshcom_source_blacklist: Vec::new(),
             sds_source_issi: default_source_issi(),
             sds_dest_issi: 0,
             sds_dest_is_group: false,
@@ -204,6 +224,8 @@ pub fn apply_geoalarm_patch(src: CfgGeoalarmDto) -> Result<CfgGeoalarm, String> 
 
     let tetra_issi_whitelist = normalize_issi_set(src.tetra_issi_whitelist)?;
     let tetra_issi_blacklist = normalize_issi_set(src.tetra_issi_blacklist)?;
+    let telegram_tetra_issi_whitelist = normalize_issi_set(src.telegram_tetra_issi_whitelist)?;
+    let telegram_tetra_issi_blacklist = normalize_issi_set(src.telegram_tetra_issi_blacklist)?;
 
     Ok(CfgGeoalarm {
         enabled: src.enabled,
@@ -225,6 +247,10 @@ pub fn apply_geoalarm_patch(src: CfgGeoalarmDto) -> Result<CfgGeoalarm, String> 
         tetra_issi_blacklist,
         meshcom_source_whitelist: normalize_source_list(src.meshcom_source_whitelist),
         meshcom_source_blacklist: normalize_source_list(src.meshcom_source_blacklist),
+        telegram_tetra_issi_whitelist,
+        telegram_tetra_issi_blacklist,
+        telegram_meshcom_source_whitelist: normalize_source_list(src.telegram_meshcom_source_whitelist),
+        telegram_meshcom_source_blacklist: normalize_source_list(src.telegram_meshcom_source_blacklist),
         sds_source_issi: src.sds_source_issi.max(1),
         sds_dest_issi: src.sds_dest_issi,
         sds_dest_is_group: src.sds_dest_is_group,

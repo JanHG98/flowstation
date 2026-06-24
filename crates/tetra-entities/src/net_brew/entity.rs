@@ -332,7 +332,33 @@ impl BrewEntity {
                     // returns false for GSSIs where only external subscribers are present,
                     // causing BS to reject U-SETUP with "no listeners".
                     match msg_type {
-                        crate::net_brew::protocol::BREW_SUBSCRIBER_AFFILIATE => {
+                        t if t == self.brew_config.subscriber_type_register => {
+                            tracing::info!("[{}] BrewEntity: external subscriber issi={} → REGISTER", self.log_label(), issi);
+                            queue.push_back(SapMsg {
+                                sap: tetra_core::Sap::Control,
+                                src: self.entity,
+                                dest: TetraEntity::Cmce,
+                                msg: SapMsgInner::MmSubscriberUpdate(MmSubscriberUpdate {
+                                    issi,
+                                    groups: Vec::new(),
+                                    action: BrewSubscriberAction::Register,
+                                }),
+                            });
+                        }
+                        t if t == self.brew_config.subscriber_type_reregister => {
+                            tracing::info!("[{}] BrewEntity: external subscriber issi={} → REREGISTER", self.log_label(), issi);
+                            queue.push_back(SapMsg {
+                                sap: tetra_core::Sap::Control,
+                                src: self.entity,
+                                dest: TetraEntity::Cmce,
+                                msg: SapMsgInner::MmSubscriberUpdate(MmSubscriberUpdate {
+                                    issi,
+                                    groups: Vec::new(),
+                                    action: BrewSubscriberAction::Register,
+                                }),
+                            });
+                        }
+                        t if t == self.brew_config.subscriber_type_affiliate => {
                             if !groups.is_empty() {
                                 tracing::info!(
                                     "[{}] BrewEntity: external subscriber issi={} → AFFILIATE groups={:?}",
@@ -352,7 +378,7 @@ impl BrewEntity {
                                 });
                             }
                         }
-                        crate::net_brew::protocol::BREW_SUBSCRIBER_DEAFFILIATE => {
+                        t if t == self.brew_config.subscriber_type_deaffiliate => {
                             if !groups.is_empty() {
                                 tracing::info!(
                                     "[{}] BrewEntity: external subscriber issi={} → DEAFFILIATE groups={:?}",
@@ -372,7 +398,7 @@ impl BrewEntity {
                                 });
                             }
                         }
-                        crate::net_brew::protocol::BREW_SUBSCRIBER_DEREGISTER => {
+                        t if t == self.brew_config.subscriber_type_deregister => {
                             tracing::info!("[{}] BrewEntity: external subscriber issi={} → DEREGISTER", self.log_label(), issi);
                             queue.push_back(SapMsg {
                                 sap: tetra_core::Sap::Control,
@@ -385,7 +411,15 @@ impl BrewEntity {
                                 }),
                             });
                         }
-                        _ => {}
+                        _ => {
+                            tracing::debug!(
+                                "[{}] BrewEntity: external subscriber issi={} ignored unknown subscriber type={} groups={:?}",
+                                self.log_label(),
+                                issi,
+                                msg_type,
+                                groups
+                            );
+                        }
                     }
                 }
                 BrewEvent::ServerError { error_type, data } => {

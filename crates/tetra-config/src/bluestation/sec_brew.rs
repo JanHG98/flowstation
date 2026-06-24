@@ -38,6 +38,16 @@ pub struct CfgBrew {
     pub local_issi_allowlist: Option<Vec<u32>>,
     /// Local TETRA ISSIs that must never register or originate traffic over this Brew server.
     pub local_issi_blocklist: Vec<u32>,
+    /// Subscriber message type used by this Brew server for deregistration.
+    pub subscriber_type_deregister: u8,
+    /// Subscriber message type used by this Brew server for first registration.
+    pub subscriber_type_register: u8,
+    /// Subscriber message type used by this Brew server for re-registration.
+    pub subscriber_type_reregister: u8,
+    /// Subscriber message type used by this Brew server for group affiliation.
+    pub subscriber_type_affiliate: u8,
+    /// Subscriber message type used by this Brew server for group de-affiliation.
+    pub subscriber_type_deaffiliate: u8,
 }
 
 #[derive(Default, Deserialize)]
@@ -84,6 +94,19 @@ pub struct CfgBrewDto {
     #[serde(default, alias = "local_issi_blacklist", alias = "issi_blocklist", alias = "issi_blacklist")]
     pub local_issi_blocklist: Vec<u32>,
 
+    /// Subscriber message type mapping. Defaults are the classic Brew/TetraPack values:
+    /// deregister=0, register=1, reregister=2, affiliate=8, deaffiliate=9.
+    #[serde(default = "default_subscriber_type_deregister")]
+    pub subscriber_type_deregister: u8,
+    #[serde(default = "default_subscriber_type_register")]
+    pub subscriber_type_register: u8,
+    #[serde(default = "default_subscriber_type_reregister")]
+    pub subscriber_type_reregister: u8,
+    #[serde(default = "default_subscriber_type_affiliate")]
+    pub subscriber_type_affiliate: u8,
+    #[serde(default = "default_subscriber_type_deaffiliate")]
+    pub subscriber_type_deaffiliate: u8,
+
     #[serde(flatten)]
     pub extra: HashMap<String, Value>,
 }
@@ -126,6 +149,26 @@ fn default_brew_feature_sds_enabled() -> bool {
     true
 }
 
+fn default_subscriber_type_deregister() -> u8 {
+    0
+}
+
+fn default_subscriber_type_register() -> u8 {
+    1
+}
+
+fn default_subscriber_type_reregister() -> u8 {
+    2
+}
+
+fn default_subscriber_type_affiliate() -> u8 {
+    8
+}
+
+fn default_subscriber_type_deaffiliate() -> u8 {
+    9
+}
+
 /// Convert a CfgBrewDto (from TOML) into a CfgBrew (used in the stack config)
 pub fn apply_brew_patch(src: CfgBrewDto) -> CfgBrew {
     CfgBrew {
@@ -142,5 +185,10 @@ pub fn apply_brew_patch(src: CfgBrewDto) -> CfgBrew {
         pbx_gateway_issis: src.pbx_gateway_issis,
         local_issi_allowlist: src.local_issi_allowlist,
         local_issi_blocklist: src.local_issi_blocklist,
+        subscriber_type_deregister: src.subscriber_type_deregister,
+        subscriber_type_register: src.subscriber_type_register,
+        subscriber_type_reregister: src.subscriber_type_reregister,
+        subscriber_type_affiliate: src.subscriber_type_affiliate,
+        subscriber_type_deaffiliate: src.subscriber_type_deaffiliate,
     }
 }

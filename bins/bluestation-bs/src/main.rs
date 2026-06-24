@@ -612,6 +612,7 @@ fn main() {
         dapnet_telegram_sink.clone(),
         snom_notify_sink.clone(),
         geoalarm_sink.clone(),
+        dapnet_telemetry_sink.clone(),
     );
     spawn_dapnet_worker(cfg.clone(), dapnet_cmd_tx, dapnet_telegram_sink, dapnet_telemetry_sink);
 

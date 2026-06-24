@@ -11,14 +11,13 @@ use std::thread;
 use std::time::Duration;
 
 use serde_json::Value;
-use tetra_config::bluestation::{
-    CfgMeshcom, MeshcomMessageStatus, MeshcomNodeStatus, MeshcomRuntimeStatus, SharedConfig,
-};
+use tetra_config::bluestation::{CfgMeshcom, MeshcomMessageStatus, MeshcomNodeStatus, MeshcomRuntimeStatus, SharedConfig};
 
 use crate::net_control::commands::ControlCommand;
 use crate::net_geoalarm::GeoAlarmSink;
 use crate::net_snom::SnomNotifySink;
 use crate::net_telegram::TelegramAlertSink;
+use crate::net_telemetry::{TelemetryEvent, TelemetrySink};
 use crate::tpg2200::build_sds_text_payload;
 
 type CmdSender = crossbeam_channel::Sender<ControlCommand>;
@@ -33,10 +32,11 @@ pub fn spawn_meshcom_worker(
     telegram_sink: Option<TelegramAlertSink>,
     snom_sink: Option<SnomNotifySink>,
     geoalarm_sink: Option<GeoAlarmSink>,
+    telemetry_sink: Option<TelemetrySink>,
 ) -> Option<thread::JoinHandle<()>> {
     match thread::Builder::new()
         .name("meshcom-worker".into())
-        .spawn(move || MeshcomWorker::new(cfg, cmce_cmd_tx, telegram_sink, snom_sink, geoalarm_sink).run())
+        .spawn(move || MeshcomWorker::new(cfg, cmce_cmd_tx, telegram_sink, snom_sink, geoalarm_sink, telemetry_sink).run())
     {
         Ok(handle) => Some(handle),
         Err(err) => {
@@ -52,6 +52,7 @@ struct MeshcomWorker {
     telegram_sink: Option<TelegramAlertSink>,
     snom_sink: Option<SnomNotifySink>,
     geoalarm_sink: Option<GeoAlarmSink>,
+    telemetry_sink: Option<TelemetrySink>,
     socket: Option<UdpSocket>,
     bind_key: String,
     rx_packets: u64,
@@ -67,6 +68,7 @@ impl MeshcomWorker {
         telegram_sink: Option<TelegramAlertSink>,
         snom_sink: Option<SnomNotifySink>,
         geoalarm_sink: Option<GeoAlarmSink>,
+        telemetry_sink: Option<TelemetrySink>,
     ) -> Self {
         Self {
             cfg,
@@ -74,6 +76,7 @@ impl MeshcomWorker {
             telegram_sink,
             snom_sink,
             geoalarm_sink,
+            telemetry_sink,
             socket: None,
             bind_key: String::new(),
             rx_packets: 0,
@@ -140,9 +143,7 @@ impl MeshcomWorker {
                         }
                     }
                 }
-                Err(err)
-                    if err.kind() == std::io::ErrorKind::WouldBlock
-                        || err.kind() == std::io::ErrorKind::TimedOut => {}
+                Err(err) if err.kind() == std::io::ErrorKind::WouldBlock || err.kind() == std::io::ErrorKind::TimedOut => {}
                 Err(err) => {
                     let msg = format!("UDP receive failed: {err}");
                     tracing::warn!("MeshCom: {}", msg);
@@ -210,9 +211,7 @@ impl MeshcomWorker {
             msg_id.as_deref(),
         );
 
-        if let (Some(sink), Some(source), Some(lat), Some(lon)) =
-            (&self.geoalarm_sink, src.as_deref(), lat, lon)
-        {
+        if let (Some(sink), Some(source), Some(lat), Some(lon)) = (&self.geoalarm_sink, src.as_deref(), lat, lon) {
             sink.send_meshcom_position(source.to_string(), lat, lon);
         }
 
@@ -236,29 +235,70 @@ impl MeshcomWorker {
         };
 
         if let Some(source) = src {
-            self.upsert_node(
-                meshcom,
-                MeshcomNodeStatus {
-                    src: source,
-                    last_seen: ts,
-                    last_type: msg_type,
-                    lat,
-                    lon,
-                    alt,
-                    batt,
-                    rssi,
-                    snr,
-                    firmware,
-                    fw_sub,
-                    hw_id,
-                },
-            );
+            let node = MeshcomNodeStatus {
+                src: source,
+                last_seen: ts.clone(),
+                last_type: msg_type.clone(),
+                lat,
+                lon,
+                alt,
+                batt,
+                rssi,
+                snr,
+                firmware,
+                fw_sub,
+                hw_id,
+            };
+            self.emit_node_update(&node);
+            self.upsert_node(meshcom, node);
         }
+        self.emit_message_log(&event);
         self.messages.push_front(event);
         while self.messages.len() > meshcom.max_messages {
             self.messages.pop_back();
         }
         Ok(())
+    }
+
+    fn emit_message_log(&self, event: &MeshcomMessageStatus) {
+        if let Some(sink) = &self.telemetry_sink {
+            sink.send(TelemetryEvent::MeshcomMessageLog {
+                ts: event.ts.clone(),
+                direction: event.direction.clone(),
+                msg_type: event.msg_type.clone(),
+                src_type: event.src_type.clone(),
+                src: event.src.clone(),
+                dst: event.dst.clone(),
+                msg: event.msg.clone(),
+                msg_id: event.msg_id.clone(),
+                paths: event.paths.clone(),
+                lat: event.lat,
+                lon: event.lon,
+                alt: event.alt,
+                batt: event.batt,
+                rssi: event.rssi,
+                snr: event.snr,
+            });
+        }
+    }
+
+    fn emit_node_update(&self, node: &MeshcomNodeStatus) {
+        if let Some(sink) = &self.telemetry_sink {
+            sink.send(TelemetryEvent::MeshcomNodeUpdate {
+                src: node.src.clone(),
+                last_seen: node.last_seen.clone(),
+                last_type: node.last_type.clone(),
+                lat: node.lat,
+                lon: node.lon,
+                alt: node.alt,
+                batt: node.batt,
+                rssi: node.rssi,
+                snr: node.snr,
+                firmware: node.firmware.clone(),
+                fw_sub: node.fw_sub.clone(),
+                hw_id: node.hw_id.clone(),
+            });
+        }
     }
 
     fn upsert_node(&mut self, meshcom: &CfgMeshcom, update: MeshcomNodeStatus) {
@@ -337,9 +377,7 @@ impl MeshcomWorker {
             }
         }
 
-        if paths.is_empty()
-            && (meshcom.forward_sds || meshcom.forward_sip || meshcom.forward_telegram)
-        {
+        if paths.is_empty() && (meshcom.forward_sds || meshcom.forward_sip || meshcom.forward_telegram) {
             tracing::info!(
                 "MeshCom: received message src={} dst={} with no successful forwarding target",
                 src,
@@ -376,14 +414,7 @@ impl MeshcomWorker {
         .map_err(|e| format!("send to CMCE failed: {}", e))
     }
 
-    fn forward_sip(
-        &self,
-        meshcom: &CfgMeshcom,
-        src: &str,
-        dst: Option<&str>,
-        text: &str,
-        msg_id: Option<&str>,
-    ) -> Result<(), String> {
+    fn forward_sip(&self, meshcom: &CfgMeshcom, src: &str, dst: Option<&str>, text: &str, msg_id: Option<&str>) -> Result<(), String> {
         let Some(sink) = &self.snom_sink else {
             return Err("Snom notify sink unavailable".to_string());
         };
@@ -401,31 +432,17 @@ impl MeshcomWorker {
         let Some(sink) = &self.telegram_sink else {
             return Err("Telegram alert sink unavailable".to_string());
         };
-        sink.send_meshcom(
-            meshcom.telegram_prefix.clone(),
-            src.to_string(),
-            text.to_string(),
-        );
+        sink.send_meshcom(meshcom.telegram_prefix.clone(), src.to_string(), text.to_string());
         Ok(())
     }
 
-    fn publish_status(
-        &self,
-        meshcom: &CfgMeshcom,
-        last_rx: Option<String>,
-        last_error: Option<String>,
-    ) {
+    fn publish_status(&self, meshcom: &CfgMeshcom, last_rx: Option<String>, last_error: Option<String>) {
         let mut state = self.cfg.state_write();
         let previous_tx_packets = state.meshcom_status.tx_packets;
         let previous_last_tx = state.meshcom_status.last_tx.clone();
         let previous_last_rx = state.meshcom_status.last_rx.clone();
         let mut messages: Vec<MeshcomMessageStatus> = self.messages.iter().cloned().collect();
-        for msg in state
-            .meshcom_status
-            .messages
-            .iter()
-            .filter(|msg| msg.direction == "tx")
-        {
+        for msg in state.meshcom_status.messages.iter().filter(|msg| msg.direction == "tx") {
             if messages.len() >= meshcom.max_messages {
                 break;
             }
@@ -464,10 +481,9 @@ fn string_field(value: &Value, key: &str) -> Option<String> {
 }
 
 fn f64_field(value: &Value, key: &str) -> Option<f64> {
-    value.get(key).and_then(|v| {
-        v.as_f64()
-            .or_else(|| v.as_str().and_then(|s| s.trim().parse::<f64>().ok()))
-    })
+    value
+        .get(key)
+        .and_then(|v| v.as_f64().or_else(|| v.as_str().and_then(|s| s.trim().parse::<f64>().ok())))
 }
 
 fn i64_field(value: &Value, key: &str) -> Option<i64> {
