@@ -2237,11 +2237,11 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
       <span class="nav-label" data-i18n="dapnet">DAPNET</span>
     </div>
     <div class="nav-item" onclick="showPage('echolink',this)" id="nav-echolink">
-      <span class="nav-icon">🔗</span>
+      <span class="nav-icon" data-icon="dapnet"></span>
       <span class="nav-label" data-i18n="echolink">EchoLink</span>
     </div>
     <div class="nav-item" onclick="showPage('meshcom',this)" id="nav-meshcom">
-      <span class="nav-icon">⌁</span>
+      <span class="nav-icon" data-icon="dapnet"></span>
       <span class="nav-label" data-i18n="meshcom">MeshCom</span>
     </div>
     <div class="nav-item" onclick="showPage('geoalarm',this)" id="nav-geoalarm">
