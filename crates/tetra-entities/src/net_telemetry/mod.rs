@@ -12,7 +12,7 @@ pub mod worker;
 use std::time::Duration;
 
 pub use self::channel::{TelemetrySink, TelemetrySource, telemetry_channel};
-pub use self::events::TelemetryEvent;
+pub use self::events::{TelemetryEvent, telemetry_source_for_entity};
 pub use self::worker::TelemetryWorker;
 
 /// Sent as subprotocol in WebSocket handshake
