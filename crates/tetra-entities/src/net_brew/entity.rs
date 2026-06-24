@@ -138,12 +138,14 @@ pub struct BrewEntity {
 
     /// Whether the worker is connected
     connected: bool,
-    /// True once we've already told MM about this connection (so it re-registers local MS exactly
-    /// ONCE per connect, not on every inbound message). The server version is detected from every
-    /// GROUP_TX with a mnemonic — many per second — so without this latch the BrewReconnected
-    /// notification (and the D-LOCATION-UPDATE-COMMAND sweep it triggers) would fire continuously
-    /// and flood every radio with re-registration commands. Reset on (re)connect and disconnect.
+    /// True once we've already told MM about this transport connection. The MM recovery sweep must
+    /// be tied to the actual socket connect, not to later version discovery from traffic; otherwise
+    /// the first inbound GROUP_TX after startup can trigger D-LOCATION-UPDATE-COMMAND while users
+    /// are already camped or in a call.
     brew_reconnect_announced: bool,
+    /// True once we've logged/emitted the lazily detected Brew protocol version for this connection.
+    /// GROUP_TX may carry this clue repeatedly, so version telemetry is also one-shot per connect.
+    brew_version_announced: bool,
     /// Optional telemetry sink for emitting brew status events
     telemetry_sink: Option<TelemetrySink>,
 
@@ -208,6 +210,7 @@ impl BrewEntity {
             subscriber_groups: HashMap::new(),
             connected: false,
             brew_reconnect_announced: false,
+            brew_version_announced: false,
             telemetry_sink: None,
             rssi_last_sent: HashMap::new(),
             worker_handle: Some(handle),
@@ -244,33 +247,27 @@ impl BrewEntity {
                         server_version
                     );
                     self.connected = true;
-                    // Re-arm the one-shot reconnect notification for this fresh connection.
+                    // Re-arm one-shot latches for this fresh connection.
                     self.brew_reconnect_announced = false;
+                    self.brew_version_announced = false;
                     self.resync_subscribers();
                     self.set_network_connected(true, server_version);
+                    self.announce_brew_reconnected(queue);
                 }
                 BrewEvent::VersionDetected { version } => {
                     // VersionDetected fires on EVERY inbound GROUP_TX that carries a mnemonic
-                    // (many per second). Only act on the first one of each connection, or we would
-                    // flood MM with BrewReconnected — and every radio with re-registration
-                    // D-LOCATION-UPDATE-COMMANDs — continuously.
-                    if !self.brew_reconnect_announced {
-                        self.brew_reconnect_announced = true;
+                    // (many per second). Only emit the version telemetry once per connection.
+                    // Do NOT send BrewReconnected here: when the handshake lacks X-Brew-Version,
+                    // this event can arrive minutes later during a call, and recovery commands at
+                    // that point can knock camped radios out of service.
+                    if !self.brew_version_announced {
+                        self.brew_version_announced = true;
                         tracing::info!(
                             "[{}] BrewEntity: server Brew version detected from message length: v{}",
                             self.log_label(),
                             version
                         );
                         self.emit_brew_version(version);
-                        // Notify MM (once) that Brew (re)connected so it re-registers local MS.
-                        // Without this, MS that were registered before a disconnect believe they
-                        // are still affiliated and never re-register — PTT denied until power-cycle.
-                        queue.push_back(SapMsg {
-                            sap: tetra_core::Sap::Control,
-                            src: self.entity,
-                            dest: TetraEntity::Mm,
-                            msg: SapMsgInner::BrewReconnected,
-                        });
                     }
                 }
                 BrewEvent::Disconnected(reason) => {
@@ -282,6 +279,7 @@ impl BrewEntity {
                     self.connected = false;
                     // Re-arm so the next reconnect re-registers local MS exactly once.
                     self.brew_reconnect_announced = false;
+                    self.brew_version_announced = false;
                     self.set_network_connected(false, 0);
                     // ETSI EN 300 392-2 §14.9.4: BS must release all circuits immediately
                     // when backhaul connection is lost. MS will receive D-RELEASE.
@@ -842,6 +840,19 @@ impl BrewEntity {
                 server_version: version,
             });
         }
+    }
+
+    fn announce_brew_reconnected(&mut self, queue: &mut MessageQueue) {
+        if self.brew_reconnect_announced {
+            return;
+        }
+        self.brew_reconnect_announced = true;
+        queue.push_back(SapMsg {
+            sap: tetra_core::Sap::Control,
+            src: self.entity,
+            dest: TetraEntity::Mm,
+            msg: SapMsgInner::BrewReconnected,
+        });
     }
 
     fn emit_external_subscriber_registered(&self, issi: u32) {
