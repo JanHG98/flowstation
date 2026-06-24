@@ -7834,7 +7834,6 @@ function classifyDapnetHealth(data){
   } else {
     notes.push('RWTH receive feed disabled');
   }
-  if(!paths.length)notes.push('no forwarding path enabled');
   if(notes.length)level='degraded';
   const status=rt.rwth_core_status||(data.rwth_core_enabled?'enabled':'disabled');
   const detail='RWTH '+status+' · '+(paths.length?paths.join(', '):'no forwarding');
