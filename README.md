@@ -129,8 +129,10 @@ rustup default stable
 Optional integrations need these additional packages:
 
 ```bash
-# Asterisk SIP, AMI, and Snom SIP NOTIFY support
-sudo apt install -y asterisk
+# Asterisk SIP, AMI, and Snom SIP NOTIFY support:
+# On Debian GNU/Linux 13, skip apt's Asterisk package and build from source below.
+# On distributions where the packaged Asterisk build is suitable:
+# sudo apt install -y asterisk
 
 # EchoLink GSM-FR audio support
 sudo apt install -y libgsm1 libgsm1-dev
@@ -173,22 +175,102 @@ After installation, verify both directions before enabling audio bridges:
 # - PCM -> TETRA ACELP encoding works
 ```
 
-### Asterisk packages and modules
+### Asterisk packages, source build, and modules
 
-Install Asterisk when using the SIP bridge or Snom display notifications:
+Asterisk is required for the SIP/RTP bridge and for Snom XML display
+notifications via AMI `PJSIPNotify`.
+
+On Debian GNU/Linux 13, build Asterisk from source. The distribution package may
+not provide the module set FlowStation needs, especially `res_pjsip_notify.so`.
+The commands below use Asterisk 22 LTS/current; use a pinned tarball if you need
+reproducible builds.
+
+Install build dependencies:
+
+```bash
+sudo apt update
+sudo apt install -y \
+  build-essential pkg-config wget tar git subversion \
+  autoconf automake libtool bison flex \
+  libedit-dev libjansson-dev libxml2-dev libsqlite3-dev uuid-dev \
+  libssl-dev libsrtp2-dev libspeexdsp-dev libgsm1-dev libopus-dev \
+  libcurl4-openssl-dev libnewt-dev libncurses-dev
+```
+
+Download and build Asterisk:
+
+```bash
+cd /usr/src
+sudo wget -O asterisk-22-current.tar.gz \
+  https://downloads.asterisk.org/pub/telephony/asterisk/asterisk-22-current.tar.gz
+sudo tar xzf asterisk-22-current.tar.gz
+cd asterisk-22*/
+
+sudo ./configure --with-jansson-bundled --with-pjproject-bundled
+sudo make menuselect.makeopts
+sudo menuselect/menuselect \
+  --enable chan_pjsip \
+  --enable res_pjsip \
+  --enable res_pjsip_session \
+  --enable res_pjsip_pubsub \
+  --enable res_pjsip_notify \
+  --enable res_pjsip_outbound_registration \
+  --enable res_pjsip_registrar \
+  --enable res_pjsip_authenticator_digest \
+  --enable res_pjsip_endpoint_identifier_user \
+  --enable res_pjsip_endpoint_identifier_ip \
+  --enable res_rtp_asterisk \
+  --enable codec_ulaw \
+  --enable app_dial \
+  --enable app_playback \
+  --enable app_stack \
+  --enable pbx_config \
+  menuselect.makeopts
+
+sudo make -j"$(nproc)"
+sudo make install
+```
+
+For a first-time install, install sample configs and the systemd service. Do not
+run `make samples` on a production Asterisk host without backing up
+`/etc/asterisk` first, because it can overwrite local config files.
+
+```bash
+sudo make samples
+sudo make config
+sudo ldconfig
+sudo systemctl enable --now asterisk
+```
+
+If you prefer running Asterisk as the dedicated `asterisk` user, create it and set
+ownership before starting the service:
+
+```bash
+sudo useradd --system --user-group --home-dir /var/lib/asterisk \
+  --shell /usr/sbin/nologin asterisk || true
+sudo chown -R asterisk:asterisk /etc/asterisk /var/lib/asterisk \
+  /var/log/asterisk /var/spool/asterisk /usr/lib/asterisk
+sudo sed -i 's/^;\?runuser = .*/runuser = asterisk/' /etc/asterisk/asterisk.conf
+sudo sed -i 's/^;\?rungroup = .*/rungroup = asterisk/' /etc/asterisk/asterisk.conf
+sudo systemctl restart asterisk
+```
+
+On Debian/Ubuntu systems where the packaged Asterisk is known to include the
+required modules, this shorter path may still be sufficient:
 
 ```bash
 sudo apt install -y asterisk
 sudo systemctl enable --now asterisk
 ```
 
-For Snom XML display notifications, Asterisk must be able to load
-`res_pjsip_notify.so`. Some distributions refuse to load it if
-`pjsip_notify.conf` is missing, so create the file:
+Verify the PJSIP and NOTIFY modules. Some builds refuse to load
+`res_pjsip_notify.so` if `pjsip_notify.conf` is missing, so create the file:
 
 ```bash
 sudo touch /etc/asterisk/pjsip_notify.conf
 sudo asterisk -rx "module load res_pjsip_notify.so"
+sudo asterisk -rx "module load chan_pjsip.so"
+sudo asterisk -rx "module show like pjsip"
 sudo asterisk -rx "module show like pjsip_notify"
 ```
 
