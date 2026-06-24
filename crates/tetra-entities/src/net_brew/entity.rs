@@ -102,6 +102,7 @@ struct UlForwardedCall {
 
 pub struct BrewEntity {
     entity: TetraEntity,
+    log_label: String,
     config: SharedConfig,
 
     /// Also contained in the SharedConfig, but kept for fast, convenient access
@@ -161,6 +162,7 @@ impl BrewEntity {
     /// implementation can be used (WebSocket, QUIC, TCP, …).
     pub fn new<T: NetworkTransport + 'static>(config: SharedConfig, entity: TetraEntity, brew_config: CfgBrew, transport: T) -> Self {
         assert!(super::is_brew_entity(entity), "BrewEntity requires a Brew router entity");
+        let log_label = Self::make_log_label(entity, &brew_config);
         // Create channels
         let (event_sender, event_receiver) = unbounded::<BrewEvent>();
         let (command_sender, command_receiver) = unbounded::<BrewCommand>();
@@ -168,10 +170,18 @@ impl BrewEntity {
         // Spawn worker thread with the provided transport
         let worker_config = config.clone();
         let worker_brew_config = brew_config.clone();
+        let worker_log_label = log_label.clone();
         let handle = thread::Builder::new()
             .name(format!("{:?}-worker", entity).to_lowercase())
             .spawn(move || {
-                let mut worker = BrewWorker::new(worker_config, worker_brew_config, event_sender, command_receiver, transport);
+                let mut worker = BrewWorker::new(
+                    worker_log_label,
+                    worker_config,
+                    worker_brew_config,
+                    event_sender,
+                    command_receiver,
+                    transport,
+                );
                 worker.run();
             })
             .expect("failed to spawn BrewWorker thread");
@@ -184,6 +194,7 @@ impl BrewEntity {
 
         Self {
             entity,
+            log_label,
             config,
             brew_config,
             dltime: TdmaTime::default(),
@@ -203,6 +214,20 @@ impl BrewEntity {
         }
     }
 
+    fn make_log_label(entity: TetraEntity, brew_config: &CfgBrew) -> String {
+        let name = match entity {
+            TetraEntity::Brew => "Brew",
+            TetraEntity::Brew2 => "Brew2",
+            _ => "Brew?",
+        };
+        let scheme = if brew_config.tls { "wss" } else { "ws" };
+        format!("{name} {scheme}://{}:{}", brew_config.host, brew_config.port)
+    }
+
+    fn log_label(&self) -> &str {
+        &self.log_label
+    }
+
     /// Set telemetry sink for emitting brew status events.
     pub fn set_telemetry_sink(&mut self, sink: TelemetrySink) {
         self.telemetry_sink = Some(sink);
@@ -213,7 +238,11 @@ impl BrewEntity {
         while let Ok(event) = self.event_receiver.try_recv() {
             match event {
                 BrewEvent::Connected { server_version } => {
-                    tracing::debug!("BrewEntity: connected to TetraPack server (Brew v{})", server_version);
+                    tracing::debug!(
+                        "[{}] BrewEntity: connected to TetraPack server (Brew v{})",
+                        self.log_label(),
+                        server_version
+                    );
                     self.connected = true;
                     // Re-arm the one-shot reconnect notification for this fresh connection.
                     self.brew_reconnect_announced = false;
@@ -227,7 +256,11 @@ impl BrewEntity {
                     // D-LOCATION-UPDATE-COMMANDs — continuously.
                     if !self.brew_reconnect_announced {
                         self.brew_reconnect_announced = true;
-                        tracing::info!("BrewEntity: server Brew version detected from message length: v{}", version);
+                        tracing::info!(
+                            "[{}] BrewEntity: server Brew version detected from message length: v{}",
+                            self.log_label(),
+                            version
+                        );
                         self.emit_brew_version(version);
                         // Notify MM (once) that Brew (re)connected so it re-registers local MS.
                         // Without this, MS that were registered before a disconnect believe they
@@ -241,7 +274,11 @@ impl BrewEntity {
                     }
                 }
                 BrewEvent::Disconnected(reason) => {
-                    tracing::warn!("BrewEntity: Brew backhaul disconnected: {} — releasing all active calls", reason);
+                    tracing::warn!(
+                        "[{}] BrewEntity: Brew backhaul disconnected: {} — releasing all active calls",
+                        self.log_label(),
+                        reason
+                    );
                     self.connected = false;
                     // Re-arm so the next reconnect re-registers local MS exactly once.
                     self.brew_reconnect_announced = false;
@@ -257,7 +294,11 @@ impl BrewEntity {
                     priority,
                     service,
                 } => {
-                    tracing::info!("BrewEntity: GROUP_TX service={} (0=TETRA ACELP, expect 0)", service);
+                    tracing::info!(
+                        "[{}] BrewEntity: GROUP_TX service={} (0=TETRA ACELP, expect 0)",
+                        self.log_label(),
+                        service
+                    );
                     self.handle_group_call_start(queue, uuid, source_issi, dest_gssi, priority);
                 }
                 BrewEvent::GroupCallEnd { uuid, cause } => {
@@ -276,10 +317,16 @@ impl BrewEntity {
                     self.handle_sds_transfer(queue, uuid, source, destination, data, length_bits);
                 }
                 BrewEvent::SdsReport { uuid, status } => {
-                    tracing::debug!("BrewEntity: SDS report uuid={} status={}", uuid, status);
+                    tracing::debug!("[{}] BrewEntity: SDS report uuid={} status={}", self.log_label(), uuid, status);
                 }
                 BrewEvent::SubscriberEvent { msg_type, issi, groups } => {
-                    tracing::debug!("BrewEntity: subscriber event type={} issi={} groups={:?}", msg_type, issi, groups);
+                    tracing::debug!(
+                        "[{}] BrewEntity: subscriber event type={} issi={} groups={:?}",
+                        self.log_label(),
+                        msg_type,
+                        issi,
+                        groups
+                    );
                     // External subscriber (e.g. SvxLink gateway) affiliated/deaffiliated on Brew server.
                     // Notify CMCE so it updates group_listeners — without this, has_listener()
                     // returns false for GSSIs where only external subscribers are present,
@@ -287,7 +334,12 @@ impl BrewEntity {
                     match msg_type {
                         crate::net_brew::protocol::BREW_SUBSCRIBER_AFFILIATE => {
                             if !groups.is_empty() {
-                                tracing::info!("BrewEntity: external subscriber issi={} → AFFILIATE groups={:?}", issi, groups);
+                                tracing::info!(
+                                    "[{}] BrewEntity: external subscriber issi={} → AFFILIATE groups={:?}",
+                                    self.log_label(),
+                                    issi,
+                                    groups
+                                );
                                 queue.push_back(SapMsg {
                                     sap: tetra_core::Sap::Control,
                                     src: self.entity,
@@ -302,7 +354,12 @@ impl BrewEntity {
                         }
                         crate::net_brew::protocol::BREW_SUBSCRIBER_DEAFFILIATE => {
                             if !groups.is_empty() {
-                                tracing::info!("BrewEntity: external subscriber issi={} → DEAFFILIATE groups={:?}", issi, groups);
+                                tracing::info!(
+                                    "[{}] BrewEntity: external subscriber issi={} → DEAFFILIATE groups={:?}",
+                                    self.log_label(),
+                                    issi,
+                                    groups
+                                );
                                 queue.push_back(SapMsg {
                                     sap: tetra_core::Sap::Control,
                                     src: self.entity,
@@ -316,7 +373,7 @@ impl BrewEntity {
                             }
                         }
                         crate::net_brew::protocol::BREW_SUBSCRIBER_DEREGISTER => {
-                            tracing::info!("BrewEntity: external subscriber issi={} → DEREGISTER", issi);
+                            tracing::info!("[{}] BrewEntity: external subscriber issi={} → DEREGISTER", self.log_label(), issi);
                             queue.push_back(SapMsg {
                                 sap: tetra_core::Sap::Control,
                                 src: self.entity,
@@ -332,7 +389,12 @@ impl BrewEntity {
                     }
                 }
                 BrewEvent::ServerError { error_type, data } => {
-                    tracing::error!("BrewEntity: server error type={} data={} bytes", error_type, data.len());
+                    tracing::error!(
+                        "[{}] BrewEntity: server error type={} data={} bytes",
+                        self.log_label(),
+                        error_type,
+                        data.len()
+                    );
                 }
 
                 // ── Circuit / individual call events ──────────────────────
@@ -341,7 +403,8 @@ impl BrewEntity {
                     // Map Brew wire struct → SAP NetworkCircuitCall and forward to CMCE.
                     let network_call = Self::map_brew_to_network_circuit_call(&call);
                     tracing::info!(
-                        "BrewEntity: CIRCUIT SETUP REQUEST uuid={} src={} dst={} number='{}' duplex={}",
+                        "[{}] BrewEntity: CIRCUIT SETUP REQUEST uuid={} src={} dst={} number='{}' duplex={}",
+                        self.log_label(),
                         uuid,
                         call.source,
                         call.destination,
@@ -359,7 +422,7 @@ impl BrewEntity {
                     });
                 }
                 BrewEvent::CircuitSetupAccept { uuid } => {
-                    tracing::info!("BrewEntity: CIRCUIT SETUP ACCEPT uuid={}", uuid);
+                    tracing::info!("[{}] BrewEntity: CIRCUIT SETUP ACCEPT uuid={}", self.log_label(), uuid);
                     queue.push_back(SapMsg {
                         sap: tetra_core::Sap::Control,
                         src: self.entity,
@@ -368,7 +431,12 @@ impl BrewEntity {
                     });
                 }
                 BrewEvent::CircuitSetupReject { uuid, cause } => {
-                    tracing::info!("BrewEntity: CIRCUIT SETUP REJECT uuid={} cause={}", uuid, cause);
+                    tracing::info!(
+                        "[{}] BrewEntity: CIRCUIT SETUP REJECT uuid={} cause={}",
+                        self.log_label(),
+                        uuid,
+                        cause
+                    );
                     queue.push_back(SapMsg {
                         sap: tetra_core::Sap::Control,
                         src: self.entity,
@@ -377,7 +445,7 @@ impl BrewEntity {
                     });
                 }
                 BrewEvent::CircuitCallAlert { uuid } => {
-                    tracing::info!("BrewEntity: CIRCUIT CALL ALERT uuid={}", uuid);
+                    tracing::info!("[{}] BrewEntity: CIRCUIT CALL ALERT uuid={}", self.log_label(), uuid);
                     queue.push_back(SapMsg {
                         sap: tetra_core::Sap::Control,
                         src: self.entity,
@@ -388,7 +456,8 @@ impl BrewEntity {
                 BrewEvent::CircuitConnectRequest { uuid, call } => {
                     let network_call = Self::map_brew_to_network_circuit_call(&call);
                     tracing::info!(
-                        "BrewEntity: CIRCUIT CONNECT REQUEST uuid={} src={} dst={} duplex={}",
+                        "[{}] BrewEntity: CIRCUIT CONNECT REQUEST uuid={} src={} dst={} duplex={}",
+                        self.log_label(),
                         uuid,
                         call.source,
                         call.destination,
@@ -406,7 +475,8 @@ impl BrewEntity {
                 }
                 BrewEvent::CircuitConnectConfirm { uuid, grant, permission } => {
                     tracing::info!(
-                        "BrewEntity: CIRCUIT CONNECT CONFIRM uuid={} grant={} permission={}",
+                        "[{}] BrewEntity: CIRCUIT CONNECT CONFIRM uuid={} grant={} permission={}",
+                        self.log_label(),
                         uuid,
                         grant,
                         permission
@@ -424,7 +494,8 @@ impl BrewEntity {
                 }
                 BrewEvent::CircuitSimplexGranted { uuid, grant, permission } => {
                     tracing::info!(
-                        "BrewEntity: CIRCUIT SIMPLEX GRANTED uuid={} grant={} permission={}",
+                        "[{}] BrewEntity: CIRCUIT SIMPLEX GRANTED uuid={} grant={} permission={}",
+                        self.log_label(),
                         uuid,
                         grant,
                         permission
@@ -442,7 +513,8 @@ impl BrewEntity {
                 }
                 BrewEvent::CircuitSimplexIdle { uuid, grant, permission } => {
                     tracing::info!(
-                        "BrewEntity: CIRCUIT SIMPLEX IDLE uuid={} grant={} permission={}",
+                        "[{}] BrewEntity: CIRCUIT SIMPLEX IDLE uuid={} grant={} permission={}",
+                        self.log_label(),
                         uuid,
                         grant,
                         permission
@@ -459,7 +531,12 @@ impl BrewEntity {
                     });
                 }
                 BrewEvent::CircuitCallRelease { uuid, cause } => {
-                    tracing::info!("BrewEntity: CIRCUIT CALL RELEASE uuid={} cause={}", uuid, cause);
+                    tracing::info!(
+                        "[{}] BrewEntity: CIRCUIT CALL RELEASE uuid={} cause={}",
+                        self.log_label(),
+                        uuid,
+                        cause
+                    );
                     queue.push_back(SapMsg {
                         sap: tetra_core::Sap::Control,
                         src: self.entity,
@@ -475,7 +552,7 @@ impl BrewEntity {
                     self.drop_network_circuit(uuid);
                 }
                 BrewEvent::CircuitDtmf { uuid, length_bits, data } => {
-                    tracing::debug!("BrewEntity: CIRCUIT DTMF uuid={} bits={}", uuid, length_bits);
+                    tracing::debug!("[{}] BrewEntity: CIRCUIT DTMF uuid={} bits={}", self.log_label(), uuid, length_bits);
                     // DTMF from network → CMCE (CMCE can forward to local MS via U-INFO if needed)
                     // For now we log it; full downstream DTMF is a future extension.
                     let _ = (uuid, length_bits, data);
@@ -508,11 +585,17 @@ impl BrewEntity {
         if should_send {
             self.rssi_last_sent.insert(issi, now);
             let _ = self.command_sender.send(BrewCommand::SendRssiUpdate { issi, rssi_dbfs });
-            tracing::debug!("Brew: queued RSSI export issi={} rssi={:.1}dBFS", issi, rssi_dbfs);
+            tracing::debug!(
+                "[{}] BrewEntity: queued RSSI export issi={} rssi={:.1}dBFS",
+                self.log_label(),
+                issi,
+                rssi_dbfs
+            );
         }
     }
 
     fn handle_subscriber_update(&mut self, update: MmSubscriberUpdate) {
+        let log_label = self.log_label().to_string();
         let issi = update.issi;
         let groups = update.groups;
         let routable = super::is_brew_local_issi_allowed_for_entity(&self.config, self.entity, issi)
@@ -522,13 +605,21 @@ impl BrewEntity {
             BrewSubscriberAction::Register => {
                 self.subscriber_groups.entry(issi).or_insert_with(HashSet::new);
                 if routable && self.connected {
-                    tracing::info!("BrewEntity: subscriber register issi={} → REGISTER", issi);
+                    tracing::info!("[{}] BrewEntity: subscriber register issi={} → REGISTER", log_label, issi);
                     let _ = self.command_sender.send(BrewCommand::RegisterSubscriber { issi });
                 } else if !routable {
-                    tracing::debug!("BrewEntity: subscriber register issi={} (filtered, not sent to Brew)", issi);
+                    tracing::debug!(
+                        "[{}] BrewEntity: subscriber register issi={} (filtered, not sent to Brew)",
+                        log_label,
+                        issi
+                    );
                 } else {
                     // routable but disconnected — affiliations replayed on reconnect via resync
-                    tracing::debug!("BrewEntity: subscriber register issi={} cached until Brew reconnect", issi);
+                    tracing::debug!(
+                        "[{}] BrewEntity: subscriber register issi={} cached until Brew reconnect",
+                        log_label,
+                        issi
+                    );
                 }
             }
             BrewSubscriberAction::Deregister => {
@@ -538,7 +629,11 @@ impl BrewEntity {
                     .map(|g| g.into_iter().collect())
                     .unwrap_or_default();
                 if routable && self.connected {
-                    tracing::info!("BrewEntity: subscriber deregister issi={} → DEAFFILIATE + DEREGISTER", issi);
+                    tracing::info!(
+                        "[{}] BrewEntity: subscriber deregister issi={} → DEAFFILIATE + DEREGISTER",
+                        log_label,
+                        issi
+                    );
                     if !existing_groups.is_empty() {
                         let _ = self.command_sender.send(BrewCommand::DeaffiliateGroups {
                             issi,
@@ -547,9 +642,17 @@ impl BrewEntity {
                     }
                     let _ = self.command_sender.send(BrewCommand::DeregisterSubscriber { issi });
                 } else if !routable {
-                    tracing::debug!("BrewEntity: subscriber deregister issi={} (filtered, not sent to Brew)", issi);
+                    tracing::debug!(
+                        "[{}] BrewEntity: subscriber deregister issi={} (filtered, not sent to Brew)",
+                        log_label,
+                        issi
+                    );
                 } else {
-                    tracing::debug!("BrewEntity: subscriber deregister issi={} cached while Brew disconnected", issi);
+                    tracing::debug!(
+                        "[{}] BrewEntity: subscriber deregister issi={} cached while Brew disconnected",
+                        log_label,
+                        issi
+                    );
                 }
             }
             BrewSubscriberAction::Affiliate => {
@@ -561,17 +664,24 @@ impl BrewEntity {
                     }
                 }
                 if !new_groups.is_empty() && routable && self.connected {
-                    tracing::info!("BrewEntity: affiliate issi={} → AFFILIATE groups={:?}", issi, new_groups);
+                    tracing::info!(
+                        "[{}] BrewEntity: affiliate issi={} → AFFILIATE groups={:?}",
+                        log_label,
+                        issi,
+                        new_groups
+                    );
                     let _ = self.command_sender.send(BrewCommand::AffiliateGroups { issi, groups: new_groups });
                 } else if !new_groups.is_empty() && !routable {
                     tracing::debug!(
-                        "BrewEntity: affiliate issi={} groups={:?} (filtered, not sent to Brew)",
+                        "[{}] BrewEntity: affiliate issi={} groups={:?} (filtered, not sent to Brew)",
+                        log_label,
                         issi,
                         new_groups
                     );
                 } else if !new_groups.is_empty() {
                     tracing::debug!(
-                        "BrewEntity: affiliate issi={} groups={:?} cached until Brew reconnect",
+                        "[{}] BrewEntity: affiliate issi={} groups={:?} cached until Brew reconnect",
+                        log_label,
                         issi,
                         new_groups
                     );
@@ -587,20 +697,27 @@ impl BrewEntity {
                     }
                 }
                 if !removed_groups.is_empty() && routable && self.connected {
-                    tracing::info!("BrewEntity: deaffiliate issi={} → DEAFFILIATE groups={:?}", issi, removed_groups);
+                    tracing::info!(
+                        "[{}] BrewEntity: deaffiliate issi={} → DEAFFILIATE groups={:?}",
+                        log_label,
+                        issi,
+                        removed_groups
+                    );
                     let _ = self.command_sender.send(BrewCommand::DeaffiliateGroups {
                         issi,
                         groups: removed_groups,
                     });
                 } else if !removed_groups.is_empty() && !routable {
                     tracing::debug!(
-                        "BrewEntity: deaffiliate issi={} groups={:?} (filtered, not sent to Brew)",
+                        "[{}] BrewEntity: deaffiliate issi={} groups={:?} (filtered, not sent to Brew)",
+                        log_label,
                         issi,
                         removed_groups
                     );
                 } else if !removed_groups.is_empty() {
                     tracing::debug!(
-                        "BrewEntity: deaffiliate issi={} groups={:?} cached while Brew disconnected",
+                        "[{}] BrewEntity: deaffiliate issi={} groups={:?} cached while Brew disconnected",
+                        log_label,
                         issi,
                         removed_groups
                     );
@@ -610,20 +727,26 @@ impl BrewEntity {
     }
 
     fn resync_subscribers(&self) {
+        let log_label = self.log_label().to_string();
         for (issi, groups) in &self.subscriber_groups {
             let routable = super::is_brew_local_issi_allowed_for_entity(&self.config, self.entity, *issi)
                 && super::is_brew_issi_routable_for_entity(&self.config, self.entity, *issi);
             if !routable {
-                tracing::debug!("BrewEntity: resync skipping issi={} (filtered)", issi);
+                tracing::debug!("[{}] BrewEntity: resync skipping issi={} (filtered)", log_label, issi);
                 continue;
             }
             let _ = self.command_sender.send(BrewCommand::RegisterSubscriber { issi: *issi });
             if groups.is_empty() {
-                tracing::info!("BrewEntity: resync issi={} — registered, no group affiliations", issi);
+                tracing::info!(
+                    "[{}] BrewEntity: resync issi={} — registered, no group affiliations",
+                    log_label,
+                    issi
+                );
             } else {
                 let gssi_list: Vec<u32> = groups.iter().copied().collect();
                 tracing::info!(
-                    "BrewEntity: resync issi={} — registered, affiliating {} groups: {:?}",
+                    "[{}] BrewEntity: resync issi={} — registered, affiliating {} groups: {:?}",
+                    log_label,
                     issi,
                     gssi_list.len(),
                     gssi_list
@@ -638,6 +761,7 @@ impl BrewEntity {
 
     fn set_network_connected(&mut self, connected: bool, server_version: u8) {
         self.connected = connected;
+        let log_label = self.log_label().to_string();
         let changed = {
             let mut state = self.config.state_write();
             let old_aggregate = state.network_connected;
@@ -646,7 +770,8 @@ impl BrewEntity {
             if old_aggregate != aggregate {
                 state.network_connected = aggregate;
                 tracing::info!(
-                    "BrewEntity: backhaul aggregate {} ({:?} {})",
+                    "[{}] BrewEntity: backhaul aggregate {} ({:?} {})",
+                    log_label,
                     if aggregate { "CONNECTED" } else { "DISCONNECTED" },
                     self.entity,
                     if connected { "connected" } else { "disconnected" }
@@ -654,7 +779,8 @@ impl BrewEntity {
                 true
             } else {
                 tracing::info!(
-                    "BrewEntity: {:?} backhaul {}",
+                    "[{}] BrewEntity: {:?} backhaul {}",
+                    log_label,
                     self.entity,
                     if connected { "CONNECTED" } else { "DISCONNECTED" }
                 );
@@ -684,12 +810,14 @@ impl BrewEntity {
 
     /// Handle new group call from Brew, reusing hanging call circuits if available.
     fn handle_group_call_start(&mut self, queue: &mut MessageQueue, uuid: Uuid, source_issi: u32, dest_gssi: u32, priority: u8) {
+        let log_label = self.log_label().to_string();
         // Check if this call is already active (speaker change or repeated GROUP_TX)
         if let Some(call) = self.active_calls.get_mut(&uuid) {
             // Only notify CMCE if the speaker actually changed
             if call.source_issi != source_issi {
                 tracing::info!(
-                    "BrewEntity: GROUP_TX speaker change on uuid={} new_speaker={} (was {})",
+                    "[{}] BrewEntity: GROUP_TX speaker change on uuid={} new_speaker={} (was {})",
+                    log_label,
                     uuid,
                     source_issi,
                     call.source_issi
@@ -703,7 +831,8 @@ impl BrewEntity {
                     let dropped = jitter.flush();
                     if dropped > 0 {
                         tracing::debug!(
-                            "BrewEntity: flushed {} stale frames from jitter on speaker change uuid={}",
+                            "[{}] BrewEntity: flushed {} stale frames from jitter on speaker change uuid={}",
+                            log_label,
                             dropped,
                             uuid
                         );
@@ -724,7 +853,12 @@ impl BrewEntity {
                 });
             } else {
                 // Repeated GROUP_TX with same speaker - this is normal, just log at trace level
-                tracing::trace!("BrewEntity: repeated GROUP_TX on uuid={} speaker={}", uuid, source_issi);
+                tracing::trace!(
+                    "[{}] BrewEntity: repeated GROUP_TX on uuid={} speaker={}",
+                    log_label,
+                    uuid,
+                    source_issi
+                );
             }
             return;
         }
@@ -732,7 +866,8 @@ impl BrewEntity {
         // Check if there's a hanging call we can reuse
         if let Some(hanging) = self.hanging_calls.remove(&dest_gssi) {
             tracing::info!(
-                "BrewEntity: reusing hanging circuit for gssi={} uuid={} (hangtime {:.1}s)",
+                "[{}] BrewEntity: reusing hanging circuit for gssi={} uuid={} (hangtime {:.1}s)",
+                log_label,
                 dest_gssi,
                 uuid,
                 hanging.since.elapsed().as_secs_f32()
@@ -775,7 +910,8 @@ impl BrewEntity {
 
         // New call - track it and request CMCE to allocate and set up
         tracing::info!(
-            "BrewEntity: requesting new network call uuid={} src={} gssi={}",
+            "[{}] BrewEntity: requesting new network call uuid={} src={} gssi={}",
+            log_label,
             uuid,
             source_issi,
             dest_gssi
@@ -812,7 +948,7 @@ impl BrewEntity {
     /// Handle GROUP_IDLE by forwarding to CMCE and tracking for hangtime reuse
     fn handle_group_call_end(&mut self, queue: &mut MessageQueue, uuid: Uuid, _cause: u8) {
         let Some(call) = self.active_calls.remove(&uuid) else {
-            tracing::debug!("BrewEntity: GROUP_IDLE for unknown uuid={}", uuid);
+            tracing::debug!("[{}] BrewEntity: GROUP_IDLE for unknown uuid={}", self.log_label(), uuid);
             return;
         };
 
@@ -822,7 +958,8 @@ impl BrewEntity {
             if let Some(ts) = call.ts {
                 if !jitter.is_empty() {
                     tracing::debug!(
-                        "BrewEntity: GROUP_IDLE uuid={} moving {} buffered frames to drain",
+                        "[{}] BrewEntity: GROUP_IDLE uuid={} moving {} buffered frames to drain",
+                        self.log_label(),
                         uuid,
                         jitter.len()
                     );
@@ -832,7 +969,8 @@ impl BrewEntity {
         }
 
         tracing::info!(
-            "BrewEntity: group call ended uuid={} call_id={:?} gssi={} frames={}",
+            "[{}] BrewEntity: group call ended uuid={} call_id={:?} gssi={} frames={}",
+            self.log_label(),
             uuid,
             call.call_id,
             call.dest_gssi,
@@ -856,7 +994,8 @@ impl BrewEntity {
             if let Some(stale) = self.hanging_calls.remove(&call.dest_gssi) {
                 if stale.uuid != uuid {
                     tracing::debug!(
-                        "BrewEntity: replacing stale hanging call gssi={} old_uuid={} new_uuid={}",
+                        "[{}] BrewEntity: replacing stale hanging call gssi={} old_uuid={} new_uuid={}",
+                        self.log_label(),
                         call.dest_gssi,
                         stale.uuid,
                         uuid
@@ -893,7 +1032,12 @@ impl BrewEntity {
 
         for gssi in expired {
             if let Some(hanging) = self.hanging_calls.remove(&gssi) {
-                tracing::debug!("BrewEntity: hanging call expired gssi={} uuid={} (no reuse)", gssi, hanging.uuid);
+                tracing::debug!(
+                    "[{}] BrewEntity: hanging call expired gssi={} uuid={} (no reuse)",
+                    self.log_label(),
+                    gssi,
+                    hanging.uuid
+                );
                 // No action needed - CMCE already released the circuit
             }
         }
@@ -901,9 +1045,15 @@ impl BrewEntity {
 
     /// Handle a voice frame from Brew — inject into the downlink
     fn handle_voice_frame(&mut self, uuid: Uuid, _length_bits: u16, data: Vec<u8>) {
+        let log_label = self.log_label().to_string();
         let Some(call) = self.active_calls.get_mut(&uuid) else {
             // Voice frame for unknown call — might arrive before GROUP_TX or after GROUP_IDLE
-            tracing::trace!("BrewEntity: voice frame for unknown uuid={} ({} bytes)", uuid, data.len());
+            tracing::trace!(
+                "[{}] BrewEntity: voice frame for unknown uuid={} ({} bytes)",
+                log_label,
+                uuid,
+                data.len()
+            );
             return;
         };
 
@@ -917,15 +1067,29 @@ impl BrewEntity {
         // STE format: byte 0 = header (control bits), bytes 1-35 = 274 ACELP bits for TCH/S.
         // Validate before slicing so a short frame can never panic.
         if data.len() < 36 {
-            tracing::warn!("BrewEntity: voice frame too short ({} bytes, expected 36 STE bytes)", data.len());
+            tracing::warn!(
+                "[{}] BrewEntity: voice frame too short ({} bytes, expected 36 STE bytes)",
+                log_label,
+                data.len()
+            );
             return;
         }
 
         // Log the first frame per call (whether or not the channel is open yet).
         if frame_count == 1 {
             match ts {
-                Some(ts) => tracing::info!("BrewEntity: voice frame #1 uuid={} len={} bytes ts={}", uuid, data.len(), ts),
-                None => tracing::debug!("BrewEntity: early voice frame uuid={} buffered before resources allocated", uuid),
+                Some(ts) => tracing::info!(
+                    "[{}] BrewEntity: voice frame #1 uuid={} len={} bytes ts={}",
+                    log_label,
+                    uuid,
+                    data.len(),
+                    ts
+                ),
+                None => tracing::debug!(
+                    "[{}] BrewEntity: early voice frame uuid={} buffered before resources allocated",
+                    log_label,
+                    uuid
+                ),
             }
         }
 
@@ -991,13 +1155,14 @@ impl BrewEntity {
             })
             .collect();
         for uuid in finished {
-            tracing::debug!("BrewEntity: drain complete (or reaped) for uuid={}", uuid);
+            tracing::debug!("[{}] BrewEntity: drain complete (or reaped) for uuid={}", self.log_label(), uuid);
             self.draining_jitter.remove(&uuid);
         }
 
         for (ts, uuid, target_frames, frame) in to_send {
             tracing::trace!(
-                "BrewEntity: playout uuid={} ts={} rx_seq={} age_ms={} target_frames={}",
+                "[{}] BrewEntity: playout uuid={} ts={} rx_seq={} age_ms={} target_frames={}",
+                self.log_label(),
                 uuid,
                 ts,
                 frame.rx_seq,
@@ -1042,7 +1207,8 @@ impl BrewEntity {
         // entry cleanly via handle_local_call_start.
         if !self.ul_forwarded.is_empty() {
             tracing::debug!(
-                "BrewEntity: clearing {} stale ul_forwarded entries on release",
+                "[{}] BrewEntity: clearing {} stale ul_forwarded entries on release",
+                self.log_label(),
                 self.ul_forwarded.len()
             );
             self.ul_forwarded.clear();
@@ -1052,7 +1218,8 @@ impl BrewEntity {
     /// Handle NetworkCallReady response from CMCE
     fn rx_network_call_ready(&mut self, queue: &mut MessageQueue, brew_uuid: Uuid, call_id: u16, ts: u8, usage: u8) {
         tracing::info!(
-            "BrewEntity: network call ready uuid={} call_id={} ts={} usage={}",
+            "[{}] BrewEntity: network call ready uuid={} call_id={} ts={} usage={}",
+            self.log_label(),
             brew_uuid,
             call_id,
             ts,
@@ -1072,7 +1239,8 @@ impl BrewEntity {
             // GROUP_IDLE will ever release). Tell CMCE to release it so the timeslot is
             // freed for the next call.
             tracing::warn!(
-                "BrewEntity: NetworkCallReady for unknown uuid={} (call already gone) — releasing orphaned circuit call_id={} ts={}",
+                "[{}] BrewEntity: NetworkCallReady for unknown uuid={} (call already gone) — releasing orphaned circuit call_id={} ts={}",
+                self.log_label(),
                 brew_uuid,
                 call_id,
                 ts
@@ -1113,9 +1281,13 @@ impl BrewEntity {
         // so that DL audio from TetraPack reaches the MS. Clean up here to avoid stale entries.
         self.active_calls.remove(&brew_uuid);
         if had_jitter || had_ts {
-            tracing::info!("BrewEntity: dropped circuit uuid={}", brew_uuid);
+            tracing::info!("[{}] BrewEntity: dropped circuit uuid={}", self.log_label(), brew_uuid);
         } else {
-            tracing::debug!("BrewEntity: drop_network_circuit for unknown uuid={}", brew_uuid);
+            tracing::debug!(
+                "[{}] BrewEntity: drop_network_circuit for unknown uuid={}",
+                self.log_label(),
+                brew_uuid
+            );
         }
         had_jitter || had_ts
     }
@@ -1123,7 +1295,8 @@ impl BrewEntity {
     fn drop_network_call(&mut self, brew_uuid: Uuid) {
         if let Some(call) = self.active_calls.remove(&brew_uuid) {
             tracing::info!(
-                "BrewEntity: dropping network call uuid={} gssi={} (CMCE request)",
+                "[{}] BrewEntity: dropping network call uuid={} gssi={} (CMCE request)",
+                self.log_label(),
                 brew_uuid,
                 call.dest_gssi
             );
@@ -1141,10 +1314,15 @@ impl BrewEntity {
             .iter()
             .find_map(|(gssi, hanging)| if hanging.uuid == brew_uuid { Some(*gssi) } else { None });
         if let Some(gssi) = hanging_gssi {
-            tracing::info!("BrewEntity: dropping hanging call uuid={} gssi={} (CMCE request)", brew_uuid, gssi);
+            tracing::info!(
+                "[{}] BrewEntity: dropping hanging call uuid={} gssi={} (CMCE request)",
+                self.log_label(),
+                brew_uuid,
+                gssi
+            );
             self.hanging_calls.remove(&gssi);
         } else {
-            tracing::debug!("BrewEntity: drop requested for unknown uuid={}", brew_uuid);
+            tracing::debug!("[{}] BrewEntity: drop requested for unknown uuid={}", self.log_label(), brew_uuid);
         }
     }
 }
@@ -1208,7 +1386,11 @@ impl TetraEntityTrait for BrewEntity {
             // ── Circuit / individual call outbound signals (CMCE → Brew → TetraPack) ──
             SapMsgInner::CmceCallControl(CallControl::NetworkCircuitSetupRequest { brew_uuid, call }) => {
                 if !self.connected {
-                    tracing::debug!("BrewEntity: not connected, dropping NetworkCircuitSetupRequest uuid={}", brew_uuid);
+                    tracing::debug!(
+                        "[{}] BrewEntity: not connected, dropping NetworkCircuitSetupRequest uuid={}",
+                        self.log_label(),
+                        brew_uuid
+                    );
                     return;
                 }
                 let wire_call = Self::map_network_to_brew_circuit_call(&call);
@@ -1235,7 +1417,8 @@ impl TetraEntityTrait for BrewEntity {
             SapMsgInner::CmceCallControl(CallControl::NetworkCircuitConnectRequest { brew_uuid, call }) => {
                 if !self.connected {
                     tracing::debug!(
-                        "BrewEntity: not connected, dropping NetworkCircuitConnectRequest uuid={}",
+                        "[{}] BrewEntity: not connected, dropping NetworkCircuitConnectRequest uuid={}",
+                        self.log_label(),
                         brew_uuid
                     );
                     return;
@@ -1286,7 +1469,13 @@ impl TetraEntityTrait for BrewEntity {
                 }
             }
             SapMsgInner::CmceCallControl(CallControl::NetworkCircuitMediaReady { brew_uuid, call_id, ts }) => {
-                tracing::info!("BrewEntity: circuit media ready uuid={} call_id={} ts={}", brew_uuid, call_id, ts);
+                tracing::info!(
+                    "[{}] BrewEntity: circuit media ready uuid={} call_id={} ts={}",
+                    self.log_label(),
+                    brew_uuid,
+                    call_id,
+                    ts
+                );
                 // Register UL forwarding: voice on `ts` gets sent to TetraPack.
                 self.ul_forwarded.insert(
                     ts,
@@ -1354,7 +1543,12 @@ impl TetraEntityTrait for BrewEntity {
                 self.handle_sds_send(sds);
             }
             _ => {
-                tracing::debug!("BrewEntity: unexpected rx_prim from {:?} on {:?}", message.src, message.sap);
+                tracing::debug!(
+                    "[{}] BrewEntity: unexpected rx_prim from {:?} on {:?}",
+                    self.log_label(),
+                    message.src,
+                    message.sap
+                );
             }
         }
     }
@@ -1407,15 +1601,17 @@ impl BrewEntity {
     /// Handle notification that a local UL group call has started.
     /// If the group is subscribed (in config.groups), start forwarding to TetraPack.
     fn handle_local_call_start(&mut self, call_id: u16, source_issi: u32, dest_gssi: u32, ts: u8) {
+        let log_label = self.log_label().to_string();
         if !self.connected {
-            tracing::trace!("BrewEntity: not connected, ignoring local call start");
+            tracing::trace!("[{}] BrewEntity: not connected, ignoring local call start", log_label);
             return;
         }
         let source_allowed = super::is_brew_local_issi_allowed_for_entity(&self.config, self.entity, source_issi)
             && super::is_brew_issi_routable_for_entity(&self.config, self.entity, source_issi);
         if !source_allowed {
             tracing::debug!(
-                "BrewEntity: suppressing GROUP_TX for source_issi={} (filtered, not sent to Brew)",
+                "[{}] BrewEntity: suppressing GROUP_TX for source_issi={} (filtered, not sent to Brew)",
+                log_label,
                 source_issi
             );
             return;
@@ -1425,7 +1621,8 @@ impl BrewEntity {
         if let Some(fwd) = self.ul_forwarded.get_mut(&ts) {
             if fwd.call_id != call_id || fwd.dest_gssi != dest_gssi {
                 tracing::warn!(
-                    "BrewEntity: updating forwarded call on ts={} (was call_id={} gssi={}) -> (call_id={} gssi={})",
+                    "[{}] BrewEntity: updating forwarded call on ts={} (was call_id={} gssi={}) -> (call_id={} gssi={})",
+                    log_label,
                     ts,
                     fwd.call_id,
                     fwd.dest_gssi,
@@ -1453,7 +1650,8 @@ impl BrewEntity {
         // Generate a UUID for this Brew session
         let uuid = Uuid::new_v4();
         tracing::info!(
-            "BrewEntity: forwarding local call to TetraPack: call_id={} src={} gssi={} ts={} uuid={}",
+            "[{}] BrewEntity: forwarding local call to TetraPack: call_id={} src={} gssi={} ts={} uuid={}",
+            log_label,
             call_id,
             source_issi,
             dest_gssi,
@@ -1486,10 +1684,12 @@ impl BrewEntity {
 
     /// Handle notification that a local UL call has ended.
     fn handle_local_call_tx_stopped(&mut self, call_id: u16, ts: u8) {
+        let log_label = self.log_label().to_string();
         if let Some(fwd) = self.ul_forwarded.remove(&ts) {
             if fwd.call_id != call_id {
                 tracing::warn!(
-                    "BrewEntity: call_id mismatch on ts={}: expected {} got {}",
+                    "[{}] BrewEntity: call_id mismatch on ts={}: expected {} got {}",
+                    log_label,
                     ts,
                     fwd.call_id,
                     call_id
@@ -1498,7 +1698,8 @@ impl BrewEntity {
             match fwd.kind {
                 UlForwardKind::Group => {
                     tracing::info!(
-                        "BrewEntity: local call transmission stopped, sending GROUP_IDLE to TetraPack: uuid={} frames={}",
+                        "[{}] BrewEntity: local call transmission stopped, sending GROUP_IDLE to TetraPack: uuid={} frames={}",
+                        log_label,
                         fwd.uuid,
                         fwd.frame_count
                     );
@@ -1512,11 +1713,13 @@ impl BrewEntity {
     }
 
     fn handle_local_call_end(&mut self, call_id: u16, ts: u8) {
+        let log_label = self.log_label().to_string();
         // Check if ul_forwarded entry still exists (might have been removed by handle_local_call_tx_stopped)
         if let Some(fwd) = self.ul_forwarded.remove(&ts) {
             if fwd.call_id != call_id {
                 tracing::warn!(
-                    "BrewEntity: call_id mismatch on ts={}: expected {} got {}",
+                    "[{}] BrewEntity: call_id mismatch on ts={}: expected {} got {}",
+                    log_label,
                     ts,
                     fwd.call_id,
                     call_id
@@ -1525,7 +1728,8 @@ impl BrewEntity {
             match fwd.kind {
                 UlForwardKind::Group => {
                     tracing::debug!(
-                        "BrewEntity: local call ended (already sent GROUP_IDLE during tx_stopped): uuid={} frames={}",
+                        "[{}] BrewEntity: local call ended (already sent GROUP_IDLE during tx_stopped): uuid={} frames={}",
+                        log_label,
                         fwd.uuid,
                         fwd.frame_count
                     );
@@ -1535,13 +1739,18 @@ impl BrewEntity {
                 }
             }
         } else {
-            tracing::debug!("BrewEntity: local call ended on ts={} (already cleaned up during tx_stopped)", ts);
+            tracing::debug!(
+                "[{}] BrewEntity: local call ended on ts={} (already cleaned up during tx_stopped)",
+                log_label,
+                ts
+            );
         }
     }
 
     /// Handle UL voice data from UMAC. If the timeslot is being forwarded to TetraPack,
     /// convert to STE format and send.
     fn handle_ul_voice(&mut self, ts: u8, acelp_bits: Vec<u8>) {
+        let log_label = self.log_label().to_string();
         let Some(fwd) = self.ul_forwarded.get_mut(&ts) else {
             return; // Not forwarded to TetraPack
         };
@@ -1562,7 +1771,7 @@ impl BrewEntity {
             ste
         } else {
             if acelp_bits.len() < 274 {
-                tracing::warn!("BrewEntity: UL voice too short: {} bits", acelp_bits.len());
+                tracing::warn!("[{}] BrewEntity: UL voice too short: {} bits", log_label, acelp_bits.len());
                 return;
             }
 
@@ -1606,7 +1815,8 @@ impl BrewEntity {
         length_bits: u16,
     ) {
         tracing::info!(
-            "BrewEntity: SDS transfer uuid={} src={} dst={} {} bytes",
+            "[{}] BrewEntity: SDS transfer uuid={} src={} dst={} {} bytes",
+            self.log_label(),
             uuid,
             source,
             destination,
@@ -1616,7 +1826,8 @@ impl BrewEntity {
         // Only forward and acknowledge if destination ISSI is locally registered
         if !self.config.state_read().subscribers.is_registered(destination) {
             tracing::warn!(
-                "BrewEntity: SDS dest ISSI {} not registered, dropping (no report sent) uuid={}",
+                "[{}] BrewEntity: SDS dest ISSI {} not registered, dropping (no report sent) uuid={}",
+                self.log_label(),
                 destination,
                 uuid
             );
@@ -1624,7 +1835,8 @@ impl BrewEntity {
         }
         if !super::is_brew_local_issi_allowed_for_entity(&self.config, self.entity, destination) {
             tracing::warn!(
-                "BrewEntity: SDS dest ISSI {} is not allowed on {:?}, dropping uuid={}",
+                "[{}] BrewEntity: SDS dest ISSI {} is not allowed on {:?}, dropping uuid={}",
+                self.log_label(),
                 destination,
                 self.entity,
                 uuid
@@ -1655,14 +1867,15 @@ impl BrewEntity {
         // TODO: should be sent after the radio ACKs on the air interface (LLC BL-ACK),
         // currently sent immediately after queuing for delivery.
         let _ = self.command_sender.send(BrewCommand::SendSdsReport { uuid, status: 0 });
-        tracing::info!("BrewEntity: SDS_REPORT uuid={} status=0 -> Brew", uuid);
+        tracing::info!("[{}] BrewEntity: SDS_REPORT uuid={} status=0 -> Brew", self.log_label(), uuid);
     }
 
     /// Handle outgoing SDS from CMCE → Brew (local MS → network)
     fn handle_sds_send(&self, sds: CmceSdsData) {
         if !self.connected {
             tracing::warn!(
-                "BrewEntity: not connected, dropping outgoing SDS {} -> {}",
+                "[{}] BrewEntity: not connected, dropping outgoing SDS {} -> {}",
+                self.log_label(),
                 sds.source_issi,
                 sds.dest_issi
             );
@@ -1670,14 +1883,16 @@ impl BrewEntity {
         }
         if !self.brew_config.feature_sds_enabled {
             tracing::debug!(
-                "BrewEntity: ignoring outgoing SDS because SDS over Brew is disabled for {:?}",
+                "[{}] BrewEntity: ignoring outgoing SDS because SDS over Brew is disabled for {:?}",
+                self.log_label(),
                 self.entity
             );
             return;
         }
         if !super::is_brew_local_issi_allowed_for_entity(&self.config, self.entity, sds.source_issi) {
             tracing::debug!(
-                "BrewEntity: ignoring outgoing SDS {} -> {} because source ISSI is not allowed on {:?}",
+                "[{}] BrewEntity: ignoring outgoing SDS {} -> {} because source ISSI is not allowed on {:?}",
+                self.log_label(),
                 sds.source_issi,
                 sds.dest_issi,
                 self.entity
@@ -1687,7 +1902,8 @@ impl BrewEntity {
 
         let uuid = Uuid::new_v4();
         tracing::info!(
-            "BrewEntity: sending SDS uuid={} src={} dst={} type={} {} bits",
+            "[{}] BrewEntity: sending SDS uuid={} src={} dst={} type={} {} bits",
+            self.log_label(),
             uuid,
             sds.source_issi,
             sds.dest_issi,
@@ -1707,7 +1923,7 @@ impl BrewEntity {
 
 impl Drop for BrewEntity {
     fn drop(&mut self) {
-        tracing::debug!("BrewEntity: shutting down, sending graceful disconnect");
+        tracing::debug!("[{}] BrewEntity: shutting down, sending graceful disconnect", self.log_label());
         let _ = self.command_sender.send(BrewCommand::Disconnect);
 
         // Give the worker thread time to send DEAFFILIATE + DEREGISTER and close
@@ -1717,11 +1933,14 @@ impl Drop for BrewEntity {
             loop {
                 if handle.is_finished() {
                     let _ = handle.join();
-                    tracing::debug!("BrewEntity: worker thread joined cleanly");
+                    tracing::debug!("[{}] BrewEntity: worker thread joined cleanly", self.log_label());
                     break;
                 }
                 if start.elapsed() >= timeout {
-                    tracing::warn!("BrewEntity: worker thread did not finish in time, abandoning");
+                    tracing::warn!(
+                        "[{}] BrewEntity: worker thread did not finish in time, abandoning",
+                        self.log_label()
+                    );
                     break;
                 }
                 std::thread::sleep(std::time::Duration::from_millis(50));

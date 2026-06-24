@@ -12,6 +12,8 @@ use crate::net_telemetry::TelemetryEvent;
 use crate::net_control::commands::ControlCommand;
 use crate::net_echolink::{EcholinkCmdSender, EcholinkCommand};
 use crate::tpg2200::{build_sds_text_payload, build_tpg2200_callout_payload, format_hex_bytes, parse_hex_payload};
+use tetra_config::bluestation::CfgBrew;
+use tetra_core::tetra_entities::TetraEntity;
 
 type CmdSender = crossbeam_channel::Sender<ControlCommand>;
 
@@ -1702,6 +1704,10 @@ fn handle_connection(
         let mut s = stream;
         drain_http_headers(&mut s);
         serve_asterisk_status(s, &shared_config);
+    } else if req_line.contains("GET /api/brew/status") {
+        let mut s = stream;
+        drain_http_headers(&mut s);
+        serve_brew_status(s, &shared_config);
     } else if req_line.contains("GET /api/snom-notify") {
         let mut s = stream;
         drain_http_headers(&mut s);
@@ -2493,6 +2499,102 @@ fn serve_asterisk_status(
         }),
     };
     http_json_response(stream, 200, &body.to_string());
+}
+
+/// GET /api/brew/status — config + runtime status for all Brew backhaul servers.
+fn serve_brew_status(
+    stream: TcpStream,
+    shared_config: &Option<tetra_config::bluestation::SharedConfig>,
+) {
+    let body = match shared_config {
+        Some(cfg) => {
+            let c = cfg.config();
+            let state = cfg.state_read();
+            let servers = vec![
+                brew_status_json(
+                    "brew",
+                    "Brew",
+                    TetraEntity::Brew,
+                    c.brew.as_ref(),
+                    *state.brew_entity_connected.get(&TetraEntity::Brew).unwrap_or(&false),
+                ),
+                brew_status_json(
+                    "brew2",
+                    "Brew2",
+                    TetraEntity::Brew2,
+                    c.brew2.as_ref(),
+                    *state.brew_entity_connected.get(&TetraEntity::Brew2).unwrap_or(&false),
+                ),
+            ];
+            let configured_count = servers
+                .iter()
+                .filter(|server| server.get("configured").and_then(|value| value.as_bool()).unwrap_or(false))
+                .count();
+            let connected_count = servers
+                .iter()
+                .filter(|server| server.get("connected").and_then(|value| value.as_bool()).unwrap_or(false))
+                .count();
+            serde_json::json!({
+                "servers": servers,
+                "configured_count": configured_count,
+                "connected_count": connected_count,
+                "aggregate_connected": state.network_connected,
+            })
+        }
+        None => serde_json::json!({
+            "servers": [
+                { "entity": "brew", "title": "Brew", "configured": false, "connected": false },
+                { "entity": "brew2", "title": "Brew2", "configured": false, "connected": false },
+            ],
+            "configured_count": 0,
+            "connected_count": 0,
+            "aggregate_connected": false,
+        }),
+    };
+    http_json_response(stream, 200, &body.to_string());
+}
+
+fn brew_status_json(
+    entity_key: &str,
+    title: &str,
+    entity: TetraEntity,
+    brew: Option<&CfgBrew>,
+    connected: bool,
+) -> serde_json::Value {
+    match brew {
+        Some(brew) => {
+            let scheme = if brew.tls { "wss" } else { "ws" };
+            let allowlist = brew.effective_local_issi_allowlist().unwrap_or_default();
+            serde_json::json!({
+                "entity": entity_key,
+                "title": title,
+                "entity_debug": format!("{:?}", entity),
+                "configured": true,
+                "connected": connected,
+                "host": brew.host.clone(),
+                "port": brew.port,
+                "tls": brew.tls,
+                "endpoint": format!("{}://{}:{}", scheme, brew.host, brew.port),
+                "username_set": brew.username.as_ref().is_some_and(|value| !value.trim().is_empty()),
+                "password_set": brew.password.as_ref().is_some_and(|value| !value.as_ref().trim().is_empty()),
+                "reconnect_delay_secs": brew.reconnect_delay.as_secs(),
+                "jitter_initial_latency_frames": brew.jitter_initial_latency_frames,
+                "feature_sds_enabled": brew.feature_sds_enabled,
+                "feature_rssi_export": brew.feature_rssi_export,
+                "whitelisted_ssis": brew.whitelisted_ssis.clone().unwrap_or_default(),
+                "pbx_gateway_issis": brew.pbx_gateway_issis.clone().unwrap_or_default(),
+                "local_issi_allowlist": allowlist,
+                "local_issi_blocklist": brew.local_issi_blocklist.clone(),
+            })
+        }
+        None => serde_json::json!({
+            "entity": entity_key,
+            "title": title,
+            "entity_debug": format!("{:?}", entity),
+            "configured": false,
+            "connected": false,
+        }),
+    }
 }
 
 /// GET /api/snom-notify — return effective Snom XML NOTIFY settings.

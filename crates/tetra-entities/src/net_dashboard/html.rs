@@ -7636,6 +7636,7 @@ function healthDomainSvg(d){
 function healthDomainAccent(d){ return (HEALTH_SVG[d]||{}).accent || ''; }
 // Inline SVGs for the integration cards (replace ☎ 📟 ◎).
 const INTEGRATION_SVG = {
+  brew:'<path d="M4.93 4.93a14 14 0 0 0 0 14.14M19.07 4.93a14 14 0 0 1 0 14.14M8.46 8.46a7 7 0 0 0 0 7.08M15.54 8.46a7 7 0 0 1 0 7.08"/><circle cx="12" cy="12" r="1.5"/>',
   asterisk:'<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/>',
   dapnet:'<rect x="5" y="2" width="14" height="20" rx="2"/><path d="M9 6h6M9 10h6M9 14h3"/>',
   echolink:'<path d="M10 13a5 5 0 0 0 7.07 0l2.12-2.12a5 5 0 0 0-7.07-7.07L11 4.93"/><path d="M14 11a5 5 0 0 0-7.07 0L4.81 13.12a5 5 0 0 0 7.07 7.07L13 19.07"/>',
@@ -7697,8 +7698,8 @@ function renderHealthTab(h){
   });
 }
 
-let healthIntegrationState={asterisk:null,dapnet:null,echolink:null,meshcom:null,geoalarm:null,lastLoad:0};
-// title, iconKey (asterisk|dapnet|echolink|meshcom|geoalarm), accent (blue|purple|''), level, detail, extra.
+let healthIntegrationState={brew:null,asterisk:null,dapnet:null,echolink:null,meshcom:null,geoalarm:null,lastLoad:0};
+// title, iconKey (brew|asterisk|dapnet|echolink|meshcom|geoalarm), accent (blue|purple|''), level, detail, extra.
 function integrationHealthCard(title,iconKey,accent,level,detail,extra){
   const lvlCls = healthLevelClass(level);
   const icoCls = level==='ok' ? accent : lvlCls;
@@ -7715,6 +7716,21 @@ function integrationHealthCard(title,iconKey,accent,level,detail,extra){
       + (extra?'<div class="h-det">'+escHtml(extra)+'</div>':'')
     + '</div>';
   return card;
+}
+function classifyBrewHealth(server){
+  if(!server||!server.configured)return {level:'ok',detail:'not configured',extra:'No config section for this Brew server.'};
+  const allow=(server.local_issi_allowlist||[]).filter(function(v){return v!==null&&v!==undefined;});
+  const block=(server.local_issi_blocklist||[]).filter(function(v){return v!==null&&v!==undefined;});
+  let level=server.connected?'ok':'degraded';
+  const detail=(server.connected?'connected':'disconnected')+' · '+(server.endpoint||((server.host||'—')+':'+(server.port||'—')));
+  const parts=[];
+  parts.push((server.feature_sds_enabled?'SDS on':'SDS off'));
+  parts.push((server.feature_rssi_export?'RSSI on':'RSSI off'));
+  if(allow.length)parts.push('ISSI allow '+allow.join(', '));
+  if(block.length)parts.push('ISSI block '+block.join(', '));
+  if(!allow.length&&server.entity==='brew2')parts.push('missing local_issi_allowlist');
+  if(!allow.length&&server.entity==='brew2')level='degraded';
+  return {level,detail,extra:parts.join(' · ')};
 }
 function classifyAsteriskHealth(data){
   const c=(data&&data.config)||{},rt=(data&&data.runtime)||{};
@@ -7807,6 +7823,19 @@ function renderHealthIntegrations(){
   const grid=document.getElementById('health-integrations-grid');
   if(!grid)return;
   grid.innerHTML='';
+  if(healthIntegrationState.brew){
+    const servers=(healthIntegrationState.brew.servers||[]).filter(function(server){return server.configured;});
+    if(servers.length){
+      servers.forEach(function(server){
+        const b=classifyBrewHealth(server);
+        grid.appendChild(integrationHealthCard(server.title||server.entity||'Brew','brew','blue',b.level,b.detail,b.extra));
+      });
+    } else {
+      grid.appendChild(integrationHealthCard('Brew','brew','blue','ok','not configured','No Brew backhaul section is active.'));
+    }
+  } else {
+    grid.appendChild(integrationHealthCard('Brew','brew','blue','degraded','status unavailable','Wait for the next refresh.'));
+  }
   if(healthIntegrationState.asterisk){
     const a=classifyAsteriskHealth(healthIntegrationState.asterisk);
     grid.appendChild(integrationHealthCard('Asterisk SIP','asterisk','',a.level,a.detail,a.extra));
@@ -7841,13 +7870,15 @@ function renderHealthIntegrations(){
 async function loadHealthIntegrations(){
   healthIntegrationState.lastLoad=Date.now();
   try{
-    const [ast,dap,el,mesh,geo]=await Promise.all([
+    const [brew,ast,dap,el,mesh,geo]=await Promise.all([
+      fetch('/api/brew/status').then(r=>r.ok?r.json():null).catch(()=>null),
       fetch('/api/asterisk/status').then(r=>r.ok?r.json():null).catch(()=>null),
       fetch('/api/dapnet').then(r=>r.ok?r.json():null).catch(()=>null),
       fetch('/api/echolink').then(r=>r.ok?r.json():null).catch(()=>null),
       fetch('/api/meshcom').then(r=>r.ok?r.json():null).catch(()=>null),
       fetch('/api/geoalarm').then(r=>r.ok?r.json():null).catch(()=>null)
     ]);
+    healthIntegrationState.brew=brew;
     healthIntegrationState.asterisk=ast;
     healthIntegrationState.dapnet=dap;
     healthIntegrationState.echolink=el;
