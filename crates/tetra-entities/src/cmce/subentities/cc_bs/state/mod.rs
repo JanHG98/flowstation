@@ -45,6 +45,8 @@ fn call_timeout_to_timeslots(timeout: CallTimeout) -> Option<i32> {
     }
 }
 
+pub(super) const LOCAL_ECHO_ISSI: u32 = 999;
+
 pub(super) struct CachedSetup {
     pub(super) pdu: DSetup,
     pub(super) dest_addr: TetraAddress,
@@ -419,6 +421,15 @@ pub(super) struct IndividualCall {
 }
 
 impl IndividualCall {
+    #[inline]
+    pub(super) fn is_local_echo_call(&self) -> bool {
+        self.called_addr.ssi == LOCAL_ECHO_ISSI
+            && self.called_handle.is_none()
+            && self.called_ts == self.calling_ts
+            && !self.calling_over_brew
+            && !self.called_over_brew
+    }
+
     #[inline]
     pub(super) fn is_network_party(&self, addr: TetraAddress) -> bool {
         (self.calling_over_brew && addr.ssi == self.calling_addr.ssi) || (self.called_over_brew && addr.ssi == self.called_addr.ssi)

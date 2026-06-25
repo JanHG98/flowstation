@@ -42,7 +42,7 @@ impl CcBsSubentity {
     }
 
     fn individual_floor_party_is_local(call: &IndividualCall, party: IndividualFloorParty) -> bool {
-        !call.is_network_party(party.addr)
+        !call.is_network_party(party.addr) && !(call.is_local_echo_call() && party.addr.ssi == LOCAL_ECHO_ISSI)
     }
 
     fn send_individual_d_tx_granted(
