@@ -80,6 +80,12 @@ pub fn from_toml_str(toml_str: &str) -> Result<StackConfig, Box<dyn std::error::
         }
     });
 
+    // Extract the dashboard-only NetCore Directory block before typed deserialisation.
+    // The dashboard server reads this block directly from the active config file;
+    // removing it here keeps the strict top-level unknown-field guard intact without
+    // plumbing these UI-only fields through the whole StackConfig yet.
+    let _netcore_directory_raw = raw.remove("netcore_directory");
+
     // Now deserialise the (mutated) Value into the typed root — neighbor_cells_ca
     // has been removed so it will not appear in the flatten HashMap.
     let root: TomlConfigRoot = Value::Table(raw).try_into()?;
