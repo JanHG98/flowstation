@@ -5547,30 +5547,46 @@ let ws=null,state={ms:{},calls:{},emergencies:{},lastHeard:[],sdsLog:[],dapnetLo
 let deviceRegistry={},deviceRegistryLoaded=false,deviceRegistryInflight=false;
 function normalizeDeviceRegistry(raw){
   const out={};
-  if(!raw||typeof raw!=='object'||Array.isArray(raw))return out;
-  Object.entries(raw).forEach(([issi,entry])=>{
-    const key=String(issi||'').trim();
+  const put=(issi,entry)=>{
+    const key=String(issi??'').trim();
     if(!key)return;
     if(typeof entry==='string'){
       const name=entry.trim();
-      if(name)out[key]={name};
+      if(name)out[key]={issi:key,name};
       return;
     }
     if(entry&&typeof entry==='object'){
-      const name=String(entry.name||entry.label||entry.title||'').trim();
-      const type=String(entry.type||entry.role||'').trim();
-      const owner=String(entry.owner||entry.user||'').trim();
-      const note=String(entry.note||entry.description||'').trim();
-      if(name||type||owner||note)out[key]={name:name||`TETRA LIP ${key}`,type,owner,note};
+      const visible=entry.visible;
+      if(visible===false||visible===0||String(visible).toLowerCase()==='false')return;
+      const name=String(entry.name||entry.label||entry.title||entry.callsign||'').trim();
+      const short=String(entry.short||entry.short_name||'').trim();
+      const type=String(entry.type||entry.device_type||entry.role||'').trim();
+      const owner=String(entry.owner||entry.user||entry.fname||'').trim();
+      const role=String(entry.role||entry.city||'').trim();
+      const note=String(entry.note||entry.notes||entry.description||entry.remarks||'').trim();
+      const icon=String(entry.icon||'').trim();
+      const color=String(entry.color||'').trim();
+      if(name||short||type||owner||role||note)out[key]={issi:key,name:name||short||`TETRA LIP ${key}`,short,type,owner,role,note,icon,color};
     }
-  });
+  };
+  if(!raw||typeof raw!=='object')return out;
+  if(Array.isArray(raw)){
+    raw.forEach(entry=>put(entry&&(entry.issi??entry.id??entry.ssi),entry));
+    return out;
+  }
+  if(Array.isArray(raw.devices)){
+    raw.devices.forEach(entry=>put(entry&&(entry.issi??entry.id??entry.ssi),entry));
+    return out;
+  }
+  Object.entries(raw).forEach(([issi,entry])=>put(issi,entry));
   return out;
 }
+
 async function loadDeviceRegistry(){
   if(deviceRegistryInflight)return;
   deviceRegistryInflight=true;
   try{
-    const r=await fetch('/devices.json',{cache:'no-store',credentials:'same-origin'});
+    const r=await fetch('/api/devices',{cache:'no-store',credentials:'same-origin'});
     if(r.ok){
       deviceRegistry=normalizeDeviceRegistry(await r.json());
       deviceRegistryLoaded=true;
@@ -5579,7 +5595,7 @@ async function loadDeviceRegistry(){
       deviceRegistryLoaded=true;
     }
   }catch(e){
-    console.warn('devices.json not available, using ISSI fallback',e);
+    console.warn('NetCore Directory not available, using ISSI fallback',e);
     deviceRegistry={};
     deviceRegistryLoaded=true;
   }finally{
@@ -5599,10 +5615,14 @@ function deviceInfoForIssi(issi,fallbackPrefix='TETRA LIP'){
   if(typeof entry==='string')return {issi:key,name:entry||fallback,type:'',owner:'',note:'',known:true,registered};
   return {
     issi:key,
-    name:String(entry.name||fallback),
+    name:String(entry.name||entry.short||fallback),
+    short:String(entry.short||''),
     type:String(entry.type||''),
     owner:String(entry.owner||''),
+    role:String(entry.role||''),
     note:String(entry.note||''),
+    icon:String(entry.icon||''),
+    color:String(entry.color||''),
     known:true,
     registered
   };
@@ -5628,6 +5648,7 @@ function mapsDeviceCardHtml(device){
   if(device.registered)chips.push(`<span class="maps-device-chip online">ONLINE</span>`);
   if(device.type)chips.push(`<span class="maps-device-chip">${escHtml(device.type)}</span>`);
   if(device.owner)chips.push(`<span class="maps-device-chip owner">${escHtml(device.owner)}</span>`);
+  if(device.role)chips.push(`<span class="maps-device-chip">${escHtml(device.role)}</span>`);
   if(!device.known)chips.push(`<span class="maps-device-chip unknown">unknown</span>`);
   return `<div class="maps-device-card">${chips.join('')}</div>`;
 }
@@ -5640,7 +5661,7 @@ function mapsDeviceMeta(source,device){
 }
 
 // ── Local device labels (devices.json) ────────────────────────────────────────
-// External callsign lookup is disabled. ISSI labels come only from devices.json.
+// External callsign lookup is disabled. ISSI labels come from the local NetCore Directory API.
 // Keeping the old function names as no-op compatibility hooks avoids touching every
 // render path that used to call refreshCallsigns().
 function deviceInlineName(issi){
@@ -5654,7 +5675,7 @@ function deviceInlineName(issi){
 function deviceSearchText(issi){
   const key=String(issi??'').trim();
   const info=deviceInfoForIssi(key,'TETRA LIP');
-  return [key,info.known?info.name:'',info.type||'',info.owner||''].filter(Boolean).join(' ');
+  return [key,info.known?info.name:'',info.short||'',info.type||'',info.owner||'',info.role||''].filter(Boolean).join(' ');
 }
 function idCell(issi){
   const key=String(issi??'').trim();
@@ -5662,7 +5683,7 @@ function idCell(issi){
   return `<code>${escHtml(key)}</code>${name?` <span class="callsign">${escHtml(name)}</span>`:''}`;
 }
 function refreshCallsigns(){
-  // Legacy hook name: no external lookup. Reload devices.json once if it has not been loaded yet.
+  // Legacy hook name: no external lookup. Reload the local NetCore Directory once if it has not been loaded yet.
   if(!deviceRegistryLoaded&&!deviceRegistryInflight){
     loadDeviceRegistry().then(()=>{renderStations();renderCalls();renderLastHeard();renderSdsLog();renderEmergencyBanner();renderMapsIfActive();});
   }
