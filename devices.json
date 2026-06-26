@@ -1,6 +1,17 @@
 {
-  "2010002": "MTP850 Jan",
-  "5102": "LIP Testgerät 5102",
-  "2020001": "Motorola MTP",
-  "4010001": "NetCore BS"
+  "2010002": {
+    "name": "Hytera HRT",
+    "type": "HRT",
+    "owner": "Jan"
+  },
+  "2020001": {
+    "name": "Motorola MTP",
+    "type": "HRT",
+    "owner": "Ole"
+  },
+  "5102": {
+    "name": "Sepura SC",
+    "type": "HRT",
+    "owner": "Jan"
+  }
 }
