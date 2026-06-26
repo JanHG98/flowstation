@@ -595,23 +595,23 @@ timeout_ms = 2000
 # Uncomment this section to automatically enable the Brew entity.
 # See: https://wiki.tetrapack.online/books/tetra/page/brew
 
-# [brew]
+[brew]
 
 # Server address
-# host = "10.0.1.22"
-# port = 8081
+host = "10.0.1.22"
+port = 8081
 
 # Use TLS (wss:// / https://)
-# tls = false
+tls = false
 
 # HTTP Digest authentication credentials, registered in BrandMeister.
 # Username should be your SSID (DMR ID + 2-digit suffix).
 # Password is your BrandMeister hotspot password.
-# username = 4010001
-# password = "012345"
+username = 4010001
+password = "012345"
 
 # Reconnect delay (seconds)
-# reconnect_delay_secs = 5
+reconnect_delay_secs = 5
 
 # Additional initial latency in frames for inbound Brew jitter playback.
 # Default: 0. Increase if you hear audio artifacts at the start of transmissions.
@@ -624,7 +624,7 @@ timeout_ms = 2000
 # Disabled by default. Enable if your Brew server supports RSSI data ingestion.
 # When enabled, each radio's signal level is sent at most once every 5 seconds.
 # Format: {"issi": 2260570, "rssi_dbfs": -42.3}
-# feature_rssi_export = true
+feature_rssi_export = true
 
 # OPTIONAL: restrict OUTBOUND Brew forwarding to selected SSIs.
 # This is an OUTBOUND-only filter (FH-FEAT-032 R3): only calls/SDS TO these SSIs are
