@@ -546,6 +546,15 @@ bind = "0.0.0.0"               # bind address (default: 0.0.0.0 = all interfaces
 
 ###############################################################################
 
+[netcore_directory]
+# Local/LAN NetCore Directory Server for device, base-station, group and status labels.
+# Set base_url to the LXC/host running NetCore Directory.
+enabled = true
+base_url = "http://127.0.0.1:8095"
+timeout_ms = 2000
+
+###############################################################################
+
 # OPTIONAL: Telemetry export — push live BTS state to a remote collector over a
 # WebSocket connection. Inert unless this whole section is present.
 #
