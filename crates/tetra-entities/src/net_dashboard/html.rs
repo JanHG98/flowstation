@@ -3091,7 +3091,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
                 <label class="h-fopt"><input type="checkbox" id="snom-dir-tx"> TX</label>
               </div>
               <label class="h-flabel">SDS ISSI whitelist</label>
-              <textarea id="snom-sds-issis" class="form-input" rows="4" placeholder="2632585&#10;9999"></textarea>
+              <textarea id="snom-sds-issis" class="form-input" rows="4" placeholder="2632585&#10;4010001"></textarea>
               <div class="help-text">Empty = every SDS. A match on source or destination ISSI is enough.</div>
             </div>
             <div>
@@ -3240,7 +3240,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
               <label class="sw-row"><span class="sw-text">Forward to SDS</span><span class="sw"><input type="checkbox" id="dap-forward-sds"><i></i></span></label>
               <div class="h-form-pair" style="margin-top:10px">
                 <label class="h-flabel">Source ISSI</label>
-                <input type="number" id="dap-sds-source" class="form-input" min="1" max="16777215" placeholder="9999">
+                <input type="number" id="dap-sds-source" class="form-input" min="1" max="16777215" placeholder="4010001">
                 <label class="h-flabel">Destination</label>
                 <input type="number" id="dap-sds-dest" class="form-input" min="0" max="16777215" placeholder="ISSI or GSSI">
                 <label class="h-flabel">Destination is group</label>
@@ -3258,7 +3258,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
               <label class="sw-row"><span class="sw-text">Forward to TPG2200 Call-Out</span><span class="sw"><input type="checkbox" id="dap-forward-callout"><i></i></span></label>
               <div class="h-form-pair" style="margin-top:10px">
                 <label class="h-flabel">Source ISSI</label>
-                <input type="number" id="dap-callout-source" class="form-input" min="1" max="16777215" placeholder="9999">
+                <input type="number" id="dap-callout-source" class="form-input" min="1" max="16777215" placeholder="4010001">
                 <label class="h-flabel">Destination</label>
                 <input type="number" id="dap-callout-dest" class="form-input" min="0" max="16777215" placeholder="TPG2200 ISSI">
                 <label class="h-flabel">TPG RIC</label>
@@ -3387,7 +3387,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
               <label class="sw-row"><span class="sw-text">Inbound EchoLink → TETRA</span><span class="sw"><input type="checkbox" id="el-inbound"><i></i></span></label>
               <div style="display:grid;grid-template-columns:140px 1fr;gap:10px;align-items:center;margin-top:10px">
                 <label style="color:var(--muted);font-size:13px">Source ISSI</label>
-                <input type="number" id="el-source-issi" class="form-input" min="1" max="16777215" placeholder="9999">
+                <input type="number" id="el-source-issi" class="form-input" min="1" max="16777215" placeholder="4010001">
                 <label style="color:var(--muted);font-size:13px">Default destination</label>
                 <input type="number" id="el-dest-issi" class="form-input" min="0" max="16777215" placeholder="ISSI">
                 <label style="color:var(--muted);font-size:13px">Group destination</label>
@@ -3412,7 +3412,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
                 <label style="color:var(--muted);font-size:13px;align-self:flex-start;padding-top:8px">Allowed callsigns</label>
                 <textarea id="el-allowed-calls" class="form-input" rows="3" placeholder="ECHOTEST&#10;DB0ABC-L"></textarea>
                 <label style="color:var(--muted);font-size:13px;align-self:flex-start;padding-top:8px">Allowed node IDs</label>
-                <textarea id="el-allowed-nodes" class="form-input" rows="3" placeholder="9999"></textarea>
+                <textarea id="el-allowed-nodes" class="form-input" rows="3" placeholder="4010001"></textarea>
                 <label style="color:var(--muted);font-size:13px">Auto connect</label>
                 <input type="text" id="el-auto-connect" class="form-input" placeholder="ECHOTEST">
                 <label style="color:var(--muted);font-size:13px">Reconnect / max session</label>
@@ -3530,7 +3530,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
                 <span class="sw"><input type="checkbox" id="mesh-forward-sds"><i></i></span>
               </label>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
-                <label class="h-field"><span class="h-field-label">SDS source ISSI</span><input type="number" id="mesh-sds-source" class="form-input" min="1" max="16777215" placeholder="9999"></label>
+                <label class="h-field"><span class="h-field-label">SDS source ISSI</span><input type="number" id="mesh-sds-source" class="form-input" min="1" max="16777215" placeholder="4010001"></label>
                 <label class="h-field"><span class="h-field-label">SDS destination ISSI/GSSI</span><input type="number" id="mesh-sds-dest" class="form-input" min="0" max="16777215" placeholder="0"></label>
               </div>
               <label style="display:flex;align-items:center;gap:10px;margin-top:10px"><span class="sw"><input type="checkbox" id="mesh-sds-group"><i></i></span><span style="color:var(--muted);font-size:12px">Destination is group/GSSI</span></label>
@@ -3787,7 +3787,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
                 <span class="sw"><input type="checkbox" id="geo-forward-tpg"><i></i></span>
               </label>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
-                <label class="h-field"><span class="h-field-label">Source ISSI</span><input type="number" id="geo-tpg-source" class="form-input" min="1" max="16777215" placeholder="9999"></label>
+                <label class="h-field"><span class="h-field-label">Source ISSI</span><input type="number" id="geo-tpg-source" class="form-input" min="1" max="16777215" placeholder="4010001"></label>
                 <label class="h-field"><span class="h-field-label">TPG2200 ISSI</span><input type="number" id="geo-tpg-dest" class="form-input" min="0" max="16777215" placeholder="0"></label>
               </div>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
@@ -3810,7 +3810,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
                 <span class="sw"><input type="checkbox" id="geo-forward-sds"><i></i></span>
               </label>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
-                <label class="h-field"><span class="h-field-label">Source ISSI</span><input type="number" id="geo-sds-source" class="form-input" min="1" max="16777215" placeholder="9999"></label>
+                <label class="h-field"><span class="h-field-label">Source ISSI</span><input type="number" id="geo-sds-source" class="form-input" min="1" max="16777215" placeholder="4010001"></label>
                 <label class="h-field"><span class="h-field-label">Destination ISSI/GSSI</span><input type="number" id="geo-sds-dest" class="form-input" min="0" max="16777215" placeholder="0"></label>
               </div>
               <label class="h-finline" style="margin-top:10px"><span class="sw"><input type="checkbox" id="geo-sds-group"><i></i></span><span class="h-flabel-sm">Destination is group/GSSI</span></label>
@@ -4447,7 +4447,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
     <div id="sds-callout-fields" style="display:none">
       <div class="form-row">
         <label class="form-label" data-i18n="sds_callout_source">Source ISSI</label>
-        <input type="number" id="sds-callout-source" class="form-input" value="9999" min="1">
+        <input type="number" id="sds-callout-source" class="form-input" value="4010001" min="1">
       </div>
       <div class="form-row">
         <label class="form-label" data-i18n="sds_callout_id">Call-Out ID</label>
@@ -7175,13 +7175,13 @@ async function loadDapnet(){
     dapCheck('dap-forward-sds',d.forward_sds);
     dapCheck('dap-forward-callout',d.forward_callout);
     dapCheck('dap-forward-telegram',d.forward_telegram);
-    dapSet('dap-sds-source',d.sds_source_issi||9999);
+    dapSet('dap-sds-source',d.sds_source_issi||4010001);
     dapSet('dap-sds-dest',d.sds_dest_issi||0);
     dapCheck('dap-sds-group',d.sds_dest_is_group);
     dapSet('dap-ric-routes',dapRicRoutesText(d.ric_issi_routes));
     dapSet('dap-ric-group-routes',dapRicRoutesText(d.ric_gssi_routes));
     dapSet('dap-sds-rics',dapRicListText(d.sds_allowed_rics));
-    dapSet('dap-callout-source',d.callout_source_issi||9999);
+    dapSet('dap-callout-source',d.callout_source_issi||4010001);
     dapSet('dap-callout-dest',d.callout_dest_issi||0);
     dapSet('dap-callout-tpg-ric',tpgRicText(d.callout_tpg_ric??0x00090D10));
     dapSet('dap-callout-id',(d.callout_id_base??d.callout_incident_base??33));
@@ -7229,13 +7229,13 @@ async function saveDapnet(){
     forward_sds:document.getElementById('dap-forward-sds').checked,
     forward_callout:document.getElementById('dap-forward-callout').checked,
     forward_telegram:document.getElementById('dap-forward-telegram').checked,
-    sds_source_issi:dapNum('dap-sds-source',9999,1,16777215),
+    sds_source_issi:dapNum('dap-sds-source',4010001,1,16777215),
     sds_dest_issi:dapNum('dap-sds-dest',0,0,16777215),
     sds_dest_is_group:document.getElementById('dap-sds-group').checked,
     ric_issi_routes:ricRoutes,
     ric_gssi_routes:ricGroupRoutes,
     sds_allowed_rics:sdsRics,
-    callout_source_issi:dapNum('dap-callout-source',9999,1,16777215),
+    callout_source_issi:dapNum('dap-callout-source',4010001,1,16777215),
     callout_dest_issi:dapNum('dap-callout-dest',0,0,16777215),
     callout_tpg_ric:tpgRicInput('dap-callout-tpg-ric',0x00090D10),
     callout_id_base:dapNum('dap-callout-id',33,0,255),
@@ -7380,7 +7380,7 @@ async function loadEcholink(){
     dapSet('el-out-prefix',d.outbound_prefix||'92');
     dapCheck('el-strip-prefix',d.strip_outbound_prefix);
     dapSet('el-service-numbers',echolinkListText(d.service_numbers));
-    dapSet('el-source-issi',d.default_tetra_source_issi||9999);
+    dapSet('el-source-issi',d.default_tetra_source_issi||4010001);
     dapSet('el-dest-issi',d.default_tetra_dest_issi||0);
     dapCheck('el-dest-group',false);
     dapSet('el-routes',echolinkRoutesText(d.routes));
@@ -7421,7 +7421,7 @@ async function saveEcholink(){
     outbound_prefix:dapVal('el-out-prefix')||'92',
     strip_outbound_prefix:document.getElementById('el-strip-prefix').checked,
     service_numbers:echolinkListBody('el-service-numbers'),
-    default_tetra_source_issi:dapNum('el-source-issi',9999,1,16777215),
+    default_tetra_source_issi:dapNum('el-source-issi',4010001,1,16777215),
     default_tetra_dest_issi:dapNum('el-dest-issi',0,0,16777215),
     default_tetra_dest_is_group:false,
     routes,
@@ -7730,7 +7730,7 @@ async function loadMeshcom(){
     dapCheck('mesh-forward-sds',d.forward_sds);
     dapCheck('mesh-forward-sip',d.forward_sip);
     dapCheck('mesh-forward-telegram',d.forward_telegram);
-    dapSet('mesh-sds-source',d.sds_source_issi||9999);
+    dapSet('mesh-sds-source',d.sds_source_issi||4010001);
     dapSet('mesh-sds-dest',d.sds_dest_issi||0);
     dapCheck('mesh-sds-group',d.sds_dest_is_group);
     dapSet('mesh-sds-sources',meshSourceListText(d.sds_allowed_sources));
@@ -7764,7 +7764,7 @@ async function saveMeshcom(){
     forward_sds:document.getElementById('mesh-forward-sds').checked,
     forward_sip:document.getElementById('mesh-forward-sip').checked,
     forward_telegram:document.getElementById('mesh-forward-telegram').checked,
-    sds_source_issi:dapNum('mesh-sds-source',9999,1,16777215),
+    sds_source_issi:dapNum('mesh-sds-source',4010001,1,16777215),
     sds_dest_issi:dapNum('mesh-sds-dest',0,0,16777215),
     sds_dest_is_group:document.getElementById('mesh-sds-group').checked,
     sds_allowed_sources:meshSourceListBody('mesh-sds-sources'),
@@ -7850,10 +7850,10 @@ async function loadGeoalarm(){
     dapSet('geo-telegram-tetra-black',geoIssiListText(d.telegram_tetra_issi_blacklist));
     dapSet('geo-telegram-mesh-white',meshSourceListText(d.telegram_meshcom_source_whitelist));
     dapSet('geo-telegram-mesh-black',meshSourceListText(d.telegram_meshcom_source_blacklist));
-    dapSet('geo-sds-source',d.sds_source_issi||9999);
+    dapSet('geo-sds-source',d.sds_source_issi||4010001);
     dapSet('geo-sds-dest',d.sds_dest_issi||0);
     dapCheck('geo-sds-group',d.sds_dest_is_group);
-    dapSet('geo-tpg-source',d.tpg2200_source_issi||9999);
+    dapSet('geo-tpg-source',d.tpg2200_source_issi||4010001);
     dapSet('geo-tpg-dest',d.tpg2200_dest_issi||0);
     dapSet('geo-tpg-ric',tpgRicText(d.tpg2200_ric??0x00090D10));
     dapSet('geo-tpg-id',(d.tpg2200_callout_id_base??d.tpg2200_incident_base??33));
@@ -7917,10 +7917,10 @@ async function saveGeoalarm(){
     telegram_tetra_issi_blacklist:telegramTetraBlack,
     telegram_meshcom_source_whitelist:meshSourceListBody('geo-telegram-mesh-white'),
     telegram_meshcom_source_blacklist:meshSourceListBody('geo-telegram-mesh-black'),
-    sds_source_issi:dapNum('geo-sds-source',9999,1,16777215),
+    sds_source_issi:dapNum('geo-sds-source',4010001,1,16777215),
     sds_dest_issi:dapNum('geo-sds-dest',0,0,16777215),
     sds_dest_is_group:document.getElementById('geo-sds-group').checked,
-    tpg2200_source_issi:dapNum('geo-tpg-source',9999,1,16777215),
+    tpg2200_source_issi:dapNum('geo-tpg-source',4010001,1,16777215),
     tpg2200_dest_issi:dapNum('geo-tpg-dest',0,0,16777215),
     tpg2200_ric:tpgRicInput('geo-tpg-ric',0x00090D10),
     tpg2200_callout_id_base:dapNum('geo-tpg-id',33,0,255),
@@ -8361,10 +8361,10 @@ async function restartService(){if(!confirm(t('confirm_restart')))return;wsSend(
 async function shutdownService(){if(!confirm(t('confirm_shutdown')))return;wsSend({type:'shutdown'});}
 function kickMs(issi){if(!confirm(t('confirm_kick',{issi})))return;wsSend({type:'kick',issi});}
 function toggleSdsCallout(){const on=document.getElementById('sds-callout').checked;document.getElementById('sds-callout-fields').style.display=on?'block':'none';}
-function resetSdsCallout(){document.getElementById('sds-callout').checked=false;document.getElementById('sds-callout-source').value='9999';document.getElementById('sds-callout-id').value='33';document.getElementById('sds-callout-ric').value='0x00090D10';document.getElementById('sds-callout-priority').value='15';document.getElementById('sds-callout-text').value='ALARM';document.getElementById('sds-callout-raw').value='';toggleSdsCallout();}
+function resetSdsCallout(){document.getElementById('sds-callout').checked=false;document.getElementById('sds-callout-source').value='4010001';document.getElementById('sds-callout-id').value='33';document.getElementById('sds-callout-ric').value='0x00090D10';document.getElementById('sds-callout-priority').value='15';document.getElementById('sds-callout-text').value='ALARM';document.getElementById('sds-callout-raw').value='';toggleSdsCallout();}
 function openSds(issi){sdsDest=issi;document.getElementById('sds-dest').value=issi;document.getElementById('sds-msg').value='';resetSdsCallout();document.getElementById('sds-modal').classList.add('open');}
 function closeSdsModal(){document.getElementById('sds-modal').classList.remove('open');}
-function sendSds(){const dest=parseInt(document.getElementById('sds-dest').value);if(!dest)return;if(document.getElementById('sds-callout').checked){const source=parseInt(document.getElementById('sds-callout-source').value)||9999;const calloutId=Math.max(0,Math.min(255,parseInt(document.getElementById('sds-callout-id').value)||0));const tpgRic=tpgRicInput('sds-callout-ric',0x00090D10);const priority=Math.max(0,Math.min(15,parseInt(document.getElementById('sds-callout-priority').value)||0));const alarmText=document.getElementById('sds-callout-text').value.trim()||'ALARM';const rawhex=document.getElementById('sds-callout-raw').value.trim();wsSend({type:'sds_callout',dest_issi:dest,source_issi:source,tpg_ric:tpgRic,callout_id:calloutId,priority,message:alarmText,raw_hex:rawhex});closeSdsModal();return;}const msg=document.getElementById('sds-msg').value.trim();if(!msg)return;wsSend({type:'sds',dest_issi:dest,message:msg});closeSdsModal();}
+function sendSds(){const dest=parseInt(document.getElementById('sds-dest').value);if(!dest)return;if(document.getElementById('sds-callout').checked){const source=parseInt(document.getElementById('sds-callout-source').value)||4010001;const calloutId=Math.max(0,Math.min(255,parseInt(document.getElementById('sds-callout-id').value)||0));const tpgRic=tpgRicInput('sds-callout-ric',0x00090D10);const priority=Math.max(0,Math.min(15,parseInt(document.getElementById('sds-callout-priority').value)||0));const alarmText=document.getElementById('sds-callout-text').value.trim()||'ALARM';const rawhex=document.getElementById('sds-callout-raw').value.trim();wsSend({type:'sds_callout',dest_issi:dest,source_issi:source,tpg_ric:tpgRic,callout_id:calloutId,priority,message:alarmText,raw_hex:rawhex});closeSdsModal();return;}const msg=document.getElementById('sds-msg').value.trim();if(!msg)return;wsSend({type:'sds',dest_issi:dest,message:msg});closeSdsModal();}
 function openDgna(issi){document.getElementById('dgna-issi').value=issi;document.getElementById('dgna-gssi').value='';const cur=document.getElementById('dgna-current');const gl=(state.ms[issi]&&state.ms[issi].groups)||[];cur.innerHTML=gl.length?gl.slice().sort((a,b)=>a-b).map(g=>`<span class="badge badge-blue" style="font-size:10px">${g}</span>`).join(''):'<span class="badge badge-dim">—</span>';document.getElementById('dgna-modal').classList.add('open');}
 function closeDgnaModal(){document.getElementById('dgna-modal').classList.remove('open');}
 function sendDgna(attach){const issi=parseInt(document.getElementById('dgna-issi').value),gssi=parseInt(document.getElementById('dgna-gssi').value);if(!issi||!gssi)return;wsSend({type:'dgna',issi,gssi,attach});closeDgnaModal();}
