@@ -1,197 +1,328 @@
-//! On-demand RadioID (radioid.net) callsign resolver with a local disk + memory cache.
+//! NetCore Directory client for FlowStation dashboard labels.
 //!
-//! The ISSIs on this network are DMR IDs, so radioid.net resolves them to a callsign
-//! ("indicativ"). To avoid hammering the public API, every ID is queried AT MOST ONCE: the
-//! result — a found callsign, or a definitive "not in the database" — is cached in memory and
-//! persisted to a small JSON file so it survives restarts. Lookups never block the caller:
-//! [`RadioIdCache::get`] returns the cached value immediately or [`Lookup::Pending`] after
-//! queuing a throttled background fetch handled by a dedicated worker thread.
+//! This module intentionally keeps the historic filename `radioid.rs` so the
+//! existing module wiring does not need to move yet. It no longer talks to
+//! radioid.net. Instead it queries the local/LAN NetCore Directory Server.
+//!
+//! Supported local endpoints:
+//! - `/api/devices`
+//! - `/api/basestations`
+//! - `/api/groups`
+//! - `/api/status`
+//! - `/api/dmr/user/?id=...`
+//! - `/api/dmr/repeater/?id=...`
+//!
+//! Configuration is read directly from the active `config.toml` so the dashboard
+//! can use it without plumbing a new field through the whole StackConfig yet:
+//!
+//! ```toml
+//! [netcore_directory]
+//! enabled = true
+//! base_url = "http://127.0.0.1:8095"
+//! timeout_ms = 2000
+//! ```
+//!
+//! Environment overrides are also accepted:
+//! - `NETCORE_DIRECTORY_ENABLED=true|false`
+//! - `NETCORE_DIRECTORY_URL=http://x.x.x.x:8095`
+//! - `NETCORE_DIRECTORY_TIMEOUT_MS=2000`
 
-use std::collections::{HashMap, HashSet};
-use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use serde_json::{Map, Value};
 use std::time::Duration;
 
-/// Per-ID lookup endpoint. radioid.net answers `{"count":N,"results":[{"id":..,"callsign":..}]}`.
-const API_URL_PREFIX: &str = "https://radioid.net/api/dmr/user/?id=";
-const RPTR_API_URL_PREFIX: &str = "https://radioid.net/api/dmr/repeater/?id=";
-/// Politeness delay between successive API calls (each ID is fetched only once, ever).
-const FETCH_THROTTLE: Duration = Duration::from_millis(1100);
-const HTTP_TIMEOUT: Duration = Duration::from_secs(8);
+const DEFAULT_BASE_URL: &str = "http://127.0.0.1:8095";
+const DEFAULT_TIMEOUT_MS: u64 = 2_000;
 
-/// Result of a callsign lookup.
-pub enum Lookup {
-    /// Resolved to a callsign.
-    Found(String),
-    /// Looked up and confirmed to have no RadioID entry — callers should not retry.
-    NotFound,
-    /// Not yet resolved; a background fetch has been queued. Callers may retry later.
-    Pending,
+/// Runtime config for the local NetCore Directory client.
+#[derive(Debug, Clone)]
+pub struct NetCoreDirectoryConfig {
+    pub enabled: bool,
+    pub base_url: String,
+    pub timeout_ms: u64,
 }
 
-#[derive(Clone)]
-enum Entry {
-    Found(String),
-    NotFound,
-}
-
-struct Inner {
-    map: HashMap<u32, Entry>,
-    /// IDs currently queued / in-flight, to dedup fetch requests.
-    pending: HashSet<u32>,
-    path: PathBuf,
-}
-
-/// Cheap-to-clone handle to the shared cache + background fetch worker.
-#[derive(Clone)]
-pub struct RadioIdCache {
-    inner: Arc<Mutex<Inner>>,
-    tx: crossbeam_channel::Sender<u32>,
-}
-
-impl RadioIdCache {
-    /// Build the cache, load any persisted entries from `path`, and spawn the background fetch
-    /// worker. Cloning shares the same inner state and worker.
-    pub fn new(path: PathBuf) -> Self {
-        let map = load_disk(&path);
-        if !map.is_empty() {
-            tracing::info!("RadioID: loaded {} cached callsign(s) from {}", map.len(), path.display());
+impl Default for NetCoreDirectoryConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            base_url: DEFAULT_BASE_URL.to_string(),
+            timeout_ms: DEFAULT_TIMEOUT_MS,
         }
-        let inner = Arc::new(Mutex::new(Inner {
-            map,
-            pending: HashSet::new(),
-            path,
-        }));
-        let (tx, rx) = crossbeam_channel::unbounded::<u32>();
-        let worker_inner = Arc::clone(&inner);
-        std::thread::Builder::new()
-            .name("radioid-fetch".into())
-            .spawn(move || worker_loop(rx, worker_inner))
-            .ok();
-        Self { inner, tx }
-    }
-
-    /// Look up `issi`, returning the cached result immediately or [`Lookup::Pending`] after
-    /// queuing a background fetch (deduped) for an ID we have never resolved.
-    pub fn get(&self, issi: u32) -> Lookup {
-        let mut inner = self.inner.lock().unwrap();
-        if let Some(entry) = inner.map.get(&issi) {
-            return match entry {
-                Entry::Found(cs) => Lookup::Found(cs.clone()),
-                Entry::NotFound => Lookup::NotFound,
-            };
-        }
-        if inner.pending.insert(issi) {
-            let _ = self.tx.send(issi);
-        }
-        Lookup::Pending
     }
 }
 
-fn worker_loop(rx: crossbeam_channel::Receiver<u32>, inner: Arc<Mutex<Inner>>) {
-    let client = match reqwest::blocking::Client::builder()
-        .timeout(HTTP_TIMEOUT)
-        .user_agent("flowstation-dashboard")
-        .build()
-    {
-        Ok(c) => c,
-        Err(e) => {
-            tracing::warn!("RadioID: HTTP client init failed ({e}) — callsign resolution disabled");
-            return;
-        }
-    };
-    while let Ok(issi) = rx.recv() {
-        // Another request may have already resolved it between queue and now.
-        if inner.lock().unwrap().map.contains_key(&issi) {
-            inner.lock().unwrap().pending.remove(&issi);
+impl NetCoreDirectoryConfig {
+    pub fn normalized_base_url(&self) -> String {
+        self.base_url.trim().trim_end_matches('/').to_string()
+    }
+}
+
+fn parse_netcore_directory_section(text: &str) -> std::collections::HashMap<String, String> {
+    let mut out = std::collections::HashMap::new();
+    let mut in_section = false;
+
+    for raw_line in text.lines() {
+        let line = strip_toml_comment(raw_line).trim().to_string();
+        if line.is_empty() {
             continue;
         }
-        match fetch_callsign(&client, issi) {
-            Ok(Some(cs)) => {
-                let mut g = inner.lock().unwrap();
-                g.map.insert(issi, Entry::Found(cs.clone()));
-                g.pending.remove(&issi);
-                persist(&g);
-                tracing::debug!("RadioID: {issi} -> {cs}");
-            }
-            Ok(None) => {
-                // Definitive: this ID is not in the RadioID database. Cache so we never re-query.
-                let mut g = inner.lock().unwrap();
-                g.map.insert(issi, Entry::NotFound);
-                g.pending.remove(&issi);
-                persist(&g);
-                tracing::debug!("RadioID: {issi} not in database");
-            }
-            Err(e) => {
-                // Transient (offline / parse error) — leave uncached so a later request retries.
-                inner.lock().unwrap().pending.remove(&issi);
-                tracing::debug!("RadioID: lookup for {issi} failed, will retry later: {e}");
-            }
+
+        if line.starts_with('[') && line.ends_with(']') {
+            in_section = line.trim_matches(|c| c == '[' || c == ']').trim() == "netcore_directory";
+            continue;
         }
-        std::thread::sleep(FETCH_THROTTLE);
+
+        if !in_section {
+            continue;
+        }
+
+        let Some((key, value)) = line.split_once('=') else {
+            continue;
+        };
+        out.insert(key.trim().to_string(), unquote_toml_value(value.trim()));
+    }
+
+    out
+}
+
+fn strip_toml_comment(line: &str) -> &str {
+    let mut in_string = false;
+    let mut escaped = false;
+    for (idx, ch) in line.char_indices() {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+        match ch {
+            '\\' if in_string => escaped = true,
+            '"' => in_string = !in_string,
+            '#' if !in_string => return &line[..idx],
+            _ => {}
+        }
+    }
+    line
+}
+
+fn unquote_toml_value(value: &str) -> String {
+    let v = value.trim();
+    if v.len() >= 2 && v.starts_with('"') && v.ends_with('"') {
+        v[1..v.len() - 1].replace("\\\"", "\"")
+    } else {
+        v.to_string()
     }
 }
 
-/// Fetch one ID. `Ok(Some(callsign))` = found, `Ok(None)` = confirmed absent, `Err` = transient.
+fn parse_bool(value: &str) -> Option<bool> {
+    match value.trim().to_ascii_lowercase().as_str() {
+        "1" | "true" | "yes" | "on" => Some(true),
+        "0" | "false" | "no" | "off" => Some(false),
+        _ => None,
+    }
+}
+
+/// Read `[netcore_directory]` from the active FlowStation config file.
 ///
-/// Tries the user database first. If the ID is not found there, tries the repeater database.
-/// This covers both individual operators (7-digit IDs) and repeaters/gateways (6-digit IDs),
-/// without hard-coding a digit-count heuristic that may not hold universally.
-fn fetch_callsign(client: &reqwest::blocking::Client, issi: u32) -> Result<Option<String>, String> {
-    // Try user database first.
-    if let Some(cs) = query_radioid(client, &format!("{API_URL_PREFIX}{issi}"))? {
-        return Ok(Some(cs));
-    }
-    // Fall back to repeater database.
-    query_radioid(client, &format!("{RPTR_API_URL_PREFIX}{issi}"))
-}
+/// This is deliberately tolerant: unknown/missing/broken config falls back to disabled
+/// so a directory outage can never prevent the BS from starting.
+pub fn load_config(config_path: &str) -> NetCoreDirectoryConfig {
+    let mut cfg = NetCoreDirectoryConfig::default();
 
-/// Query a RadioID API endpoint and extract the callsign from `results[0].callsign`.
-/// Returns `Ok(Some(callsign))` = found, `Ok(None)` = confirmed absent, `Err` = transient.
-fn query_radioid(client: &reqwest::blocking::Client, url: &str) -> Result<Option<String>, String> {
-    let resp = client.get(url).send().map_err(|e| e.to_string())?;
-    if !resp.status().is_success() {
-        return Err(format!("HTTP {}", resp.status()));
-    }
-    let json: serde_json::Value = resp.json().map_err(|e| e.to_string())?;
-    match json.get("results").and_then(|r| r.as_array()) {
-        Some(arr) if !arr.is_empty() => {
-            let cs = arr[0].get("callsign").and_then(|c| c.as_str()).unwrap_or("").trim().to_string();
-            if cs.is_empty() { Ok(None) } else { Ok(Some(cs)) }
+    if let Ok(text) = std::fs::read_to_string(config_path) {
+        let section = parse_netcore_directory_section(&text);
+        if let Some(v) = section.get("enabled").and_then(|v| parse_bool(v)) {
+            cfg.enabled = v;
         }
-        Some(_) => Ok(None), // empty results array = not in DB
-        None => Err("unexpected response shape".to_string()),
+        if let Some(v) = section.get("base_url") {
+            let v = v.trim();
+            if !v.is_empty() {
+                cfg.base_url = v.to_string();
+            }
+        }
+        if let Some(v) = section.get("timeout_ms") {
+            if let Ok(n) = v.trim().parse::<u64>() {
+                cfg.timeout_ms = n.clamp(250, 30_000);
+            }
+        }
     }
+
+    // Environment wins over file settings. Handy for systemd drop-ins.
+    if let Ok(v) = std::env::var("NETCORE_DIRECTORY_URL") {
+        let v = v.trim();
+        if !v.is_empty() {
+            cfg.base_url = v.to_string();
+            cfg.enabled = true;
+        }
+    }
+    if let Ok(v) = std::env::var("NETCORE_DIRECTORY_TIMEOUT_MS") {
+        if let Ok(n) = v.trim().parse::<u64>() {
+            cfg.timeout_ms = n.clamp(250, 30_000);
+        }
+    }
+    if let Ok(v) = std::env::var("NETCORE_DIRECTORY_ENABLED") {
+        match v.trim().to_ascii_lowercase().as_str() {
+            "1" | "true" | "yes" | "on" => cfg.enabled = true,
+            "0" | "false" | "no" | "off" => cfg.enabled = false,
+            _ => {}
+        }
+    }
+
+    cfg.base_url = cfg.normalized_base_url();
+    cfg
 }
 
-/// On-disk format: `{ "2260324": "YO3XYZ", "2260575": "" }` — empty string means NotFound.
-fn load_disk(path: &PathBuf) -> HashMap<u32, Entry> {
-    let mut map = HashMap::new();
-    let Ok(text) = std::fs::read_to_string(path) else { return map };
-    let Ok(json) = serde_json::from_str::<HashMap<String, String>>(&text) else {
-        return map;
+/// Fetch a raw path from the configured NetCore Directory Server.
+///
+/// `path_and_query` must start with `/`, e.g. `/api/devices`.
+pub fn fetch_path(cfg: &NetCoreDirectoryConfig, path_and_query: &str) -> Result<Option<String>, String> {
+    if !cfg.enabled {
+        return Ok(None);
+    }
+    let path = if path_and_query.starts_with('/') {
+        path_and_query.to_string()
+    } else {
+        format!("/{path_and_query}")
     };
-    for (k, v) in json {
-        if let Ok(id) = k.parse::<u32>() {
-            map.insert(id, if v.is_empty() { Entry::NotFound } else { Entry::Found(v) });
-        }
+    let url = format!("{}{}", cfg.normalized_base_url(), path);
+
+    let client = reqwest::blocking::Client::builder()
+        .timeout(Duration::from_millis(cfg.timeout_ms))
+        .user_agent("netcore-flowstation-directory")
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    let resp = client.get(&url).send().map_err(|e| e.to_string())?;
+    let status = resp.status();
+    if !status.is_success() {
+        return Err(format!("{} returned HTTP {}", url, status));
     }
-    map
+    resp.text().map(Some).map_err(|e| e.to_string())
 }
 
-fn persist(inner: &Inner) {
-    let json: HashMap<String, String> = inner
-        .map
-        .iter()
-        .map(|(k, v)| {
-            let s = match v {
-                Entry::Found(c) => c.clone(),
-                Entry::NotFound => String::new(),
-            };
-            (k.to_string(), s)
-        })
-        .collect();
-    if let Ok(text) = serde_json::to_string(&json) {
-        let _ = std::fs::write(&inner.path, text);
+/// Fetch a local Directory path using config loaded from `config_path`.
+pub fn fetch_path_from_config(config_path: &str, path_and_query: &str) -> Result<Option<String>, String> {
+    let cfg = load_config(config_path);
+    fetch_path(&cfg, path_and_query)
+}
+
+/// Convert a Directory `/api/devices` response into the dashboard's compact
+/// ISSI-keyed object form.
+///
+/// Accepted input formats:
+/// - Native Directory list: `[{"issi":2020001,"name":"Motorola MTP",...}]`
+/// - Export format: `{"devices":[...]}`
+/// - Existing local format: `{"2020001":{"name":"Motorola MTP",...}}`
+///
+/// Output format:
+/// `{ "2020001": { "name": "...", "short": "...", "type": "...", ... } }`
+pub fn normalize_devices_json(raw: &str) -> Result<String, String> {
+    let json: Value = serde_json::from_str(raw).map_err(|e| e.to_string())?;
+    let mut out = Map::new();
+
+    match json {
+        Value::Array(arr) => collect_device_array(&mut out, arr),
+        Value::Object(mut map) => {
+            if let Some(Value::Array(arr)) = map.remove("devices") {
+                collect_device_array(&mut out, arr);
+            } else {
+                // Already an ISSI-keyed object. Keep only numeric keys and visible-ish entries.
+                for (key, value) in map {
+                    let id = key.trim();
+                    if id.parse::<u32>().is_err() {
+                        continue;
+                    }
+                    if !value_visible(&value) {
+                        continue;
+                    }
+                    out.insert(id.to_string(), normalize_device_value(id, value));
+                }
+            }
+        }
+        _ => {}
+    }
+
+    serde_json::to_string(&Value::Object(out)).map_err(|e| e.to_string())
+}
+
+fn collect_device_array(out: &mut Map<String, Value>, arr: Vec<Value>) {
+    for value in arr {
+        let Some(id) = id_from_value(&value, &["issi", "id", "ssi"]) else {
+            continue;
+        };
+        if !value_visible(&value) {
+            continue;
+        }
+        out.insert(id.to_string(), normalize_device_value(&id.to_string(), value));
+    }
+}
+
+fn id_from_value(value: &Value, keys: &[&str]) -> Option<u32> {
+    let obj = value.as_object()?;
+    for key in keys {
+        if let Some(v) = obj.get(*key) {
+            if let Some(n) = v.as_u64() {
+                if n <= u32::MAX as u64 {
+                    return Some(n as u32);
+                }
+            }
+            if let Some(s) = v.as_str() {
+                if let Ok(n) = s.trim().parse::<u32>() {
+                    return Some(n);
+                }
+            }
+        }
+    }
+    None
+}
+
+fn value_visible(value: &Value) -> bool {
+    let Some(obj) = value.as_object() else {
+        return true;
+    };
+    match obj.get("visible") {
+        Some(Value::Bool(v)) => *v,
+        Some(Value::Number(n)) => n.as_i64().unwrap_or(1) != 0,
+        Some(Value::String(s)) => !matches!(s.trim().to_ascii_lowercase().as_str(), "0" | "false" | "no" | "off" | "hidden"),
+        _ => true,
+    }
+}
+
+fn normalize_device_value(id: &str, value: Value) -> Value {
+    match value {
+        Value::String(name) => {
+            let mut obj = Map::new();
+            obj.insert("issi".to_string(), Value::String(id.to_string()));
+            obj.insert("name".to_string(), Value::String(name));
+            Value::Object(obj)
+        }
+        Value::Object(mut obj) => {
+            obj.entry("issi".to_string()).or_insert_with(|| Value::String(id.to_string()));
+
+            // Normalize common aliases so older/newer frontends both work.
+            if !obj.contains_key("name") {
+                if let Some(v) = obj.get("label").cloned().or_else(|| obj.get("title").cloned()) {
+                    obj.insert("name".to_string(), v);
+                }
+            }
+            if !obj.contains_key("note") {
+                if let Some(v) = obj.get("notes").cloned().or_else(|| obj.get("description").cloned()) {
+                    obj.insert("note".to_string(), v);
+                }
+            }
+            Value::Object(obj)
+        }
+        _ => {
+            let mut obj = Map::new();
+            obj.insert("issi".to_string(), Value::String(id.to_string()));
+            Value::Object(obj)
+        }
+    }
+}
+
+/// Generic pass-through JSON sanity check.
+pub fn validate_json_or_empty(raw: &str, empty: &str) -> String {
+    if serde_json::from_str::<Value>(raw).is_ok() {
+        raw.to_string()
+    } else {
+        empty.to_string()
     }
 }
