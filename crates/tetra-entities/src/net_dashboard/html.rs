@@ -2183,6 +2183,33 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
 .maps-popup-title{font-weight:800;color:var(--text);margin-bottom:4px;}
 .maps-popup-meta,.maps-list-meta{font:700 11px/1.5 var(--mono);color:var(--text3);}
 .maps-popup-detail{margin-top:8px;color:var(--text2);font-size:13px;line-height:1.45;}
+.maps-device-card{
+  display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:8px 0 2px;
+}
+.maps-device-chip{
+  display:inline-flex;align-items:center;gap:4px;
+  padding:3px 8px;border-radius:999px;
+  border:1px solid color-mix(in srgb,var(--accent2) 30%,transparent);
+  background:color-mix(in srgb,var(--accent2) 10%,transparent);
+  color:var(--accent2);
+  font:800 10px/1.3 var(--mono);
+  letter-spacing:.04em;text-transform:uppercase;
+}
+.maps-device-chip.owner{
+  border-color:color-mix(in srgb,var(--accent) 32%,transparent);
+  background:color-mix(in srgb,var(--accent) 10%,transparent);
+  color:var(--accent);
+}
+.maps-device-chip.issi{
+  border-color:var(--border);
+  background:var(--bg3);
+  color:var(--text3);
+}
+.maps-device-chip.unknown{
+  border-color:color-mix(in srgb,var(--warn) 32%,transparent);
+  background:color-mix(in srgb,var(--warn) 10%,transparent);
+  color:var(--warn);
+}
 .maps-list{max-height:560px;overflow:auto;border:1px solid var(--border);border-radius:var(--r);background:var(--bg1);}
 .maps-list-row{display:grid;grid-template-columns:auto 1fr;gap:10px;padding:11px 12px;border-bottom:1px solid var(--border);cursor:pointer;}
 .maps-list-row:last-child{border-bottom:0;}
@@ -5508,6 +5535,85 @@ function escAttr(s){ return String(s).replace(/&/g,'&amp;').replace(/'/g,"&#39;"
 // ── State + WS ────────────────────────────────────────────────────────────
 let ws=null,state={ms:{},calls:{},emergencies:{},lastHeard:[],sdsLog:[],dapnetLog:[],echolinkDirectory:[],echolinkDirectoryStatus:'',meshcomNodes:[],meshcomMessages:[],geoalarmEvents:[],geoalarmConfig:null,brewOnline:false,brewVer:0,brewStatus:null,brewStatusLoadedAt:0},sdsDest=0;
 
+// ── Local device registry (root /devices.json) ────────────────────────────────
+// Supports both compact mappings ("2010002":"Hytera HRT") and structured entries:
+// {"2010002":{"name":"Hytera HRT","type":"HRT","owner":"Jan"}}.
+// Missing/invalid entries fall back to "TETRA LIP <ISSI>" so the map never breaks.
+let deviceRegistry={},deviceRegistryLoaded=false,deviceRegistryInflight=false;
+function normalizeDeviceRegistry(raw){
+  const out={};
+  if(!raw||typeof raw!=='object'||Array.isArray(raw))return out;
+  Object.entries(raw).forEach(([issi,entry])=>{
+    const key=String(issi||'').trim();
+    if(!key)return;
+    if(typeof entry==='string'){
+      const name=entry.trim();
+      if(name)out[key]={name};
+      return;
+    }
+    if(entry&&typeof entry==='object'){
+      const name=String(entry.name||entry.label||entry.title||'').trim();
+      const type=String(entry.type||entry.role||'').trim();
+      const owner=String(entry.owner||entry.user||'').trim();
+      const note=String(entry.note||entry.description||'').trim();
+      if(name||type||owner||note)out[key]={name:name||`TETRA LIP ${key}`,type,owner,note};
+    }
+  });
+  return out;
+}
+async function loadDeviceRegistry(){
+  if(deviceRegistryInflight)return;
+  deviceRegistryInflight=true;
+  try{
+    const r=await fetch('/devices.json',{cache:'no-store',credentials:'same-origin'});
+    if(r.ok){
+      deviceRegistry=normalizeDeviceRegistry(await r.json());
+      deviceRegistryLoaded=true;
+    }else{
+      deviceRegistry={};
+      deviceRegistryLoaded=true;
+    }
+  }catch(e){
+    console.warn('devices.json not available, using ISSI fallback',e);
+    deviceRegistry={};
+    deviceRegistryLoaded=true;
+  }finally{
+    deviceRegistryInflight=false;
+    renderMapsIfActive();
+  }
+}
+function deviceInfoForIssi(issi,fallbackPrefix='TETRA LIP'){
+  const key=String(issi??'').trim();
+  const fallback=`${fallbackPrefix} ${key||'—'}`;
+  const entry=key?deviceRegistry[key]:null;
+  if(!entry)return {issi:key,name:fallback,type:'',owner:'',note:'',known:false};
+  if(typeof entry==='string')return {issi:key,name:entry||fallback,type:'',owner:'',note:'',known:true};
+  return {
+    issi:key,
+    name:String(entry.name||fallback),
+    type:String(entry.type||''),
+    owner:String(entry.owner||''),
+    note:String(entry.note||''),
+    known:true
+  };
+}
+function mapsDeviceCardHtml(device){
+  if(!device)return '';
+  const chips=[];
+  chips.push(`<span class="maps-device-chip issi">ISSI ${escHtml(device.issi||'—')}</span>`);
+  if(device.type)chips.push(`<span class="maps-device-chip">${escHtml(device.type)}</span>`);
+  if(device.owner)chips.push(`<span class="maps-device-chip owner">${escHtml(device.owner)}</span>`);
+  if(!device.known)chips.push(`<span class="maps-device-chip unknown">unknown</span>`);
+  return `<div class="maps-device-card">${chips.join('')}</div>`;
+}
+function mapsDeviceMeta(source,device){
+  const parts=[source||''];
+  if(device&&device.issi)parts.push(`ISSI ${device.issi}`);
+  if(device&&device.type)parts.push(device.type);
+  if(device&&device.owner)parts.push(device.owner);
+  return parts.filter(Boolean).join(' · ');
+}
+
 // ── RadioID callsigns (indicativ) ──────────────────────────────────────────────
 // issi -> {cs:"CALLSIGN", fl:"🇷🇴"} (found; fl is the country flag emoji from the prefix, or "")
 //       | "" (looked up, none). A missing key means unresolved.
@@ -6340,12 +6446,19 @@ function mapsCollect(){
   (state.sdsLog||[]).forEach(e=>{
     const lip=lipPositionFromText(e.text);
     if(!lip)return;
-    const cs=callsigns[e.source_issi]?.cs;
-    const src=[e.source_issi,cs].filter(Boolean).join(' ');
-    const marker=mapsMarker('sds',`TETRA LIP ${src||'—'}`,lip.lat,lip.lon,
+    const issi=e.source_issi||'';
+    const device=deviceInfoForIssi(issi,'TETRA LIP');
+    const cs=callsigns[issi]?.cs;
+    const callsign=cs?` · ${cs}`:'';
+    const detail=[
       `SDS ${String(e.direction||'').toUpperCase()} ${e.source_issi||'—'} → ${e.dest_issi||'—'}${e.is_group?' group':''}`,
-      'SDS/LIP',e.ts,`sds:${e.source_issi||src||'unknown'}`);
-    if(marker)items.push(marker);
+      device.note||'',
+      callsign?`RadioID${callsign}`:''
+    ].filter(Boolean).join(' · ');
+    const marker=mapsMarker('sds',device.name,lip.lat,lip.lon,
+      detail,
+      mapsDeviceMeta('SDS/LIP',device),e.ts,`sds:${device.issi||issi||'unknown'}`);
+    if(marker){marker.device=device;items.push(marker);}
   });
   (state.meshcomNodes||[]).forEach(n=>{
     const src=meshOrigin(n)||'—';
@@ -6599,7 +6712,10 @@ function mapsPointerUp(e){
 function mapsInitial(m){
   if(m.type==='station')return 'FS';
   if(m.type==='focus')return 'F';
-  if(m.type==='sds')return 'S';
+  if(m.type==='sds'){
+    const t=String(m.device?.type||'').trim().replace(/[^a-z0-9]/gi,'');
+    return t?t.slice(0,2).toUpperCase():'S';
+  }
   if(m.type==='meshcom')return 'M';
   if(m.type==='alarm')return '!';
   return 'G';
@@ -6708,6 +6824,7 @@ function renderMapsPage(){
       <div>
         <div class="maps-list-title">${escHtml(m.title)}</div>
         <div class="maps-list-meta">${m.ts?escHtml(m.ts)+' · ':''}${m.lat.toFixed(6)}, ${m.lon.toFixed(6)}</div>
+        ${m.device?mapsDeviceCardHtml(m.device):''}
         ${m.detail?`<div class="maps-list-detail">${escHtml(m.detail)}</div>`:''}
       </div>
     </div>`).join(''):'<div class="maps-empty">No positions yet</div>';
@@ -6731,6 +6848,7 @@ function selectMapMarker(index,scroll=true){
     popup.style.display='block';
     popup.innerHTML=`<div class="maps-popup-title">${escHtml(m.title)}</div>
       <div class="maps-popup-meta">${escHtml(mapsTypeLabel(m))}${m.ts?' · '+escHtml(m.ts):''} · ${m.lat.toFixed(6)}, ${m.lon.toFixed(6)}</div>
+      ${m.device?mapsDeviceCardHtml(m.device):''}
       ${m.meta?`<div class="maps-popup-meta">${escHtml(m.meta)}</div>`:''}
       ${m.detail?`<div class="maps-popup-detail">${escHtml(m.detail)}</div>`:''}
       <div style="margin-top:9px"><a class="sds-map-link" href="${mapsOsmUrl(m)}" target="_blank" rel="noopener noreferrer">Open in OpenStreetMap</a></div>`;
@@ -6742,7 +6860,7 @@ function openMapsOsm(){
 }
 function refreshMapsData(){
   renderMapsIfActive();
-  Promise.allSettled([loadSdsLog(),loadMeshcomNodes(),loadMeshcomMessages(),loadGeoalarm()]).then(()=>renderMapsIfActive());
+  Promise.allSettled([loadDeviceRegistry(),loadSdsLog(),loadMeshcomNodes(),loadMeshcomMessages(),loadGeoalarm()]).then(()=>renderMapsIfActive());
 }
 function sdsMessageBody(e){
   if(e.text&&e.text.length){
@@ -9620,6 +9738,7 @@ async function checkUpdate(){
 // 200 => either a no-auth deployment or an authenticated admin — behave as before.
 async function boot(){
   bindMapsControls();
+  loadDeviceRegistry();
   const hasAuthMarker = document.cookie.split(';').some(c=>c.trim().startsWith('fs_auth='));
   let anonymous = false;
   if(!hasAuthMarker){
