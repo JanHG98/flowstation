@@ -561,16 +561,16 @@ impl MmBs {
                     .unwrap_or(false);
                 if recently_registered {
                     tracing::debug!(
-                        "MM: ISSI {} RoamingLocationUpdating within 120s of last register — treating as soft re-attach (Sepura post-PTT)",
+                        "MM: ISSI {} RoamingLocationUpdating within 120s of last register — treating as mobility refresh only",
                         issi
                     );
-                    // Even on soft re-attach, force CMCE to release any individual P2P calls
-                    // involving this ISSI. Terminals (e.g. Motorola MTP3550) that drop RF for
-                    // 2s and re-attach lose call state but BS keeps the call alive — next PTT
-                    // is rejected ("PTT denied") because the terminal doesn't recognize the call_id
-                    // in our D-TX-GRANTED. Releasing the individual call here forces a clean U-SETUP
-                    // on the next PTT.
-                    self.emit_individual_call_release_for_issi(queue, issi);
+                    // Do NOT force a CMCE Deregister/Register cycle for this soft re-attach.
+                    //
+                    // Motorola/Sepura terminals can emit RoamingLocationUpdating shortly after PTT
+                    // or RF micro-dropouts while they are still logically attached. Tearing the
+                    // subscriber down here briefly removes its group listener state and can race the
+                    // next PTT into "no listeners" / "unit not attached" behaviour. Keep the MS
+                    // registered and let the normal LocationUpdateAccept refresh MM state.
                     false
                 } else {
                     true
@@ -628,7 +628,23 @@ impl MmBs {
         // happens at first expiry, so Brew still holds the subscriber — re-registering would be a
         // needless REGISTER every interval (the Brew flap this avoids).
         let is_itsi_attach = pdu.location_update_type == LocationUpdateType::ItsiAttach;
-        let needs_brew_register = is_new || (!is_new && is_itsi_attach) || was_dropped;
+        let known_recent_itsi_attach = !is_new
+            && is_itsi_attach
+            && !was_dropped
+            && self.config.state_read().subscribers.is_registered(issi)
+            && self
+                .client_mgr
+                .get_client_by_issi(issi)
+                .map(|c| c.last_registration_time.elapsed().as_secs() < 120)
+                .unwrap_or(false);
+        let needs_brew_register = is_new || was_dropped || (!is_new && is_itsi_attach && !known_recent_itsi_attach);
+
+        if known_recent_itsi_attach {
+            tracing::debug!(
+                "MM: ISSI {} repeated ItsiAttach within 120s while already registered — treating as mobility refresh only",
+                issi
+            );
+        }
 
         if is_new {
             match self.client_mgr.try_register_client(issi, true) {
@@ -1019,6 +1035,18 @@ impl MmBs {
                 tracing::info!("MS {} energy saving mode change response: {:?}", issi, esm);
                 let _ = self.client_mgr.set_client_energy_saving_mode(issi, esm);
                 self.recovery_mark_dirty();
+                handled = true;
+            }
+            StatusUplink::NetworkOrUserSpecific32 => {
+                // Motorola MTP-series terminals send this vendor/network-specific status during
+                // normal attach/idle housekeeping. Rejecting it with MM-PDU-FUNCTION-NOT-SUPPORTED
+                // creates needless LLC/MM churn and can upset timing-sensitive attach/PTT sequences.
+                // We do not need to act on the payload for now; accept-and-ignore is safer.
+                tracing::debug!(
+                    "MM: ignoring vendor/network-specific UMmStatus {:?} from ISSI {}",
+                    pdu.status_uplink,
+                    issi
+                );
                 handled = true;
             }
             StatusUplink::DualWatchModeRequest
