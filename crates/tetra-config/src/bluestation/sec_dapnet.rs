@@ -71,7 +71,7 @@ impl Default for CfgDapnet {
             forward_callout: false,
             forward_telegram: false,
 
-            sds_source_issi: 9999,
+            sds_source_issi: 4010001,
             sds_dest_issi: 0,
             sds_dest_is_group: false,
             ric_issi_routes: BTreeMap::new(),
@@ -80,7 +80,7 @@ impl Default for CfgDapnet {
             callout_allowed_rics: BTreeSet::new(),
             telegram_allowed_rics: BTreeSet::new(),
 
-            callout_source_issi: 9999,
+            callout_source_issi: 4010001,
             callout_dest_issi: 0,
             callout_tpg_ric: default_tpg2200_ric(),
             callout_incident_base: default_callout_id_base(),
@@ -248,7 +248,7 @@ fn default_poll_interval_secs() -> u64 {
 }
 
 fn default_source_issi() -> u32 {
-    9999
+    4010001
 }
 
 fn default_callout_id_base() -> u16 {
