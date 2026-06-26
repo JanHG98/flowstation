@@ -1553,10 +1553,22 @@ fn request_route(req_line: &str) -> &str {
         .unwrap_or("")
 }
 
-fn is_devices_request(req_line: &str) -> bool {
+fn directory_proxy_route(req_line: &str) -> Option<&'static str> {
     let mut parts = req_line.split_whitespace();
     let method = parts.next().unwrap_or("");
-    matches!(method, "GET") && matches!(request_route(req_line), "/devices.json" | "/api/devices")
+    if method != "GET" {
+        return None;
+    }
+    let route = request_route(req_line).trim_end_matches('/');
+    match route {
+        "/devices.json" | "/api/devices" => Some("devices"),
+        "/api/basestations" => Some("basestations"),
+        "/api/groups" => Some("groups"),
+        "/api/status" => Some("status"),
+        "/api/dmr/user" => Some("dmr_user"),
+        "/api/dmr/repeater" => Some("dmr_repeater"),
+        _ => None,
+    }
 }
 
 fn devices_json_candidates(config_path: &str, source_dir_override: Option<&str>) -> Vec<std::path::PathBuf> {
@@ -1590,14 +1602,69 @@ fn devices_json_candidates(config_path: &str, source_dir_override: Option<&str>)
     candidates
 }
 
-fn serve_devices_json(mut stream: TcpStream, config_path: &str, source_dir_override: Option<&str>) {
+fn serve_directory_proxy_request(
+    stream: TcpStream,
+    config_path: &str,
+    source_dir_override: Option<&str>,
+    req_line: &str,
+) {
+    match directory_proxy_route(req_line) {
+        Some("devices") => serve_devices_json(stream, config_path, source_dir_override),
+        Some("basestations") => serve_directory_raw_json(stream, config_path, "/api/basestations", "[]"),
+        Some("groups") => serve_directory_raw_json(stream, config_path, "/api/groups", "[]"),
+        Some("status") => serve_directory_raw_json(stream, config_path, "/api/status", "[]"),
+        Some("dmr_user") | Some("dmr_repeater") => {
+            let path = request_path(req_line).unwrap_or("/");
+            serve_directory_raw_json(stream, config_path, path, r#"{"count":0,"results":[]}"#);
+        }
+        _ => http_response(stream, 404, "not found"),
+    }
+}
+
+fn serve_directory_raw_json(stream: TcpStream, config_path: &str, directory_path: &str, fallback: &str) {
+    match crate::net_dashboard::radioid::fetch_path_from_config(config_path, directory_path) {
+        Ok(Some(body)) => {
+            let body = crate::net_dashboard::radioid::validate_json_or_empty(&body, fallback);
+            http_json_response(stream, 200, &body);
+        }
+        Ok(None) => {
+            http_json_response(stream, 200, fallback);
+        }
+        Err(e) => {
+            tracing::warn!("NetCore Directory: {} failed: {}", directory_path, e);
+            http_json_response(stream, 200, fallback);
+        }
+    }
+}
+
+fn serve_devices_json(stream: TcpStream, config_path: &str, source_dir_override: Option<&str>) {
+    match crate::net_dashboard::radioid::fetch_path_from_config(config_path, "/api/devices") {
+        Ok(Some(body)) => match crate::net_dashboard::radioid::normalize_devices_json(&body) {
+            Ok(body) => {
+                tracing::debug!("Dashboard: serving devices from NetCore Directory");
+                http_json_response(stream, 200, &body);
+                return;
+            }
+            Err(e) => {
+                tracing::warn!("NetCore Directory: invalid /api/devices response: {}", e);
+                // Fall through to local devices.json below.
+            }
+        },
+        Ok(None) => {
+            // Directory disabled; fall back to local devices.json.
+        }
+        Err(e) => {
+            tracing::warn!("NetCore Directory: /api/devices failed: {} — falling back to local devices.json", e);
+        }
+    }
+
     for path in devices_json_candidates(config_path, source_dir_override) {
         let Ok(body) = std::fs::read_to_string(&path) else {
             continue;
         };
 
-        match serde_json::from_str::<serde_json::Value>(&body) {
-            Ok(_) => {
+        match crate::net_dashboard::radioid::normalize_devices_json(&body) {
+            Ok(body) => {
                 tracing::debug!("Dashboard: serving devices.json from {}", path.display());
                 http_json_response(stream, 200, &body);
                 return;
@@ -1610,7 +1677,7 @@ fn serve_devices_json(mut stream: TcpStream, config_path: &str, source_dir_overr
         }
     }
 
-    // Missing file is non-fatal: the dashboard keeps using ISSI fallback labels.
+    // Missing directory/local file is non-fatal: the dashboard keeps using ISSI fallback labels.
     http_json_response(stream, 200, "{}");
 }
 
@@ -2667,13 +2734,12 @@ fn handle_connection(
         }))
         .unwrap_or_default();
         http_json_response(stream, 200, &body);
-    } else if is_devices_request(&req_line) {
-        // Local operator-maintained device directory for UI labels:
-        // /devices.json and /api/devices both return ISSI -> metadata JSON.
+    } else if directory_proxy_route(&req_line).is_some() {
+        // NetCore Directory / local device-label endpoints.
         // This must be handled before the SPA catch-all, otherwise the browser
-        // gets DASHBOARD_HTML for /devices.json and the frontend falls back to UNKNOWN.
+        // gets DASHBOARD_HTML for /api/devices or /devices.json and falls back to UNKNOWN.
         drain_http_headers(&mut stream);
-        serve_devices_json(stream, &config_path, source_dir_override.as_deref());
+        serve_directory_proxy_request(stream, &config_path, source_dir_override.as_deref(), &req_line);
     } else {
         let mut buf = BufReader::new(stream);
         loop {
