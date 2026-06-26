@@ -1558,6 +1558,73 @@ fn request_path(req_line: &str) -> Option<&str> {
     req_line.split_whitespace().nth(1)
 }
 
+fn request_route(req_line: &str) -> &str {
+    request_path(req_line)
+        .and_then(|path| path.split_once('?').map(|(route, _)| route).or(Some(path)))
+        .unwrap_or("")
+}
+
+fn is_devices_request(req_line: &str) -> bool {
+    let mut parts = req_line.split_whitespace();
+    let method = parts.next().unwrap_or("");
+    matches!(method, "GET") && matches!(request_route(req_line), "/devices.json" | "/api/devices")
+}
+
+fn devices_json_candidates(config_path: &str, source_dir_override: Option<&str>) -> Vec<std::path::PathBuf> {
+    let mut candidates = Vec::new();
+
+    // 1) Preferred operator location: next to the active config.toml.
+    if let Some(config_dir) = std::path::Path::new(config_path).parent() {
+        candidates.push(config_dir.join("devices.json"));
+    }
+
+    // 2) Explicit dashboard source directory, when configured.
+    if let Some(dir) = source_dir_override {
+        candidates.push(std::path::Path::new(dir).join("devices.json"));
+    }
+
+    // 3) Auto-detected FlowStation source tree. Useful when devices.json lives in the repo root.
+    if let Ok(src_dir) = resolve_source_dir(source_dir_override) {
+        candidates.push(src_dir.join("devices.json"));
+    }
+
+    // 4) Process working directory and binary directory as fallbacks.
+    if let Ok(cwd) = std::env::current_dir() {
+        candidates.push(cwd.join("devices.json"));
+    }
+    if let Ok(exe) = std::env::current_exe()
+        && let Some(exe_dir) = exe.parent()
+    {
+        candidates.push(exe_dir.join("devices.json"));
+    }
+
+    candidates
+}
+
+fn serve_devices_json(mut stream: TcpStream, config_path: &str, source_dir_override: Option<&str>) {
+    for path in devices_json_candidates(config_path, source_dir_override) {
+        let Ok(body) = std::fs::read_to_string(&path) else {
+            continue;
+        };
+
+        match serde_json::from_str::<serde_json::Value>(&body) {
+            Ok(_) => {
+                tracing::debug!("Dashboard: serving devices.json from {}", path.display());
+                http_json_response(stream, 200, &body);
+                return;
+            }
+            Err(e) => {
+                tracing::warn!("Dashboard: invalid devices.json at {}: {}", path.display(), e);
+                http_response(stream, 500, &format!("invalid devices.json at {}: {}", path.display(), e));
+                return;
+            }
+        }
+    }
+
+    // Missing file is non-fatal: the dashboard keeps using ISSI fallback labels.
+    http_json_response(stream, 200, "{}");
+}
+
 fn is_tpg2200_action_request(req_line: &str) -> bool {
     let mut parts = req_line.split_whitespace();
     let method = parts.next().unwrap_or("");
@@ -2615,6 +2682,13 @@ fn handle_connection(
         }))
         .unwrap_or_default();
         http_json_response(stream, 200, &body);
+    } else if is_devices_request(&req_line) {
+        // Local operator-maintained device directory for UI labels:
+        // /devices.json and /api/devices both return ISSI -> metadata JSON.
+        // This must be handled before the SPA catch-all, otherwise the browser
+        // gets DASHBOARD_HTML for /devices.json and the frontend falls back to UNKNOWN.
+        drain_http_headers(&mut stream);
+        serve_devices_json(stream, &config_path, source_dir_override.as_deref());
     } else {
         let mut buf = BufReader::new(stream);
         loop {
