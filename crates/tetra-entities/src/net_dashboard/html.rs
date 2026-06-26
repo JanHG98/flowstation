@@ -2210,6 +2210,11 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
   background:color-mix(in srgb,var(--warn) 10%,transparent);
   color:var(--warn);
 }
+.maps-device-chip.online{
+  border-color:color-mix(in srgb,var(--ok) 38%,transparent);
+  background:color-mix(in srgb,var(--ok) 12%,transparent);
+  color:var(--ok);
+}
 .maps-list{max-height:560px;overflow:auto;border:1px solid var(--border);border-radius:var(--r);background:var(--bg1);}
 .maps-list-row{display:grid;grid-template-columns:auto 1fr;gap:10px;padding:11px 12px;border-bottom:1px solid var(--border);cursor:pointer;}
 .maps-list-row:last-child{border-bottom:0;}
@@ -5586,21 +5591,38 @@ function deviceInfoForIssi(issi,fallbackPrefix='TETRA LIP'){
   const key=String(issi??'').trim();
   const fallback=`${fallbackPrefix} ${key||'—'}`;
   const entry=key?deviceRegistry[key]:null;
-  if(!entry)return {issi:key,name:fallback,type:'',owner:'',note:'',known:false};
-  if(typeof entry==='string')return {issi:key,name:entry||fallback,type:'',owner:'',note:'',known:true};
+  const registered=mapsIsRegisteredIssi(key);
+  if(!entry)return {issi:key,name:fallback,type:'',owner:'',note:'',known:false,registered};
+  if(typeof entry==='string')return {issi:key,name:entry||fallback,type:'',owner:'',note:'',known:true,registered};
   return {
     issi:key,
     name:String(entry.name||fallback),
     type:String(entry.type||''),
     owner:String(entry.owner||''),
     note:String(entry.note||''),
-    known:true
+    known:true,
+    registered
   };
+}
+function mapsIsRegisteredIssi(issi){
+  const key=String(issi??'').trim();
+  return !!key && !!(state.ms||{})[key];
+}
+function mapsRegisteredDeviceCount(){
+  return Object.keys(state.ms||{}).length;
+}
+function mapsRegisteredOnlyInfo(rawTotal,visibleCount){
+  if(visibleCount)return '';
+  const reg=mapsRegisteredDeviceCount();
+  if(rawTotal&&reg===0)return 'No radios registered at BS';
+  if(rawTotal)return `No registered radios with positions (${reg} registered)`;
+  return '';
 }
 function mapsDeviceCardHtml(device){
   if(!device)return '';
   const chips=[];
   chips.push(`<span class="maps-device-chip issi">ISSI ${escHtml(device.issi||'—')}</span>`);
+  if(device.registered)chips.push(`<span class="maps-device-chip online">ONLINE</span>`);
   if(device.type)chips.push(`<span class="maps-device-chip">${escHtml(device.type)}</span>`);
   if(device.owner)chips.push(`<span class="maps-device-chip owner">${escHtml(device.owner)}</span>`);
   if(!device.known)chips.push(`<span class="maps-device-chip unknown">unknown</span>`);
@@ -5852,9 +5874,9 @@ function handleMsg(msg){
       // comparison `g === sel` in renderStations behaves consistently with the server-side
       // None initialiser in server.rs.
       state.ms[msg.issi]=Object.assign({issi:msg.issi,groups:[],selected_group:null,rssi_dbfs:null,energy_saving_mode:0},state.ms[msg.issi]||{},{issi:msg.issi,_last_seen_ts:Date.now()});
-      renderStations();break;
+      renderStations();renderMapsIfActive();break;
     case 'ms_deregistered':
-      delete state.ms[msg.issi];renderStations();break;
+      delete state.ms[msg.issi];renderStations();renderMapsIfActive();break;
     case 'ms_rssi':
       if(state.ms[msg.issi]){state.ms[msg.issi].rssi_dbfs=msg.rssi_dbfs;state.ms[msg.issi]._last_seen_ts=Date.now();}
       renderStations();break;
@@ -6447,6 +6469,7 @@ function mapsCollect(){
     const lip=lipPositionFromText(e.text);
     if(!lip)return;
     const issi=e.source_issi||'';
+    if(!mapsIsRegisteredIssi(issi))return;
     const device=deviceInfoForIssi(issi,'TETRA LIP');
     const cs=callsigns[issi]?.cs;
     const callsign=cs?` · ${cs}`:'';
@@ -6535,6 +6558,8 @@ function mapsSourceButtonsHtml(message=''){
 function mapsSourceMessage(markerCount,rawTotal){
   if(markerCount)return '';
   if(!mapsAnySourceEnabled())return 'All marker sources hidden';
+  const registeredOnly=mapsRegisteredOnlyInfo(rawTotal,markerCount);
+  if(registeredOnly)return registeredOnly;
   return rawTotal?`No usable coordinates yet (${mapsRawCountsText(mapsRawCounts())})`:'No positions collected yet';
 }
 function updateMapsSourceButtons(){
