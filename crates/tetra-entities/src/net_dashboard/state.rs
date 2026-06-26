@@ -15,14 +15,14 @@ pub struct MsState {
     pub rssi_dbfs: Option<f32>,
     pub registered_at: u64,
     pub last_seen_secs_ago: u64,
-    pub energy_saving_mode: u8,   // 0=StayAlive, 1=Eg1..7=Eg7
+    pub energy_saving_mode: u8, // 0=StayAlive, 1=Eg1..7=Eg7
 }
 
 /// Active call state
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct CallState {
     pub call_id: u16,
-    pub call_type: &'static str,  // "group" or "individual"
+    pub call_type: &'static str, // "group" or "individual"
     pub gssi: u32,
     pub caller_issi: u32,
     pub called_issi: u32,
@@ -53,18 +53,21 @@ pub struct LogEntry {
 /// Last Heard entry — one entry per call start or SDS activity
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct LastHeardEntry {
-    pub ts: String,           // HH:MM:SS timestamp
-    pub issi: u32,            // source ISSI
-    pub activity: String,     // "call_group", "call_individual", "sds"
-    pub dest: u32,            // destination GSSI or ISSI (0 if unknown)
+    pub ts: String,                 // HH:MM:SS timestamp
+    pub issi: u32,                  // source ISSI
+    pub activity: String,           // "call_group", "call_individual", "sds"
+    pub dest: u32,                  // destination GSSI or ISSI (0 if unknown)
+    pub source: String,             // "local", "brew", "brew2", "asterisk", "echolink"
+    pub call_id: Option<u16>,       // present for call rows, absent for one-shot activity
+    pub duration_secs: Option<u64>, // filled once a call ends; None while active / for SDS
 }
 
 /// SDS Log entry — one SDS message the BS sent or received locally. Persisted to disk
 /// (`sds_log.json` next to the active config) so the log survives a restart.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SdsLogEntry {
-    pub ts: String,           // "YYYY-MM-DD HH:MM:SS" local time
-    pub direction: String,    // "rx" (from MS) | "net" (from network) | "tx" (from dashboard)
+    pub ts: String,        // "YYYY-MM-DD HH:MM:SS" local time
+    pub direction: String, // "rx" (from MS) | "net" (from network) | "tx" (from dashboard)
     pub source_issi: u32,
     pub dest_issi: u32,
     pub is_group: bool,
@@ -76,14 +79,57 @@ pub struct SdsLogEntry {
 /// disk (`dapnet_log.json` next to the active config) so the history survives a restart.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct DapnetLogEntry {
-    pub ts: String,           // "YYYY-MM-DD HH:MM:SS" local time
-    pub direction: String,    // "rx" | "tx"
+    pub ts: String,        // "YYYY-MM-DD HH:MM:SS" local time
+    pub direction: String, // "rx" | "tx"
     pub id: String,
     pub callsign: String,
     pub recipient: String,
     pub text: String,
     pub priority: Option<u8>,
     pub paths: Vec<String>,
+}
+
+/// MeshCom packet log entry. Persisted to disk (`meshcom_messages.json` next to the active
+/// config) so the packet history survives a FlowStation restart.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct MeshcomMessageLogEntry {
+    pub ts: String,
+    pub direction: String,
+    pub msg_type: String,
+    pub src_type: Option<String>,
+    pub src: Option<String>,
+    #[serde(default)]
+    pub via: Vec<String>,
+    pub dst: Option<String>,
+    pub msg: Option<String>,
+    pub msg_id: Option<String>,
+    pub paths: Vec<String>,
+    pub lat: Option<f64>,
+    pub lon: Option<f64>,
+    pub alt: Option<f64>,
+    pub batt: Option<f64>,
+    pub rssi: Option<i64>,
+    pub snr: Option<i64>,
+}
+
+/// MeshCom node directory entry. Persisted to disk (`meshcom_nodes.json` next to the active
+/// config) so the node list survives a FlowStation restart.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct MeshcomNodeLogEntry {
+    pub src: String,
+    #[serde(default)]
+    pub via: Vec<String>,
+    pub last_seen: String,
+    pub last_type: String,
+    pub lat: Option<f64>,
+    pub lon: Option<f64>,
+    pub alt: Option<f64>,
+    pub batt: Option<f64>,
+    pub rssi: Option<i64>,
+    pub snr: Option<i64>,
+    pub firmware: Option<String>,
+    pub fw_sub: Option<String>,
+    pub hw_id: Option<String>,
 }
 
 /// Shared mutable state for the dashboard, protected by RwLock
@@ -104,6 +150,14 @@ pub struct DashboardStateInner {
     pub dapnet_log: std::collections::VecDeque<DapnetLogEntry>,
     /// Where `dapnet_log` is persisted. Empty disables persistence.
     dapnet_log_path: std::path::PathBuf,
+    /// MeshCom packet log ring (newest at the front). Backed by an on-disk JSON file.
+    pub meshcom_messages: std::collections::VecDeque<MeshcomMessageLogEntry>,
+    /// Where `meshcom_messages` is persisted. Empty disables persistence.
+    meshcom_messages_path: std::path::PathBuf,
+    /// MeshCom node directory (newest/most recently seen at the front). Backed by JSON.
+    pub meshcom_nodes: Vec<MeshcomNodeLogEntry>,
+    /// Where `meshcom_nodes` is persisted. Empty disables persistence.
+    meshcom_nodes_path: std::path::PathBuf,
     pub config_path: String,
     pub brew_online: bool,
     pub brew_version: u8,
@@ -173,6 +227,10 @@ pub const LAST_HEARD_MAX: usize = 50;
 pub const SDS_LOG_MAX: usize = 500;
 /// Max DAPNET Log entries kept in memory and on disk.
 pub const DAPNET_LOG_MAX: usize = 500;
+/// Max MeshCom message entries kept in memory and on disk.
+pub const MESHCOM_MESSAGES_MAX: usize = 10_000;
+/// Max MeshCom nodes kept in memory and on disk.
+pub const MESHCOM_NODES_MAX: usize = 65_535;
 
 #[derive(Debug)]
 pub struct MsEntry {
@@ -232,6 +290,30 @@ impl DashboardStateInner {
         if !dapnet_log.is_empty() {
             tracing::info!("DAPNET Log: loaded {} entries from {}", dapnet_log.len(), dapnet_log_path.display());
         }
+        let meshcom_messages_path = std::path::Path::new(&config_path)
+            .parent()
+            .map(|d| d.join("meshcom_messages.json"))
+            .unwrap_or_else(|| std::path::PathBuf::from("meshcom_messages.json"));
+        let meshcom_messages = load_meshcom_messages(&meshcom_messages_path);
+        if !meshcom_messages.is_empty() {
+            tracing::info!(
+                "MeshCom Messages: loaded {} entries from {}",
+                meshcom_messages.len(),
+                meshcom_messages_path.display()
+            );
+        }
+        let meshcom_nodes_path = std::path::Path::new(&config_path)
+            .parent()
+            .map(|d| d.join("meshcom_nodes.json"))
+            .unwrap_or_else(|| std::path::PathBuf::from("meshcom_nodes.json"));
+        let meshcom_nodes = load_meshcom_nodes(&meshcom_nodes_path);
+        if !meshcom_nodes.is_empty() {
+            tracing::info!(
+                "MeshCom Nodes: loaded {} entries from {}",
+                meshcom_nodes.len(),
+                meshcom_nodes_path.display()
+            );
+        }
         Self {
             ms_map: HashMap::new(),
             calls: HashMap::new(),
@@ -242,6 +324,10 @@ impl DashboardStateInner {
             sds_log_path,
             dapnet_log,
             dapnet_log_path,
+            meshcom_messages,
+            meshcom_messages_path,
+            meshcom_nodes,
+            meshcom_nodes_path,
             config_path,
             brew_online: false,
             brew_version: 0,
@@ -255,17 +341,28 @@ impl DashboardStateInner {
         }
     }
 
-    pub fn push_last_heard(&mut self, issi: u32, activity: &str, dest: u32) {
+    pub fn push_last_heard(&mut self, issi: u32, activity: &str, dest: u32, source: &str, call_id: Option<u16>) {
         let entry = LastHeardEntry {
             ts: chrono::Local::now().format("%H:%M:%S").to_string(),
             issi,
             activity: activity.to_string(),
             dest,
+            source: source.to_string(),
+            call_id,
+            duration_secs: None,
         };
         if self.last_heard.len() >= LAST_HEARD_MAX {
             self.last_heard.pop_back();
         }
         self.last_heard.push_front(entry);
+    }
+
+    pub fn finish_last_heard_call(&mut self, call_id: u16, duration_secs: u64) {
+        for entry in &mut self.last_heard {
+            if entry.call_id == Some(call_id) {
+                entry.duration_secs = Some(duration_secs);
+            }
+        }
     }
 
     pub fn push_log(&mut self, level: &str, msg: String) {
@@ -357,43 +454,137 @@ impl DashboardStateInner {
         self.persist_dapnet_log();
     }
 
+    /// Append one MeshCom packet to the persistent packet log. Best-effort only: write failures
+    /// never affect UDP handling.
+    pub fn push_meshcom_message(&mut self, mut entry: MeshcomMessageLogEntry) {
+        normalize_meshcom_message_route(&mut entry);
+        self.meshcom_messages.push_front(entry);
+        while self.meshcom_messages.len() > MESHCOM_MESSAGES_MAX {
+            self.meshcom_messages.pop_back();
+        }
+        self.persist_meshcom_messages();
+    }
+
+    fn persist_meshcom_messages(&self) {
+        if self.meshcom_messages_path.as_os_str().is_empty() {
+            return;
+        }
+        if let Ok(text) = serde_json::to_string(&self.meshcom_messages) {
+            let _ = std::fs::write(&self.meshcom_messages_path, text);
+        }
+    }
+
+    pub fn clear_meshcom_messages(&mut self) {
+        self.meshcom_messages.clear();
+        self.persist_meshcom_messages();
+    }
+
+    /// Merge one MeshCom node update into the persistent node directory. Empty optional fields do
+    /// not erase previously observed metadata for the same node.
+    pub fn upsert_meshcom_node(&mut self, mut update: MeshcomNodeLogEntry) {
+        normalize_meshcom_node_route(&mut update);
+        if let Some(pos) = self.meshcom_nodes.iter().position(|node| node.src == update.src) {
+            let mut node = self.meshcom_nodes.remove(pos);
+            node.last_seen = update.last_seen;
+            node.last_type = update.last_type;
+            node.via = update.via;
+            if update.lat.is_some() {
+                node.lat = update.lat;
+            }
+            if update.lon.is_some() {
+                node.lon = update.lon;
+            }
+            if update.alt.is_some() {
+                node.alt = update.alt;
+            }
+            if update.batt.is_some() {
+                node.batt = update.batt;
+            }
+            if update.rssi.is_some() {
+                node.rssi = update.rssi;
+            }
+            if update.snr.is_some() {
+                node.snr = update.snr;
+            }
+            if update.firmware.is_some() {
+                node.firmware = update.firmware;
+            }
+            if update.fw_sub.is_some() {
+                node.fw_sub = update.fw_sub;
+            }
+            if update.hw_id.is_some() {
+                node.hw_id = update.hw_id;
+            }
+            self.meshcom_nodes.insert(0, node);
+        } else {
+            self.meshcom_nodes.insert(0, update);
+        }
+        while self.meshcom_nodes.len() > MESHCOM_NODES_MAX {
+            self.meshcom_nodes.pop();
+        }
+        self.persist_meshcom_nodes();
+    }
+
+    fn persist_meshcom_nodes(&self) {
+        if self.meshcom_nodes_path.as_os_str().is_empty() {
+            return;
+        }
+        if let Ok(text) = serde_json::to_string(&self.meshcom_nodes) {
+            let _ = std::fs::write(&self.meshcom_nodes_path, text);
+        }
+    }
+
+    pub fn clear_meshcom_nodes(&mut self) {
+        self.meshcom_nodes.clear();
+        self.persist_meshcom_nodes();
+    }
+
     pub fn snapshot_ms(&self) -> Vec<MsState> {
-        self.ms_map.values().map(|e| MsState {
-            issi: e.issi,
-            groups: e.groups.clone(),
-            selected_group: e.selected_group,
-            rssi_dbfs: e.rssi_dbfs,
-            registered_at: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_secs()
-                .saturating_sub(e.registered_at.elapsed().as_secs()),
-            last_seen_secs_ago: e.last_seen.elapsed().as_secs(),
-            energy_saving_mode: e.energy_saving_mode,
-        }).collect()
+        self.ms_map
+            .values()
+            .map(|e| MsState {
+                issi: e.issi,
+                groups: e.groups.clone(),
+                selected_group: e.selected_group,
+                rssi_dbfs: e.rssi_dbfs,
+                registered_at: std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_secs()
+                    .saturating_sub(e.registered_at.elapsed().as_secs()),
+                last_seen_secs_ago: e.last_seen.elapsed().as_secs(),
+                energy_saving_mode: e.energy_saving_mode,
+            })
+            .collect()
     }
 
     pub fn snapshot_calls(&self) -> Vec<CallState> {
-        self.calls.values().map(|c| CallState {
-            call_id: c.call_id,
-            call_type: if c.is_group { "group" } else { "individual" },
-            gssi: c.gssi,
-            caller_issi: c.caller_issi,
-            called_issi: c.called_issi,
-            active_speaker: c.speaker_issi,
-            started_secs_ago: c.started_at.elapsed().as_secs(),
-            simplex: c.simplex,
-            ts: c.ts,
-            priority: c.priority,
-        }).collect()
+        self.calls
+            .values()
+            .map(|c| CallState {
+                call_id: c.call_id,
+                call_type: if c.is_group { "group" } else { "individual" },
+                gssi: c.gssi,
+                caller_issi: c.caller_issi,
+                called_issi: c.called_issi,
+                active_speaker: c.speaker_issi,
+                started_secs_ago: c.started_at.elapsed().as_secs(),
+                simplex: c.simplex,
+                ts: c.ts,
+                priority: c.priority,
+            })
+            .collect()
     }
 
     pub fn snapshot_emergencies(&self) -> Vec<EmergencyState> {
-        self.emergencies.values().map(|e| EmergencyState {
-            issi: e.issi,
-            dest_ssi: e.dest_ssi,
-            started_secs_ago: e.started_at.elapsed().as_secs(),
-        }).collect()
+        self.emergencies
+            .values()
+            .map(|e| EmergencyState {
+                issi: e.issi,
+                dest_ssi: e.dest_ssi,
+                started_secs_ago: e.started_at.elapsed().as_secs(),
+            })
+            .collect()
     }
 
     /// Raise (or refresh) an emergency for `issi`. Returns true only on the idle→emergency
@@ -401,13 +592,20 @@ impl DashboardStateInner {
     pub fn emergency_enter(&mut self, issi: u32, dest_ssi: u32) -> bool {
         match self.emergencies.get_mut(&issi) {
             Some(e) => {
-                if dest_ssi != 0 { e.dest_ssi = dest_ssi; }
+                if dest_ssi != 0 {
+                    e.dest_ssi = dest_ssi;
+                }
                 false
             }
             None => {
-                self.emergencies.insert(issi, EmergencyEntry {
-                    issi, dest_ssi, started_at: Instant::now(),
-                });
+                self.emergencies.insert(
+                    issi,
+                    EmergencyEntry {
+                        issi,
+                        dest_ssi,
+                        started_at: Instant::now(),
+                    },
+                );
                 true
             }
         }
@@ -433,4 +631,58 @@ fn load_dapnet_log(path: &std::path::Path) -> std::collections::VecDeque<DapnetL
         return std::collections::VecDeque::new();
     };
     serde_json::from_str(&text).unwrap_or_default()
+}
+
+fn load_meshcom_messages(path: &std::path::Path) -> std::collections::VecDeque<MeshcomMessageLogEntry> {
+    let Ok(text) = std::fs::read_to_string(path) else {
+        return std::collections::VecDeque::new();
+    };
+    let mut entries: std::collections::VecDeque<MeshcomMessageLogEntry> = serde_json::from_str(&text).unwrap_or_default();
+    for entry in &mut entries {
+        normalize_meshcom_message_route(entry);
+    }
+    entries
+}
+
+fn load_meshcom_nodes(path: &std::path::Path) -> Vec<MeshcomNodeLogEntry> {
+    let Ok(text) = std::fs::read_to_string(path) else {
+        return Vec::new();
+    };
+    let mut entries: Vec<MeshcomNodeLogEntry> = serde_json::from_str(&text).unwrap_or_default();
+    for entry in &mut entries {
+        normalize_meshcom_node_route(entry);
+    }
+    entries
+}
+
+fn normalize_meshcom_message_route(entry: &mut MeshcomMessageLogEntry) {
+    if !entry.via.is_empty() {
+        return;
+    }
+    let Some(src) = entry.src.as_deref() else {
+        return;
+    };
+    let (origin, via) = split_meshcom_route(src);
+    if !via.is_empty() {
+        entry.src = Some(origin);
+        entry.via = via;
+    }
+}
+
+fn normalize_meshcom_node_route(entry: &mut MeshcomNodeLogEntry) {
+    if !entry.via.is_empty() {
+        return;
+    }
+    let (origin, via) = split_meshcom_route(&entry.src);
+    if !via.is_empty() {
+        entry.src = origin;
+        entry.via = via;
+    }
+}
+
+fn split_meshcom_route(src: &str) -> (String, Vec<String>) {
+    let mut parts = src.split(',').map(str::trim).filter(|s| !s.is_empty());
+    let origin = parts.next().unwrap_or(src.trim()).to_string();
+    let via = parts.map(ToString::to_string).collect();
+    (origin, via)
 }

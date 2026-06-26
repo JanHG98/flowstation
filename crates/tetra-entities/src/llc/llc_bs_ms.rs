@@ -103,12 +103,10 @@ impl Llc {
 
     /// Returns details for outstanding to-be-sent ACK, if any. Returned u8 is the sequence number.
     /// ETSI 22.3.2.3 case d: when a waiting ACK and outgoing TL-DATA exist for the same link, the
-    /// LLC shall emit a combined BL-ADATA PDU. Matching by SSI alone is correct today because all
-    /// downlink signalling funnels to ts1 (see dl_enqueue_tma in bs_sched), so any pending ACK
-    /// for this SSI will ride the same slot as the outgoing data.
-    /// TODO: once bs_sched's identify_timeslots_for_ssi is implemented and DL signalling can
-    /// land on non-ts1 slots, also match on the target timeslot to avoid bundling an ACK onto a
-    /// BL-DATA heading to a different slot than where the ACK was scheduled.
+    /// LLC shall emit a combined BL-ADATA PDU. We currently key this by SSI because the basic-link
+    /// state here is still per-subscriber rather than per-(subscriber,timeslot) signalling path.
+    /// If we ever need to distinguish concurrent basic-link signalling contexts for the same SSI,
+    /// extend this matching to include the target link/timeslot.
     fn get_out_ack_seq_if_any(&mut self, addr: TetraAddress) -> Option<u8> {
         for i in 0..self.scheduled_out_acks.len() {
             if self.scheduled_out_acks[i].addr.ssi == addr.ssi {
@@ -194,7 +192,8 @@ impl Llc {
                 self.rx_tma_report_ind(queue, message);
             }
             _ => {
-                tracing::error!("BUG: unexpected message or state -- routing error"); return;
+                tracing::error!("BUG: unexpected message or state -- routing error");
+                return;
             }
         }
     }
@@ -202,8 +201,9 @@ impl Llc {
     fn rx_tla_tlunitdata_req_bl(&mut self, _queue: &mut MessageQueue, message: SapMsg) {
         tracing::trace!("rx_tla_tlunitdata_req_bl");
         let SapMsgInner::TlaTlUnitdataReqBl(mut prim) = message.msg else {
-                tracing::error!("BUG: unexpected message or state -- routing error"); return;
-            };
+            tracing::error!("BUG: unexpected message or state -- routing error");
+            return;
+        };
 
         let mut pdu_buf = BitBuffer::new_autoexpand(32);
         let pdu = BlUdata { has_fcs: false };
@@ -221,6 +221,7 @@ impl Llc {
                 req_handle: prim.req_handle,
                 pdu: pdu_buf,
                 main_address: prim.main_address,
+                link_id: prim.link_id,
                 endpoint_id: prim.endpoint_id,
                 stealing_permission: prim.stealing_permission,
                 subscriber_class: prim.subscriber_class,
@@ -252,15 +253,80 @@ impl Llc {
     fn rx_tla_tldata_req_bl(&mut self, _queue: &mut MessageQueue, message: SapMsg) {
         tracing::trace!("rx_tla_tldata_req_bl");
         let SapMsgInner::TlaTlDataReqBl(mut prim) = message.msg else {
-                tracing::error!("BUG: unexpected message or state -- routing error"); return;
-            };
-
-        if prim.stealing_permission {
-            tracing::error!("LLC: BL-DATA requested for STCH message (stealing_permission=true) — not supported, dropping");
+            tracing::error!("BUG: unexpected message or state -- routing error");
             return;
+        };
+
+        // Traffic-channel responses may carry the TL-SDU on the BL-ACK itself.
+        // This is required for U-Alert and other BL response payloads.
+        if prim.stealing_permission {
+            if let Some(out_ack_n) = self.get_out_ack_seq_if_any(prim.main_address) {
+                let mut pdu_buf = BitBuffer::new_autoexpand(32);
+                let pdu = BlAck {
+                    has_fcs: prim.fcs_flag,
+                    nr: out_ack_n,
+                };
+                pdu.to_bitbuf(&mut pdu_buf);
+                let sdu_len = prim.tl_sdu.get_len_remaining();
+                pdu_buf.copy_bits(&mut prim.tl_sdu, sdu_len);
+                pdu_buf.seek(0);
+                tracing::debug!(ts=%self.dltime, "-> {:?} piggyback sdu {}", pdu, pdu_buf.dump_bin());
+
+                let sapmsg = SapMsg {
+                    sap: Sap::TmaSap,
+                    src: self.entity(),
+                    dest: TetraEntity::Umac,
+                    msg: SapMsgInner::TmaUnitdataReq(TmaUnitdataReq {
+                        req_handle: prim.req_handle,
+                        pdu: pdu_buf,
+                        main_address: prim.main_address,
+                        link_id: prim.link_id,
+                        endpoint_id: prim.endpoint_id,
+                        stealing_permission: prim.stealing_permission,
+                        subscriber_class: prim.subscriber_class,
+                        air_interface_encryption: prim.air_interface_encryption,
+                        stealing_repeats_flag: prim.stealing_repeats_flag,
+                        data_category: prim.data_class_info,
+                        chan_alloc: prim.chan_alloc,
+                        tx_reporter: prim.tx_reporter.take(),
+                    }),
+                };
+                self.outbound_udata_messages.push_back(sapmsg);
+                return;
+            }
         }
-        if prim.main_address.ssi_type == SsiType::Gssi {
-            tracing::error!("LLC: BL-DATA requested for GSSI-addressed message — not supported, dropping");
+
+        // Group signalling and STCH requests without an ACK to piggyback should
+        // go out as BL-UDATA instead of being dropped.
+        if prim.stealing_permission || prim.main_address.ssi_type == SsiType::Gssi {
+            let mut pdu_buf = BitBuffer::new_autoexpand(32);
+            let pdu = BlUdata { has_fcs: false };
+            pdu.to_bitbuf(&mut pdu_buf);
+            let sdu_len = prim.tl_sdu.get_len_remaining();
+            pdu_buf.copy_bits(&mut prim.tl_sdu, sdu_len);
+            pdu_buf.seek(0);
+            tracing::debug!(ts=%self.dltime, "-> {:?} sdu {}", pdu, pdu_buf.dump_bin());
+
+            let sapmsg = SapMsg {
+                sap: Sap::TmaSap,
+                src: self.entity(),
+                dest: TetraEntity::Umac,
+                msg: SapMsgInner::TmaUnitdataReq(TmaUnitdataReq {
+                    req_handle: prim.req_handle,
+                    pdu: pdu_buf,
+                    main_address: prim.main_address,
+                    link_id: 0,
+                    endpoint_id: prim.endpoint_id,
+                    stealing_permission: prim.stealing_permission,
+                    subscriber_class: prim.subscriber_class,
+                    air_interface_encryption: prim.air_interface_encryption,
+                    stealing_repeats_flag: prim.stealing_repeats_flag,
+                    data_category: prim.data_class_info,
+                    chan_alloc: prim.chan_alloc,
+                    tx_reporter: prim.tx_reporter.take(),
+                }),
+            };
+            self.outbound_udata_messages.push_back(sapmsg);
             return;
         }
 
@@ -303,7 +369,9 @@ impl Llc {
 
         // Derive the timeslot from chan_alloc (first set timeslot in [bool;4]), defaulting to 1.
         // Must be done before chan_alloc is moved into TmaUnitdataReq below.
-        let derived_ts: u8 = prim.chan_alloc.as_ref()
+        let derived_ts: u8 = prim
+            .chan_alloc
+            .as_ref()
             .and_then(|ca| ca.timeslots.iter().enumerate().find(|&(_, &set)| set).map(|(i, _)| (i + 1) as u8))
             .unwrap_or(1);
 
@@ -318,6 +386,7 @@ impl Llc {
                 req_handle: prim.req_handle,
                 pdu: pdu_buf,
                 main_address: prim.main_address,
+                link_id: 0,
                 endpoint_id: prim.endpoint_id,
                 stealing_permission: prim.stealing_permission,
                 subscriber_class: prim.subscriber_class,
@@ -357,7 +426,9 @@ impl Llc {
             SapMsgInner::TlaTlUnitdataReqBl(_) => {
                 self.rx_tla_tlunitdata_req_bl(queue, message);
             }
-            _ => { tracing::warn!("unhandled match variant, ignoring"); }
+            _ => {
+                tracing::warn!("unhandled match variant, ignoring");
+            }
         }
     }
 
@@ -389,7 +460,8 @@ impl Llc {
 
             pdu_type
         } else {
-            tracing::error!("BUG: unexpected message or state -- routing error"); return;
+            tracing::error!("BUG: unexpected message or state -- routing error");
+            return;
         };
 
         // Call handler function
@@ -416,7 +488,8 @@ impl Llc {
             }
 
             _ => {
-                tracing::error!("BUG: unexpected message or state -- routing error"); return;
+                tracing::error!("BUG: unexpected message or state -- routing error");
+                return;
             }
         }
     }
@@ -426,7 +499,8 @@ impl Llc {
 
         // Get header bits (again) and prepare MLE message
         let SapMsgInner::TmaUnitdataInd(prim) = &mut message.msg else {
-            tracing::error!("BUG: unexpected message or state -- routing error"); return;
+            tracing::error!("BUG: unexpected message or state -- routing error");
+            return;
         };
         let Some(mut pdu) = prim.pdu.take() else {
             tracing::warn!("LLC: rx_tma_unitdata_ind_bl received message with no pdu, ignoring");
@@ -484,7 +558,8 @@ impl Llc {
                 }
             },
             _ => {
-                tracing::error!("BUG: unexpected message or state -- routing error"); return;
+                tracing::error!("BUG: unexpected message or state -- routing error");
+                return;
             }
         };
 
@@ -507,10 +582,32 @@ impl Llc {
         }
 
         if pdu_type == LlcPduType::BlAck || pdu_type == LlcPduType::BlAckFcs {
-            // No payload, no need to do anything further
-            if pdu.get_len_remaining() > 4 {
-                tracing::warn!("BL-ACK PDU with unexpected payload, ignoring extra bits: {}", pdu.dump_bin());
+            if pdu.get_len_remaining() == 0 {
+                return;
             }
+            tracing::debug!("BL-ACK PDU carrying a payload: {}", pdu.dump_bin());
+            pdu.set_raw_start(pdu.get_raw_pos());
+            let m = TlaTlDataIndBl {
+                main_address: prim.main_address,
+                link_id: 0,
+                endpoint_id: prim.endpoint_id,
+                new_endpoint_id: prim.new_endpoint_id,
+                css_endpoint_id: prim.css_endpoint_id,
+                tl_sdu: Some(pdu),
+                scrambling_code: prim.scrambling_code,
+                fcs_flag: has_fcs,
+                air_interface_encryption: prim.air_interface_encryption,
+                chan_change_resp_req: prim.chan_change_response_req,
+                chan_change_handle: prim.chan_change_handle,
+                chan_info: prim.chan_info,
+                req_handle: 0, // TODO FIXME
+            };
+            queue.push_back(SapMsg {
+                sap: Sap::TlaSap,
+                src: TetraEntity::Llc,
+                dest: TetraEntity::Mle,
+                msg: SapMsgInner::TlaTlDataIndBl(m),
+            });
             return;
         }
 
@@ -546,7 +643,7 @@ impl Llc {
             let m = TlaTlDataIndBl {
                 // address_type: 0, // TODO FIXME
                 main_address: prim.main_address,
-                link_id: 0,
+                link_id: prim.link_id,
                 endpoint_id: prim.endpoint_id,
                 new_endpoint_id: prim.new_endpoint_id,
                 css_endpoint_id: prim.css_endpoint_id,
@@ -743,6 +840,7 @@ impl Llc {
                     req_handle: 0, // TODO FIXME
                     pdu: pdu_buf,
                     main_address: ack.addr,
+                    link_id: if steal { ack.ts as u32 } else { 0 },
                     endpoint_id: 0, // todo fixme
                     stealing_permission: steal,
                     subscriber_class: 0,            // TODO FIXME
@@ -817,7 +915,9 @@ impl TetraEntityTrait for Llc {
             Sap::TlaSap => {
                 self.rx_tla_prim(queue, message);
             }
-            _ => { tracing::warn!("unhandled match variant, ignoring"); }
+            _ => {
+                tracing::warn!("unhandled match variant, ignoring");
+            }
         }
     }
 

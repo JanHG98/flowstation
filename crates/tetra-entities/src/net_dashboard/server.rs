@@ -4,14 +4,19 @@ use std::net::{TcpListener, TcpStream, UdpSocket};
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::Instant;
 
-use tungstenite::{accept_hdr, handshake::server::{Request, Response}, Message};
+use tungstenite::{
+    Message, accept_hdr,
+    handshake::server::{Request, Response},
+};
 
-use crate::net_dashboard::html::DASHBOARD_HTML;
-use crate::net_dashboard::state::{DashboardState, DashboardStateInner, MsEntry, CallEntry};
-use crate::net_telemetry::TelemetryEvent;
 use crate::net_control::commands::ControlCommand;
+use crate::net_dashboard::html::DASHBOARD_HTML;
+use crate::net_dashboard::state::{CallEntry, DashboardState, DashboardStateInner, MeshcomMessageLogEntry, MeshcomNodeLogEntry, MsEntry};
 use crate::net_echolink::{EcholinkCmdSender, EcholinkCommand};
-use crate::tpg2200::{build_sds_text_payload, build_tpg2200_callout_payload, format_hex_bytes, parse_hex_payload};
+use crate::net_telemetry::TelemetryEvent;
+use crate::tpg2200::{build_sds_text_payload, build_tpg2200_callout_payload, format_hex_bytes, parse_hex_payload, tpg2200_incident_byte};
+use tetra_config::bluestation::CfgBrew;
+use tetra_core::tetra_entities::TetraEntity;
 
 type CmdSender = crossbeam_channel::Sender<ControlCommand>;
 
@@ -37,10 +42,23 @@ struct UpdateState {
 }
 
 impl UpdateState {
-    fn new() -> Self { UpdateState { phase: UpdatePhase::Idle, log: String::new() } }
-    fn append(&mut self, line: &str) { self.log.push_str(line); self.log.push('\n'); }
-    fn start(&mut self) { self.phase = UpdatePhase::Running; self.log.clear(); }
-    fn finish(&mut self, success: bool) { self.phase = UpdatePhase::Done { success }; }
+    fn new() -> Self {
+        UpdateState {
+            phase: UpdatePhase::Idle,
+            log: String::new(),
+        }
+    }
+    fn append(&mut self, line: &str) {
+        self.log.push_str(line);
+        self.log.push('\n');
+    }
+    fn start(&mut self) {
+        self.phase = UpdatePhase::Running;
+        self.log.clear();
+    }
+    fn finish(&mut self, success: bool) {
+        self.phase = UpdatePhase::Done { success };
+    }
 }
 
 type SharedUpdateState = Arc<Mutex<UpdateState>>;
@@ -115,7 +133,8 @@ fn generate_session_token() -> String {
         // Fallback: deterministic-ish entropy from time + pid + addr-of-self.
         let nanos = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_nanos()).unwrap_or(0);
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
         let pid = std::process::id() as u128;
         let mix = nanos.wrapping_mul(0x9e37_79b9_7f4a_7c15).wrapping_add(pid << 64);
         for (i, b) in bytes.iter_mut().enumerate() {
@@ -206,12 +225,7 @@ fn resolve_source_dir(override_dir: Option<&str>) -> Result<std::path::PathBuf, 
     }
 
     // 3. Well-known install paths.
-    for candidate in &[
-        "/opt/tetra-bluestation",
-        "/opt/flowstation",
-        "/opt/tetra-bs",
-        "/opt/tetra",
-    ] {
+    for candidate in &["/opt/tetra-bluestation", "/opt/flowstation", "/opt/tetra-bs", "/opt/tetra"] {
         let p = std::path::PathBuf::from(candidate);
         if is_git_repo(&p) {
             return Ok(p);
@@ -385,12 +399,7 @@ fn run_update(update: SharedUpdateState, config_path: String, source_dir_overrid
     log!(update, "Source dir: {}", src_dir.display());
 
     /// Run a command, streaming stdout+stderr into the log; return collected stdout or None.
-    fn run_cmd_output(
-        update: &SharedUpdateState,
-        program: &str,
-        args: &[&str],
-        dir: &std::path::Path,
-    ) -> Option<String> {
+    fn run_cmd_output(update: &SharedUpdateState, program: &str, args: &[&str], dir: &std::path::Path) -> Option<String> {
         let label = format!("$ {} {}", program, args.join(" "));
         tracing::info!("UPDATE: {}", label);
         let mut cmd = std::process::Command::new(program);
@@ -423,7 +432,14 @@ fn run_update(update: SharedUpdateState, config_path: String, source_dir_overrid
         }
         log!(update, "");
         log!(update, "--- Detected dubious ownership — registering as safe.directory ---");
-        if run_cmd_output(&update, "git", &["config", "--global", "--add", "safe.directory", src_str], &src_dir).is_none() {
+        if run_cmd_output(
+            &update,
+            "git",
+            &["config", "--global", "--add", "safe.directory", src_str],
+            &src_dir,
+        )
+        .is_none()
+        {
             log!(update, "ERROR: could not register safe.directory automatically.");
             log!(update, "Manual fix: run this on the server as the user that runs FlowStation:");
             log!(update, "    git config --global --add safe.directory {}", src_str);
@@ -447,12 +463,16 @@ fn run_update(update: SharedUpdateState, config_path: String, source_dir_overrid
     let local_commit = run_cmd_output(&update, "git", &["-C", src_str, "rev-parse", "HEAD"], &src_dir)
         .map(|s| s.trim().to_string())
         .unwrap_or_default();
-    if local_commit.is_empty() { return; }
+    if local_commit.is_empty() {
+        return;
+    }
 
     let remote_commit = run_cmd_output(&update, "git", &["-C", src_str, "rev-parse", "origin/main"], &src_dir)
         .map(|s| s.trim().to_string())
         .unwrap_or_default();
-    if remote_commit.is_empty() { return; }
+    if remote_commit.is_empty() {
+        return;
+    }
 
     log!(update, "Local  commit: {}", &local_commit[..local_commit.len().min(12)]);
     log!(update, "Remote commit: {}", &remote_commit[..remote_commit.len().min(12)]);
@@ -466,7 +486,7 @@ fn run_update(update: SharedUpdateState, config_path: String, source_dir_overrid
         // Backup config before touching anything.
         let backup_path = format!("{}.bak", config_path);
         match std::fs::copy(&config_path, &backup_path) {
-            Ok(_)  => log!(update, "Config backed up → {}", backup_path),
+            Ok(_) => log!(update, "Config backed up → {}", backup_path),
             Err(e) => log!(update, "WARNING: config backup failed: {} (continuing)", e),
         }
 
@@ -487,14 +507,26 @@ fn run_update(update: SharedUpdateState, config_path: String, source_dir_overrid
     let binary_current = binary_built_from(tetra_core::GIT_HASH, repo_head);
     if !merged && binary_current != Some(false) {
         match binary_current {
-            Some(true) => log!(update, "Already up to date — running {} matches the repository.", tetra_core::STACK_VERSION),
-            _ => log!(update, "Repository is up to date; running {} (build hash not verifiable).", tetra_core::STACK_VERSION),
+            Some(true) => log!(
+                update,
+                "Already up to date — running {} matches the repository.",
+                tetra_core::STACK_VERSION
+            ),
+            _ => log!(
+                update,
+                "Repository is up to date; running {} (build hash not verifiable).",
+                tetra_core::STACK_VERSION
+            ),
         }
         update.lock().unwrap().finish(true);
         return;
     }
     if !merged {
-        log!(update, "Repository is current but the running binary ({}) predates it — rebuilding.", tetra_core::STACK_VERSION);
+        log!(
+            update,
+            "Repository is current but the running binary ({}) predates it — rebuilding.",
+            tetra_core::STACK_VERSION
+        );
     }
 
     // Step 7: build. cargo lives in ~/.cargo/bin, which the systemd service PATH usually omits, so
@@ -526,10 +558,7 @@ fn run_update(update: SharedUpdateState, config_path: String, source_dir_overrid
     log!(update, "--- Build successful. Restarting service in 2s... ---");
     update.lock().unwrap().finish(true);
 
-    crate::service_control::schedule_service_action(
-        crate::service_control::ServiceAction::Restart,
-        std::time::Duration::from_secs(2),
-    );
+    crate::service_control::schedule_service_action(crate::service_control::ServiceAction::Restart, std::time::Duration::from_secs(2));
 }
 
 pub struct DashboardServer {
@@ -625,10 +654,8 @@ impl DashboardServer {
         let state = Arc::clone(&self.state);
         let clients = Arc::clone(&self.clients);
         let config_path = self.config_path.clone();
-        let cmd_tx: Arc<Mutex<Option<CmdSender>>> =
-            Arc::new(Mutex::new(self.cmd_tx.take()));
-        let echolink_cmd_tx: Arc<Mutex<Option<EcholinkCmdSender>>> =
-            Arc::new(Mutex::new(self.echolink_cmd_tx.take()));
+        let cmd_tx: Arc<Mutex<Option<CmdSender>>> = Arc::new(Mutex::new(self.cmd_tx.take()));
+        let echolink_cmd_tx: Arc<Mutex<Option<EcholinkCmdSender>>> = Arc::new(Mutex::new(self.echolink_cmd_tx.take()));
         let update_state = Arc::clone(&self.update_state);
         let source_dir_override = self.source_dir_override.clone();
         let auth = self.auth.clone();
@@ -650,11 +677,15 @@ impl DashboardServer {
                 // loop runs only on the dashboard thread, so it can never block the PHY/main loop.
                 let listener = loop {
                     match TcpListener::bind(&addr) {
-                        Ok(l) => { tracing::info!("Dashboard listening on http://{}", addr); break l; }
+                        Ok(l) => {
+                            tracing::info!("Dashboard listening on http://{}", addr);
+                            break l;
+                        }
                         Err(e) => {
                             tracing::error!(
                                 "Dashboard failed to bind {}: {} — retrying in 5s (interface/IP may not be ready yet)",
-                                addr, e
+                                addr,
+                                e
                             );
                             std::thread::sleep(std::time::Duration::from_secs(5));
                         }
@@ -675,7 +706,23 @@ impl DashboardServer {
                     let radioid = radioid.clone();
                     std::thread::Builder::new()
                         .name("dashboard-conn".into())
-                        .spawn(move || handle_connection(stream, state, clients, config_path, cmd_tx, echolink_cmd_tx, update_state, source_dir_override, auth, shared_config, sessions, radioid, public_overview))
+                        .spawn(move || {
+                            handle_connection(
+                                stream,
+                                state,
+                                clients,
+                                config_path,
+                                cmd_tx,
+                                echolink_cmd_tx,
+                                update_state,
+                                source_dir_override,
+                                auth,
+                                shared_config,
+                                sessions,
+                                radioid,
+                                public_overview,
+                            )
+                        })
                         .ok();
                 }
             })
@@ -692,11 +739,18 @@ impl DashboardServer {
             let mut s = self.state.write().unwrap();
             match &event {
                 TelemetryEvent::MsRegistration { issi } => {
-                    s.ms_map.insert(*issi, MsEntry {
-                        issi: *issi, groups: Vec::new(), selected_group: None,
-                        rssi_dbfs: None, registered_at: Instant::now(), last_seen: Instant::now(),
-                        energy_saving_mode: 0,
-                    });
+                    s.ms_map.insert(
+                        *issi,
+                        MsEntry {
+                            issi: *issi,
+                            groups: Vec::new(),
+                            selected_group: None,
+                            rssi_dbfs: None,
+                            registered_at: Instant::now(),
+                            last_seen: Instant::now(),
+                            energy_saving_mode: 0,
+                        },
+                    );
                     s.push_log("INFO", format!("MS {} registered", issi));
                 }
                 TelemetryEvent::MsDeregistration { issi } => {
@@ -711,7 +765,11 @@ impl DashboardServer {
                 }
                 TelemetryEvent::MsGroupAttach { issi, gssis } => {
                     if let Some(e) = s.ms_map.get_mut(issi) {
-                        for g in gssis { if !e.groups.contains(g) { e.groups.push(*g); } }
+                        for g in gssis {
+                            if !e.groups.contains(g) {
+                                e.groups.push(*g);
+                            }
+                        }
                     }
                 }
                 TelemetryEvent::MsGroupsSnapshot { issi, gssis } => {
@@ -750,56 +808,116 @@ impl DashboardServer {
                         e.energy_saving_mode = *mode;
                     }
                 }
-                TelemetryEvent::GroupCallStarted { call_id, gssi, caller_issi, ts, priority } => {
-                    s.calls.insert(*call_id, CallEntry {
-                        call_id: *call_id, is_group: true, gssi: *gssi,
-                        caller_issi: *caller_issi, called_issi: 0,
-                        speaker_issi: Some(*caller_issi), started_at: Instant::now(), simplex: false, ts: *ts,
-                        priority: *priority,
-                    });
+                TelemetryEvent::GroupCallStarted {
+                    call_id,
+                    gssi,
+                    caller_issi,
+                    ts,
+                    priority,
+                    source,
+                } => {
+                    s.calls.insert(
+                        *call_id,
+                        CallEntry {
+                            call_id: *call_id,
+                            is_group: true,
+                            gssi: *gssi,
+                            caller_issi: *caller_issi,
+                            called_issi: 0,
+                            speaker_issi: Some(*caller_issi),
+                            started_at: Instant::now(),
+                            simplex: false,
+                            ts: *ts,
+                            priority: *priority,
+                        },
+                    );
                     // The caller keyed up on this GSSI, so it's their actively-selected TG (vs the
                     // other scanned/affiliated groups). The browser derives the same thing from the
                     // call_started message; this keeps the snapshot sent to new clients in sync.
-                    if let Some(e) = s.ms_map.get_mut(caller_issi) { e.selected_group = Some(*gssi); }
-                    s.push_last_heard(*caller_issi, "call_group", *gssi);
+                    if let Some(e) = s.ms_map.get_mut(caller_issi) {
+                        e.selected_group = Some(*gssi);
+                    }
+                    s.push_last_heard(*caller_issi, "call_group", *gssi, source, Some(*call_id));
                     // priority 15 = emergency (ETSI clause 14.8). Flag it in the live log. (The
                     // persistent emergency banner + Telegram are driven by the emergency-status
                     // alarm; an emergency-priority CALL is surfaced in the Active Calls table.)
                     if *priority >= 15 {
-                        s.push_log("WARN", format!("EMERGENCY group call {} started: {} -> GSSI {} (priority {})", call_id, caller_issi, gssi, priority));
+                        s.push_log(
+                            "WARN",
+                            format!(
+                                "EMERGENCY group call {} started: {} -> GSSI {} (priority {})",
+                                call_id, caller_issi, gssi, priority
+                            ),
+                        );
                     } else {
                         s.push_log("INFO", format!("Group call {} started: {} -> GSSI {}", call_id, caller_issi, gssi));
                     }
                 }
                 TelemetryEvent::GroupCallEnded { call_id, gssi: _ } => {
-                    s.calls.remove(call_id);
+                    if let Some(call) = s.calls.remove(call_id) {
+                        s.finish_last_heard_call(*call_id, call.started_at.elapsed().as_secs());
+                    }
                     s.push_log("INFO", format!("Group call {} ended", call_id));
                 }
-                TelemetryEvent::GroupCallSpeakerChanged { call_id, gssi, speaker_issi } => {
-                    if let Some(c) = s.calls.get_mut(call_id) { c.speaker_issi = Some(*speaker_issi); }
+                TelemetryEvent::GroupCallSpeakerChanged {
+                    call_id,
+                    gssi,
+                    speaker_issi,
+                    source,
+                } => {
+                    if let Some(c) = s.calls.get_mut(call_id) {
+                        c.speaker_issi = Some(*speaker_issi);
+                    }
                     // Whoever is speaking has this GSSI selected.
-                    if let Some(e) = s.ms_map.get_mut(speaker_issi) { e.selected_group = Some(*gssi); }
-                    s.push_last_heard(*speaker_issi, "call_group", *gssi);
+                    if let Some(e) = s.ms_map.get_mut(speaker_issi) {
+                        e.selected_group = Some(*gssi);
+                    }
+                    s.push_last_heard(*speaker_issi, "call_group", *gssi, source, Some(*call_id));
                 }
-                TelemetryEvent::IndividualCallStarted { call_id, calling_issi, called_issi, simplex, ts, priority } => {
-                    s.calls.insert(*call_id, CallEntry {
-                        call_id: *call_id, is_group: false, gssi: 0,
-                        caller_issi: *calling_issi, called_issi: *called_issi,
-                        speaker_issi: None, started_at: Instant::now(), simplex: *simplex, ts: *ts,
-                        priority: *priority,
-                    });
-                    s.push_last_heard(*calling_issi, "call_individual", *called_issi);
+                TelemetryEvent::IndividualCallStarted {
+                    call_id,
+                    calling_issi,
+                    called_issi,
+                    simplex,
+                    ts,
+                    priority,
+                    source,
+                } => {
+                    s.calls.insert(
+                        *call_id,
+                        CallEntry {
+                            call_id: *call_id,
+                            is_group: false,
+                            gssi: 0,
+                            caller_issi: *calling_issi,
+                            called_issi: *called_issi,
+                            speaker_issi: None,
+                            started_at: Instant::now(),
+                            simplex: *simplex,
+                            ts: *ts,
+                            priority: *priority,
+                        },
+                    );
+                    s.push_last_heard(*calling_issi, "call_individual", *called_issi, source, Some(*call_id));
                     // priority 15 = emergency (ETSI clause 14.8). Flag it in the live log. (The
                     // persistent emergency banner + Telegram are driven by the emergency-status
                     // alarm; an emergency-priority CALL is surfaced in the Active Calls table.)
                     if *priority >= 15 {
-                        s.push_log("WARN", format!("EMERGENCY P2P call {} started: {} -> {} (priority {})", call_id, calling_issi, called_issi, priority));
+                        s.push_log(
+                            "WARN",
+                            format!(
+                                "EMERGENCY P2P call {} started: {} -> {} (priority {})",
+                                call_id, calling_issi, called_issi, priority
+                            ),
+                        );
                     } else {
                         s.push_log("INFO", format!("P2P call {} started: {} -> {}", call_id, calling_issi, called_issi));
                     }
                 }
                 TelemetryEvent::IndividualCallEnded { call_id } => {
-                    s.calls.remove(call_id);
+                    if let Some(call) = s.calls.remove(call_id) {
+                        s.finish_last_heard_call(*call_id, call.started_at.elapsed().as_secs());
+                    }
                     s.push_log("INFO", format!("P2P call {} ended", call_id));
                 }
                 TelemetryEvent::BrewConnected { connected, server_version } => {
@@ -808,20 +926,37 @@ impl DashboardServer {
                     // reports 0 ("unknown") on every (re)connect and v1 is only learned later
                     // (lazily, from a v1-flavoured group call); an unconditional assignment let a
                     // reconnect DOWNGRADE a confirmed v1 back to v0. Only ever raise it.
-                    if *connected { s.brew_version = s.brew_version.max(*server_version); }
+                    if *connected {
+                        s.brew_version = s.brew_version.max(*server_version);
+                    }
                 }
-                TelemetryEvent::SdsActivity { source_issi, dest_issi } => {
-                    s.push_last_heard(*source_issi, "sds", *dest_issi);
+                TelemetryEvent::SdsActivity {
+                    source_issi,
+                    dest_issi,
+                    source,
+                } => {
+                    s.push_last_heard(*source_issi, "sds", *dest_issi, source, None);
                 }
-                TelemetryEvent::SdsLog { direction, source_issi, dest_issi, is_group, protocol_id, text } => {
+                TelemetryEvent::SdsLog {
+                    direction,
+                    source_issi,
+                    dest_issi,
+                    is_group,
+                    protocol_id,
+                    text,
+                } => {
                     s.push_sds_log(direction, *source_issi, *dest_issi, *is_group, *protocol_id, text.clone());
                 }
                 TelemetryEvent::TsVoiceActivity { .. } => {
                     // Handled below with rate limiting — no state update needed
                 }
                 TelemetryEvent::TxVisual {
-                    sample_rate, center_freq_hz, rms_dbfs, peak_dbfs,
-                    spectrum_db_tenths, constellation_iq,
+                    sample_rate,
+                    center_freq_hz,
+                    rms_dbfs,
+                    peak_dbfs,
+                    spectrum_db_tenths,
+                    constellation_iq,
                 } => {
                     // Cache the visual snapshot so newly-connected dashboard clients
                     // see something on the RF page before the next ~200 ms emit cycle.
@@ -835,9 +970,14 @@ impl DashboardServer {
                     });
                 }
                 TelemetryEvent::TxQuality {
-                    papr_db, evm_pct, dc_offset_i, dc_offset_q,
-                    iq_amplitude_imbalance_db, iq_phase_imbalance_deg,
-                    carrier_leakage_db, occupied_bandwidth_hz,
+                    papr_db,
+                    evm_pct,
+                    dc_offset_i,
+                    dc_offset_q,
+                    iq_amplitude_imbalance_db,
+                    iq_phase_imbalance_deg,
+                    carrier_leakage_db,
+                    occupied_bandwidth_hz,
                 } => {
                     // Cache the quality numbers so late-joining clients get them
                     // straight away rather than waiting up to a second.
@@ -852,7 +992,11 @@ impl DashboardServer {
                         occupied_bandwidth_hz: *occupied_bandwidth_hz,
                     });
                 }
-                TelemetryEvent::SdrHealth { temperature_c, tx_gains, rx_gains } => {
+                TelemetryEvent::SdrHealth {
+                    temperature_c,
+                    tx_gains,
+                    rx_gains,
+                } => {
                     s.last_sdr_health = Some(crate::net_dashboard::state::SdrHealthSnapshot {
                         temperature_c: *temperature_c,
                         tx_gains: tx_gains.clone(),
@@ -876,7 +1020,9 @@ impl DashboardServer {
                     // ENTER only — re-sends return false and produce no log/broadcast.
                     if s.emergency_enter(*source_issi, *dest_ssi) {
                         s.push_log("WARN", format!("EMERGENCY raised by ISSI {} (dest {})", source_issi, dest_ssi));
-                        if let Ok(j) = serde_json::to_string(&serde_json::json!({"type":"emergency_added","issi":source_issi,"dest_ssi":dest_ssi,"started_secs_ago":0})) {
+                        if let Ok(j) = serde_json::to_string(
+                            &serde_json::json!({"type":"emergency_added","issi":source_issi,"dest_ssi":dest_ssi,"started_secs_ago":0}),
+                        ) {
                             extra_broadcasts.push(j);
                         }
                     }
@@ -889,7 +1035,15 @@ impl DashboardServer {
                         }
                     }
                 }
-                TelemetryEvent::DapnetLog { direction, id, callsign, recipient, text, priority, paths } => {
+                TelemetryEvent::DapnetLog {
+                    direction,
+                    id,
+                    callsign,
+                    recipient,
+                    text,
+                    priority,
+                    paths,
+                } => {
                     s.push_dapnet_log(
                         direction,
                         id.clone(),
@@ -900,6 +1054,75 @@ impl DashboardServer {
                         paths.clone(),
                     );
                 }
+                TelemetryEvent::MeshcomMessageLog {
+                    ts,
+                    direction,
+                    msg_type,
+                    src_type,
+                    src,
+                    dst,
+                    msg,
+                    msg_id,
+                    paths,
+                    lat,
+                    lon,
+                    alt,
+                    batt,
+                    rssi,
+                    snr,
+                    via,
+                } => {
+                    s.push_meshcom_message(MeshcomMessageLogEntry {
+                        ts: ts.clone(),
+                        direction: direction.clone(),
+                        msg_type: msg_type.clone(),
+                        src_type: src_type.clone(),
+                        src: src.clone(),
+                        via: via.clone(),
+                        dst: dst.clone(),
+                        msg: msg.clone(),
+                        msg_id: msg_id.clone(),
+                        paths: paths.clone(),
+                        lat: *lat,
+                        lon: *lon,
+                        alt: *alt,
+                        batt: *batt,
+                        rssi: *rssi,
+                        snr: *snr,
+                    });
+                }
+                TelemetryEvent::MeshcomNodeUpdate {
+                    src,
+                    last_seen,
+                    last_type,
+                    lat,
+                    lon,
+                    alt,
+                    batt,
+                    rssi,
+                    snr,
+                    firmware,
+                    fw_sub,
+                    hw_id,
+                    via,
+                } => {
+                    s.upsert_meshcom_node(MeshcomNodeLogEntry {
+                        src: src.clone(),
+                        via: via.clone(),
+                        last_seen: last_seen.clone(),
+                        last_type: last_type.clone(),
+                        lat: *lat,
+                        lon: *lon,
+                        alt: *alt,
+                        batt: *batt,
+                        rssi: *rssi,
+                        snr: *snr,
+                        firmware: firmware.clone(),
+                        fw_sub: fw_sub.clone(),
+                        hw_id: hw_id.clone(),
+                    });
+                }
+                TelemetryEvent::BrewSubscriberRegistered { .. } | TelemetryEvent::BrewSubscriberDeregistered { .. } => {}
             }
         }
         if let Some(json) = msg {
@@ -947,43 +1170,73 @@ impl DashboardServer {
 
 fn event_to_ws_msg(event: &TelemetryEvent) -> Option<String> {
     let v = match event {
-        TelemetryEvent::MsRegistration { issi } =>
-            serde_json::json!({"type":"ms_registered","issi":issi}),
-        TelemetryEvent::MsDeregistration { issi } =>
-            serde_json::json!({"type":"ms_deregistered","issi":issi}),
-        TelemetryEvent::MsTimeoutDrop { issi } =>
-            serde_json::json!({"type":"ms_deregistered","issi":issi,"reason":"t351"}),
-        TelemetryEvent::MsGroupAttach { issi, gssis } =>
-            serde_json::json!({"type":"ms_groups","issi":issi,"groups":gssis}),
-        TelemetryEvent::MsGroupDetach { issi, gssis } =>
-            serde_json::json!({"type":"ms_groups_detach","issi":issi,"groups":gssis}),
-        TelemetryEvent::MsGroupsSnapshot { issi, gssis } =>
-            serde_json::json!({"type":"ms_groups_all","issi":issi,"groups":gssis}),
-        TelemetryEvent::MsRssi { issi, rssi_dbfs } =>
-            serde_json::json!({"type":"ms_rssi","issi":issi,"rssi_dbfs":rssi_dbfs}),
-        TelemetryEvent::MsEnergySaving { issi, mode } =>
-            serde_json::json!({"type":"ms_energy_saving","issi":issi,"mode":mode}),
-        TelemetryEvent::GroupCallStarted { call_id, gssi, caller_issi, ts, priority } =>
-            serde_json::json!({"type":"call_started","call_id":call_id,"call_type":"group","gssi":gssi,"caller_issi":caller_issi,"ts":ts,"priority":priority,"last_heard":{"issi":caller_issi,"activity":"call_group","dest":gssi}}),
-        TelemetryEvent::GroupCallEnded { call_id, gssi: _ } =>
-            serde_json::json!({"type":"call_ended","call_id":call_id}),
-        TelemetryEvent::GroupCallSpeakerChanged { call_id, gssi, speaker_issi } =>
-            serde_json::json!({"type":"speaker_changed","call_id":call_id,"speaker_issi":speaker_issi,"last_heard":{"issi":speaker_issi,"activity":"call_group","dest":gssi}}),
-        TelemetryEvent::IndividualCallStarted { call_id, calling_issi, called_issi, simplex, ts, priority } =>
-            serde_json::json!({"type":"call_started","call_id":call_id,"call_type":"individual","caller_issi":calling_issi,"called_issi":called_issi,"simplex":simplex,"ts":ts,"priority":priority,"last_heard":{"issi":calling_issi,"activity":"call_individual","dest":called_issi}}),
-        TelemetryEvent::IndividualCallEnded { call_id } =>
-            serde_json::json!({"type":"call_ended","call_id":call_id}),
-        TelemetryEvent::BrewConnected { connected, server_version } =>
-            serde_json::json!({"type":"brew_status","connected":connected,"brew_version":server_version}),
-        TelemetryEvent::SdsActivity { source_issi, dest_issi } =>
-            serde_json::json!({"type":"last_heard","issi":source_issi,"activity":"sds","dest":dest_issi}),
-        TelemetryEvent::SdsLog { direction, source_issi, dest_issi, is_group, protocol_id, text } =>
-            serde_json::json!({"type":"sds_log","direction":direction,"source_issi":source_issi,"dest_issi":dest_issi,"is_group":is_group,"protocol_id":protocol_id,"text":text}),
-        TelemetryEvent::TsVoiceActivity { ts } =>
-            serde_json::json!({"type":"ts_voice","ts":ts}),
+        TelemetryEvent::MsRegistration { issi } => serde_json::json!({"type":"ms_registered","issi":issi}),
+        TelemetryEvent::MsDeregistration { issi } => serde_json::json!({"type":"ms_deregistered","issi":issi}),
+        TelemetryEvent::MsTimeoutDrop { issi } => serde_json::json!({"type":"ms_deregistered","issi":issi,"reason":"t351"}),
+        TelemetryEvent::MsGroupAttach { issi, gssis } => serde_json::json!({"type":"ms_groups","issi":issi,"groups":gssis}),
+        TelemetryEvent::MsGroupDetach { issi, gssis } => serde_json::json!({"type":"ms_groups_detach","issi":issi,"groups":gssis}),
+        TelemetryEvent::MsGroupsSnapshot { issi, gssis } => serde_json::json!({"type":"ms_groups_all","issi":issi,"groups":gssis}),
+        TelemetryEvent::MsRssi { issi, rssi_dbfs } => serde_json::json!({"type":"ms_rssi","issi":issi,"rssi_dbfs":rssi_dbfs}),
+        TelemetryEvent::MsEnergySaving { issi, mode } => serde_json::json!({"type":"ms_energy_saving","issi":issi,"mode":mode}),
+        TelemetryEvent::GroupCallStarted {
+            call_id,
+            gssi,
+            caller_issi,
+            ts,
+            priority,
+            source,
+        } => {
+            serde_json::json!({"type":"call_started","call_id":call_id,"call_type":"group","gssi":gssi,"caller_issi":caller_issi,"ts":ts,"priority":priority,"source":source,"last_heard":{"issi":caller_issi,"activity":"call_group","dest":gssi,"source":source,"call_id":call_id}})
+        }
+        TelemetryEvent::GroupCallEnded { call_id, gssi: _ } => serde_json::json!({"type":"call_ended","call_id":call_id}),
+        TelemetryEvent::GroupCallSpeakerChanged {
+            call_id,
+            gssi,
+            speaker_issi,
+            source,
+        } => {
+            serde_json::json!({"type":"speaker_changed","call_id":call_id,"speaker_issi":speaker_issi,"source":source,"last_heard":{"issi":speaker_issi,"activity":"call_group","dest":gssi,"source":source,"call_id":call_id}})
+        }
+        TelemetryEvent::IndividualCallStarted {
+            call_id,
+            calling_issi,
+            called_issi,
+            simplex,
+            ts,
+            priority,
+            source,
+        } => {
+            serde_json::json!({"type":"call_started","call_id":call_id,"call_type":"individual","caller_issi":calling_issi,"called_issi":called_issi,"simplex":simplex,"ts":ts,"priority":priority,"source":source,"last_heard":{"issi":calling_issi,"activity":"call_individual","dest":called_issi,"source":source,"call_id":call_id}})
+        }
+        TelemetryEvent::IndividualCallEnded { call_id } => serde_json::json!({"type":"call_ended","call_id":call_id}),
+        TelemetryEvent::BrewConnected { connected, server_version } => {
+            serde_json::json!({"type":"brew_status","connected":connected,"brew_version":server_version})
+        }
+        TelemetryEvent::SdsActivity {
+            source_issi,
+            dest_issi,
+            source,
+        } => {
+            serde_json::json!({"type":"last_heard","issi":source_issi,"activity":"sds","dest":dest_issi,"source":source})
+        }
+        TelemetryEvent::SdsLog {
+            direction,
+            source_issi,
+            dest_issi,
+            is_group,
+            protocol_id,
+            text,
+        } => {
+            serde_json::json!({"type":"sds_log","direction":direction,"source_issi":source_issi,"dest_issi":dest_issi,"is_group":is_group,"protocol_id":protocol_id,"text":text})
+        }
+        TelemetryEvent::TsVoiceActivity { ts } => serde_json::json!({"type":"ts_voice","ts":ts}),
         TelemetryEvent::TxVisual {
-            sample_rate, center_freq_hz, rms_dbfs, peak_dbfs,
-            spectrum_db_tenths, constellation_iq,
+            sample_rate,
+            center_freq_hz,
+            rms_dbfs,
+            peak_dbfs,
+            spectrum_db_tenths,
+            constellation_iq,
         } => serde_json::json!({
             "type": "tx_visual",
             "sample_rate": sample_rate,
@@ -994,9 +1247,14 @@ fn event_to_ws_msg(event: &TelemetryEvent) -> Option<String> {
             "constellation_iq": constellation_iq,
         }),
         TelemetryEvent::TxQuality {
-            papr_db, evm_pct, dc_offset_i, dc_offset_q,
-            iq_amplitude_imbalance_db, iq_phase_imbalance_deg,
-            carrier_leakage_db, occupied_bandwidth_hz,
+            papr_db,
+            evm_pct,
+            dc_offset_i,
+            dc_offset_q,
+            iq_amplitude_imbalance_db,
+            iq_phase_imbalance_deg,
+            carrier_leakage_db,
+            occupied_bandwidth_hz,
         } => serde_json::json!({
             "type": "tx_quality",
             "papr_db": papr_db,
@@ -1008,7 +1266,11 @@ fn event_to_ws_msg(event: &TelemetryEvent) -> Option<String> {
             "carrier_leakage_db": carrier_leakage_db,
             "occupied_bandwidth_hz": occupied_bandwidth_hz,
         }),
-        TelemetryEvent::SdrHealth { temperature_c, tx_gains, rx_gains } => serde_json::json!({
+        TelemetryEvent::SdrHealth {
+            temperature_c,
+            tx_gains,
+            rx_gains,
+        } => serde_json::json!({
             "type": "sdr_health",
             "temperature_c": temperature_c,
             "tx_gains": tx_gains,
@@ -1028,9 +1290,87 @@ fn event_to_ws_msg(event: &TelemetryEvent) -> Option<String> {
         }),
         // Emergency add/remove are broadcast explicitly (transition-gated) from handle_telemetry,
         // so the generic path stays silent — otherwise every periodic re-send would re-broadcast.
-        TelemetryEvent::EmergencyAlarm { .. } | TelemetryEvent::EmergencyCancel { .. } => return None,
-        TelemetryEvent::DapnetLog { direction, id, callsign, recipient, text, priority, paths } =>
-            serde_json::json!({"type":"dapnet_log","direction":direction,"id":id,"callsign":callsign,"recipient":recipient,"text":text,"priority":priority,"paths":paths}),
+        TelemetryEvent::EmergencyAlarm { .. }
+        | TelemetryEvent::EmergencyCancel { .. }
+        | TelemetryEvent::BrewSubscriberRegistered { .. }
+        | TelemetryEvent::BrewSubscriberDeregistered { .. } => return None,
+        TelemetryEvent::DapnetLog {
+            direction,
+            id,
+            callsign,
+            recipient,
+            text,
+            priority,
+            paths,
+        } => {
+            serde_json::json!({"type":"dapnet_log","direction":direction,"id":id,"callsign":callsign,"recipient":recipient,"text":text,"priority":priority,"paths":paths})
+        }
+        TelemetryEvent::MeshcomMessageLog {
+            ts,
+            direction,
+            msg_type,
+            src_type,
+            src,
+            dst,
+            msg,
+            msg_id,
+            paths,
+            lat,
+            lon,
+            alt,
+            batt,
+            rssi,
+            snr,
+            via,
+        } => serde_json::json!({
+            "type": "meshcom_message",
+            "ts": ts,
+            "direction": direction,
+            "msg_type": msg_type,
+            "src_type": src_type,
+            "src": src,
+            "via": via,
+            "dst": dst,
+            "msg": msg,
+            "msg_id": msg_id,
+            "paths": paths,
+            "lat": lat,
+            "lon": lon,
+            "alt": alt,
+            "batt": batt,
+            "rssi": rssi,
+            "snr": snr,
+        }),
+        TelemetryEvent::MeshcomNodeUpdate {
+            src,
+            last_seen,
+            last_type,
+            lat,
+            lon,
+            alt,
+            batt,
+            rssi,
+            snr,
+            firmware,
+            fw_sub,
+            hw_id,
+            via,
+        } => serde_json::json!({
+            "type": "meshcom_node",
+            "src": src,
+            "via": via,
+            "last_seen": last_seen,
+            "last_type": last_type,
+            "lat": lat,
+            "lon": lon,
+            "alt": alt,
+            "batt": batt,
+            "rssi": rssi,
+            "snr": snr,
+            "firmware": firmware,
+            "fw_sub": fw_sub,
+            "hw_id": hw_id,
+        }),
     };
     serde_json::to_string(&v).ok()
 }
@@ -1052,9 +1392,7 @@ fn parse_basic_auth(headers: &str) -> Option<(String, String)> {
             let value = line[14..].trim();
             if let Some(encoded) = value.strip_prefix("Basic ").or_else(|| value.strip_prefix("basic ")) {
                 use base64::Engine;
-                let decoded = base64::engine::general_purpose::STANDARD
-                    .decode(encoded.trim())
-                    .ok()?;
+                let decoded = base64::engine::general_purpose::STANDARD.decode(encoded.trim()).ok()?;
                 let s = String::from_utf8(decoded).ok()?;
                 let mut parts = s.splitn(2, ':');
                 let user = parts.next()?.to_string();
@@ -1069,7 +1407,9 @@ fn parse_basic_auth(headers: &str) -> Option<(String, String)> {
 /// Constant-time byte slice comparison to mitigate timing attacks.
 /// Returns true iff a == b in length and content.
 fn timing_safe_eq(a: &[u8], b: &[u8]) -> bool {
-    if a.len() != b.len() { return false; }
+    if a.len() != b.len() {
+        return false;
+    }
     let mut diff: u8 = 0;
     for (x, y) in a.iter().zip(b.iter()) {
         diff |= x ^ y;
@@ -1090,7 +1430,8 @@ fn http_response_401(mut stream: TcpStream) {
          Connection: close\r\n\
          \r\n\
          {}",
-        body.len(), body
+        body.len(),
+        body
     );
     let _ = stream.write_all(resp.as_bytes());
 }
@@ -1144,19 +1485,66 @@ fn serve_dapnet_log_clear(stream: TcpStream, state: &DashboardState) {
     http_json_response(stream, 200, "{\"ok\":true}");
 }
 
+/// GET /api/meshcom-messages — the persisted MeshCom packet log as JSON, newest first.
+fn serve_meshcom_messages(stream: TcpStream, state: &DashboardState) {
+    let body = {
+        match state.read() {
+            Ok(s) => serde_json::to_string(&s.meshcom_messages).unwrap_or_else(|_| "[]".to_string()),
+            Err(_) => "[]".to_string(),
+        }
+    };
+    http_json_response(stream, 200, &body);
+}
+
+/// DELETE /api/meshcom-messages — clear the persisted MeshCom packet log.
+fn serve_meshcom_messages_clear(stream: TcpStream, state: &DashboardState) {
+    if let Ok(mut s) = state.write() {
+        s.clear_meshcom_messages();
+    }
+    http_json_response(stream, 200, "{\"ok\":true}");
+}
+
+/// GET /api/meshcom-nodes — the persisted MeshCom node directory as JSON, newest first.
+fn serve_meshcom_nodes(stream: TcpStream, state: &DashboardState) {
+    let body = {
+        match state.read() {
+            Ok(s) => serde_json::to_string(&s.meshcom_nodes).unwrap_or_else(|_| "[]".to_string()),
+            Err(_) => "[]".to_string(),
+        }
+    };
+    http_json_response(stream, 200, &body);
+}
+
+/// DELETE /api/meshcom-nodes — clear the persisted MeshCom node directory.
+fn serve_meshcom_nodes_clear(stream: TcpStream, state: &DashboardState) {
+    if let Ok(mut s) = state.write() {
+        s.clear_meshcom_nodes();
+    }
+    http_json_response(stream, 200, "{\"ok\":true}");
+}
+
 /// Serialize the current live SDS queue to JSON and serve it.
 fn serve_live_sds_list(mut stream: TcpStream, cfg: &Option<tetra_config::bluestation::SharedConfig>) {
-    let items: Vec<serde_json::Value> = cfg.as_ref().map(|c| {
-        let state = c.state_read();
-        state.live_sds_queue.iter().map(|m| serde_json::json!({
-            "id": m.id,
-            "text": m.text,
-            "protocol_id": m.protocol_id,
-            "source_issi": m.source_issi,
-            "repeat_count": m.repeat_count,
-            "sent_count": m.sent_count,
-        })).collect()
-    }).unwrap_or_default();
+    let items: Vec<serde_json::Value> = cfg
+        .as_ref()
+        .map(|c| {
+            let state = c.state_read();
+            state
+                .live_sds_queue
+                .iter()
+                .map(|m| {
+                    serde_json::json!({
+                        "id": m.id,
+                        "text": m.text,
+                        "protocol_id": m.protocol_id,
+                        "source_issi": m.source_issi,
+                        "repeat_count": m.repeat_count,
+                        "sent_count": m.sent_count,
+                    })
+                })
+                .collect()
+        })
+        .unwrap_or_default();
     let body = serde_json::to_string(&items).unwrap_or_else(|_| "[]".to_string());
     let header = format!(
         "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
@@ -1201,15 +1589,60 @@ fn truncate_action_text(text: &str, max: usize) -> (String, bool) {
     }
 }
 
-fn next_tpg2200_action_incident(
-    cfg: &tetra_config::bluestation::SharedConfig,
-    base: u16,
-) -> u16 {
+fn next_tpg2200_action_incident(cfg: &tetra_config::bluestation::SharedConfig, base: u16) -> u16 {
     let base = base.clamp(1, 256);
     let mut state = cfg.state_write();
     let incident = state.tpg2200_action_next_incident.unwrap_or(base).clamp(1, 256);
     state.tpg2200_action_next_incident = Some(if incident >= 256 { 1 } else { incident + 1 });
     incident
+}
+
+fn query_u16(params: &HashMap<String, String>, keys: &[&str], max: u16) -> Option<u16> {
+    for key in keys {
+        if let Some(value) = params.get(*key) {
+            if let Ok(parsed) = value.trim().parse::<u16>() {
+                return Some(parsed.min(max));
+            }
+        }
+    }
+    None
+}
+
+fn query_u8(params: &HashMap<String, String>, keys: &[&str], max: u8) -> Option<u8> {
+    for key in keys {
+        if let Some(value) = params.get(*key) {
+            if let Ok(parsed) = value.trim().parse::<u8>() {
+                return Some(parsed.min(max));
+            }
+        }
+    }
+    None
+}
+
+fn query_tpg_ric(params: &HashMap<String, String>, keys: &[&str]) -> Option<u32> {
+    for key in keys {
+        if let Some(value) = params.get(*key) {
+            if let Ok(parsed) = tetra_config::bluestation::parse_ric_route_key(value) {
+                return Some(parsed);
+            }
+        }
+    }
+    None
+}
+
+fn tpg2200_priority_for(
+    default_priority: u8,
+    issi_priorities: &BTreeMap<u32, u8>,
+    ric_priorities: &BTreeMap<u32, u8>,
+    dest_issi: u32,
+    tpg_ric: u32,
+) -> u8 {
+    issi_priorities
+        .get(&dest_issi)
+        .or_else(|| ric_priorities.get(&tpg_ric))
+        .copied()
+        .unwrap_or(default_priority)
+        .min(15)
 }
 
 /// GET /api/action/tpg2200?token=...&text=...
@@ -1239,9 +1672,7 @@ fn serve_tpg2200_action_url(
     let params = query_params(path);
     let supplied_token = params.get("token").map(|s| s.as_str()).unwrap_or("");
     let expected_token = action.token.as_ref();
-    if expected_token.trim().is_empty()
-        || !timing_safe_eq(supplied_token.as_bytes(), expected_token.as_bytes())
-    {
+    if expected_token.trim().is_empty() || !timing_safe_eq(supplied_token.as_bytes(), expected_token.as_bytes()) {
         tracing::warn!("TPG2200 ActionURL rejected: invalid token");
         http_response(stream, 403, "Forbidden");
         return;
@@ -1261,10 +1692,7 @@ fn serve_tpg2200_action_url(
     let message = if requested_text.is_empty() { "ALARM" } else { requested_text };
     let (message, truncated) = truncate_action_text(message, action.max_text_chars.max(1));
     if truncated {
-        tracing::warn!(
-            "TPG2200 ActionURL text truncated to {} chars",
-            action.max_text_chars
-        );
+        tracing::warn!("TPG2200 ActionURL text truncated to {} chars", action.max_text_chars);
     }
 
     let tx = match cmd_tx.lock() {
@@ -1276,8 +1704,23 @@ fn serve_tpg2200_action_url(
         return;
     };
 
-    let incident = next_tpg2200_action_incident(cfg, action.incident_base);
-    let payload = build_tpg2200_callout_payload(incident, &message);
+    let incident = query_u16(&params, &["incident", "incident_id"], 256).map(|n| n.clamp(1, 256));
+    let raw_callout_id = query_u16(&params, &["id", "callout_id", "raw_id"], 255);
+    let callout_id = raw_callout_id.unwrap_or_else(|| {
+        let incident = incident.unwrap_or_else(|| next_tpg2200_action_incident(cfg, action.incident_base));
+        tpg2200_incident_byte(incident) as u16
+    });
+    let tpg_ric = query_tpg_ric(&params, &["ric", "tpg_ric"]).unwrap_or(action.tpg_ric);
+    let priority = query_u8(&params, &["priority", "prio", "tone"], 15).unwrap_or_else(|| {
+        tpg2200_priority_for(
+            action.priority,
+            &action.tpg_issi_priorities,
+            &action.tpg_ric_priorities,
+            action.dest_issi,
+            tpg_ric,
+        )
+    });
+    let payload = build_tpg2200_callout_payload(tpg_ric, callout_id, priority, &message);
     if payload.len() > (u16::MAX as usize / 8) {
         http_response(stream, 500, "TPG2200 payload too large");
         return;
@@ -1297,22 +1740,28 @@ fn serve_tpg2200_action_url(
     }
 
     tracing::info!(
-        "TPG2200 ActionURL sent: dest={} source={} incident={} text={:?}",
+        "TPG2200 ActionURL sent: dest={} source={} tpg_ric={:08X} selector=0x{:02X} priority={} text={:?}",
         action.dest_issi,
         action.source_issi,
-        incident,
+        tpg_ric,
+        callout_id,
+        priority,
         message
     );
     if let Ok(mut s) = state.write() {
         s.push_log(
             "INFO",
             format!(
-                "TPG2200 ActionURL sent to {}: incident {} text {}",
-                action.dest_issi, incident, message
+                "TPG2200 ActionURL sent to {}: selector 0x{:02X} priority {} text {}",
+                action.dest_issi, callout_id, priority, message
             ),
         );
     }
-    http_response(stream, 200, &format!("OK incident={incident}"));
+    http_response(
+        stream,
+        200,
+        &format!("OK ric={tpg_ric:08X} selector=0x{callout_id:02X} priority={priority}"),
+    );
 }
 
 fn handle_connection(
@@ -1339,7 +1788,10 @@ fn handle_connection(
     {
         // peek for the request line (already works for routing)
         let mut peek_buf = [0u8; 4096];
-        let n = match stream.peek(&mut peek_buf) { Ok(n) => n, Err(_) => return };
+        let n = match stream.peek(&mut peek_buf) {
+            Ok(n) => n,
+            Err(_) => return,
+        };
         header_buf.extend_from_slice(&peek_buf[..n]);
     }
     let header_str = String::from_utf8_lossy(&header_buf);
@@ -1364,7 +1816,7 @@ fn handle_connection(
     if let Some((ref expected_user, ref expected_pass)) = auth {
         // Login page and login API must remain reachable without a session.
         let is_login_page = req_line.starts_with("GET /login ") || req_line.starts_with("GET /login?");
-        let is_login_api  = req_line.starts_with("POST /api/login ");
+        let is_login_api = req_line.starts_with("POST /api/login ");
 
         // Validate session cookie when present. Note: validate() refreshes last-seen,
         // so active users effectively never time out.
@@ -1380,7 +1832,9 @@ fn handle_connection(
             loop {
                 let mut line = String::new();
                 let _ = buf.read_line(&mut line);
-                if line == "\r\n" || line.is_empty() || line == "\n" { break; }
+                if line == "\r\n" || line.is_empty() || line == "\n" {
+                    break;
+                }
             }
             // If already logged in, send them straight to the dashboard.
             if session_ok {
@@ -1398,11 +1852,18 @@ fn handle_connection(
             loop {
                 let mut line = String::new();
                 let _ = buf.read_line(&mut line);
-                if line == "\r\n" || line.is_empty() || line == "\n" { break; }
+                if line == "\r\n" || line.is_empty() || line == "\n" {
+                    break;
+                }
                 let lower = line.to_lowercase();
                 if lower.starts_with("content-length:") {
-                    content_length = lower.trim_start_matches("content-length:").trim()
-                        .trim_end_matches("\r\n").trim_end_matches('\n').parse().unwrap_or(0);
+                    content_length = lower
+                        .trim_start_matches("content-length:")
+                        .trim()
+                        .trim_end_matches("\r\n")
+                        .trim_end_matches('\n')
+                        .parse()
+                        .unwrap_or(0);
                 }
             }
             let mut body = vec![0u8; content_length.min(4096)];
@@ -1410,12 +1871,14 @@ fn handle_connection(
             let body_str = String::from_utf8_lossy(&body);
 
             let (user, pass) = parse_login_body(&body_str);
-            let ok = timing_safe_eq(user.as_bytes(), expected_user.as_bytes())
-                  && timing_safe_eq(pass.as_bytes(), expected_pass.as_bytes());
+            let ok = timing_safe_eq(user.as_bytes(), expected_user.as_bytes()) && timing_safe_eq(pass.as_bytes(), expected_pass.as_bytes());
 
             if ok {
-                let token = if let Ok(mut store) = sessions.lock() { store.create() }
-                            else { String::new() };
+                let token = if let Ok(mut store) = sessions.lock() {
+                    store.create()
+                } else {
+                    String::new()
+                };
                 tracing::info!("Dashboard: login OK (user: {})", user);
                 serve_login_success(buf.into_inner(), &token);
             } else {
@@ -1438,7 +1901,9 @@ fn handle_connection(
             loop {
                 let mut line = String::new();
                 let _ = buf.read_line(&mut line);
-                if line == "\r\n" || line.is_empty() || line == "\n" { break; }
+                if line == "\r\n" || line.is_empty() || line == "\n" {
+                    break;
+                }
             }
             serve_logout(buf.into_inner());
             return;
@@ -1450,12 +1915,12 @@ fn handle_connection(
             loop {
                 let mut line = String::new();
                 let _ = buf.read_line(&mut line);
-                if line == "\r\n" || line.is_empty() || line == "\n" { break; }
+                if line == "\r\n" || line.is_empty() || line == "\n" {
+                    break;
+                }
             }
             let inner = buf.into_inner();
-            let is_root = req_line.starts_with("GET / ")
-                || req_line.starts_with("GET /?")
-                || req_line == "GET / HTTP/1.1";
+            let is_root = req_line.starts_with("GET / ") || req_line.starts_with("GET /?") || req_line == "GET / HTTP/1.1";
 
             // Public overview (FH-FEAT-033): when enabled, an anonymous visitor may load the SPA
             // shell and read the narrow public snapshot — nothing else. Every other route (config,
@@ -1498,7 +1963,10 @@ fn handle_connection(
         let body = read_http_body(&mut stream);
         let req: serde_json::Value = match serde_json::from_slice(&body) {
             Ok(v) => v,
-            Err(e) => { http_response(stream, 400, &format!("invalid JSON: {e}")); return; }
+            Err(e) => {
+                http_response(stream, 400, &format!("invalid JSON: {e}"));
+                return;
+            }
         };
         let value = req.get("value").and_then(|v| v.as_u64()).unwrap_or(u64::MAX);
         if value > u64::from(crate::backlight::MAX_VALUE) {
@@ -1518,7 +1986,9 @@ fn handle_connection(
         loop {
             let mut line = String::new();
             let _ = buf.read_line(&mut line);
-            if line == "\r\n" || line.is_empty() || line == "\n" { break; }
+            if line == "\r\n" || line.is_empty() || line == "\n" {
+                break;
+            }
         }
         serve_system_info(buf.into_inner(), &config_path);
     } else if req_line.contains("POST /api/configs/activate") {
@@ -1527,14 +1997,21 @@ fn handle_connection(
         loop {
             let mut line = String::new();
             let _ = buf.read_line(&mut line);
-            if line == "\r\n" || line.is_empty() || line == "\n" { break; }
+            if line == "\r\n" || line.is_empty() || line == "\n" {
+                break;
+            }
             let lower = line.to_lowercase();
             if lower.starts_with("content-length:") {
-                content_length = lower.trim_start_matches("content-length:").trim()
-                    .trim_end_matches("\r\n").trim_end_matches('\n').parse().unwrap_or(0);
+                content_length = lower
+                    .trim_start_matches("content-length:")
+                    .trim()
+                    .trim_end_matches("\r\n")
+                    .trim_end_matches('\n')
+                    .parse()
+                    .unwrap_or(0);
             }
         }
-        let mut body = vec![0u8; content_length];
+        let mut body = vec![0u8; content_length.min(512 * 1024)];
         let _ = buf.read_exact(&mut body);
         let profile = String::from_utf8_lossy(&body).trim().to_string();
         match activate_config_profile(&config_path, &profile) {
@@ -1549,11 +2026,15 @@ fn handle_connection(
         loop {
             let mut line = String::new();
             let _ = buf.read_line(&mut line);
-            if line == "\r\n" || line.is_empty() || line == "\n" { break; }
+            if line == "\r\n" || line.is_empty() || line == "\n" {
+                break;
+            }
         }
         // GET /api/configs/<name> — read a specific profile's content
         // GET /api/configs       — list all profiles
-        let profile_name: Option<String> = req_line.split_whitespace().nth(1)
+        let profile_name: Option<String> = req_line
+            .split_whitespace()
+            .nth(1)
             .and_then(|path| path.strip_prefix("/api/configs/"))
             .map(|n| n.to_string());
         if let Some(name) = profile_name {
@@ -1563,7 +2044,9 @@ fn handle_connection(
         }
     } else if req_line.contains("POST /api/configs/") {
         // POST /api/configs/<name> — save content to a specific profile (not activate)
-        let profile_name: Option<String> = req_line.split_whitespace().nth(1)
+        let profile_name: Option<String> = req_line
+            .split_whitespace()
+            .nth(1)
             .and_then(|path| path.strip_prefix("/api/configs/"))
             .map(|n| n.to_string());
         let mut buf = BufReader::new(stream);
@@ -1571,33 +2054,40 @@ fn handle_connection(
         loop {
             let mut line = String::new();
             let _ = buf.read_line(&mut line);
-            if line == "\r\n" || line.is_empty() || line == "\n" { break; }
+            if line == "\r\n" || line.is_empty() || line == "\n" {
+                break;
+            }
             let lower = line.to_lowercase();
             if lower.starts_with("content-length:") {
-                content_length = lower.trim_start_matches("content-length:").trim()
-                    .trim_end_matches("\r\n").trim_end_matches('\n').parse().unwrap_or(0);
+                content_length = lower
+                    .trim_start_matches("content-length:")
+                    .trim()
+                    .trim_end_matches("\r\n")
+                    .trim_end_matches('\n')
+                    .parse()
+                    .unwrap_or(0);
             }
         }
         let mut body = vec![0u8; content_length.min(512 * 1024)];
         let _ = buf.read_exact(&mut body);
         match profile_name {
             None => http_response(buf.into_inner(), 400, "missing profile name"),
-            Some(name) => {
-                match save_config_profile(&config_path, &name, &String::from_utf8_lossy(&body)) {
-                    Ok(_) => {
-                        tracing::info!("Dashboard: saved profile '{}'", name);
-                        http_response(buf.into_inner(), 200, "OK")
-                    }
-                    Err(e) => http_response(buf.into_inner(), 500, &e),
+            Some(name) => match save_config_profile(&config_path, &name, &String::from_utf8_lossy(&body)) {
+                Ok(_) => {
+                    tracing::info!("Dashboard: saved profile '{}'", name);
+                    http_response(buf.into_inner(), 200, "OK")
                 }
-            }
+                Err(e) => http_response(buf.into_inner(), 500, &e),
+            },
         }
     } else if req_line.contains("GET /api/callsigns") {
         let mut buf = BufReader::new(stream);
         loop {
             let mut line = String::new();
             let _ = buf.read_line(&mut line);
-            if line == "\r\n" || line.is_empty() || line == "\n" { break; }
+            if line == "\r\n" || line.is_empty() || line == "\n" {
+                break;
+            }
         }
         serve_callsigns(buf.into_inner(), &radioid, &req_line);
     } else if req_line.contains("GET /api/update/check") {
@@ -1605,7 +2095,9 @@ fn handle_connection(
         loop {
             let mut line = String::new();
             let _ = buf.read_line(&mut line);
-            if line == "\r\n" || line.is_empty() || line == "\n" { break; }
+            if line == "\r\n" || line.is_empty() || line == "\n" {
+                break;
+            }
         }
         serve_update_check(buf.into_inner());
     } else if req_line.contains("GET /api/update/status") {
@@ -1613,7 +2105,9 @@ fn handle_connection(
         loop {
             let mut line = String::new();
             let _ = buf.read_line(&mut line);
-            if line == "\r\n" || line.is_empty() || line == "\n" { break; }
+            if line == "\r\n" || line.is_empty() || line == "\n" {
+                break;
+            }
         }
         serve_update_status(buf.into_inner(), &update_state);
     } else if req_line.contains("POST /api/update") {
@@ -1621,7 +2115,9 @@ fn handle_connection(
         loop {
             let mut line = String::new();
             let _ = buf.read_line(&mut line);
-            if line == "\r\n" || line.is_empty() || line == "\n" { break; }
+            if line == "\r\n" || line.is_empty() || line == "\n" {
+                break;
+            }
         }
         {
             let mut u = update_state.lock().unwrap();
@@ -1645,7 +2141,9 @@ fn handle_connection(
         loop {
             let mut line = String::new();
             let _ = buf.read_line(&mut line);
-            if line == "\r\n" || line.is_empty() || line == "\n" { break; }
+            if line == "\r\n" || line.is_empty() || line == "\n" {
+                break;
+            }
         }
         let backup_path = format!("{}.bak", config_path);
         serve_config_get(buf.into_inner(), &backup_path);
@@ -1654,7 +2152,9 @@ fn handle_connection(
         loop {
             let mut line = String::new();
             let _ = buf.read_line(&mut line);
-            if line == "\r\n" || line.is_empty() || line == "\n" { break; }
+            if line == "\r\n" || line.is_empty() || line == "\n" {
+                break;
+            }
         }
         let backup_path = format!("{}.bak", config_path);
         match std::fs::copy(&backup_path, &config_path) {
@@ -1670,15 +2170,21 @@ fn handle_connection(
         loop {
             let mut line = String::new();
             let _ = buf.read_line(&mut line);
-            if line == "\r\n" || line.is_empty() || line == "\n" { break; }
+            if line == "\r\n" || line.is_empty() || line == "\n" {
+                break;
+            }
             let lower = line.to_lowercase();
             if lower.starts_with("content-length:") {
-                content_length = lower.trim_start_matches("content-length:")
-                    .trim().trim_end_matches("\r\n").trim_end_matches('\n')
-                    .parse().unwrap_or(0);
+                content_length = lower
+                    .trim_start_matches("content-length:")
+                    .trim()
+                    .trim_end_matches("\r\n")
+                    .trim_end_matches('\n')
+                    .parse()
+                    .unwrap_or(0);
             }
         }
-        let mut body = vec![0u8; content_length];
+        let mut body = vec![0u8; content_length.min(512 * 1024)];
         let _ = buf.read_exact(&mut body);
         let body_str = String::from_utf8_lossy(&body);
         // Write backup of current config before overwriting
@@ -1695,13 +2201,19 @@ fn handle_connection(
         loop {
             let mut line = String::new();
             let _ = buf.read_line(&mut line);
-            if line == "\r\n" || line.is_empty() || line == "\n" { break; }
+            if line == "\r\n" || line.is_empty() || line == "\n" {
+                break;
+            }
         }
         serve_bts_info(buf.into_inner(), &shared_config);
     } else if req_line.contains("GET /api/asterisk/status") {
         let mut s = stream;
         drain_http_headers(&mut s);
         serve_asterisk_status(s, &shared_config);
+    } else if req_line.contains("GET /api/brew/status") {
+        let mut s = stream;
+        drain_http_headers(&mut s);
+        serve_brew_status(s, &shared_config);
     } else if req_line.contains("GET /api/snom-notify") {
         let mut s = stream;
         drain_http_headers(&mut s);
@@ -1714,7 +2226,9 @@ fn handle_connection(
         loop {
             let mut line = String::new();
             let _ = buf.read_line(&mut line);
-            if line == "\r\n" || line.is_empty() || line == "\n" { break; }
+            if line == "\r\n" || line.is_empty() || line == "\n" {
+                break;
+            }
         }
         serve_whitelist_get(buf.into_inner(), &shared_config);
     } else if req_line.contains("POST /api/whitelist") {
@@ -1723,15 +2237,21 @@ fn handle_connection(
         loop {
             let mut line = String::new();
             let _ = buf.read_line(&mut line);
-            if line == "\r\n" || line.is_empty() || line == "\n" { break; }
+            if line == "\r\n" || line.is_empty() || line == "\n" {
+                break;
+            }
             let lower = line.to_lowercase();
             if lower.starts_with("content-length:") {
-                content_length = lower.trim_start_matches("content-length:")
-                    .trim().trim_end_matches("\r\n").trim_end_matches('\n')
-                    .parse().unwrap_or(0);
+                content_length = lower
+                    .trim_start_matches("content-length:")
+                    .trim()
+                    .trim_end_matches("\r\n")
+                    .trim_end_matches('\n')
+                    .parse()
+                    .unwrap_or(0);
             }
         }
-        let mut body = vec![0u8; content_length];
+        let mut body = vec![0u8; content_length.min(512 * 1024)];
         let _ = buf.read_exact(&mut body);
         let body_str = String::from_utf8_lossy(&body);
         serve_whitelist_post(buf.into_inner(), &shared_config, &config_path, body_str.as_ref(), &cmd_tx);
@@ -1740,7 +2260,9 @@ fn handle_connection(
         loop {
             let mut line = String::new();
             let _ = buf.read_line(&mut line);
-            if line == "\r\n" || line.is_empty() || line == "\n" { break; }
+            if line == "\r\n" || line.is_empty() || line == "\n" {
+                break;
+            }
         }
         serve_wx_get(buf.into_inner(), &shared_config);
     } else if req_line.contains("POST /api/wx") {
@@ -1749,15 +2271,21 @@ fn handle_connection(
         loop {
             let mut line = String::new();
             let _ = buf.read_line(&mut line);
-            if line == "\r\n" || line.is_empty() || line == "\n" { break; }
+            if line == "\r\n" || line.is_empty() || line == "\n" {
+                break;
+            }
             let lower = line.to_lowercase();
             if lower.starts_with("content-length:") {
-                content_length = lower.trim_start_matches("content-length:")
-                    .trim().trim_end_matches("\r\n").trim_end_matches('\n')
-                    .parse().unwrap_or(0);
+                content_length = lower
+                    .trim_start_matches("content-length:")
+                    .trim()
+                    .trim_end_matches("\r\n")
+                    .trim_end_matches('\n')
+                    .parse()
+                    .unwrap_or(0);
             }
         }
-        let mut body = vec![0u8; content_length];
+        let mut body = vec![0u8; content_length.min(512 * 1024)];
         let _ = buf.read_exact(&mut body);
         let body_str = String::from_utf8_lossy(&body);
         serve_wx_post(buf.into_inner(), &shared_config, &config_path, body_str.as_ref());
@@ -1813,9 +2341,25 @@ fn handle_connection(
     } else if req_line.contains("POST /api/echolink") {
         let (inner, body_str) = read_post_body(stream);
         serve_echolink_post(inner, &shared_config, &config_path, &body_str);
+    } else if req_line.contains("DELETE /api/meshcom-messages") {
+        let mut s = stream;
+        drain_http_headers(&mut s);
+        serve_meshcom_messages_clear(s, &state);
+    } else if req_line.contains("GET /api/meshcom-messages") {
+        let mut s = stream;
+        drain_http_headers(&mut s);
+        serve_meshcom_messages(s, &state);
+    } else if req_line.contains("DELETE /api/meshcom-nodes") {
+        let mut s = stream;
+        drain_http_headers(&mut s);
+        serve_meshcom_nodes_clear(s, &state);
+    } else if req_line.contains("GET /api/meshcom-nodes") {
+        let mut s = stream;
+        drain_http_headers(&mut s);
+        serve_meshcom_nodes(s, &state);
     } else if req_line.contains("POST /api/meshcom/send") {
         let (inner, body_str) = read_post_body(stream);
-        serve_meshcom_send(inner, &shared_config, &body_str);
+        serve_meshcom_send(inner, &shared_config, &state, &body_str);
     } else if req_line.contains("GET /api/meshcom") {
         let mut s = stream;
         drain_http_headers(&mut s);
@@ -1835,7 +2379,9 @@ fn handle_connection(
         loop {
             let mut line = String::new();
             let _ = buf.read_line(&mut line);
-            if line == "\r\n" || line.is_empty() || line == "\n" { break; }
+            if line == "\r\n" || line.is_empty() || line == "\n" {
+                break;
+            }
         }
         serve_config_get(buf.into_inner(), &config_path);
     } else if req_line.contains("DELETE /api/sds-log") {
@@ -1843,7 +2389,9 @@ fn handle_connection(
         loop {
             let mut line = String::new();
             let _ = buf.read_line(&mut line);
-            if line == "\r\n" || line.is_empty() || line == "\n" { break; }
+            if line == "\r\n" || line.is_empty() || line == "\n" {
+                break;
+            }
         }
         serve_sds_log_clear(buf.into_inner(), &state);
     } else if req_line.contains("GET /api/sds-log") {
@@ -1852,7 +2400,9 @@ fn handle_connection(
         loop {
             let mut line = String::new();
             let _ = buf.read_line(&mut line);
-            if line == "\r\n" || line.is_empty() || line == "\n" { break; }
+            if line == "\r\n" || line.is_empty() || line == "\n" {
+                break;
+            }
         }
         serve_sds_log(buf.into_inner(), &state);
     } else if req_line.contains("GET /api/live-sds") {
@@ -1861,12 +2411,16 @@ fn handle_connection(
         loop {
             let mut line = String::new();
             let _ = buf.read_line(&mut line);
-            if line == "\r\n" || line.is_empty() || line == "\n" { break; }
+            if line == "\r\n" || line.is_empty() || line == "\n" {
+                break;
+            }
         }
         serve_live_sds_list(buf.into_inner(), &shared_config);
     } else if req_line.contains("DELETE /api/live-sds/") {
         // DELETE /api/live-sds/<id>
-        let id: u32 = req_line.split('/').nth(3)
+        let id: u32 = req_line
+            .split('/')
+            .nth(3)
             .and_then(|s| s.split_whitespace().next())
             .and_then(|s| s.parse().ok())
             .unwrap_or(0);
@@ -1874,7 +2428,9 @@ fn handle_connection(
         loop {
             let mut line = String::new();
             let _ = buf.read_line(&mut line);
-            if line == "\r\n" || line.is_empty() || line == "\n" { break; }
+            if line == "\r\n" || line.is_empty() || line == "\n" {
+                break;
+            }
         }
         if id == 0 {
             http_response(buf.into_inner(), 400, "invalid id");
@@ -1888,7 +2444,9 @@ fn handle_connection(
         loop {
             let mut line = String::new();
             let _ = buf.read_line(&mut line);
-            if line == "\r\n" || line.is_empty() || line == "\n" { break; }
+            if line == "\r\n" || line.is_empty() || line == "\n" {
+                break;
+            }
         }
         send_control_cmd(&cmd_tx, ControlCommand::ClearLiveSds);
         http_response(buf.into_inner(), 200, "OK");
@@ -1899,11 +2457,18 @@ fn handle_connection(
         loop {
             let mut line = String::new();
             let _ = buf.read_line(&mut line);
-            if line == "\r\n" || line.is_empty() || line == "\n" { break; }
+            if line == "\r\n" || line.is_empty() || line == "\n" {
+                break;
+            }
             let lower = line.to_lowercase();
             if lower.starts_with("content-length:") {
-                content_length = lower.trim_start_matches("content-length:").trim()
-                    .trim_end_matches("\r\n").trim_end_matches('\n').parse().unwrap_or(0);
+                content_length = lower
+                    .trim_start_matches("content-length:")
+                    .trim()
+                    .trim_end_matches("\r\n")
+                    .trim_end_matches('\n')
+                    .parse()
+                    .unwrap_or(0);
             }
         }
         let mut body = vec![0u8; content_length.min(4096)];
@@ -1918,9 +2483,15 @@ fn handle_connection(
                     let source_issi = v.get("source_issi").and_then(|s| s.as_u64()).unwrap_or(16777215) as u32;
                     let repeat_count = v.get("repeat_count").and_then(|r| r.as_u64()).unwrap_or(0) as u32;
                     tracing::info!("Dashboard: AddLiveSds text={:?} repeat={}", text, repeat_count);
-                    send_control_cmd(&cmd_tx, ControlCommand::AddLiveSds {
-                        text, protocol_id, source_issi, repeat_count,
-                    });
+                    send_control_cmd(
+                        &cmd_tx,
+                        ControlCommand::AddLiveSds {
+                            text,
+                            protocol_id,
+                            source_issi,
+                            repeat_count,
+                        },
+                    );
                     http_response(buf.into_inner(), 200, "OK");
                 }
             }
@@ -2000,11 +2571,17 @@ fn handle_connection(
         let body = read_http_body(&mut stream);
         let req: serde_json::Value = match serde_json::from_slice(&body) {
             Ok(v) => v,
-            Err(e) => { http_response(stream, 400, &format!("invalid JSON: {}", e)); return; }
+            Err(e) => {
+                http_response(stream, 400, &format!("invalid JSON: {}", e));
+                return;
+            }
         };
         let uuid = match req.get("uuid").and_then(|v| v.as_str()) {
             Some(u) => u,
-            None => { http_response(stream, 400, "missing uuid"); return; }
+            None => {
+                http_response(stream, 400, "missing uuid");
+                return;
+            }
         };
         tracing::info!("Dashboard: forgetting WiFi profile uuid={}", uuid);
         let body = match crate::wifi::forget(uuid) {
@@ -2017,7 +2594,10 @@ fn handle_connection(
         let body = read_http_body(&mut stream);
         let req: serde_json::Value = match serde_json::from_slice(&body) {
             Ok(v) => v,
-            Err(e) => { http_response(stream, 400, &format!("invalid JSON: {}", e)); return; }
+            Err(e) => {
+                http_response(stream, 400, &format!("invalid JSON: {}", e));
+                return;
+            }
         };
         let enabled = req.get("enabled").and_then(|v| v.as_bool()).unwrap_or(true);
         tracing::info!("Dashboard: setting WiFi radio enabled={}", enabled);
@@ -2032,34 +2612,43 @@ fn handle_connection(
         drain_http_headers(&mut stream);
         let body = serde_json::to_string(&serde_json::json!({
             "available": crate::wifi::available()
-        })).unwrap_or_default();
+        }))
+        .unwrap_or_default();
         http_json_response(stream, 200, &body);
     } else {
         let mut buf = BufReader::new(stream);
         loop {
             let mut line = String::new();
             let _ = buf.read_line(&mut line);
-            if line == "\r\n" || line.is_empty() || line == "\n" { break; }
+            if line == "\r\n" || line.is_empty() || line == "\n" {
+                break;
+            }
         }
         serve_html(buf.into_inner());
     }
 }
 
-fn handle_ws(stream: TcpStream, state: DashboardState, clients: WsClients,
-             cmd_tx: Arc<Mutex<Option<CmdSender>>>, update_state: SharedUpdateState,
-             _auth: Option<(String, String)>) {
+fn handle_ws(
+    stream: TcpStream,
+    state: DashboardState,
+    clients: WsClients,
+    cmd_tx: Arc<Mutex<Option<CmdSender>>>,
+    update_state: SharedUpdateState,
+    _auth: Option<(String, String)>,
+) {
     let _ = stream.set_read_timeout(Some(std::time::Duration::from_millis(50)));
 
     // Note: cookie-based auth is checked by handle_connection BEFORE we get here,
     // so we don't need to re-validate during the WS upgrade. The cookie travels on
     // the Upgrade request and was already verified against the session store.
-    let callback = move |_req: &Request, res: Response| -> Result<Response, _> {
-        Ok(res)
-    };
+    let callback = move |_req: &Request, res: Response| -> Result<Response, _> { Ok(res) };
 
     let mut ws = match accept_hdr(stream, callback) {
         Ok(w) => w,
-        Err(e) => { tracing::debug!("WS handshake failed: {}", e); return; }
+        Err(e) => {
+            tracing::debug!("WS handshake failed: {}", e);
+            return;
+        }
     };
 
     // Register this connection for broadcasts
@@ -2106,7 +2695,9 @@ fn handle_ws(stream: TcpStream, state: DashboardState, clients: WsClients,
     loop {
         // Drain outbound broadcast messages first
         while let Ok(msg) = broadcast_rx.try_recv() {
-            if ws.send(Message::Text(msg)).is_err() { return; }
+            if ws.send(Message::Text(msg)).is_err() {
+                return;
+            }
         }
 
         // Then check for inbound messages from browser
@@ -2115,18 +2706,21 @@ fn handle_ws(stream: TcpStream, state: DashboardState, clients: WsClients,
                 handle_ws_command(&text, &state, &cmd_tx, &update_state);
             }
             Ok(Message::Close(_)) => break,
-            Ok(Message::Ping(data)) => { let _ = ws.send(Message::Pong(data)); }
+            Ok(Message::Ping(data)) => {
+                let _ = ws.send(Message::Pong(data));
+            }
             Ok(_) => {}
             Err(tungstenite::Error::Io(ref e))
-                if e.kind() == std::io::ErrorKind::WouldBlock
-                    || e.kind() == std::io::ErrorKind::TimedOut => {}
+                if e.kind() == std::io::ErrorKind::WouldBlock || e.kind() == std::io::ErrorKind::TimedOut => {}
             Err(_) => break,
         }
     }
 }
 
 fn handle_ws_command(text: &str, state: &DashboardState, cmd_tx: &Arc<Mutex<Option<CmdSender>>>, update_state: &SharedUpdateState) {
-    let Ok(v) = serde_json::from_str::<serde_json::Value>(text) else { return };
+    let Ok(v) = serde_json::from_str::<serde_json::Value>(text) else {
+        return;
+    };
 
     let send_cmd = |cmd: ControlCommand| -> bool {
         if let Ok(guard) = cmd_tx.lock() {
@@ -2140,7 +2734,9 @@ fn handle_ws_command(text: &str, state: &DashboardState, cmd_tx: &Arc<Mutex<Opti
     match v.get("type").and_then(|t| t.as_str()) {
         Some("kick") => {
             let issi = v.get("issi").and_then(|i| i.as_u64()).unwrap_or(0) as u32;
-            if issi == 0 { return; }
+            if issi == 0 {
+                return;
+            }
             tracing::info!("Dashboard: kick ISSI {}", issi);
             if !send_cmd(ControlCommand::KickMs { issi }) {
                 tracing::warn!("Dashboard: no control dispatcher for kick");
@@ -2175,7 +2771,9 @@ fn handle_ws_command(text: &str, state: &DashboardState, cmd_tx: &Arc<Mutex<Opti
         Some("sds") => {
             let dest = v.get("dest_issi").and_then(|i| i.as_u64()).unwrap_or(0) as u32;
             let msg_text = v.get("message").and_then(|m| m.as_str()).unwrap_or("").to_string();
-            if dest == 0 || msg_text.is_empty() { return; }
+            if dest == 0 || msg_text.is_empty() {
+                return;
+            }
             tracing::info!("Dashboard: SDS to {} = {}", dest, msg_text);
 
             let (len_bits, payload) = build_sds_text_payload(&msg_text);
@@ -2193,21 +2791,36 @@ fn handle_ws_command(text: &str, state: &DashboardState, cmd_tx: &Arc<Mutex<Opti
         }
         Some("sds_callout") => {
             let dest = v.get("dest_issi").and_then(|i| i.as_u64()).unwrap_or(0) as u32;
-            if dest == 0 { return; }
+            if dest == 0 {
+                return;
+            }
             let source_issi = match v.get("source_issi").and_then(|i| i.as_u64()) {
                 Some(0) | None => 9999,
                 Some(source) => source.min(u32::MAX as u64) as u32,
             };
-            let incident = v
-                .get("incident")
+            let callout_id = v
+                .get("callout_id")
+                .or_else(|| v.get("id"))
+                .or_else(|| v.get("incident"))
                 .and_then(|i| i.as_u64())
-                .unwrap_or(1)
-                .clamp(1, 256) as u16;
-            let message_input = v
-                .get("message")
-                .and_then(|m| m.as_str())
-                .unwrap_or("ALARM")
-                .trim();
+                .unwrap_or(0x11)
+                .min(255) as u16;
+            let priority = v
+                .get("priority")
+                .or_else(|| v.get("tone"))
+                .and_then(|i| i.as_u64())
+                .unwrap_or(15)
+                .min(15) as u8;
+            let tpg_ric = v
+                .get("tpg_ric")
+                .or_else(|| v.get("ric"))
+                .and_then(|i| {
+                    i.as_u64()
+                        .map(|n| n.min(u32::MAX as u64) as u32)
+                        .or_else(|| i.as_str().and_then(|s| tetra_config::bluestation::parse_ric_route_key(s).ok()))
+                })
+                .unwrap_or_else(crate::tpg2200::default_tpg2200_ric);
+            let message_input = v.get("message").and_then(|m| m.as_str()).unwrap_or("ALARM").trim();
             let alarm_text = if message_input.is_empty() {
                 "ALARM".to_string()
             } else {
@@ -2216,7 +2829,7 @@ fn handle_ws_command(text: &str, state: &DashboardState, cmd_tx: &Arc<Mutex<Opti
             let raw_hex = v.get("raw_hex").and_then(|m| m.as_str()).unwrap_or("").trim();
 
             let payload = if raw_hex.is_empty() {
-                build_tpg2200_callout_payload(incident, &alarm_text)
+                build_tpg2200_callout_payload(tpg_ric, callout_id, priority, &alarm_text)
             } else {
                 match parse_hex_payload(raw_hex) {
                     Ok(payload) => payload,
@@ -2245,9 +2858,11 @@ fn handle_ws_command(text: &str, state: &DashboardState, cmd_tx: &Arc<Mutex<Opti
             }
             let len_bits = (payload.len() * 8) as u16;
             tracing::info!(
-                "Dashboard: TPG2200 Call-Out to {} incident={} source={} text={:?} payload=[{}]",
+                "Dashboard: TPG2200 Call-Out to {} tpg_ric={:08X} callout_id={} priority={} source={} text={:?} payload=[{}]",
                 dest,
-                incident,
+                tpg_ric,
+                callout_id,
+                priority,
                 source_issi,
                 alarm_text,
                 format_hex_bytes(&payload)
@@ -2266,26 +2881,41 @@ fn handle_ws_command(text: &str, state: &DashboardState, cmd_tx: &Arc<Mutex<Opti
             let mut s = state.write().unwrap();
             s.push_log(
                 "INFO",
-                format!("TPG2200 Call-Out sent to {}: incident {} text {}", dest, incident, alarm_text),
+                format!(
+                    "TPG2200 Call-Out sent to {}: ric {:08X} callout_id {} priority {} text {}",
+                    dest, tpg_ric, callout_id, priority, alarm_text
+                ),
             );
         }
         Some("dgna") => {
             let issi = v.get("issi").and_then(|i| i.as_u64()).unwrap_or(0) as u32;
             let gssi = v.get("gssi").and_then(|i| i.as_u64()).unwrap_or(0) as u32;
             let attach = v.get("attach").and_then(|a| a.as_bool()).unwrap_or(true);
-            if issi == 0 || gssi == 0 { return; }
+            if issi == 0 || gssi == 0 {
+                return;
+            }
             let verb = if attach { "assign" } else { "deassign" };
             tracing::info!("Dashboard: DGNA {} GSSI {} on ISSI {}", verb, gssi, issi);
             if !send_cmd(ControlCommand::Dgna { issi, gssi, attach }) {
                 tracing::warn!("Dashboard: no control dispatcher for DGNA");
             }
             let mut s = state.write().unwrap();
-            s.push_log("INFO", format!("DGNA {} requested: GSSI {} {} ISSI {}",
-                verb, gssi, if attach { "to" } else { "from" }, issi));
+            s.push_log(
+                "INFO",
+                format!(
+                    "DGNA {} requested: GSSI {} {} ISSI {}",
+                    verb,
+                    gssi,
+                    if attach { "to" } else { "from" },
+                    issi
+                ),
+            );
         }
         Some("emergency_clear") => {
             let issi = v.get("issi").and_then(|i| i.as_u64()).unwrap_or(0) as u32;
-            if issi == 0 { return; }
+            if issi == 0 {
+                return;
+            }
             tracing::info!("Dashboard: operator clearing emergency for ISSI {}", issi);
             // Route to CMCE: it clears the source SDS session (so the emergency does not re-arm on
             // the radio's next status re-send) and emits EmergencyCancel, which clears the banner
@@ -2334,11 +2964,7 @@ fn serve_update_status(mut stream: TcpStream, update_state: &SharedUpdateState) 
 /// derived from the call-sign prefix, or empty if unknown) and `{ "<id>": "" }` for IDs confirmed
 /// absent from RadioID. IDs still being fetched in the background are OMITTED, so the client retries
 /// them on a later poll. Lookups are non-blocking — unknown IDs are queued for background resolution.
-fn serve_callsigns(
-    stream: TcpStream,
-    radioid: &crate::net_dashboard::radioid::RadioIdCache,
-    req_line: &str,
-) {
+fn serve_callsigns(stream: TcpStream, radioid: &crate::net_dashboard::radioid::RadioIdCache, req_line: &str) {
     use crate::net_dashboard::radioid::Lookup;
     // Parse the `ids=` query parameter from "GET /api/callsigns?ids=1,2,3 HTTP/1.1".
     let ids: Vec<u32> = req_line
@@ -2391,10 +3017,7 @@ fn serve_update_check(mut stream: TcpStream) {
 /// `enabled` is false when the list is empty (open network).
 /// GET /api/btsinfo — static cell + RF identity pulled from the running config, for the
 /// "TETRA BTS Details" card on the dashboard. Read-only; non-sensitive scalars only.
-fn serve_bts_info(
-    mut stream: TcpStream,
-    shared_config: &Option<tetra_config::bluestation::SharedConfig>,
-) {
+fn serve_bts_info(mut stream: TcpStream, shared_config: &Option<tetra_config::bluestation::SharedConfig>) {
     let body = match shared_config {
         Some(cfg) => {
             // Whitelist status (runtime override beats config) — mirrors serve_whitelist_get.
@@ -2407,10 +3030,13 @@ fn serve_bts_info(
 
             let c = cfg.config();
             let soapy = c.phy_io.soapysdr.as_ref();
-            let tx = soapy.map(|s| s.dl_freq);     // downlink = BS transmit
-            let rx = soapy.map(|s| s.ul_freq);     // uplink   = BS receive
+            let tx = soapy.map(|s| s.dl_freq); // downlink = BS transmit
+            let rx = soapy.map(|s| s.ul_freq); // uplink   = BS receive
             // Duplex shift expressed relative to TX (offset to add to TX to reach RX).
-            let shift = match (tx, rx) { (Some(t), Some(r)) => Some(r - t), _ => None };
+            let shift = match (tx, rx) {
+                (Some(t), Some(r)) => Some(r - t),
+                _ => None,
+            };
 
             serde_json::json!({
                 "tx_freq_hz": tx,
@@ -2423,7 +3049,8 @@ fn serve_bts_info(
                 "hangtime_secs": c.cell.hangtime_secs,
                 "whitelist_restricted": restricted,
                 "whitelist_count": wl_count,
-            }).to_string()
+            })
+            .to_string()
         }
         None => "{}".to_string(),
     };
@@ -2436,10 +3063,7 @@ fn serve_bts_info(
 }
 
 /// GET /api/asterisk/status — config + runtime status for the Asterisk SIP bridge.
-fn serve_asterisk_status(
-    stream: TcpStream,
-    shared_config: &Option<tetra_config::bluestation::SharedConfig>,
-) {
+fn serve_asterisk_status(stream: TcpStream, shared_config: &Option<tetra_config::bluestation::SharedConfig>) {
     let body = match shared_config {
         Some(cfg) => {
             let c = cfg.config();
@@ -2453,6 +3077,7 @@ fn serve_asterisk_status(
                     "remote": format!("{}:{}", c.asterisk.remote_host, c.asterisk.remote_port),
                     "rtp_port_range": format!("{}-{}", c.asterisk.rtp_port_min, c.asterisk.rtp_port_max),
                     "codec": c.asterisk.codec.clone(),
+                    "inbound_setup_timeout_secs": c.asterisk.inbound_setup_timeout_secs,
                     "outbound_prefix": c.asterisk.outbound_prefix.clone(),
                     "strip_outbound_prefix": c.asterisk.strip_outbound_prefix,
                     "service_numbers": c.asterisk.service_numbers.clone(),
@@ -2495,15 +3120,96 @@ fn serve_asterisk_status(
     http_json_response(stream, 200, &body.to_string());
 }
 
+/// GET /api/brew/status — config + runtime status for all Brew backhaul servers.
+fn serve_brew_status(stream: TcpStream, shared_config: &Option<tetra_config::bluestation::SharedConfig>) {
+    let body = match shared_config {
+        Some(cfg) => {
+            let c = cfg.config();
+            let state = cfg.state_read();
+            let servers = vec![
+                brew_status_json(
+                    "brew",
+                    "Brew",
+                    TetraEntity::Brew,
+                    c.brew.as_ref(),
+                    *state.brew_entity_connected.get(&TetraEntity::Brew).unwrap_or(&false),
+                ),
+                brew_status_json(
+                    "brew2",
+                    "Brew2",
+                    TetraEntity::Brew2,
+                    c.brew2.as_ref(),
+                    *state.brew_entity_connected.get(&TetraEntity::Brew2).unwrap_or(&false),
+                ),
+            ];
+            let configured_count = servers
+                .iter()
+                .filter(|server| server.get("configured").and_then(|value| value.as_bool()).unwrap_or(false))
+                .count();
+            let connected_count = servers
+                .iter()
+                .filter(|server| server.get("connected").and_then(|value| value.as_bool()).unwrap_or(false))
+                .count();
+            serde_json::json!({
+                "servers": servers,
+                "configured_count": configured_count,
+                "connected_count": connected_count,
+                "aggregate_connected": state.network_connected,
+            })
+        }
+        None => serde_json::json!({
+            "servers": [
+                { "entity": "brew", "title": "Brew", "configured": false, "connected": false },
+                { "entity": "brew2", "title": "Brew2", "configured": false, "connected": false },
+            ],
+            "configured_count": 0,
+            "connected_count": 0,
+            "aggregate_connected": false,
+        }),
+    };
+    http_json_response(stream, 200, &body.to_string());
+}
+
+fn brew_status_json(entity_key: &str, title: &str, entity: TetraEntity, brew: Option<&CfgBrew>, connected: bool) -> serde_json::Value {
+    match brew {
+        Some(brew) => {
+            let scheme = if brew.tls { "wss" } else { "ws" };
+            let allowlist = brew.effective_local_issi_allowlist().unwrap_or_default();
+            serde_json::json!({
+                "entity": entity_key,
+                "title": title,
+                "entity_debug": format!("{:?}", entity),
+                "configured": true,
+                "connected": connected,
+                "host": brew.host.clone(),
+                "port": brew.port,
+                "tls": brew.tls,
+                "endpoint": format!("{}://{}:{}", scheme, brew.host, brew.port),
+                "username_set": brew.username.as_ref().is_some_and(|value| !value.trim().is_empty()),
+                "password_set": brew.password.as_ref().is_some_and(|value| !value.as_ref().trim().is_empty()),
+                "reconnect_delay_secs": brew.reconnect_delay.as_secs(),
+                "jitter_initial_latency_frames": brew.jitter_initial_latency_frames,
+                "feature_sds_enabled": brew.feature_sds_enabled,
+                "feature_rssi_export": brew.feature_rssi_export,
+                "whitelisted_ssis": brew.whitelisted_ssis.clone().unwrap_or_default(),
+                "pbx_gateway_issis": brew.pbx_gateway_issis.clone().unwrap_or_default(),
+                "local_issi_allowlist": allowlist,
+                "local_issi_blocklist": brew.local_issi_blocklist.clone(),
+            })
+        }
+        None => serde_json::json!({
+            "entity": entity_key,
+            "title": title,
+            "entity_debug": format!("{:?}", entity),
+            "configured": false,
+            "connected": false,
+        }),
+    }
+}
+
 /// GET /api/snom-notify — return effective Snom XML NOTIFY settings.
-fn serve_snom_notify_get(
-    stream: TcpStream,
-    shared_config: &Option<tetra_config::bluestation::SharedConfig>,
-) {
-    let snom = shared_config
-        .as_ref()
-        .map(|cfg| cfg.effective_snom_notify())
-        .unwrap_or_default();
+fn serve_snom_notify_get(stream: TcpStream, shared_config: &Option<tetra_config::bluestation::SharedConfig>) {
+    let snom = shared_config.as_ref().map(|cfg| cfg.effective_snom_notify()).unwrap_or_default();
     let password = snom.ami_password.as_ref();
     let body = serde_json::json!({
         "enabled": snom.enabled,
@@ -2551,22 +3257,20 @@ fn serve_snom_notify_post(
     };
 
     let cur = cfg.effective_snom_notify();
-    let dapnet_allowed_rics =
-        match dapnet_ric_set_from_json(&json, "dapnet_allowed_rics", &cur.dapnet_allowed_rics) {
-            Ok(rics) => rics,
-            Err(err) => {
-                http_response(stream, 400, &format!("Invalid Snom DAPNET RIC filter: {err}"));
-                return;
-            }
-        };
-    let sds_allowed_issis =
-        match snom_issi_set_from_json(&json, "sds_allowed_issis", &cur.sds_allowed_issis) {
-            Ok(issis) => issis,
-            Err(err) => {
-                http_response(stream, 400, &format!("Invalid Snom SDS ISSI filter: {err}"));
-                return;
-            }
-        };
+    let dapnet_allowed_rics = match dapnet_ric_set_from_json(&json, "dapnet_allowed_rics", &cur.dapnet_allowed_rics) {
+        Ok(rics) => rics,
+        Err(err) => {
+            http_response(stream, 400, &format!("Invalid Snom DAPNET RIC filter: {err}"));
+            return;
+        }
+    };
+    let sds_allowed_issis = match snom_issi_set_from_json(&json, "sds_allowed_issis", &cur.sds_allowed_issis) {
+        Ok(issis) => issis,
+        Err(err) => {
+            http_response(stream, 400, &format!("Invalid Snom SDS ISSI filter: {err}"));
+            return;
+        }
+    };
 
     let enabled = dapnet_as_bool(&json, "enabled", cur.enabled);
     let ami_host = snom_non_empty_or(dapnet_as_string(&json, "ami_host", &cur.ami_host), "127.0.0.1");
@@ -2598,26 +3302,15 @@ fn serve_snom_notify_post(
         sds_directions,
         dapnet_allowed_rics,
         sds_allowed_issis,
-        title_prefix: snom_non_empty_or(
-            dapnet_as_string(&json, "title_prefix", &cur.title_prefix),
-            "FlowStation",
-        ),
+        title_prefix: snom_non_empty_or(dapnet_as_string(&json, "title_prefix", &cur.title_prefix), "FlowStation"),
         notify_event: snom_non_empty_or(dapnet_as_string(&json, "notify_event", &cur.notify_event), "xml"),
-        content_type: snom_non_empty_or(
-            dapnet_as_string(&json, "content_type", &cur.content_type),
-            "application/snomxml",
-        ),
+        content_type: snom_non_empty_or(dapnet_as_string(&json, "content_type", &cur.content_type), "application/snomxml"),
         subscription_state: snom_non_empty_or(
             dapnet_as_string(&json, "subscription_state", &cur.subscription_state),
             "active;expires=30000",
         ),
         max_text_chars: dapnet_as_usize(&json, "max_text_chars", cur.max_text_chars).clamp(40, 2000),
-        connect_timeout_secs: dapnet_as_u64(
-            &json,
-            "connect_timeout_secs",
-            cur.connect_timeout_secs,
-        )
-        .clamp(1, 30),
+        connect_timeout_secs: dapnet_as_u64(&json, "connect_timeout_secs", cur.connect_timeout_secs).clamp(1, 30),
     };
 
     let mut text_fields = vec![
@@ -2667,10 +3360,7 @@ fn snom_non_empty_or(value: String, fallback: &str) -> String {
     }
 }
 
-fn serve_whitelist_get(
-    mut stream: TcpStream,
-    shared_config: &Option<tetra_config::bluestation::SharedConfig>,
-) {
+fn serve_whitelist_get(mut stream: TcpStream, shared_config: &Option<tetra_config::bluestation::SharedConfig>) {
     let (list, source): (Vec<u32>, &str) = match shared_config {
         Some(cfg) => {
             let override_list = cfg.state_read().issi_whitelist_override.clone();
@@ -2743,10 +3433,7 @@ fn serve_whitelist_post(
                 .collect()
         };
         for issi in to_kick {
-            tracing::info!(
-                "Dashboard: whitelist change — kicking non-whitelisted ISSI {}",
-                issi
-            );
+            tracing::info!("Dashboard: whitelist change — kicking non-whitelisted ISSI {}", issi);
             send_control_cmd(cmd_tx, ControlCommand::KickMs { issi });
         }
     }
@@ -2769,10 +3456,7 @@ fn serve_whitelist_post(
 // ---------------------------------------------------------------------------
 
 /// GET /api/wx — return the effective WX service settings as JSON.
-fn serve_wx_get(
-    mut stream: TcpStream,
-    shared_config: &Option<tetra_config::bluestation::SharedConfig>,
-) {
+fn serve_wx_get(mut stream: TcpStream, shared_config: &Option<tetra_config::bluestation::SharedConfig>) {
     let wx = match shared_config {
         Some(cfg) => cfg.effective_wx_service(),
         None => tetra_config::bluestation::CfgWxService::default(),
@@ -2797,12 +3481,7 @@ fn serve_wx_get(
 
 /// POST /api/wx — update WX service settings. Body: JSON object with the same fields as
 /// GET. Applies immediately via the StackState override AND rewrites the TOML.
-fn serve_wx_post(
-    stream: TcpStream,
-    shared_config: &Option<tetra_config::bluestation::SharedConfig>,
-    config_path: &str,
-    body: &str,
-) {
+fn serve_wx_post(stream: TcpStream, shared_config: &Option<tetra_config::bluestation::SharedConfig>, config_path: &str, body: &str) {
     use tetra_config::bluestation::WxRuntimeOverride;
 
     let json: serde_json::Value = match serde_json::from_str(body.trim()) {
@@ -2820,19 +3499,20 @@ fn serve_wx_post(
 
     // Start from the current effective values so a partial POST only changes what it sends.
     let cur = cfg.effective_wx_service();
-    let as_u32 = |v: &serde_json::Value, k: &str, d: u32| {
-        v.get(k).and_then(|x| x.as_u64()).map(|n| n as u32).unwrap_or(d)
-    };
-    let as_u64 = |v: &serde_json::Value, k: &str, d: u64| {
-        v.get(k).and_then(|x| x.as_u64()).unwrap_or(d)
-    };
-    let as_bool = |v: &serde_json::Value, k: &str, d: bool| {
-        v.get(k).and_then(|x| x.as_bool()).unwrap_or(d)
-    };
+    let as_u32 = |v: &serde_json::Value, k: &str, d: u32| v.get(k).and_then(|x| x.as_u64()).map(|n| n as u32).unwrap_or(d);
+    let as_u64 = |v: &serde_json::Value, k: &str, d: u64| v.get(k).and_then(|x| x.as_u64()).unwrap_or(d);
+    let as_bool = |v: &serde_json::Value, k: &str, d: bool| v.get(k).and_then(|x| x.as_bool()).unwrap_or(d);
     let icao = json
         .get("periodic_icao")
         .and_then(|x| x.as_str())
-        .map(|s| s.trim().chars().filter(|c| c.is_ascii_alphanumeric()).take(4).collect::<String>().to_uppercase())
+        .map(|s| {
+            s.trim()
+                .chars()
+                .filter(|c| c.is_ascii_alphanumeric())
+                .take(4)
+                .collect::<String>()
+                .to_uppercase()
+        })
         .unwrap_or(cur.periodic_icao.clone());
 
     let ov = WxRuntimeOverride {
@@ -2860,7 +3540,11 @@ fn serve_wx_post(
 
     tracing::info!(
         "Dashboard: WX service updated (enabled={} svc_issi={} periodic={} -> {} icao={})",
-        ov.enabled, ov.service_issi, ov.periodic_enabled, ov.periodic_issi, ov.periodic_icao
+        ov.enabled,
+        ov.service_issi,
+        ov.periodic_enabled,
+        ov.periodic_issi,
+        ov.periodic_icao
     );
     http_response(stream, 200, "OK");
 }
@@ -2874,10 +3558,7 @@ fn read_post_body(mut stream: TcpStream) -> (TcpStream, String) {
 
 /// Resolve the bot token to use for a verify/detect/test/save request: a freshly-typed token from
 /// the body (never the masked placeholder, which contains '…'), else the currently-saved one.
-fn telegram_resolve_token(
-    json: &serde_json::Value,
-    shared_config: &Option<tetra_config::bluestation::SharedConfig>,
-) -> String {
+fn telegram_resolve_token(json: &serde_json::Value, shared_config: &Option<tetra_config::bluestation::SharedConfig>) -> String {
     if let Some(t) = json.get("bot_token").and_then(|v| v.as_str()) {
         let t = t.trim();
         if !t.is_empty() && !t.contains('…') {
@@ -2895,42 +3576,41 @@ fn telegram_resolve_token(
 /// keeps the token safe inside the config TOML (a stray newline would corrupt the file) and inside
 /// the API URL path.
 fn telegram_token_acceptable(t: &str) -> bool {
-    t.is_empty()
-        || (t.contains(':') && t.chars().all(|c| !c.is_whitespace() && !c.is_control()))
+    t.is_empty() || (t.contains(':') && t.chars().all(|c| !c.is_whitespace() && !c.is_control()))
 }
 
 /// GET /api/telegram — return the effective Telegram settings as JSON. The token is masked and is
 /// never echoed in the clear; `token_set` tells the UI whether one is stored.
-fn serve_telegram_get(
-    stream: TcpStream,
-    shared_config: &Option<tetra_config::bluestation::SharedConfig>,
-) {
+fn serve_telegram_get(stream: TcpStream, shared_config: &Option<tetra_config::bluestation::SharedConfig>) {
     let tg = match shared_config {
         Some(cfg) => cfg.effective_telegram(),
         None => tetra_config::bluestation::CfgTelegram::default(),
     };
     let masked = crate::net_dashboard::telegram::mask_token(tg.bot_token.as_ref());
     let token_set = !tg.bot_token.as_ref().trim().is_empty();
-    let chat_ids = tg.chat_ids.iter().map(|i| i.to_string()).collect::<Vec<_>>().join(",");
-    let body = format!(
-        "{{\"enabled\":{},\"bot_token_masked\":\"{}\",\"token_set\":{},\"chat_ids\":[{}],\"alert_connect\":{},\"alert_disconnect\":{},\"alert_t351\":{},\"alert_lip\":{},\"alert_backhaul\":{},\"alert_critical_logs\":{}}}",
-        tg.enabled,
-        crate::net_dashboard::telegram::json_escape(&masked),
-        token_set,
-        chat_ids,
-        tg.alert_connect, tg.alert_disconnect, tg.alert_t351, tg.alert_lip, tg.alert_backhaul, tg.alert_critical_logs,
-    );
+    let body = serde_json::json!({
+        "enabled": tg.enabled,
+        "bot_token_masked": masked,
+        "token_set": token_set,
+        "chat_ids": tg.chat_ids.clone(),
+        "alert_connect": tg.alert_connect,
+        "alert_disconnect": tg.alert_disconnect,
+        "alert_t351": tg.alert_t351,
+        "alert_lip": tg.alert_lip,
+        "alert_backhaul": tg.alert_backhaul,
+        "alert_critical_logs": tg.alert_critical_logs,
+        "alert_brew_register": tg.alert_brew_register,
+        "brew_register_prefix": tg.brew_register_prefix.clone(),
+        "brew_register_issi_whitelist": issi_set_as_json(&tg.brew_register_issi_whitelist),
+        "brew_register_issi_blacklist": issi_set_as_json(&tg.brew_register_issi_blacklist),
+    })
+    .to_string();
     http_json_response(stream, 200, &body);
 }
 
 /// POST /api/telegram — save Telegram settings. Applies immediately via the StackState override
 /// AND rewrites the TOML. The token is only changed when a fresh (non-masked) one is supplied.
-fn serve_telegram_post(
-    stream: TcpStream,
-    shared_config: &Option<tetra_config::bluestation::SharedConfig>,
-    config_path: &str,
-    body: &str,
-) {
+fn serve_telegram_post(stream: TcpStream, shared_config: &Option<tetra_config::bluestation::SharedConfig>, config_path: &str, body: &str) {
     use tetra_config::bluestation::TelegramRuntimeOverride;
 
     let json: serde_json::Value = match serde_json::from_str(body.trim()) {
@@ -2957,6 +3637,30 @@ fn serve_telegram_post(
         Some(arr) => arr.iter().filter_map(|v| v.as_i64()).collect::<Vec<i64>>(),
         None => cur.chat_ids.clone(),
     };
+    let mut brew_register_prefix = dapnet_as_string(&json, "brew_register_prefix", &cur.brew_register_prefix);
+    if brew_register_prefix.trim().is_empty() {
+        brew_register_prefix = "Brew REGISTER".to_string();
+    }
+    if !dapnet_text_acceptable(&brew_register_prefix) {
+        http_response(stream, 400, "Invalid Brew REGISTER prefix: control characters are not allowed");
+        return;
+    }
+    let brew_register_issi_whitelist =
+        match snom_issi_set_from_json(&json, "brew_register_issi_whitelist", &cur.brew_register_issi_whitelist) {
+            Ok(v) => v,
+            Err(e) => {
+                http_response(stream, 400, &e);
+                return;
+            }
+        };
+    let brew_register_issi_blacklist =
+        match snom_issi_set_from_json(&json, "brew_register_issi_blacklist", &cur.brew_register_issi_blacklist) {
+            Ok(v) => v,
+            Err(e) => {
+                http_response(stream, 400, &e);
+                return;
+            }
+        };
 
     let ov = TelegramRuntimeOverride {
         enabled: as_bool("enabled", cur.enabled),
@@ -2968,6 +3672,10 @@ fn serve_telegram_post(
         alert_lip: as_bool("alert_lip", cur.alert_lip),
         alert_backhaul: as_bool("alert_backhaul", cur.alert_backhaul),
         alert_critical_logs: as_bool("alert_critical_logs", cur.alert_critical_logs),
+        alert_brew_register: as_bool("alert_brew_register", cur.alert_brew_register),
+        brew_register_prefix,
+        brew_register_issi_whitelist,
+        brew_register_issi_blacklist,
     };
 
     {
@@ -3013,6 +3721,16 @@ fn dapnet_as_u32(json: &serde_json::Value, key: &str, default: u32) -> u32 {
         .unwrap_or(default)
 }
 
+fn dapnet_as_tpg_ric(json: &serde_json::Value, key: &str, default: u32) -> u32 {
+    json.get(key)
+        .and_then(|x| {
+            x.as_u64()
+                .map(|n| n.min(u32::MAX as u64) as u32)
+                .or_else(|| x.as_str().and_then(|s| tetra_config::bluestation::parse_ric_route_key(s).ok()))
+        })
+        .unwrap_or(default)
+}
+
 fn dapnet_as_u64(json: &serde_json::Value, key: &str, default: u64) -> u64 {
     json.get(key).and_then(|x| x.as_u64()).unwrap_or(default)
 }
@@ -3032,10 +3750,7 @@ fn dapnet_as_f64(json: &serde_json::Value, key: &str, default: f64) -> f64 {
 }
 
 fn dapnet_as_usize(json: &serde_json::Value, key: &str, default: usize) -> usize {
-    json.get(key)
-        .and_then(|x| x.as_u64())
-        .map(|n| n.max(1) as usize)
-        .unwrap_or(default)
+    json.get(key).and_then(|x| x.as_u64()).map(|n| n.max(1) as usize).unwrap_or(default)
 }
 
 fn dapnet_as_string(json: &serde_json::Value, key: &str, default: &str) -> String {
@@ -3048,10 +3763,15 @@ fn dapnet_as_string(json: &serde_json::Value, key: &str, default: &str) -> Strin
 fn dapnet_ric_routes_as_json(routes: &BTreeMap<u32, u32>) -> serde_json::Value {
     let mut map = serde_json::Map::new();
     for (ric, issi) in routes {
-        map.insert(
-            tetra_config::bluestation::format_ric_route_key(*ric),
-            serde_json::json!(issi),
-        );
+        map.insert(tetra_config::bluestation::format_ric_route_key(*ric), serde_json::json!(issi));
+    }
+    serde_json::Value::Object(map)
+}
+
+fn tpg_ric_priority_map_as_json(routes: &BTreeMap<u32, u8>) -> serde_json::Value {
+    let mut map = serde_json::Map::new();
+    for (ric, priority) in routes {
+        map.insert(format!("0x{ric:08X}"), serde_json::json!(priority));
     }
     serde_json::Value::Object(map)
 }
@@ -3059,9 +3779,7 @@ fn dapnet_ric_routes_as_json(routes: &BTreeMap<u32, u32>) -> serde_json::Value {
 fn dapnet_ric_set_as_json(rics: &BTreeSet<u32>) -> serde_json::Value {
     serde_json::Value::Array(
         rics.iter()
-            .map(|ric| {
-                serde_json::Value::String(tetra_config::bluestation::format_ric_route_key(*ric))
-            })
+            .map(|ric| serde_json::Value::String(tetra_config::bluestation::format_ric_route_key(*ric)))
             .collect(),
     )
 }
@@ -3078,11 +3796,7 @@ fn dapnet_parse_ric_json_value(value: &serde_json::Value, label: &str) -> Result
     Err(format!("{label}: RIC must be a string or positive integer"))
 }
 
-fn dapnet_ric_set_from_json(
-    json: &serde_json::Value,
-    key: &str,
-    current: &BTreeSet<u32>,
-) -> Result<BTreeSet<u32>, String> {
+fn dapnet_ric_set_from_json(json: &serde_json::Value, key: &str, current: &BTreeSet<u32>) -> Result<BTreeSet<u32>, String> {
     let Some(value) = json.get(key) else {
         return Ok(current.clone());
     };
@@ -3160,17 +3874,58 @@ fn dapnet_ric_routes_from_json_key(
     Ok(routes)
 }
 
-fn dapnet_ric_routes_from_json(
-    json: &serde_json::Value,
-    current: &BTreeMap<u32, u32>,
-) -> Result<BTreeMap<u32, u32>, String> {
+fn dapnet_ric_routes_from_json(json: &serde_json::Value, current: &BTreeMap<u32, u32>) -> Result<BTreeMap<u32, u32>, String> {
     dapnet_ric_routes_from_json_key(json, "ric_issi_routes", current)
 }
 
-fn dapnet_validate_route_conflicts(
-    issi_routes: &BTreeMap<u32, u32>,
-    gssi_routes: &BTreeMap<u32, u32>,
-) -> Result<(), String> {
+fn tpg_ric_priority_map_from_json_key(
+    json: &serde_json::Value,
+    key: &str,
+    current: &BTreeMap<u32, u8>,
+) -> Result<BTreeMap<u32, u8>, String> {
+    let Some(value) = json.get(key) else {
+        return Ok(current.clone());
+    };
+    let mut routes = BTreeMap::new();
+    match value {
+        serde_json::Value::Object(map) => {
+            for (raw_ric, raw_priority) in map {
+                let ric = tetra_config::bluestation::parse_ric_route_key(raw_ric)?;
+                let Some(priority) = raw_priority.as_u64() else {
+                    return Err(format!("TPG RIC priority {raw_ric}: priority must be a number"));
+                };
+                if priority > 15 {
+                    return Err(format!("TPG RIC priority {raw_ric}: priority must be 0..=15"));
+                }
+                routes.insert(ric, priority as u8);
+            }
+        }
+        serde_json::Value::String(text) => {
+            for line in text.lines() {
+                let line = line.trim();
+                if line.is_empty() || line.starts_with('#') {
+                    continue;
+                }
+                let Some((raw_ric, raw_priority)) = line.split_once('=') else {
+                    return Err(format!("TPG RIC priority line '{line}' must be RIC=Priority"));
+                };
+                let ric = tetra_config::bluestation::parse_ric_route_key(raw_ric)?;
+                let priority = raw_priority
+                    .trim()
+                    .parse::<u8>()
+                    .map_err(|_| format!("TPG RIC priority line '{line}' has invalid priority"))?;
+                if priority > 15 {
+                    return Err(format!("TPG RIC priority line '{line}' has priority out of range"));
+                }
+                routes.insert(ric, priority);
+            }
+        }
+        _ => return Err(format!("{key} must be an object or text lines")),
+    }
+    Ok(routes)
+}
+
+fn dapnet_validate_route_conflicts(issi_routes: &BTreeMap<u32, u32>, gssi_routes: &BTreeMap<u32, u32>) -> Result<(), String> {
     for ric in issi_routes.keys() {
         if gssi_routes.contains_key(ric) {
             return Err(format!(
@@ -3184,10 +3939,7 @@ fn dapnet_validate_route_conflicts(
 
 /// GET /api/dapnet — return effective DAPNET settings as JSON. Secrets are masked and are never
 /// echoed in the clear.
-fn serve_dapnet_get(
-    stream: TcpStream,
-    shared_config: &Option<tetra_config::bluestation::SharedConfig>,
-) {
+fn serve_dapnet_get(stream: TcpStream, shared_config: &Option<tetra_config::bluestation::SharedConfig>) {
     let (dapnet, runtime) = match shared_config {
         Some(cfg) => (cfg.effective_dapnet(), cfg.state_read().dapnet_status.clone()),
         None => (
@@ -3231,7 +3983,12 @@ fn serve_dapnet_get(
         "telegram_allowed_rics": dapnet_ric_set_as_json(&dapnet.telegram_allowed_rics),
         "callout_source_issi": dapnet.callout_source_issi,
         "callout_dest_issi": dapnet.callout_dest_issi,
+        "callout_tpg_ric": dapnet.callout_tpg_ric,
+        "callout_id_base": dapnet.callout_incident_base,
         "callout_incident_base": dapnet.callout_incident_base,
+        "callout_priority": dapnet.callout_priority,
+        "callout_issi_priorities": issi_priority_map_as_json(&dapnet.callout_issi_priorities),
+        "callout_tpg_ric_priorities": tpg_ric_priority_map_as_json(&dapnet.callout_tpg_ric_priorities),
         "callout_text_prefix": dapnet.callout_text_prefix.clone(),
         "telegram_prefix": dapnet.telegram_prefix.clone(),
         "rwth_core_enabled": dapnet.rwth_core_enabled,
@@ -3253,12 +4010,7 @@ fn serve_dapnet_get(
 /// POST /api/dapnet — update DAPNET settings. Applies immediately through StackState override
 /// and rewrites `[dapnet]` in config.toml. Secrets are changed only when a fresh, non-masked
 /// value is supplied.
-fn serve_dapnet_post(
-    stream: TcpStream,
-    shared_config: &Option<tetra_config::bluestation::SharedConfig>,
-    config_path: &str,
-    body: &str,
-) {
+fn serve_dapnet_post(stream: TcpStream, shared_config: &Option<tetra_config::bluestation::SharedConfig>, config_path: &str, body: &str) {
     use tetra_config::bluestation::DapnetRuntimeOverride;
 
     let json: serde_json::Value = match serde_json::from_str(body.trim()) {
@@ -3283,39 +4035,50 @@ fn serve_dapnet_post(
             return;
         }
     };
-    let ric_gssi_routes =
-        match dapnet_ric_routes_from_json_key(&json, "ric_gssi_routes", &cur.ric_gssi_routes) {
-            Ok(routes) => routes,
-            Err(err) => {
-                http_response(stream, 400, &format!("Invalid DAPNET group RIC route: {err}"));
-                return;
-            }
-        };
+    let ric_gssi_routes = match dapnet_ric_routes_from_json_key(&json, "ric_gssi_routes", &cur.ric_gssi_routes) {
+        Ok(routes) => routes,
+        Err(err) => {
+            http_response(stream, 400, &format!("Invalid DAPNET group RIC route: {err}"));
+            return;
+        }
+    };
     if let Err(err) = dapnet_validate_route_conflicts(&ric_issi_routes, &ric_gssi_routes) {
         http_response(stream, 400, &format!("Invalid DAPNET RIC route: {err}"));
         return;
     }
-    let sds_allowed_rics =
-        match dapnet_ric_set_from_json(&json, "sds_allowed_rics", &cur.sds_allowed_rics) {
-            Ok(rics) => rics,
+    let sds_allowed_rics = match dapnet_ric_set_from_json(&json, "sds_allowed_rics", &cur.sds_allowed_rics) {
+        Ok(rics) => rics,
+        Err(err) => {
+            http_response(stream, 400, &format!("Invalid SDS RIC filter: {err}"));
+            return;
+        }
+    };
+    let callout_allowed_rics = match dapnet_ric_set_from_json(&json, "callout_allowed_rics", &cur.callout_allowed_rics) {
+        Ok(rics) => rics,
+        Err(err) => {
+            http_response(stream, 400, &format!("Invalid Call-Out RIC filter: {err}"));
+            return;
+        }
+    };
+    let telegram_allowed_rics = match dapnet_ric_set_from_json(&json, "telegram_allowed_rics", &cur.telegram_allowed_rics) {
+        Ok(rics) => rics,
+        Err(err) => {
+            http_response(stream, 400, &format!("Invalid Telegram RIC filter: {err}"));
+            return;
+        }
+    };
+    let callout_issi_priorities = match issi_priority_map_from_json(&json, "callout_issi_priorities", &cur.callout_issi_priorities) {
+        Ok(routes) => routes,
+        Err(err) => {
+            http_response(stream, 400, &format!("Invalid Call-Out ISSI priority route: {err}"));
+            return;
+        }
+    };
+    let callout_tpg_ric_priorities =
+        match tpg_ric_priority_map_from_json_key(&json, "callout_tpg_ric_priorities", &cur.callout_tpg_ric_priorities) {
+            Ok(routes) => routes,
             Err(err) => {
-                http_response(stream, 400, &format!("Invalid SDS RIC filter: {err}"));
-                return;
-            }
-        };
-    let callout_allowed_rics =
-        match dapnet_ric_set_from_json(&json, "callout_allowed_rics", &cur.callout_allowed_rics) {
-            Ok(rics) => rics,
-            Err(err) => {
-                http_response(stream, 400, &format!("Invalid Call-Out RIC filter: {err}"));
-                return;
-            }
-        };
-    let telegram_allowed_rics =
-        match dapnet_ric_set_from_json(&json, "telegram_allowed_rics", &cur.telegram_allowed_rics) {
-            Ok(rics) => rics,
-            Err(err) => {
-                http_response(stream, 400, &format!("Invalid Telegram RIC filter: {err}"));
+                http_response(stream, 400, &format!("Invalid Call-Out TPG RIC priority route: {err}"));
                 return;
             }
         };
@@ -3337,19 +4100,17 @@ fn serve_dapnet_post(
         sds_allowed_rics,
         callout_allowed_rics,
         telegram_allowed_rics,
-        callout_source_issi: dapnet_as_u32(
-            &json,
-            "callout_source_issi",
-            cur.callout_source_issi,
-        )
-        .max(1),
+        callout_source_issi: dapnet_as_u32(&json, "callout_source_issi", cur.callout_source_issi).max(1),
         callout_dest_issi: dapnet_as_u32(&json, "callout_dest_issi", cur.callout_dest_issi),
-        callout_incident_base: dapnet_as_u16(
-            &json,
-            "callout_incident_base",
-            cur.callout_incident_base,
-        )
-        .clamp(1, 256),
+        callout_tpg_ric: dapnet_as_tpg_ric(&json, "callout_tpg_ric", cur.callout_tpg_ric),
+        callout_incident_base: json
+            .get("callout_id_base")
+            .and_then(|v| v.as_u64())
+            .map(|n| n.min(255) as u16)
+            .unwrap_or_else(|| dapnet_as_u16(&json, "callout_incident_base", cur.callout_incident_base).min(255)),
+        callout_priority: dapnet_as_u16(&json, "callout_priority", cur.callout_priority as u16).min(15) as u8,
+        callout_issi_priorities,
+        callout_tpg_ric_priorities,
         callout_text_prefix: dapnet_as_string(&json, "callout_text_prefix", &cur.callout_text_prefix),
         telegram_prefix: dapnet_as_string(&json, "telegram_prefix", &cur.telegram_prefix),
         rwth_core_enabled: dapnet_as_bool(&json, "rwth_core_enabled", cur.rwth_core_enabled),
@@ -3402,10 +4163,7 @@ fn serve_dapnet_post(
 }
 
 /// GET /api/meshcom — return effective MeshCom settings and runtime status as JSON.
-fn serve_meshcom_get(
-    stream: TcpStream,
-    shared_config: &Option<tetra_config::bluestation::SharedConfig>,
-) {
+fn serve_meshcom_get(stream: TcpStream, shared_config: &Option<tetra_config::bluestation::SharedConfig>) {
     let (meshcom, runtime) = match shared_config {
         Some(cfg) => (cfg.effective_meshcom(), cfg.state_read().meshcom_status.clone()),
         None => (
@@ -3419,6 +4177,7 @@ fn serve_meshcom_get(
         .map(|node| {
             serde_json::json!({
                 "src": node.src.clone(),
+                "via": node.via.clone(),
                 "last_seen": node.last_seen.clone(),
                 "last_type": node.last_type.clone(),
                 "lat": node.lat,
@@ -3443,6 +4202,7 @@ fn serve_meshcom_get(
                 "msg_type": msg.msg_type.clone(),
                 "src_type": msg.src_type.clone(),
                 "src": msg.src.clone(),
+                "via": msg.via.clone(),
                 "dst": msg.dst.clone(),
                 "msg": msg.msg.clone(),
                 "msg_id": msg.msg_id.clone(),
@@ -3500,15 +4260,8 @@ fn serve_meshcom_get(
 
 /// POST /api/meshcom — update MeshCom UDP settings. Applies immediately through StackState
 /// override and rewrites `[meshcom]` in config.toml.
-fn serve_meshcom_post(
-    stream: TcpStream,
-    shared_config: &Option<tetra_config::bluestation::SharedConfig>,
-    config_path: &str,
-    body: &str,
-) {
-    use tetra_config::bluestation::{
-        CfgMeshcomDto, MeshcomRuntimeOverride, apply_meshcom_patch,
-    };
+fn serve_meshcom_post(stream: TcpStream, shared_config: &Option<tetra_config::bluestation::SharedConfig>, config_path: &str, body: &str) {
+    use tetra_config::bluestation::{CfgMeshcomDto, MeshcomRuntimeOverride, apply_meshcom_patch};
 
     let json: serde_json::Value = match serde_json::from_str(body.trim()) {
         Ok(v) => v,
@@ -3523,33 +4276,21 @@ fn serve_meshcom_post(
     };
 
     let cur = cfg.effective_meshcom();
-    let sds_allowed_sources = match meshcom_source_list_from_json(
-        &json,
-        "sds_allowed_sources",
-        &cur.sds_allowed_sources,
-    ) {
+    let sds_allowed_sources = match meshcom_source_list_from_json(&json, "sds_allowed_sources", &cur.sds_allowed_sources) {
         Ok(v) => v,
         Err(err) => {
             http_response(stream, 400, &err);
             return;
         }
     };
-    let sip_allowed_sources = match meshcom_source_list_from_json(
-        &json,
-        "sip_allowed_sources",
-        &cur.sip_allowed_sources,
-    ) {
+    let sip_allowed_sources = match meshcom_source_list_from_json(&json, "sip_allowed_sources", &cur.sip_allowed_sources) {
         Ok(v) => v,
         Err(err) => {
             http_response(stream, 400, &err);
             return;
         }
     };
-    let telegram_allowed_sources = match meshcom_source_list_from_json(
-        &json,
-        "telegram_allowed_sources",
-        &cur.telegram_allowed_sources,
-    ) {
+    let telegram_allowed_sources = match meshcom_source_list_from_json(&json, "telegram_allowed_sources", &cur.telegram_allowed_sources) {
         Ok(v) => v,
         Err(err) => {
             http_response(stream, 400, &err);
@@ -3591,9 +4332,7 @@ fn serve_meshcom_post(
         normalized.sip_title_prefix.as_str(),
         normalized.telegram_prefix.as_str(),
     ];
-    if !text_fields
-        .iter()
-        .all(|v| dapnet_text_acceptable(v))
+    if !text_fields.iter().all(|v| dapnet_text_acceptable(v))
         || !normalized
             .sds_allowed_sources
             .iter()
@@ -3650,10 +4389,7 @@ fn serve_meshcom_post(
 }
 
 /// GET /api/geoalarm — return effective GeoAlarm settings and runtime status as JSON.
-fn serve_geoalarm_get(
-    stream: TcpStream,
-    shared_config: &Option<tetra_config::bluestation::SharedConfig>,
-) {
+fn serve_geoalarm_get(stream: TcpStream, shared_config: &Option<tetra_config::bluestation::SharedConfig>) {
     let (geoalarm, runtime) = match shared_config {
         Some(cfg) => (cfg.effective_geoalarm(), cfg.state_read().geoalarm_status.clone()),
         None => (
@@ -3669,6 +4405,7 @@ fn serve_geoalarm_get(
                 "ts": event.ts.clone(),
                 "source": event.source.clone(),
                 "device": event.device.clone(),
+                "via": event.via.clone(),
                 "lat": event.lat,
                 "lon": event.lon,
                 "distance_m": event.distance_m,
@@ -3711,12 +4448,21 @@ fn serve_geoalarm_get(
         "tetra_issi_blacklist": issi_set_as_json(&geoalarm.tetra_issi_blacklist),
         "meshcom_source_whitelist": meshcom_source_list_as_json(&geoalarm.meshcom_source_whitelist),
         "meshcom_source_blacklist": meshcom_source_list_as_json(&geoalarm.meshcom_source_blacklist),
+        "telegram_tetra_issi_whitelist": issi_set_as_json(&geoalarm.telegram_tetra_issi_whitelist),
+        "telegram_tetra_issi_blacklist": issi_set_as_json(&geoalarm.telegram_tetra_issi_blacklist),
+        "telegram_meshcom_source_whitelist": meshcom_source_list_as_json(&geoalarm.telegram_meshcom_source_whitelist),
+        "telegram_meshcom_source_blacklist": meshcom_source_list_as_json(&geoalarm.telegram_meshcom_source_blacklist),
         "sds_source_issi": geoalarm.sds_source_issi,
         "sds_dest_issi": geoalarm.sds_dest_issi,
         "sds_dest_is_group": geoalarm.sds_dest_is_group,
         "tpg2200_source_issi": geoalarm.tpg2200_source_issi,
         "tpg2200_dest_issi": geoalarm.tpg2200_dest_issi,
+        "tpg2200_ric": geoalarm.tpg2200_ric,
+        "tpg2200_callout_id_base": geoalarm.tpg2200_incident_base,
         "tpg2200_incident_base": geoalarm.tpg2200_incident_base,
+        "tpg2200_priority": geoalarm.tpg2200_priority,
+        "tpg2200_issi_priorities": issi_priority_map_as_json(&geoalarm.tpg2200_issi_priorities),
+        "tpg2200_ric_priorities": tpg_ric_priority_map_as_json(&geoalarm.tpg2200_ric_priorities),
         "tpg2200_text_prefix": geoalarm.tpg2200_text_prefix.clone(),
         "tpg2200_max_text_chars": geoalarm.tpg2200_max_text_chars,
         "sip_title_prefix": geoalarm.sip_title_prefix.clone(),
@@ -3729,15 +4475,8 @@ fn serve_geoalarm_get(
 
 /// POST /api/geoalarm — update GeoAlarm settings. Applies immediately through StackState
 /// override and rewrites `[geoalarm]` in config.toml.
-fn serve_geoalarm_post(
-    stream: TcpStream,
-    shared_config: &Option<tetra_config::bluestation::SharedConfig>,
-    config_path: &str,
-    body: &str,
-) {
-    use tetra_config::bluestation::{
-        CfgGeoalarmDto, GeoalarmRuntimeOverride, apply_geoalarm_patch,
-    };
+fn serve_geoalarm_post(stream: TcpStream, shared_config: &Option<tetra_config::bluestation::SharedConfig>, config_path: &str, body: &str) {
+    use tetra_config::bluestation::{CfgGeoalarmDto, GeoalarmRuntimeOverride, apply_geoalarm_patch};
 
     let json: serde_json::Value = match serde_json::from_str(body.trim()) {
         Ok(v) => v,
@@ -3752,44 +4491,74 @@ fn serve_geoalarm_post(
     };
 
     let cur = cfg.effective_geoalarm();
-    let tetra_issi_whitelist = match snom_issi_set_from_json(
-        &json,
-        "tetra_issi_whitelist",
-        &cur.tetra_issi_whitelist,
-    ) {
+    let tetra_issi_whitelist = match snom_issi_set_from_json(&json, "tetra_issi_whitelist", &cur.tetra_issi_whitelist) {
         Ok(v) => v,
         Err(err) => {
             http_response(stream, 400, &err);
             return;
         }
     };
-    let tetra_issi_blacklist = match snom_issi_set_from_json(
-        &json,
-        "tetra_issi_blacklist",
-        &cur.tetra_issi_blacklist,
-    ) {
+    let tetra_issi_blacklist = match snom_issi_set_from_json(&json, "tetra_issi_blacklist", &cur.tetra_issi_blacklist) {
         Ok(v) => v,
         Err(err) => {
             http_response(stream, 400, &err);
             return;
         }
     };
-    let meshcom_source_whitelist = match meshcom_source_list_from_json(
-        &json,
-        "meshcom_source_whitelist",
-        &cur.meshcom_source_whitelist,
-    ) {
+    let meshcom_source_whitelist = match meshcom_source_list_from_json(&json, "meshcom_source_whitelist", &cur.meshcom_source_whitelist) {
         Ok(v) => v,
         Err(err) => {
             http_response(stream, 400, &err);
             return;
         }
     };
-    let meshcom_source_blacklist = match meshcom_source_list_from_json(
-        &json,
-        "meshcom_source_blacklist",
-        &cur.meshcom_source_blacklist,
-    ) {
+    let meshcom_source_blacklist = match meshcom_source_list_from_json(&json, "meshcom_source_blacklist", &cur.meshcom_source_blacklist) {
+        Ok(v) => v,
+        Err(err) => {
+            http_response(stream, 400, &err);
+            return;
+        }
+    };
+    let telegram_tetra_issi_whitelist =
+        match snom_issi_set_from_json(&json, "telegram_tetra_issi_whitelist", &cur.telegram_tetra_issi_whitelist) {
+            Ok(v) => v,
+            Err(err) => {
+                http_response(stream, 400, &err);
+                return;
+            }
+        };
+    let telegram_tetra_issi_blacklist =
+        match snom_issi_set_from_json(&json, "telegram_tetra_issi_blacklist", &cur.telegram_tetra_issi_blacklist) {
+            Ok(v) => v,
+            Err(err) => {
+                http_response(stream, 400, &err);
+                return;
+            }
+        };
+    let telegram_meshcom_source_whitelist =
+        match meshcom_source_list_from_json(&json, "telegram_meshcom_source_whitelist", &cur.telegram_meshcom_source_whitelist) {
+            Ok(v) => v,
+            Err(err) => {
+                http_response(stream, 400, &err);
+                return;
+            }
+        };
+    let telegram_meshcom_source_blacklist =
+        match meshcom_source_list_from_json(&json, "telegram_meshcom_source_blacklist", &cur.telegram_meshcom_source_blacklist) {
+            Ok(v) => v,
+            Err(err) => {
+                http_response(stream, 400, &err);
+                return;
+            }
+        };
+    let tpg2200_issi_priorities = match issi_priority_map_from_json(&json, "tpg2200_issi_priorities", &cur.tpg2200_issi_priorities) {
+        Ok(v) => v,
+        Err(err) => {
+            http_response(stream, 400, &err);
+            return;
+        }
+    };
+    let tpg2200_ric_priorities = match tpg_ric_priority_map_from_json_key(&json, "tpg2200_ric_priorities", &cur.tpg2200_ric_priorities) {
         Ok(v) => v,
         Err(err) => {
             http_response(stream, 400, &err);
@@ -3813,12 +4582,32 @@ fn serve_geoalarm_post(
         tetra_issi_blacklist: tetra_issi_blacklist.iter().copied().collect(),
         meshcom_source_whitelist,
         meshcom_source_blacklist,
+        telegram_tetra_issi_whitelist: telegram_tetra_issi_whitelist.iter().copied().collect(),
+        telegram_tetra_issi_blacklist: telegram_tetra_issi_blacklist.iter().copied().collect(),
+        telegram_meshcom_source_whitelist,
+        telegram_meshcom_source_blacklist,
         sds_source_issi: dapnet_as_u32(&json, "sds_source_issi", cur.sds_source_issi),
         sds_dest_issi: dapnet_as_u32(&json, "sds_dest_issi", cur.sds_dest_issi),
         sds_dest_is_group: dapnet_as_bool(&json, "sds_dest_is_group", cur.sds_dest_is_group),
         tpg2200_source_issi: dapnet_as_u32(&json, "tpg2200_source_issi", cur.tpg2200_source_issi),
         tpg2200_dest_issi: dapnet_as_u32(&json, "tpg2200_dest_issi", cur.tpg2200_dest_issi),
-        tpg2200_incident_base: dapnet_as_u16(&json, "tpg2200_incident_base", cur.tpg2200_incident_base),
+        tpg2200_ric: dapnet_as_tpg_ric(&json, "tpg2200_ric", cur.tpg2200_ric),
+        tpg2200_callout_id_base: Some(
+            json.get("tpg2200_callout_id_base")
+                .and_then(|v| v.as_u64())
+                .map(|n| n.min(255) as u16)
+                .unwrap_or_else(|| dapnet_as_u16(&json, "tpg2200_incident_base", cur.tpg2200_incident_base).min(255)),
+        ),
+        tpg2200_incident_base: None,
+        tpg2200_priority: dapnet_as_u16(&json, "tpg2200_priority", cur.tpg2200_priority as u16).min(15) as u8,
+        tpg2200_issi_priorities: tpg2200_issi_priorities
+            .iter()
+            .map(|(issi, priority)| (issi.to_string(), *priority))
+            .collect(),
+        tpg2200_ric_priorities: tpg2200_ric_priorities
+            .iter()
+            .map(|(ric, priority)| (format!("0x{ric:08X}"), *priority))
+            .collect(),
         tpg2200_text_prefix: dapnet_as_string(&json, "tpg2200_text_prefix", &cur.tpg2200_text_prefix),
         tpg2200_max_text_chars: dapnet_as_usize(&json, "tpg2200_max_text_chars", cur.tpg2200_max_text_chars),
         sip_title_prefix: dapnet_as_string(&json, "sip_title_prefix", &cur.sip_title_prefix),
@@ -3842,6 +4631,8 @@ fn serve_geoalarm_post(
             .meshcom_source_whitelist
             .iter()
             .chain(normalized.meshcom_source_blacklist.iter())
+            .chain(normalized.telegram_meshcom_source_whitelist.iter())
+            .chain(normalized.telegram_meshcom_source_blacklist.iter())
             .all(|v| dapnet_text_acceptable(v))
     {
         http_response(stream, 400, "Invalid GeoAlarm setting: control characters are not allowed");
@@ -3864,12 +4655,20 @@ fn serve_geoalarm_post(
         tetra_issi_blacklist: normalized.tetra_issi_blacklist,
         meshcom_source_whitelist: normalized.meshcom_source_whitelist,
         meshcom_source_blacklist: normalized.meshcom_source_blacklist,
+        telegram_tetra_issi_whitelist: normalized.telegram_tetra_issi_whitelist,
+        telegram_tetra_issi_blacklist: normalized.telegram_tetra_issi_blacklist,
+        telegram_meshcom_source_whitelist: normalized.telegram_meshcom_source_whitelist,
+        telegram_meshcom_source_blacklist: normalized.telegram_meshcom_source_blacklist,
         sds_source_issi: normalized.sds_source_issi,
         sds_dest_issi: normalized.sds_dest_issi,
         sds_dest_is_group: normalized.sds_dest_is_group,
         tpg2200_source_issi: normalized.tpg2200_source_issi,
         tpg2200_dest_issi: normalized.tpg2200_dest_issi,
+        tpg2200_ric: normalized.tpg2200_ric,
         tpg2200_incident_base: normalized.tpg2200_incident_base,
+        tpg2200_priority: normalized.tpg2200_priority,
+        tpg2200_issi_priorities: normalized.tpg2200_issi_priorities,
+        tpg2200_ric_priorities: normalized.tpg2200_ric_priorities,
         tpg2200_text_prefix: normalized.tpg2200_text_prefix,
         tpg2200_max_text_chars: normalized.tpg2200_max_text_chars,
         sip_title_prefix: normalized.sip_title_prefix,
@@ -3905,6 +4704,7 @@ fn serve_geoalarm_post(
 fn serve_meshcom_send(
     stream: TcpStream,
     shared_config: &Option<tetra_config::bluestation::SharedConfig>,
+    dashboard_state: &DashboardState,
     body: &str,
 ) {
     let json: serde_json::Value = match serde_json::from_str(body.trim()) {
@@ -3919,30 +4719,38 @@ fn serve_meshcom_send(
         }
     };
     let Some(cfg) = shared_config else {
-        http_json_response(stream, 503, &serde_json::json!({"ok": false, "error": "Config not available"}).to_string());
+        http_json_response(
+            stream,
+            503,
+            &serde_json::json!({"ok": false, "error": "Config not available"}).to_string(),
+        );
         return;
     };
     let meshcom = cfg.effective_meshcom();
     if !meshcom.enabled {
-        http_json_response(stream, 400, &serde_json::json!({"ok": false, "error": "MeshCom is disabled"}).to_string());
+        http_json_response(
+            stream,
+            400,
+            &serde_json::json!({"ok": false, "error": "MeshCom is disabled"}).to_string(),
+        );
         return;
     }
-    let dst = json
-        .get("dst")
-        .and_then(|v| v.as_str())
-        .map(str::trim)
-        .unwrap_or("");
-    let msg = json
-        .get("msg")
-        .and_then(|v| v.as_str())
-        .map(str::trim)
-        .unwrap_or("");
+    let dst = json.get("dst").and_then(|v| v.as_str()).map(str::trim).unwrap_or("");
+    let msg = json.get("msg").and_then(|v| v.as_str()).map(str::trim).unwrap_or("");
     if dst.is_empty() || msg.is_empty() {
-        http_json_response(stream, 400, &serde_json::json!({"ok": false, "error": "dst and msg are required"}).to_string());
+        http_json_response(
+            stream,
+            400,
+            &serde_json::json!({"ok": false, "error": "dst and msg are required"}).to_string(),
+        );
         return;
     }
     if !dapnet_text_acceptable(dst) || !dapnet_text_acceptable(msg) {
-        http_json_response(stream, 400, &serde_json::json!({"ok": false, "error": "control characters are not allowed"}).to_string());
+        http_json_response(
+            stream,
+            400,
+            &serde_json::json!({"ok": false, "error": "control characters are not allowed"}).to_string(),
+        );
         return;
     }
 
@@ -3953,15 +4761,15 @@ fn serve_meshcom_send(
     })
     .to_string();
     let target = format!("{}:{}", meshcom.tx_host, meshcom.tx_port);
-    let result = UdpSocket::bind("0.0.0.0:0")
-        .and_then(|socket| {
-            socket.set_broadcast(meshcom.allow_broadcast)?;
-            socket.send_to(wire.as_bytes(), &target)
-        });
+    let result = UdpSocket::bind("0.0.0.0:0").and_then(|socket| {
+        socket.set_broadcast(meshcom.allow_broadcast)?;
+        socket.send_to(wire.as_bytes(), &target)
+    });
     match result {
         Ok(bytes) => {
             let ts = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
             {
+                let msg_text = msg.chars().take(512).collect::<String>();
                 let mut state = cfg.state_write();
                 state.meshcom_status.configured = true;
                 state.meshcom_status.enabled = meshcom.enabled;
@@ -3976,13 +4784,14 @@ fn serve_meshcom_send(
                 state.meshcom_status.messages.insert(
                     0,
                     tetra_config::bluestation::MeshcomMessageStatus {
-                        ts,
+                        ts: ts.clone(),
                         direction: "tx".to_string(),
                         msg_type: "msg".to_string(),
                         src_type: Some("flowstation".to_string()),
                         src: Some("FlowStation".to_string()),
+                        via: Vec::new(),
                         dst: Some(dst.to_string()),
-                        msg: Some(msg.chars().take(512).collect::<String>()),
+                        msg: Some(msg_text.clone()),
                         msg_id: None,
                         paths: vec!["udp".to_string()],
                         lat: None,
@@ -3995,6 +4804,26 @@ fn serve_meshcom_send(
                 );
                 while state.meshcom_status.messages.len() > meshcom.max_messages {
                     state.meshcom_status.messages.pop();
+                }
+                if let Ok(mut dashboard) = dashboard_state.write() {
+                    dashboard.push_meshcom_message(MeshcomMessageLogEntry {
+                        ts,
+                        direction: "tx".to_string(),
+                        msg_type: "msg".to_string(),
+                        src_type: Some("flowstation".to_string()),
+                        src: Some("FlowStation".to_string()),
+                        via: Vec::new(),
+                        dst: Some(dst.to_string()),
+                        msg: Some(msg_text),
+                        msg_id: None,
+                        paths: vec!["udp".to_string()],
+                        lat: None,
+                        lon: None,
+                        alt: None,
+                        batt: None,
+                        rssi: None,
+                        snr: None,
+                    });
                 }
             }
             tracing::info!("MeshCom: sent {} bytes to {} dst={}", bytes, target, dst);
@@ -4016,10 +4845,7 @@ fn serve_meshcom_send(
 }
 
 /// GET /api/echolink — return effective EchoLink settings and runtime status as JSON.
-fn serve_echolink_get(
-    stream: TcpStream,
-    shared_config: &Option<tetra_config::bluestation::SharedConfig>,
-) {
+fn serve_echolink_get(stream: TcpStream, shared_config: &Option<tetra_config::bluestation::SharedConfig>) {
     let (echolink, runtime) = match shared_config {
         Some(cfg) => (cfg.effective_echolink(), cfg.state_read().echolink_status.clone()),
         None => (
@@ -4075,10 +4901,7 @@ fn serve_echolink_get(
 }
 
 /// GET /api/echolink/directory — return the last downloaded EchoLink directory list.
-fn serve_echolink_directory(
-    stream: TcpStream,
-    shared_config: &Option<tetra_config::bluestation::SharedConfig>,
-) {
+fn serve_echolink_directory(stream: TcpStream, shared_config: &Option<tetra_config::bluestation::SharedConfig>) {
     let runtime = shared_config
         .as_ref()
         .map(|cfg| cfg.state_read().echolink_status.clone())
@@ -4108,15 +4931,8 @@ fn serve_echolink_directory(
 
 /// POST /api/echolink — update EchoLink settings. Applies immediately through StackState override
 /// and rewrites `[echolink]` in config.toml.
-fn serve_echolink_post(
-    stream: TcpStream,
-    shared_config: &Option<tetra_config::bluestation::SharedConfig>,
-    config_path: &str,
-    body: &str,
-) {
-    use tetra_config::bluestation::{
-        CfgEcholinkDto, EcholinkRuntimeOverride, apply_echolink_patch,
-    };
+fn serve_echolink_post(stream: TcpStream, shared_config: &Option<tetra_config::bluestation::SharedConfig>, config_path: &str, body: &str) {
+    use tetra_config::bluestation::{CfgEcholinkDto, EcholinkRuntimeOverride, apply_echolink_patch};
 
     let json: serde_json::Value = match serde_json::from_str(body.trim()) {
         Ok(v) => v,
@@ -4148,30 +4964,14 @@ fn serve_echolink_post(
         outbound_prefix: dapnet_as_string(&json, "outbound_prefix", &cur.outbound_prefix),
         strip_outbound_prefix: dapnet_as_bool(&json, "strip_outbound_prefix", cur.strip_outbound_prefix),
         service_numbers: echolink_string_list(&json, "service_numbers", &cur.service_numbers),
-        default_tetra_source_issi: dapnet_as_u32(
-            &json,
-            "default_tetra_source_issi",
-            cur.default_tetra_source_issi,
-        ),
-        default_tetra_dest_issi: dapnet_as_u32(
-            &json,
-            "default_tetra_dest_issi",
-            cur.default_tetra_dest_issi,
-        ),
-        default_tetra_dest_is_group: dapnet_as_bool(
-            &json,
-            "default_tetra_dest_is_group",
-            cur.default_tetra_dest_is_group,
-        ),
+        default_tetra_source_issi: dapnet_as_u32(&json, "default_tetra_source_issi", cur.default_tetra_source_issi),
+        default_tetra_dest_issi: dapnet_as_u32(&json, "default_tetra_dest_issi", cur.default_tetra_dest_issi),
+        default_tetra_dest_is_group: dapnet_as_bool(&json, "default_tetra_dest_is_group", cur.default_tetra_dest_is_group),
         routes: echolink_routes_from_json(&json, &cur.routes),
         allowed_callsigns: echolink_string_list(&json, "allowed_callsigns", &cur.allowed_callsigns),
         allowed_node_ids: echolink_u32_list(&json, "allowed_node_ids", &cur.allowed_node_ids),
         auto_connect: dapnet_as_string(&json, "auto_connect", &cur.auto_connect),
-        reconnect_interval_secs: dapnet_as_u64(
-            &json,
-            "reconnect_interval_secs",
-            cur.reconnect_interval_secs,
-        ),
+        reconnect_interval_secs: dapnet_as_u64(&json, "reconnect_interval_secs", cur.reconnect_interval_secs),
         max_session_secs: dapnet_as_u64(&json, "max_session_secs", cur.max_session_secs),
         extra: HashMap::new(),
     };
@@ -4276,10 +5076,7 @@ fn serve_echolink_connect(
     }
 }
 
-fn serve_echolink_disconnect(
-    stream: TcpStream,
-    cmd_tx: &Arc<Mutex<Option<EcholinkCmdSender>>>,
-) {
+fn serve_echolink_disconnect(stream: TcpStream, cmd_tx: &Arc<Mutex<Option<EcholinkCmdSender>>>) {
     let Some(tx) = cmd_tx.lock().ok().and_then(|g| g.clone()) else {
         http_json_response(stream, 503, "{\"ok\":false,\"error\":\"EchoLink worker is unavailable\"}");
         return;
@@ -4336,28 +5133,77 @@ fn snom_string_list(json: &serde_json::Value, key: &str, default: &[String]) -> 
 }
 
 fn meshcom_source_list_as_json(values: &BTreeSet<String>) -> serde_json::Value {
-    serde_json::Value::Array(
-        values
-            .iter()
-            .map(|value| serde_json::Value::String(value.clone()))
-            .collect(),
-    )
+    serde_json::Value::Array(values.iter().map(|value| serde_json::Value::String(value.clone())).collect())
 }
 
 fn issi_set_as_json(values: &BTreeSet<u32>) -> serde_json::Value {
-    serde_json::Value::Array(
-        values
-            .iter()
-            .map(|value| serde_json::json!(*value))
-            .collect(),
-    )
+    serde_json::Value::Array(values.iter().map(|value| serde_json::json!(*value)).collect())
 }
 
-fn meshcom_source_list_from_json(
-    json: &serde_json::Value,
-    key: &str,
-    current: &BTreeSet<String>,
-) -> Result<Vec<String>, String> {
+fn issi_priority_map_as_json(values: &BTreeMap<u32, u8>) -> serde_json::Value {
+    let mut map = serde_json::Map::new();
+    for (issi, priority) in values {
+        map.insert(issi.to_string(), serde_json::json!(priority));
+    }
+    serde_json::Value::Object(map)
+}
+
+fn issi_priority_map_from_json(json: &serde_json::Value, key: &str, current: &BTreeMap<u32, u8>) -> Result<BTreeMap<u32, u8>, String> {
+    let Some(value) = json.get(key) else {
+        return Ok(current.clone());
+    };
+    let mut out = BTreeMap::new();
+    match value {
+        serde_json::Value::Object(map) => {
+            for (raw_issi, raw_priority) in map {
+                let issi = raw_issi
+                    .trim()
+                    .parse::<u32>()
+                    .map_err(|_| format!("{key}: ISSI '{raw_issi}' must be numeric"))?;
+                if issi > 16_777_215 {
+                    return Err(format!("{key}: ISSI {issi} out of range"));
+                }
+                let Some(priority) = raw_priority.as_u64() else {
+                    return Err(format!("{key}: priority for ISSI {issi} must be numeric"));
+                };
+                if priority > 15 {
+                    return Err(format!("{key}: priority for ISSI {issi} must be 0..=15"));
+                }
+                out.insert(issi, priority as u8);
+            }
+        }
+        serde_json::Value::String(text) => {
+            for line in text.lines() {
+                let line = line.trim();
+                if line.is_empty() || line.starts_with('#') {
+                    continue;
+                }
+                let Some((raw_issi, raw_priority)) = line.split_once('=') else {
+                    return Err(format!("{key}: line '{line}' must be ISSI=Priority"));
+                };
+                let issi = raw_issi
+                    .trim()
+                    .parse::<u32>()
+                    .map_err(|_| format!("{key}: line '{line}' has invalid ISSI"))?;
+                if issi > 16_777_215 {
+                    return Err(format!("{key}: ISSI {issi} out of range"));
+                }
+                let priority = raw_priority
+                    .trim()
+                    .parse::<u8>()
+                    .map_err(|_| format!("{key}: line '{line}' has invalid priority"))?;
+                if priority > 15 {
+                    return Err(format!("{key}: line '{line}' has priority out of range"));
+                }
+                out.insert(issi, priority);
+            }
+        }
+        _ => return Err(format!("{key} must be an object or text lines")),
+    }
+    Ok(out)
+}
+
+fn meshcom_source_list_from_json(json: &serde_json::Value, key: &str, current: &BTreeSet<String>) -> Result<Vec<String>, String> {
     let Some(value) = json.get(key) else {
         return Ok(current.iter().cloned().collect());
     };
@@ -4399,11 +5245,7 @@ fn push_meshcom_source_parts(key: &str, text: &str, out: &mut Vec<String>) -> Re
     Ok(())
 }
 
-fn snom_issi_set_from_json(
-    json: &serde_json::Value,
-    key: &str,
-    current: &BTreeSet<u32>,
-) -> Result<BTreeSet<u32>, String> {
+fn snom_issi_set_from_json(json: &serde_json::Value, key: &str, current: &BTreeSet<u32>) -> Result<BTreeSet<u32>, String> {
     let Some(value) = json.get(key) else {
         return Ok(current.clone());
     };
@@ -4414,9 +5256,7 @@ fn snom_issi_set_from_json(
                 let issi = if let Some(n) = item.as_u64() {
                     n
                 } else if let Some(s) = item.as_str() {
-                    s.trim()
-                        .parse::<u64>()
-                        .map_err(|_| format!("{key}: ISSI must be numeric"))?
+                    s.trim().parse::<u64>().map_err(|_| format!("{key}: ISSI must be numeric"))?
                 } else {
                     return Err(format!("{key}: ISSI must be a positive integer"));
                 };
@@ -4432,9 +5272,7 @@ fn snom_issi_set_from_json(
                 if part.is_empty() {
                     continue;
                 }
-                let issi = part
-                    .parse::<u64>()
-                    .map_err(|_| format!("{key}: ISSI must be numeric"))?;
+                let issi = part.parse::<u64>().map_err(|_| format!("{key}: ISSI must be numeric"))?;
                 if issi > 16_777_215 {
                     return Err(format!("{key}: ISSI {} out of range", issi));
                 }
@@ -4446,10 +5284,7 @@ fn snom_issi_set_from_json(
     Ok(out)
 }
 
-fn echolink_routes_from_json(
-    json: &serde_json::Value,
-    default: &BTreeMap<String, String>,
-) -> HashMap<String, String> {
+fn echolink_routes_from_json(json: &serde_json::Value, default: &BTreeMap<String, String>) -> HashMap<String, String> {
     let Some(v) = json.get("routes") else {
         return default.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
     };
@@ -4503,18 +5338,14 @@ fn normalize_dapnet_api_url(api_url: &str) -> String {
         return format!("{base}/api/calls");
     }
     if let Some(base) = url.strip_suffix("/messages")
-        && base.ends_with("/api") {
-            return format!("{base}/calls");
-        }
+        && base.ends_with("/api")
+    {
+        return format!("{base}/calls");
+    }
     url
 }
 
-fn build_dapnet_call_payload(
-    text: &str,
-    callsigns: Vec<String>,
-    groups: Vec<String>,
-    emergency: bool,
-) -> serde_json::Value {
+fn build_dapnet_call_payload(text: &str, callsigns: Vec<String>, groups: Vec<String>, emergency: bool) -> serde_json::Value {
     serde_json::json!({
         "text": text,
         "callSignNames": callsigns,
@@ -4574,7 +5405,11 @@ fn serve_dapnet_send(
     let json: serde_json::Value = match serde_json::from_str(body.trim()) {
         Ok(v) => v,
         Err(e) => {
-            http_json_response(stream, 400, &serde_json::json!({"ok":false,"error":format!("Invalid JSON: {e}")}).to_string());
+            http_json_response(
+                stream,
+                400,
+                &serde_json::json!({"ok":false,"error":format!("Invalid JSON: {e}")}).to_string(),
+            );
             return;
         }
     };
@@ -4597,7 +5432,11 @@ fn serve_dapnet_send(
         return;
     }
     if text.chars().count() > DAPNET_API_TEXT_MAX_CHARS {
-        http_json_response(stream, 200, "{\"ok\":false,\"error\":\"DAPNET message text exceeds 80 characters\"}");
+        http_json_response(
+            stream,
+            200,
+            "{\"ok\":false,\"error\":\"DAPNET message text exceeds 80 characters\"}",
+        );
         return;
     }
     let api_url = normalize_dapnet_api_url(&dapnet.api_url);
@@ -4608,7 +5447,11 @@ fn serve_dapnet_send(
     let callsigns = dapnet_string_list(&json, &["callSignNames", "callsigns", "call_signs"]);
     let groups = dapnet_string_list(&json, &["transmitterGroupNames", "transmitter_groups", "groups"]);
     if callsigns.is_empty() && groups.is_empty() {
-        http_json_response(stream, 200, "{\"ok\":false,\"error\":\"Set at least one callsign or transmitter group\"}");
+        http_json_response(
+            stream,
+            200,
+            "{\"ok\":false,\"error\":\"Set at least one callsign or transmitter group\"}",
+        );
         return;
     }
     let emergency = json.get("emergency").and_then(|v| v.as_bool()).unwrap_or(false);
@@ -4620,7 +5463,11 @@ fn serve_dapnet_send(
     {
         Ok(client) => client,
         Err(e) => {
-            http_json_response(stream, 200, &serde_json::json!({"ok":false,"error":format!("HTTP client error: {e}")}).to_string());
+            http_json_response(
+                stream,
+                200,
+                &serde_json::json!({"ok":false,"error":format!("HTTP client error: {e}")}).to_string(),
+            );
             return;
         }
     };
@@ -4644,12 +5491,14 @@ fn serve_dapnet_send(
                     clients,
                     "tx",
                     format!("api:{}", chrono::Utc::now().timestamp_millis()),
-                    req_body["callSignNames"].as_array()
+                    req_body["callSignNames"]
+                        .as_array()
                         .and_then(|a| a.first())
                         .and_then(|v| v.as_str())
                         .unwrap_or("")
                         .to_string(),
-                    req_body["transmitterGroupNames"].as_array()
+                    req_body["transmitterGroupNames"]
+                        .as_array()
                         .map(|a| a.iter().filter_map(|v| v.as_str()).collect::<Vec<_>>().join(","))
                         .unwrap_or_default(),
                     text,
@@ -4665,17 +5514,17 @@ fn serve_dapnet_send(
         }
         Err(e) => {
             tracing::warn!("Dashboard: DAPNET outbound send failed: {}", e);
-            http_json_response(stream, 200, &serde_json::json!({"ok":false,"error":format!("Network error: {e}")}).to_string());
+            http_json_response(
+                stream,
+                200,
+                &serde_json::json!({"ok":false,"error":format!("Network error: {e}")}).to_string(),
+            );
         }
     }
 }
 
 /// POST /api/telegram/verify — validate the token via getMe and return the bot @username.
-fn serve_telegram_verify(
-    stream: TcpStream,
-    shared_config: &Option<tetra_config::bluestation::SharedConfig>,
-    body: &str,
-) {
+fn serve_telegram_verify(stream: TcpStream, shared_config: &Option<tetra_config::bluestation::SharedConfig>, body: &str) {
     let json: serde_json::Value = serde_json::from_str(body.trim()).unwrap_or(serde_json::Value::Null);
     let token = telegram_resolve_token(&json, shared_config);
     if token.is_empty() {
@@ -4692,21 +5541,14 @@ fn serve_telegram_verify(
             http_json_response(stream, 200, &body);
         }
         Err(e) => {
-            let body = format!(
-                "{{\"ok\":false,\"error\":\"{}\"}}",
-                crate::net_dashboard::telegram::json_escape(&e)
-            );
+            let body = format!("{{\"ok\":false,\"error\":\"{}\"}}", crate::net_dashboard::telegram::json_escape(&e));
             http_json_response(stream, 200, &body);
         }
     }
 }
 
 /// POST /api/telegram/detect — return the chats that recently messaged the bot (getUpdates).
-fn serve_telegram_detect(
-    stream: TcpStream,
-    shared_config: &Option<tetra_config::bluestation::SharedConfig>,
-    body: &str,
-) {
+fn serve_telegram_detect(stream: TcpStream, shared_config: &Option<tetra_config::bluestation::SharedConfig>, body: &str) {
     let json: serde_json::Value = serde_json::from_str(body.trim()).unwrap_or(serde_json::Value::Null);
     let token = telegram_resolve_token(&json, shared_config);
     if token.is_empty() {
@@ -4732,21 +5574,14 @@ fn serve_telegram_detect(
             http_json_response(stream, 200, &body);
         }
         Err(e) => {
-            let body = format!(
-                "{{\"ok\":false,\"error\":\"{}\"}}",
-                crate::net_dashboard::telegram::json_escape(&e)
-            );
+            let body = format!("{{\"ok\":false,\"error\":\"{}\"}}", crate::net_dashboard::telegram::json_escape(&e));
             http_json_response(stream, 200, &body);
         }
     }
 }
 
 /// POST /api/telegram/test — send a test alert to the configured (or body-supplied) chats.
-fn serve_telegram_test(
-    stream: TcpStream,
-    shared_config: &Option<tetra_config::bluestation::SharedConfig>,
-    body: &str,
-) {
+fn serve_telegram_test(stream: TcpStream, shared_config: &Option<tetra_config::bluestation::SharedConfig>, body: &str) {
     let json: serde_json::Value = serde_json::from_str(body.trim()).unwrap_or(serde_json::Value::Null);
     let Some(cfg) = shared_config else {
         http_json_response(stream, 200, "{\"ok\":false,\"error\":\"Config indisponibil\"}");
@@ -4789,26 +5624,35 @@ fn serve_telegram_test(
 
 fn serve_system_info(mut stream: TcpStream, config_path: &str) {
     let hostname = std::process::Command::new("hostname")
-        .output().ok()
+        .output()
+        .ok()
         .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
         .unwrap_or_else(|| "unknown".to_string());
 
-    let uptime_secs: u64 = std::fs::read_to_string("/proc/uptime").ok()
+    let uptime_secs: u64 = std::fs::read_to_string("/proc/uptime")
+        .ok()
         .and_then(|s| s.split_whitespace().next().map(|n| n.parse::<f64>().ok()))
-        .flatten().map(|f| f as u64).unwrap_or(0);
+        .flatten()
+        .map(|f| f as u64)
+        .unwrap_or(0);
 
-    let os_info = std::fs::read_to_string("/etc/os-release").ok()
-        .and_then(|s| s.lines()
-            .find(|l| l.starts_with("PRETTY_NAME="))
-            .map(|l| l.trim_start_matches("PRETTY_NAME=").trim_matches('"').to_string()))
+    let os_info = std::fs::read_to_string("/etc/os-release")
+        .ok()
+        .and_then(|s| {
+            s.lines()
+                .find(|l| l.starts_with("PRETTY_NAME="))
+                .map(|l| l.trim_start_matches("PRETTY_NAME=").trim_matches('"').to_string())
+        })
         .unwrap_or_else(|| "Linux".to_string());
 
     let config_dir = std::path::Path::new(config_path)
-        .parent().map(|p| p.to_string_lossy().to_string())
+        .parent()
+        .map(|p| p.to_string_lossy().to_string())
         .unwrap_or_else(|| ".".to_string());
 
     // CPU model — /proc/cpuinfo "model name" (x86) or "Model" (ARM/Pi)
-    let cpu_model = std::fs::read_to_string("/proc/cpuinfo").ok()
+    let cpu_model = std::fs::read_to_string("/proc/cpuinfo")
+        .ok()
         .and_then(|s| {
             s.lines()
                 .find(|l| l.to_lowercase().starts_with("model name") || l.to_lowercase().starts_with("hardware"))
@@ -4817,7 +5661,8 @@ fn serve_system_info(mut stream: TcpStream, config_path: &str) {
         .unwrap_or_else(|| "unknown".to_string());
 
     // CPU core count
-    let cpu_cores = std::fs::read_to_string("/proc/cpuinfo").ok()
+    let cpu_cores = std::fs::read_to_string("/proc/cpuinfo")
+        .ok()
         .map(|s| s.lines().filter(|l| l.starts_with("processor")).count())
         .unwrap_or(0);
 
@@ -4826,24 +5671,28 @@ fn serve_system_info(mut stream: TcpStream, config_path: &str) {
     fn read_cpu_stat() -> Option<(u64, u64)> {
         let s = std::fs::read_to_string("/proc/stat").ok()?;
         let line = s.lines().next()?;
-        let nums: Vec<u64> = line.split_whitespace().skip(1)
-            .filter_map(|n| n.parse().ok()).collect();
-        if nums.len() < 4 { return None; }
+        let nums: Vec<u64> = line.split_whitespace().skip(1).filter_map(|n| n.parse().ok()).collect();
+        if nums.len() < 4 {
+            return None;
+        }
         let idle = nums[3] + nums.get(4).copied().unwrap_or(0); // idle + iowait
         let total: u64 = nums.iter().sum();
         Some((total, idle))
     }
-    let cpu_pct = if let (Some((t1, i1)), Some((t2, i2))) = (
-        read_cpu_stat(),
-        { std::thread::sleep(std::time::Duration::from_millis(100)); read_cpu_stat() }
-    ) {
+    let cpu_pct = if let (Some((t1, i1)), Some((t2, i2))) = (read_cpu_stat(), {
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        read_cpu_stat()
+    }) {
         let dt = t2.saturating_sub(t1);
         let di = i2.saturating_sub(i1);
         if dt > 0 { ((dt - di) * 100 / dt) as u8 } else { 0 }
-    } else { 0 };
+    } else {
+        0
+    };
 
     // RAM — /proc/meminfo MemTotal and MemAvailable
-    let (ram_total_mb, ram_used_mb) = std::fs::read_to_string("/proc/meminfo").ok()
+    let (ram_total_mb, ram_used_mb) = std::fs::read_to_string("/proc/meminfo")
+        .ok()
         .map(|s| {
             let mut total = 0u64;
             let mut available = 0u64;
@@ -4863,8 +5712,11 @@ fn serve_system_info(mut stream: TcpStream, config_path: &str) {
         "/sys/class/thermal/thermal_zone0/temp",
         "/sys/class/thermal/thermal_zone1/temp",
         "/sys/devices/virtual/thermal/thermal_zone0/temp",
-    ].iter().find_map(|path| {
-        std::fs::read_to_string(path).ok()
+    ]
+    .iter()
+    .find_map(|path| {
+        std::fs::read_to_string(path)
+            .ok()
             .and_then(|s| s.trim().parse::<i64>().ok())
             .map(|t| t as f32 / 1000.0)
             .filter(|&t| t > 0.0 && t < 150.0) // sanity check
@@ -4891,9 +5743,7 @@ fn serve_system_info(mut stream: TcpStream, config_path: &str) {
             // and the user saw a confusing "SoapySDRUtil --find failed" with the
             // full help dump pasted in front of it. Thanks @shawnchain for the
             // PR comment.
-            let probe = std::process::Command::new(bin)
-                .arg("--info")
-                .output();
+            let probe = std::process::Command::new(bin).arg("--info").output();
             if let Ok(out) = probe {
                 if out.status.success() {
                     // Now run --find to enumerate devices. Empty result means
@@ -4908,11 +5758,14 @@ fn serve_system_info(mut stream: TcpStream, config_path: &str) {
                     // version + module path). Beyond that it dumps a long module
                     // listing that isn't useful in the dashboard card.
                     let info = String::from_utf8_lossy(&out.stdout);
-                    let info_summary: String = info.lines()
+                    let info_summary: String = info
+                        .lines()
                         .filter(|l| {
                             let ll = l.to_lowercase();
-                            ll.contains("lib version") || ll.contains("api version")
-                            || ll.contains("abi version") || ll.contains("install root")
+                            ll.contains("lib version")
+                                || ll.contains("api version")
+                                || ll.contains("abi version")
+                                || ll.contains("install root")
                         })
                         .take(4)
                         .collect::<Vec<&str>>()
@@ -4921,19 +5774,23 @@ fn serve_system_info(mut stream: TcpStream, config_path: &str) {
                         Some(text) if text.lines().any(|l| l.to_lowercase().contains("found device")) => {
                             // Keep only the useful per-device lines (driver/serial/label) to
                             // avoid dumping pages of advertising.
-                            let lines: Vec<&str> = text.lines()
+                            let lines: Vec<&str> = text
+                                .lines()
                                 .filter(|l| {
                                     let ll = l.to_lowercase();
-                                    ll.contains("found device") || ll.contains("driver")
-                                    || ll.contains("serial") || ll.contains("label")
-                                    || ll.contains("name") || ll.contains("manufacturer")
+                                    ll.contains("found device")
+                                        || ll.contains("driver")
+                                        || ll.contains("serial")
+                                        || ll.contains("label")
+                                        || ll.contains("name")
+                                        || ll.contains("manufacturer")
                                 })
                                 .take(20)
                                 .collect();
                             format!("{}\n{}", info_summary, lines.join("\n"))
                         }
                         Some(_) => format!("{}\nNo SDR device detected.", info_summary),
-                        None    => format!("{}\nSoapySDRUtil --find failed.", info_summary),
+                        None => format!("{}\nSoapySDRUtil --find failed.", info_summary),
                     };
                 }
             }
@@ -4945,8 +5802,7 @@ fn serve_system_info(mut stream: TcpStream, config_path: &str) {
 
     // Auto-detected SDR name — set by `phy::components::soapy_settings::get_settings()`
     // at stack startup. None if no SoapySDR-backed phy is in use (file backend etc).
-    let sdr_name = crate::phy::components::soapy_settings::detected_sdr_name()
-        .unwrap_or_else(|| "unknown".to_string());
+    let sdr_name = crate::phy::components::soapy_settings::detected_sdr_name().unwrap_or_else(|| "unknown".to_string());
 
     let body = serde_json::to_string(&serde_json::json!({
         "hostname": hostname,
@@ -4963,7 +5819,8 @@ fn serve_system_info(mut stream: TcpStream, config_path: &str) {
         "cpu_temp_c": cpu_temp_c,
         "soapy_info": soapy_info,
         "sdr_name": sdr_name,
-    })).unwrap_or_else(|_| "{}".to_string());
+    }))
+    .unwrap_or_else(|_| "{}".to_string());
 
     let header = format!(
         "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
@@ -4975,10 +5832,10 @@ fn serve_system_info(mut stream: TcpStream, config_path: &str) {
 
 fn serve_config_list(mut stream: TcpStream, config_path: &str) {
     let active_name = std::path::Path::new(config_path)
-        .file_name().map(|n| n.to_string_lossy().to_string())
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
         .unwrap_or_default();
-    let config_dir = std::path::Path::new(config_path)
-        .parent().unwrap_or(std::path::Path::new("."));
+    let config_dir = std::path::Path::new(config_path).parent().unwrap_or(std::path::Path::new("."));
 
     let mut profiles: Vec<serde_json::Value> = Vec::new();
     if let Ok(entries) = std::fs::read_dir(config_dir) {
@@ -4987,7 +5844,11 @@ fn serve_config_list(mut stream: TcpStream, config_path: &str) {
             .filter_map(|e| {
                 let name = e.file_name().to_string_lossy().to_string();
                 // Include .toml files, exclude backups (.bak)
-                if name.ends_with(".toml") && !name.ends_with(".bak") { Some(name) } else { None }
+                if name.ends_with(".toml") && !name.ends_with(".bak") {
+                    Some(name)
+                } else {
+                    None
+                }
             })
             .collect();
         names.sort();
@@ -5016,8 +5877,7 @@ fn serve_config_profile_get(stream: TcpStream, config_path: &str, profile_name: 
     if !profile_name.ends_with(".toml") {
         return http_response(stream, 400, "profile must be a .toml file");
     }
-    let config_dir = std::path::Path::new(config_path)
-        .parent().unwrap_or(std::path::Path::new("."));
+    let config_dir = std::path::Path::new(config_path).parent().unwrap_or(std::path::Path::new("."));
     let profile_path = config_dir.join(profile_name);
     serve_config_get(stream, &profile_path.to_string_lossy());
 }
@@ -5032,20 +5892,19 @@ fn save_config_profile(config_path: &str, profile_name: &str, content: &str) -> 
     if !profile_name.ends_with(".toml") {
         return Err("profile must be a .toml file".to_string());
     }
-    let config_dir = std::path::Path::new(config_path)
-        .parent().unwrap_or(std::path::Path::new("."));
+    let config_dir = std::path::Path::new(config_path).parent().unwrap_or(std::path::Path::new("."));
     let profile_path = config_dir.join(profile_name);
 
     // Refuse to overwrite the active config through this endpoint
     let active_name = std::path::Path::new(config_path)
-        .file_name().map(|n| n.to_string_lossy().to_string())
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
         .unwrap_or_default();
     if profile_name == active_name {
         return Err("cannot overwrite active config via profile editor — use the Config editor tab".to_string());
     }
 
-    std::fs::write(&profile_path, content.as_bytes())
-        .map_err(|e| format!("failed to write profile: {}", e))
+    std::fs::write(&profile_path, content.as_bytes()).map_err(|e| format!("failed to write profile: {}", e))
 }
 
 /// GET /api/public — anonymous read-only overview (FH-FEAT-033). Projects ONLY non-sensitive,
@@ -5086,8 +5945,7 @@ fn activate_config_profile(config_path: &str, profile_name: &str) -> Result<(), 
         return Err("profile must be a .toml file".to_string());
     }
 
-    let config_dir = std::path::Path::new(config_path)
-        .parent().unwrap_or(std::path::Path::new("."));
+    let config_dir = std::path::Path::new(config_path).parent().unwrap_or(std::path::Path::new("."));
     let profile_path = config_dir.join(profile_name);
 
     if !profile_path.exists() {
@@ -5135,7 +5993,10 @@ fn http_response(mut stream: TcpStream, code: u16, body: &str) {
     let status = if code == 200 { "OK" } else { "Error" };
     let resp = format!(
         "HTTP/1.1 {} {}\r\nContent-Type: text/plain\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
-        code, status, body.len(), body
+        code,
+        status,
+        body.len(),
+        body
     );
     let _ = stream.write_all(resp.as_bytes());
 }
@@ -5146,7 +6007,10 @@ fn http_json_response(mut stream: TcpStream, code: u16, body: &str) {
     let status = if code == 200 { "OK" } else { "Error" };
     let resp = format!(
         "HTTP/1.1 {} {}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
-        code, status, body.len(), body
+        code,
+        status,
+        body.len(),
+        body
     );
     let _ = stream.write_all(resp.as_bytes());
 }
@@ -5162,9 +6026,13 @@ fn drain_http_headers(stream: &mut TcpStream) {
     let mut prev3 = [0u8; 3];
     let mut byte = [0u8; 1];
     loop {
-        if stream.read(&mut byte).unwrap_or(0) == 0 { break; }
+        if stream.read(&mut byte).unwrap_or(0) == 0 {
+            break;
+        }
         // Detect "\r\n\r\n" by sliding a 4-byte window.
-        if prev3 == [b'\r', b'\n', b'\r'] && byte[0] == b'\n' { break; }
+        if prev3 == [b'\r', b'\n', b'\r'] && byte[0] == b'\n' {
+            break;
+        }
         prev3 = [prev3[1], prev3[2], byte[0]];
     }
 }
@@ -5181,9 +6049,13 @@ fn read_http_body(stream: &mut TcpStream) -> Vec<u8> {
     let mut byte = [0u8; 1];
     let mut prev3 = [0u8; 3];
     loop {
-        if stream.read(&mut byte).unwrap_or(0) == 0 { return Vec::new(); }
+        if stream.read(&mut byte).unwrap_or(0) == 0 {
+            return Vec::new();
+        }
         header_buf.push(byte[0]);
-        if prev3 == [b'\r', b'\n', b'\r'] && byte[0] == b'\n' { break; }
+        if prev3 == [b'\r', b'\n', b'\r'] && byte[0] == b'\n' {
+            break;
+        }
         prev3 = [prev3[1], prev3[2], byte[0]];
     }
     let header_str = String::from_utf8_lossy(&header_buf);
@@ -5195,8 +6067,10 @@ fn read_http_body(stream: &mut TcpStream) -> Vec<u8> {
             break;
         }
     }
-    if content_length == 0 { return Vec::new(); }
-    let mut body = vec![0u8; content_length];
+    if content_length == 0 {
+        return Vec::new();
+    }
+    let mut body = vec![0u8; content_length.min(512 * 1024)];
     let _ = stream.read_exact(&mut body);
     body
 }
@@ -5249,7 +6123,10 @@ fn url_decode(s: &str) -> String {
     let mut i = 0;
     while i < bytes.len() {
         match bytes[i] {
-            b'+' => { out.push(b' '); i += 1; }
+            b'+' => {
+                out.push(b' ');
+                i += 1;
+            }
             b'%' if i + 2 < bytes.len() => {
                 let hi = (bytes[i + 1] as char).to_digit(16);
                 let lo = (bytes[i + 2] as char).to_digit(16);
@@ -5257,10 +6134,14 @@ fn url_decode(s: &str) -> String {
                     out.push((h * 16 + l) as u8);
                     i += 3;
                 } else {
-                    out.push(bytes[i]); i += 1;
+                    out.push(bytes[i]);
+                    i += 1;
                 }
             }
-            b => { out.push(b); i += 1; }
+            b => {
+                out.push(b);
+                i += 1;
+            }
         }
     }
     String::from_utf8(out).unwrap_or_default()
@@ -5288,7 +6169,9 @@ fn serve_login_success(mut stream: TcpStream, token: &str) {
          Set-Cookie: fs_session={}; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800\r\n\
          Set-Cookie: fs_auth=1; Path=/; SameSite=Lax; Max-Age=604800\r\n\
          Connection: close\r\n\r\n{}",
-        body.len(), token, body
+        body.len(),
+        token,
+        body
     );
     let _ = stream.write_all(resp.as_bytes());
 }
@@ -5320,13 +6203,14 @@ fn serve_login_page(mut stream: TcpStream) {
 #[cfg(test)]
 mod tests {
     use super::{
-        binary_built_from, build_dapnet_call_payload, dapnet_ric_routes_from_json,
-        dapnet_ric_routes_from_json_key, dapnet_ric_set_from_json, is_tpg2200_action_request,
-        normalize_dapnet_api_url, query_params, truncate_action_text, DashboardServer,
+        DashboardServer, binary_built_from, build_dapnet_call_payload, dapnet_ric_routes_from_json, dapnet_ric_routes_from_json_key,
+        dapnet_ric_set_from_json, is_tpg2200_action_request, normalize_dapnet_api_url, query_params, truncate_action_text,
+    };
+    use crate::net_telemetry::TelemetryEvent;
+    use crate::tpg2200::{
+        build_tpg2200_callout_payload, default_tpg2200_ric, parse_hex_payload, tpg2200_callout_id_byte, tpg2200_priority_byte,
     };
     use std::collections::BTreeMap;
-    use crate::net_telemetry::TelemetryEvent;
-    use crate::tpg2200::{build_tpg2200_callout_payload, parse_hex_payload, tpg2200_incident_byte};
 
     /// FH-BUG (brew shown as v0): the transport reports version 0 ("unknown") on every (re)connect
     /// and v1 is learned lazily from a v1 group call. A confirmed v1 must never be downgraded by a
@@ -5375,19 +6259,18 @@ mod tests {
     }
 
     #[test]
-    fn tpg2200_incident_byte_preserves_confirmed_values_and_covers_256_ids() {
-        assert_eq!(tpg2200_incident_byte(1), 0x11);
-        assert_eq!(tpg2200_incident_byte(2), 0x21);
-        assert_eq!(tpg2200_incident_byte(3), 0x31);
-        assert_eq!(tpg2200_incident_byte(4), 0x41);
-        assert_eq!(tpg2200_incident_byte(15), 0xF1);
-        assert_eq!(tpg2200_incident_byte(16), 0x01);
-        assert_eq!(tpg2200_incident_byte(256), 0x00);
+    fn tpg2200_callout_id_and_priority_bytes_are_direct_fields() {
+        assert_eq!(tpg2200_callout_id_byte(0), 0x00);
+        assert_eq!(tpg2200_callout_id_byte(1), 0x01);
+        assert_eq!(tpg2200_callout_id_byte(33), 0x21);
+        assert_eq!(tpg2200_callout_id_byte(255), 0xFF);
+        assert_eq!(tpg2200_callout_id_byte(256), 0xFF);
 
-        let selectors = (1..=256)
-            .map(tpg2200_incident_byte)
-            .collect::<std::collections::HashSet<_>>();
+        let selectors = (0..=255).map(tpg2200_callout_id_byte).collect::<std::collections::HashSet<_>>();
         assert_eq!(selectors.len(), 256);
+        assert_eq!(tpg2200_priority_byte(0), 0x00);
+        assert_eq!(tpg2200_priority_byte(15), 0x0F);
+        assert_eq!(tpg2200_priority_byte(16), 0x0F);
     }
 
     #[test]
@@ -5396,10 +6279,7 @@ mod tests {
             parse_hex_payload("C3 00,0x09;0D:10-21").unwrap(),
             vec![0xC3, 0x00, 0x09, 0x0D, 0x10, 0x21]
         );
-        assert_eq!(
-            parse_hex_payload("C300090D").unwrap(),
-            vec![0xC3, 0x00, 0x09, 0x0D]
-        );
+        assert_eq!(parse_hex_payload("C300090D").unwrap(), vec![0xC3, 0x00, 0x09, 0x0D]);
         assert!(parse_hex_payload("C3 0X").is_err());
         assert!(parse_hex_payload("C3 0").is_err());
     }
@@ -5407,29 +6287,22 @@ mod tests {
     #[test]
     fn build_tpg2200_callout_payload_matches_known_alarm_shape() {
         assert_eq!(
-            build_tpg2200_callout_payload(1, "ALARM"),
+            build_tpg2200_callout_payload(default_tpg2200_ric(), 0x11, 0x0F, "ALARM"),
             vec![
-                0xC3, 0x00, 0x09, 0x0D, 0x10, 0x11, 0x27, 0x0F, 0x02, 0x30, 0x8D, 0x41,
-                0x4C, 0x41, 0x52, 0x4D
+                0xC3, 0x00, 0x09, 0x0D, 0x10, 0x11, 0x27, 0x0F, 0x02, 0x30, 0x8D, 0x41, 0x4C, 0x41, 0x52, 0x4D
             ]
         );
-        assert_eq!(build_tpg2200_callout_payload(2, "ALARM")[5], 0x21);
+        let payload = build_tpg2200_callout_payload(default_tpg2200_ric(), 0x21, 0x03, "ALARM");
+        assert_eq!(payload[5], 0x21);
+        assert_eq!(payload[7], 0x03);
     }
 
     #[test]
     fn tpg2200_action_request_matches_exact_route_only() {
-        assert!(is_tpg2200_action_request(
-            "GET /api/action/tpg2200?token=abc HTTP/1.1"
-        ));
-        assert!(is_tpg2200_action_request(
-            "POST /api/action/tpg2200?token=abc HTTP/1.1"
-        ));
-        assert!(!is_tpg2200_action_request(
-            "GET /api/action/tpg2200-extra?token=abc HTTP/1.1"
-        ));
-        assert!(!is_tpg2200_action_request(
-            "DELETE /api/action/tpg2200?token=abc HTTP/1.1"
-        ));
+        assert!(is_tpg2200_action_request("GET /api/action/tpg2200?token=abc HTTP/1.1"));
+        assert!(is_tpg2200_action_request("POST /api/action/tpg2200?token=abc HTTP/1.1"));
+        assert!(!is_tpg2200_action_request("GET /api/action/tpg2200-extra?token=abc HTTP/1.1"));
+        assert!(!is_tpg2200_action_request("DELETE /api/action/tpg2200?token=abc HTTP/1.1"));
     }
 
     #[test]
@@ -5460,12 +6333,7 @@ mod tests {
 
     #[test]
     fn dapnet_call_payload_uses_hampager_call_format() {
-        let payload = build_dapnet_call_payload(
-            "Probe",
-            vec!["DJ2TH".to_string()],
-            vec!["dl-all".to_string()],
-            false,
-        );
+        let payload = build_dapnet_call_payload("Probe", vec!["DJ2TH".to_string()], vec!["dl-all".to_string()], false);
         assert_eq!(payload["text"], "Probe");
         assert_eq!(payload["callSignNames"][0], "DJ2TH");
         assert_eq!(payload["transmitterGroupNames"][0], "dl-all");
@@ -5497,8 +6365,7 @@ mod tests {
             "callout_allowed_rics": "0000200, 0000216",
             "telegram_allowed_rics": ["0001063"]
         });
-        let group_routes =
-            dapnet_ric_routes_from_json_key(&json, "ric_gssi_routes", &BTreeMap::new()).unwrap();
+        let group_routes = dapnet_ric_routes_from_json_key(&json, "ric_gssi_routes", &BTreeMap::new()).unwrap();
         assert_eq!(group_routes.get(&4520), Some(&80));
 
         let empty = std::collections::BTreeSet::new();

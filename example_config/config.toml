@@ -378,17 +378,26 @@ voice_service = true
 # next startup, proactively sends D-LOCATION-UPDATE-COMMAND (ETSI EN 300 392-2 §16.4.4) to each,
 # forcing re-registration + group re-report so PTT works again within seconds, no human action.
 #
-# Default OFF: proactively keying COMMANDs at a batch of ISSIs right after boot adds MCCH load,
-# so it is opt-in. Pairs with cell_info.periodic_registration_secs (the T351 re-registration).
+# The proactive cache replay is OFF by default: keying COMMANDs at a batch of ISSIs right after
+# boot adds MCCH load, so it is opt-in. Pairs with cell_info.periodic_registration_secs (T351).
+#
+# A second, lighter mechanism — reactive_enabled — is ON by default and needs no cache: it watches
+# the uplink and, the moment an unknown but network-permitted radio transmits (any PTT/SDS/random
+# access), keys it one rate-limited D-LOCATION-UPDATE-COMMAND to force re-registration. It fires
+# only in response to a radio that is demonstrably present, so it is RF-cheap and heals the common
+# "PTT does nothing after a BS restart" case the cache can miss. Honours the same whitelist /
+# issi_allowlist scoping. Set reactive_enabled = false to disable.
 #
 # [recovery]
-# enabled = true                  # master on/off (default false)
-# issi_allowlist = []             # empty = recover every cached ISSI; non-empty = only these
+# enabled = true                  # proactive boot-time cache replay on/off (default false)
+# issi_allowlist = []             # empty = every cached/seen ISSI; non-empty = only these (both modes)
 # cache_path = ""                 # explicit path; omit/empty = <config-dir>/recovery_cache.json
 # max_replay_attempts = 150       # per-ISSI COMMAND re-sends before giving up (1..=500)
 # replay_per_frame = 1            # COMMANDs emitted per TDMA frame during the sweep (1..=18)
 # debounce_secs = 5               # coalesce registry changes into one cache write (1..=300)
 # max_cached_issis = 1024         # hard cap on cached terminals (1..=65535)
+# reactive_enabled = true         # command unknown radios to re-register on sight (default true)
+# reactive_cooldown_secs = 10     # min gap between reactive COMMANDs to the same ISSI (2..=120)
 
 ###############################################################################
 
@@ -411,7 +420,9 @@ voice_service = true
 # core_stall_secs = 10              # core is Critical after no TDMA tick for this long (2..=600)
 # restart_after_critical_secs = 30  # how long stalled before a restart is requested (1..=3600)
 # restart_cooldown_secs = 600       # minimum spacing between restart requests (10..=86400)
-# radios_silent_secs = 900          # Radios Degraded if attached but silent this long; 0 = off
+# radios_silent_secs = 900          # FLOOR for the "radios silent" Degraded signal; 0 = off.
+                                    # Effective window = max(this, 1.5 x periodic_registration_secs/T351),
+                                    # so radios are never flagged inside their T351 re-registration window.
 # dl_queue_degraded = 64            # downlink backlog → Congestion Degraded
 # dl_queue_critical = 192           # downlink backlog → Congestion Critical
 # sds_queue_degraded = 32           # deferred-SDS backlog → Congestion Degraded
@@ -508,7 +519,11 @@ voice_service = true
 #
 # callout_source_issi = 9999
 # callout_dest_issi = 0
-# callout_incident_base = 2
+# callout_tpg_ric = 0x00090D10          # TPG2200 Call-Out payload address bytes
+# callout_id_base = 33                  # raw Call-Out ID byte 0..255; cycles after every alarm
+# callout_priority = 15                 # raw priority/tone byte 0..15
+# callout_issi_priorities = {}          # optional: "TPG ISSI" = priority
+# callout_tpg_ric_priorities = {}       # optional: "0x00090D10" = priority
 # callout_text_prefix = "DAPNET"
 #
 # telegram_prefix = "DAPNET"
@@ -533,8 +548,15 @@ voice_service = true
 #   http://<flowstation>:<dashboard_port>/api/action/tpg2200?token=<token>&text=ALARM
 #
 # Every accepted request sends a Type-4 SDS Call-Out to `dest_issi`.
-# The incident number starts at `incident_base` and increments in memory
-# on every trigger, wrapping after 256.
+# Without URL parameters, the incident number starts at `incident_base` and
+# increments in memory on every trigger, wrapping from 256 back to 1. FlowStation
+# converts that incident to the TPG selector byte sequence used by the original
+# ActionURL implementation: incident 1 => 0x11, 2 => 0x21, 3 => 0x31, ...
+# Optional URL parameters:
+#   &incident=2
+#   &id=33 or &callout_id=33 or &raw_id=33   # expert raw selector-byte override
+#   &priority=15 or &tone=15
+#   &tpg_ric=0x00090D10
 #
 # This endpoint intentionally does not require the dashboard cookie session because phones cannot
 # reliably hold it. Keep `token` long/random and do not expose the dashboard port publicly.
@@ -544,7 +566,11 @@ voice_service = true
 # token = ""
 # source_issi = 9999
 # dest_issi = 0
+# tpg_ric = 0x00090D10
 # incident_base = 1
+# priority = 15
+# tpg_issi_priorities = {}              # optional: "TPG ISSI" = priority
+# tpg_ric_priorities = {}               # optional: "0x00090D10" = priority
 # default_text = "ALARM"
 # max_text_chars = 80
 
@@ -656,7 +682,11 @@ voice_service = true
 #
 # tpg2200_source_issi = 9999
 # tpg2200_dest_issi = 0                # TPG2200 ISSI
-# tpg2200_incident_base = 1            # cycles 1..=256
+# tpg2200_ric = 0x00090D10
+# tpg2200_callout_id_base = 33         # raw selector byte 0..255, e.g. 33 = 0x21
+# tpg2200_priority = 15                # raw priority/tone byte 0..15
+# tpg2200_issi_priorities = {}         # optional: "TPG ISSI" = priority
+# tpg2200_ric_priorities = {}          # optional: "0x00090D10" = priority
 # tpg2200_text_prefix = "GeoAlarm"
 # tpg2200_max_text_chars = 80
 #
@@ -797,24 +827,62 @@ voice_service = true
 # (only local_ssi_ranges rejects inbound). If left commented, all calls outside
 # local_ssi_ranges are forwarded to Brew.
 # whitelisted_ssis = [91]
+#
+# Optional PBX gateway ISSIs that should always be considered Brew-routable
+# (useful for phone/PBX interconnect IDs that do not follow normal TetraPack ISSI rules).
+# pbx_gateway_issis = [16777184, 16777186]
+#
+# OPTIONAL: local ISSI partition for multi-Brew setups.
+# With only one Brew server this can stay commented for legacy behaviour. If [brew2]
+# is configured too, both [brew] and [brew2] MUST set a non-empty local_issi_allowlist,
+# and the two lists must not overlap. This prevents the same radio from registering
+# or forwarding traffic through both Brew servers.
+# local_issi_allowlist = [2632585, 2635411]
+# local_issi_blocklist = []
+#
+# OPTIONAL: second Brew server. Same keys as [brew]. Use non-overlapping
+# local_issi_allowlist entries so every local ISSI belongs to exactly one server.
+# [brew2]
+# host = "second.brew.example"
+# port = 9000
+# tls = true
+# username = 123456701
+# password = "012345"
+# reconnect_delay_secs = 15
+# feature_sds_enabled = true
+# feature_rssi_export = false
+# whitelisted_ssis = [92]
+# pbx_gateway_issis = []
+# local_issi_allowlist = [2636000, 2636001]
+# local_issi_blocklist = []
 
 ###############################################################################
 
 # OPTIONAL: Asterisk SIP/RTP bridge — parallel to Brew, not a replacement.
 # Only destinations listed in service_numbers are routed to Asterisk; everything else
-# stays on the normal local/Brew path.
+# stays on the normal local/Brew path. Use ["*"] to route every dial behind
+# outbound_prefix to Asterisk.
 #
 # Example: a TETRA dial string 91600 with outbound_prefix="91" and strip=true becomes
 # SIP user 600, but only because "600" is listed below.
+#
+# NOTE: Asterisk support is FEATURE-GATED on FlowStation. The default build does NOT
+# include it. To use this section the device binary must be built with
+#   cargo build --release --features asterisk
+# and requires the native tetra-codec (outerplane) ACELP library installed. The
+# default build (DAPNET / Snom / GeoAlarm / dashboard) works without it.
 
 # [asterisk]
 # enabled = true
 # outbound_prefix = "91"
 # strip_outbound_prefix = true
 # inbound_prefix = "T"
+# inbound_setup_timeout_secs = 20 # SIP -> TETRA no-alert timeout; returns 404 before ringing
 # register = true
 # codec = "PCMU"
 # service_numbers = ["600", "601"]
+# service_numbers = ["*"]       # wildcard: 91... -> Asterisk for every suffix
+# outbound_prefix = "91*"       # alternative wildcard prefix spelling
 # rtp_port_min = 30000
 # rtp_port_max = 30100
 # bind_addr = "0.0.0.0"

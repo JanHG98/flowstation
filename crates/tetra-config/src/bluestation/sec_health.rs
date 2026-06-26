@@ -27,7 +27,10 @@ pub struct CfgHealth {
     pub restart_after_critical_secs: u64,
     /// Minimum spacing between restart requests (anti-reboot-loop), seconds. Clamped 10..=86400.
     pub restart_cooldown_secs: u64,
-    /// Radios domain is Degraded if some are attached but silent this long, seconds. 0 = disabled.
+    /// Floor for the "radios attached but silent" Degraded signal, seconds. 0 = disabled.
+    /// The EFFECTIVE window is `max(this, 1.5 * periodic_registration_secs)` (the T351
+    /// re-registration interval), so a radio that is simply quiet between its periodic
+    /// registrations is never flagged — e.g. with T351 = 24 h it is not "silent" until ~36 h.
     /// Clamped 0..=86400.
     pub radios_silent_secs: u64,
     /// Downlink queue depth at/above which Congestion is Degraded / Critical.
@@ -108,16 +111,36 @@ impl Default for CfgHealthDto {
     }
 }
 
-fn default_true() -> bool { true }
-fn default_snapshot_interval() -> u64 { 5 }
-fn default_core_stall() -> u64 { 10 }
-fn default_restart_after() -> u64 { 30 }
-fn default_restart_cooldown() -> u64 { 600 }
-fn default_radios_silent() -> u64 { 900 }
-fn default_dl_degraded() -> u32 { 64 }
-fn default_dl_critical() -> u32 { 192 }
-fn default_sds_degraded() -> u32 { 32 }
-fn default_sds_critical() -> u32 { 128 }
+fn default_true() -> bool {
+    true
+}
+fn default_snapshot_interval() -> u64 {
+    5
+}
+fn default_core_stall() -> u64 {
+    10
+}
+fn default_restart_after() -> u64 {
+    30
+}
+fn default_restart_cooldown() -> u64 {
+    600
+}
+fn default_radios_silent() -> u64 {
+    900
+}
+fn default_dl_degraded() -> u32 {
+    64
+}
+fn default_dl_critical() -> u32 {
+    192
+}
+fn default_sds_degraded() -> u32 {
+    32
+}
+fn default_sds_critical() -> u32 {
+    128
+}
 
 pub fn apply_health_patch(dto: CfgHealthDto) -> CfgHealth {
     // Clamp everything so a bad TOML value can't wedge the monitor (house style — same as

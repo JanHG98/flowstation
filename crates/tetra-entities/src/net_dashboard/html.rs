@@ -29,6 +29,22 @@ html,body{height:100%;overflow:hidden;}
   --sidebar-border: #161d2c;
   --card-shadow: 0 1px 3px rgba(0,0,0,0.4);
   --r: 10px;
+
+  /* ── Design-system v3 "Instrument" tokens (single source of truth) ──
+     Semantic + structural tokens consumed by the reusable component classes
+     (.hero/.card/.pill/.gauge/.group-list/.field/.btn/.banner/.sheet …).
+     Define them HERE so nothing references them before they exist. */
+  --ok:    #2ec6a6;                         /* canonical "healthy" green — replaces every #3fb950 */
+  --info:  var(--accent2);                  /* neutral / idle accent */
+  --sep:   rgba(255,255,255,0.07);          /* hairline divider (inset from leading edge) */
+  --hair:  inset 0 1px 0 rgba(255,255,255,0.05);   /* top inner-highlight (was defined far below first use) */
+  --mat:   color-mix(in srgb, var(--bg2) 82%, transparent);   /* translucent material for sidebar/sheets/popovers */
+  --elev-1: 0 1px 2px rgba(0,0,0,.18), 0 8px 24px -12px rgba(0,0,0,.28);  /* the ONE card shadow */
+  --r-card: 12px;
+  --r-ctrl: 8px;
+  --r-pill: 999px;
+  --r-chip: 6px;
+
   --mono: 'ui-monospace','Cascadia Code','Consolas','Liberation Mono','Menlo',monospace;
   --sans: 'ui-sans-serif', system-ui, -apple-system, 'Segoe UI', 'Microsoft YaHei', 'Noto Sans SC', 'PingFang SC', 'Hiragino Sans GB', 'WenQuanYi Micro Hei', sans-serif;
 }
@@ -39,6 +55,11 @@ html,body{height:100%;overflow:hidden;}
   --text:#16202e;--text2:#3d4f66;--text3:#5f7188;
   --sidebar:#ffffff;--sidebar-border:#e3e8ef;
   --card-shadow:0 1px 3px rgba(20,30,50,0.06),0 4px 16px -8px rgba(20,30,50,0.10);
+  --ok:#16876b;--info:var(--accent2);
+  --sep:rgba(20,30,50,0.09);
+  --hair: inset 0 1px 0 rgba(255,255,255,0.7);
+  --mat: color-mix(in srgb, var(--bg2) 82%, transparent);
+  --elev-1: 0 1px 2px rgba(20,30,50,.05), 0 10px 30px -16px rgba(20,30,50,.12);
 }
 [data-theme="blue"]{
   --bg:#03071e;--bg2:#060d2a;--bg3:#091235;--bg4:#0d1840;
@@ -47,6 +68,10 @@ html,body{height:100%;overflow:hidden;}
   --text:#deeeff;--text2:#7ab0e0;--text3:#1a3a60;
   --sidebar:#020514;--sidebar-border:#0c1840;
   --card-shadow:0 1px 3px rgba(0,0,200,0.15);
+  --ok:#00f5d4;--info:var(--accent2);
+  --sep:rgba(120,180,255,0.10);
+  --mat: color-mix(in srgb, var(--bg2) 82%, transparent);
+  --elev-1: 0 1px 2px rgba(0,0,0,.30), 0 8px 24px -12px rgba(0,0,200,.30);
 }
 
 /* ── Readability scale (eye control) ──────────────────────────────────────────
@@ -710,6 +735,12 @@ input[type="radio"]{accent-color:var(--accent);}
 /* Page sections */
 .page{display:none;}
 .page.active{display:block;}
+#page-meshcom.active{display:flex;flex-direction:column;}
+#meshcom-send-card{order:1;}
+#meshcom-messages-card{order:2;}
+#meshcom-nodes-card{order:3;}
+#meshcom-config-card{order:4;}
+#meshcom-routing-card{order:5;}
 
 /* ── Stat cards ── */
 .stat-grid{
@@ -843,6 +874,29 @@ tr.row-emergency td:first-child{box-shadow:inset 3px 0 0 var(--danger);}
   padding:4px 8px;border-radius:6px;font-family:var(--mono);font-size:11px;
 }
 .autoscroll-label{display:flex;align-items:center;gap:5px;font-family:var(--mono);font-size:11px;color:var(--text2);cursor:pointer;}
+.mesh-msg-filters,.dapnet-log-filters,.sds-log-filters,.lastheard-filters{
+  display:grid;
+  grid-template-columns:auto minmax(180px,1fr) minmax(220px,1.3fr) auto;
+  align-items:end;
+  gap:10px;
+  padding:12px 16px;
+  border-bottom:1px solid var(--border);
+}
+.mesh-msg-filter-buttons{display:flex;align-items:center;gap:6px;}
+.mesh-msg-filter-field{display:flex;flex-direction:column;gap:5px;min-width:0;}
+.mesh-msg-filters{
+  grid-template-columns:auto minmax(150px,0.9fr) minmax(150px,0.9fr) minmax(220px,1.2fr) auto;
+}
+.mesh-msg-filter-label{
+  font-family:var(--mono);font-size:10px;font-weight:600;
+  letter-spacing:0.08em;text-transform:uppercase;color:var(--text3);
+}
+.mesh-msg-filter-status{font-family:var(--mono);font-size:11px;color:var(--text3);white-space:nowrap;}
+.mesh-msg-filter-status.is-error{color:var(--danger);}
+@media(max-width:900px){
+  .mesh-msg-filters,.dapnet-log-filters,.sds-log-filters,.lastheard-filters{grid-template-columns:1fr;}
+  .mesh-msg-filter-status{white-space:normal;}
+}
 
 /* ── RF live monitor ─────────────────────────────────────────────────────── */
 .rf-metrics{
@@ -888,6 +942,7 @@ tr.row-emergency td:first-child{box-shadow:inset 3px 0 0 var(--danger);}
   display:block;
 }
 .rf-canvas.small{height:260px;}
+.rf-canvas.tall{height:320px;}
 
 @media(max-width:900px){
   .rf-grid{grid-template-columns:1fr;}
@@ -938,12 +993,13 @@ tr.row-emergency td:first-child{box-shadow:inset 3px 0 0 var(--danger);}
   transition:width 0.4s ease, background 0.3s;
   border-radius:2px;
 }
-/* Status colouring is driven by JS via these classes */
-.rf-q-good .rf-qmetric-fill{background:var(--accent);}
-.rf-q-warn .rf-qmetric-fill{background:#f5a623;}
+/* Status colouring is driven by JS via these classes (now drives the value text;
+   the meter itself is the shared .gauge with is-warn/is-danger). */
+.rf-q-good .rf-qmetric-fill{background:var(--ok);}
+.rf-q-warn .rf-qmetric-fill{background:var(--warn);}
 .rf-q-bad  .rf-qmetric-fill{background:var(--danger);}
-.rf-q-good .rf-qmetric-value{color:var(--accent);}
-.rf-q-warn .rf-qmetric-value{color:#f5a623;}
+.rf-q-good .rf-qmetric-value{color:var(--ok);}
+.rf-q-warn .rf-qmetric-value{color:var(--warn);}
 .rf-q-bad  .rf-qmetric-value{color:var(--danger);}
 
 /* ── Hardware health card ────────────────────────────────────────────── */
@@ -966,8 +1022,8 @@ tr.row-emergency td:first-child{box-shadow:inset 3px 0 0 var(--danger);}
   letter-spacing:0.08em;text-transform:uppercase;
 }
 .rf-hw-temp-state.cold{color:var(--accent2);}
-.rf-hw-temp-state.nominal{color:var(--accent);}
-.rf-hw-temp-state.warm{color:#f5a623;}
+.rf-hw-temp-state.nominal{color:var(--ok);}
+.rf-hw-temp-state.warm{color:var(--warn);}
 .rf-hw-temp-state.hot{color:var(--danger);}
 .rf-hw-gain-block{
   background:var(--bg);border:1px solid var(--border);border-radius:6px;
@@ -999,8 +1055,8 @@ tr.row-emergency td:first-child{box-shadow:inset 3px 0 0 var(--danger);}
 }
 .config-msg{padding:8px 16px;font-family:var(--mono);font-size:12px;border-top:1px solid var(--border);min-height:34px;}
 
-/* ── Empty state ── */
-.empty-state{text-align:center;padding:48px 20px;}
+/* ── Empty state (legacy children; the .empty-state container itself is the
+   v3 flex component defined in the design-system block below) ── */
 .empty-icon{font-size:32px;margin-bottom:10px;opacity:0.3;}
 .empty-text{font-size:13px;color:var(--text3);}
 
@@ -1327,13 +1383,12 @@ tbody td{transition:background .12s ease;}
    ════════════════════════════════════════════════════════════════════════ */
 :root{
   --brand: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
-  --hair:  inset 0 1px 0 rgba(255,255,255,0.05);
+  /* --hair now lives in the v3 token block at :root (defined before first use). */
   --shadow-sm: 0 1px 2px rgba(0,0,0,0.45);
   --shadow-md: 0 10px 28px -14px rgba(0,0,0,0.65), 0 2px 6px rgba(0,0,0,0.32);
   --shadow-lg: 0 28px 64px -22px rgba(0,0,0,0.72), 0 6px 18px rgba(0,0,0,0.42);
   --glass: color-mix(in srgb, var(--bg2) 76%, transparent);
 }
-[data-theme="light"]{--hair: inset 0 1px 0 rgba(255,255,255,0.7);}
 
 /* Ambient backdrop — faint brand glows bleed in from the corners behind the
    content, giving the shell a sense of depth without distracting from data. */
@@ -1357,10 +1412,6 @@ body{
   box-shadow:1px 0 0 rgba(255,255,255,0.02), 8px 0 24px -16px rgba(0,0,0,0.6);
 }
 .sidebar-logo{padding-top:20px;padding-bottom:16px;}
-.logo-icon{
-  box-shadow:0 4px 14px -4px color-mix(in srgb,var(--accent) 60%, transparent), var(--hair);
-  border:1px solid color-mix(in srgb,var(--accent) 35%, transparent);
-}
 .logo-text .logo-name{font-weight:800;letter-spacing:0.01em;}
 
 /* ── Nav items: signature active treatment (left accent bar + soft wash) ── */
@@ -1455,6 +1506,306 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
 /* ── Scrollbar thumb: brand-tinted on hover ── */
 ::-webkit-scrollbar-thumb{background:var(--border2);}
 ::-webkit-scrollbar-thumb:hover{background:color-mix(in srgb,var(--accent) 40%, var(--border2));}
+
+/* ════════════════════════════════════════════════════════════════════════
+   DESIGN-SYSTEM v3 "INSTRUMENT" — reusable component library.
+   Defined ONCE here so the Tabs phase can apply these classes across every tab.
+   Everything maps to tokens (no hardcoded hex). This is the SINGLE source of
+   truth; the Health-tab premium look is generalized into these classes.
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* ── Section group label (Caption-2 above a card cluster) ── */
+.section-label{
+  font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;
+  color:var(--text3);margin:0 2px 10px;
+}
+.section-label + .section-label{margin-top:4px;}
+
+/* ── Inline SVG icon sizing — any svg dropped into a slot reads as 1em-ish ── */
+.nav-icon svg,.btn-icon svg,.pill-icon svg,.hero-ico svg,.chip svg,
+.empty-ico svg,.banner-ico svg,.sheet-close svg,.section-act svg,.ico18 svg{
+  display:block;width:100%;height:100%;
+}
+/* Generic 18px square icon holder for chrome buttons (hamburger/logout/toggle). */
+.ico18{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;color:inherit;}
+
+/* ── Status pills — unified severity language (leading dot) ───────────────
+   Variants drive from --ok/--warn/--danger/--info/--text3. Tinted fill +
+   matching low-alpha border, mono tabular, 10/600. */
+.pill{
+  --pc:var(--text3);
+  display:inline-flex;align-items:center;gap:6px;
+  font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:0.02em;
+  line-height:1;padding:4px 9px;border-radius:var(--r-pill);
+  color:var(--pc);
+  background:color-mix(in srgb,var(--pc) 13%,transparent);
+  border:1px solid color-mix(in srgb,var(--pc) 32%,transparent);
+  font-variant-numeric:tabular-nums;white-space:nowrap;vertical-align:middle;
+}
+.pill::before{
+  content:"";flex-shrink:0;width:6px;height:6px;border-radius:50%;
+  background:var(--pc);
+}
+.pill.no-dot::before{display:none;}
+.pill-icon{flex-shrink:0;width:13px;height:13px;}
+.pill-ok    {--pc:var(--ok);}
+.pill-warn  {--pc:var(--warn);}
+.pill-danger{--pc:var(--danger);}
+.pill-info  {--pc:var(--accent2);}
+.pill-idle  {--pc:var(--text3);}
+
+/* ── Hero status banner (generalized from the Health hero) ── */
+.hero{
+  display:flex;align-items:center;gap:16px;
+  padding:18px 20px;margin-bottom:22px;
+  background:var(--bg2);border:1px solid var(--border);
+  border-radius:var(--r-card);box-shadow:var(--elev-1);
+}
+.hero-dot{
+  --pc:var(--text3);
+  width:10px;height:10px;flex:0 0 auto;border-radius:50%;
+  background:var(--pc);
+  box-shadow:0 0 0 4px color-mix(in srgb,var(--pc) 16%,transparent);
+}
+.hero-dot.is-ok{--pc:var(--ok);}
+.hero-dot.is-warn{--pc:var(--warn);}
+.hero-dot.is-danger{--pc:var(--danger);}
+.hero-dot.is-idle{--pc:var(--text3);}
+.hero-main{flex:1;min-width:0;}
+.hero-title{font-size:15px;font-weight:600;color:var(--text);letter-spacing:-0.01em;}
+.hero-sub{font-size:12px;font-weight:400;color:var(--text2);margin-top:3px;}
+.hero-metrics{display:flex;align-items:center;gap:22px;flex-shrink:0;}
+.hero-metric{display:flex;flex-direction:column;gap:2px;text-align:right;}
+.hero-metric-label{font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--text3);}
+.hero-metric-value{font-family:var(--mono);font-size:14px;font-weight:600;color:var(--text);font-variant-numeric:tabular-nums;}
+
+/* ── Horizontal gauge — track + fill + trailing tabular value ── */
+.gauge{display:flex;align-items:center;gap:10px;min-width:0;}
+.gauge-track{
+  flex:1;height:4px;min-width:40px;border-radius:var(--r-pill);
+  background:var(--bg4);overflow:hidden;
+}
+.gauge-fill{
+  height:100%;width:0%;border-radius:var(--r-pill);
+  background:var(--ok);
+  transition:width .35s ease, background .25s ease;
+}
+.gauge.is-warn   .gauge-fill{background:var(--warn);}
+.gauge.is-danger .gauge-fill{background:var(--danger);}
+.gauge.is-info   .gauge-fill{background:var(--accent2);}
+.gauge.is-idle   .gauge-fill{background:var(--text3);}
+.gauge-value{
+  font-family:var(--mono);font-size:12px;font-weight:600;color:var(--text2);
+  font-variant-numeric:tabular-nums;flex-shrink:0;min-width:42px;text-align:right;
+}
+
+/* ── macOS inset list (.group-list) + .field rows ── */
+.group-list{
+  display:flex;flex-direction:column;
+  background:var(--bg2);border:1px solid var(--border);
+  border-radius:var(--r-card);overflow:hidden;
+}
+.field{
+  display:flex;align-items:center;gap:14px;min-height:44px;
+  padding:10px 16px;position:relative;
+}
+.field + .field::before{
+  content:"";position:absolute;left:16px;right:0;top:0;height:1px;
+  background:var(--sep);
+}
+.field-label{
+  flex:0 0 auto;font-size:13px;font-weight:400;color:var(--text);
+}
+.field-control{
+  margin-left:auto;display:flex;align-items:center;gap:8px;
+  font-size:13px;font-weight:500;color:var(--text2);
+  font-variant-numeric:tabular-nums;text-align:right;min-width:0;
+}
+.field-hint{
+  flex-basis:100%;font-size:11px;font-weight:400;color:var(--text3);
+  margin-top:2px;
+}
+.field-status{
+  display:inline-flex;align-items:center;gap:5px;
+  font-size:11px;font-weight:500;color:var(--text3);
+  opacity:0;transition:opacity .2s ease;
+}
+.field-status.show{opacity:1;}
+.field-status.ok{color:var(--ok);}
+.field-status.err{color:var(--danger);}
+.field-status svg{width:13px;height:13px;}
+
+/* ── Button leading-icon slot (glyphs split out of i18n strings) ── */
+.btn-icon{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:15px;height:15px;flex-shrink:0;margin-right:7px;margin-left:-2px;
+  vertical-align:-2px;
+}
+.btn .btn-icon{vertical-align:middle;}
+/* Destructive action group, separated from benign Save by a hairline. */
+.btn-group{display:inline-flex;align-items:center;gap:8px;}
+.btn-group.danger-group{
+  padding-left:12px;margin-left:4px;
+  border-left:1px solid var(--sep);
+}
+
+/* ── Calm banners (replace inline #fallback-banner / #emergency-banner) ── */
+.banner{
+  display:flex;align-items:center;gap:12px;flex-shrink:0;
+  padding:11px 18px;font-size:13px;font-weight:600;
+  color:var(--text);
+  background:color-mix(in srgb,var(--accent2) 12%,var(--bg2));
+  border-bottom:1px solid color-mix(in srgb,var(--accent2) 30%,transparent);
+}
+.banner-ico{width:18px;height:18px;flex-shrink:0;color:var(--accent2);}
+.banner-body{flex:1;min-width:0;}
+.banner-sub{font-size:11px;font-weight:400;color:var(--text2);margin-top:2px;}
+.banner-act{margin-left:auto;}
+.banner-warn{
+  background:color-mix(in srgb,var(--warn) 13%,var(--bg2));
+  border-bottom-color:color-mix(in srgb,var(--warn) 32%,transparent);
+}
+.banner-warn .banner-ico{color:var(--warn);}
+.banner-danger{
+  background:color-mix(in srgb,var(--danger) 13%,var(--bg2));
+  border-bottom-color:color-mix(in srgb,var(--danger) 34%,transparent);
+}
+.banner-danger .banner-ico{color:var(--danger);}
+/* Steady danger dot for emergency — soft breathe, never a harsh flash. */
+.banner-danger .banner-dot{
+  width:8px;height:8px;border-radius:50%;background:var(--danger);flex-shrink:0;
+  animation:fs-breathe 2.5s ease-in-out infinite;
+}
+@keyframes fs-breathe{0%,100%{opacity:1;}50%{opacity:.45;}}
+
+/* ── Empty state (one component for the duplicated stubs) ──
+   v3 flex layout; keeps the legacy .empty-icon/.empty-text children working
+   (centered column) while the Tabs phase migrates them to .empty-ico/.empty-msg. */
+.empty-state{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:10px;padding:40px 24px;text-align:center;color:var(--text3);
+}
+.empty-ico{width:34px;height:34px;color:var(--text3);opacity:.7;}
+.empty-msg{font-size:13px;font-weight:500;color:var(--text2);}
+.empty-sub{font-size:12px;font-weight:400;color:var(--text3);max-width:340px;}
+
+/* ── Unified sheet/modal (collapses .modal-overlay + .wifi-modal) ── */
+.sheet-overlay{
+  position:fixed;inset:0;z-index:1000;
+  display:none;align-items:center;justify-content:center;padding:24px;
+  background:rgba(0,0,0,.42);
+  -webkit-backdrop-filter:blur(24px) saturate(1.3);
+  backdrop-filter:blur(24px) saturate(1.3);
+}
+.sheet-overlay.open{display:flex;}
+.sheet{
+  width:100%;max-width:460px;max-height:88vh;overflow:auto;
+  background:var(--mat);border:1px solid var(--border2);
+  border-radius:var(--r-card);box-shadow:var(--shadow-lg),var(--hair);
+  -webkit-backdrop-filter:blur(24px) saturate(1.3);
+  backdrop-filter:blur(24px) saturate(1.3);
+}
+.sheet-head{
+  display:flex;align-items:center;gap:12px;
+  padding:16px 18px;border-bottom:1px solid var(--sep);
+}
+.sheet-title{font-size:15px;font-weight:600;color:var(--text);flex:1;letter-spacing:-0.01em;}
+.sheet-close{
+  width:28px;height:28px;flex-shrink:0;display:flex;align-items:center;justify-content:center;
+  border-radius:var(--r-ctrl);border:1px solid transparent;
+  background:transparent;color:var(--text3);cursor:pointer;transition:all .15s;
+}
+.sheet-close:hover{background:var(--bg3);color:var(--text);}
+.sheet-close svg{width:16px;height:16px;}
+.sheet-body{padding:18px;}
+
+/* ── Ghost SVG stat-icon: the .stat-icon slot now hosts a faint inline SVG
+   (was an emoji glyph). Auto-themes via currentColor, sits at low opacity. ── */
+.stat-icon svg{display:block;width:30px;height:30px;color:var(--text);}
+.stat-icon:has(svg){font-size:0;line-height:0;}
+/* Text-valued stat cards (RF / Network / BREW) — smaller value, state tint
+   via ONE class instead of inline font-size + JS color hacks. */
+.stat-value.is-text{font-size:18px;letter-spacing:-0.01em;}
+.stat-card.is-ok    .stat-value.is-text{color:var(--ok);}
+.stat-card.is-ok::before    {--accent-line:var(--ok);}
+.stat-card.is-info  .stat-value.is-text{color:var(--accent2);}
+.stat-card.is-info::before  {--accent-line:var(--accent2);}
+.stat-card.is-warn  .stat-value.is-text{color:var(--warn);}
+.stat-card.is-warn::before  {--accent-line:var(--warn);}
+.stat-card.is-danger .stat-value.is-text{color:var(--danger);}
+.stat-card.is-danger::before{--accent-line:var(--danger);}
+.stat-card.is-idle  .stat-value.is-text{color:var(--text3);}
+.stat-card.is-idle::before  {--accent-line:var(--text3);}
+
+/* Tabular numeric cell + muted placeholder for tables (instrument feel). */
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:12px;color:var(--text2);}
+.num.accent{color:var(--accent2);font-weight:600;}
+.muted{color:var(--text3);}
+
+/* Filled selection-triangle marker (▶ replacement) inside a TG pill. */
+.tg-marker{display:inline-flex;align-items:center;width:9px;height:9px;margin-right:2px;}
+.tg-marker svg{width:100%;height:100%;display:block;}
+
+/* Soften the emergency table badge: steady fill + a calm 2.5s breathe
+   (no harsh expanding ring). Matches the emergency BANNER's fs-breathe. */
+.badge-emergency{animation:fs-breathe 2.5s ease-in-out infinite;}
+
+/* ── Numbered steps list (Telegram setup howto) ── */
+.steps{display:flex;flex-direction:column;gap:0;counter-reset:fs-step;}
+.step{
+  display:flex;align-items:flex-start;gap:13px;padding:11px 2px;position:relative;
+  font-size:13px;color:var(--text);line-height:1.55;
+}
+.step + .step::before{
+  content:"";position:absolute;left:32px;right:0;top:0;height:1px;background:var(--sep);
+}
+.step-num{
+  counter-increment:fs-step;flex:0 0 auto;
+  width:22px;height:22px;border-radius:50%;
+  display:inline-flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:11px;font-weight:700;font-variant-numeric:tabular-nums;
+  color:var(--accent);
+  background:color-mix(in srgb,var(--accent) 13%,transparent);
+  border:1px solid color-mix(in srgb,var(--accent) 34%,transparent);
+}
+.step-num::before{content:counter(fs-step);}
+.step-body{flex:1;min-width:0;padding-top:1px;}
+
+/* ── Styled terminal block (SoapySDR probe dump, etc.) ── */
+.terminal{
+  margin:0;padding:13px 15px;
+  background:var(--bg);border:1px solid var(--border);border-radius:var(--r-ctrl);
+  box-shadow:var(--hair);
+  font-family:var(--mono);font-size:11px;line-height:1.6;
+  color:var(--text2);white-space:pre-wrap;word-break:break-all;
+  max-height:340px;overflow:auto;font-variant-numeric:tabular-nums;
+}
+
+/* ── Big-Sur inset nav selection pill + SVG nav-icon slot ──────────────────
+   Re-skins the existing .nav-item.active (overriding the polish v2 left-bar)
+   to the System-Settings inset pill: accent-tinted fill + soft radius.
+   The .nav-icon slot becomes an 18px square SVG holder (was an emoji glyph). */
+.nav-icon{
+  width:18px;height:18px;font-size:0;
+  display:inline-flex;align-items:center;justify-content:center;
+  flex-shrink:0;color:inherit;text-align:center;
+}
+.nav-item.active{
+  background:color-mix(in srgb,var(--accent) 12%,transparent);
+  border-color:transparent;
+  box-shadow:none;
+  color:var(--accent);
+}
+[data-theme="light"] .nav-item.active{
+  background:color-mix(in srgb,var(--accent) 10%,transparent);
+  border-color:transparent;box-shadow:none;
+}
+/* Keep the signature accent glow on the active icon (per nav spec). */
+.nav-item.active .nav-icon{filter:drop-shadow(0 0 6px color-mix(in srgb,var(--accent) 55%,transparent));}
+
+/* ── Header status chips (BS / Brew / Emergency) — calm .pill in the topbar ── */
+.topbar-chips{display:flex;align-items:center;gap:8px;}
+@media(max-width:760px){.topbar-chips{display:none;}}
 
 /* ════ TETRA BTS Details card ════ */
 .bts-grid{
@@ -1686,6 +2037,164 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
   html[data-uisize="h"]{ --ts:1.16; }
   html[data-uisize="u"]{ --ts:1.28; }
 }
+
+/* ── Premium health / integration components (Apple-style) ───────────────────
+   Theme-aware via tokens + color-mix. Status hues: ok=--ok, warn=--warn,
+   bad=--danger; blue/purple are fixed icon accents for domain variety.
+   Used by the Health page, the SDR Hardware-Health card and the
+   Asterisk / DAPNET / GeoAlarm pages so they all match. */
+.h-wrap{max-width:1100px;}
+
+/* Hero */
+.h-hero{
+  display:flex;align-items:center;gap:18px;
+  background:var(--bg2);border:1px solid var(--border);border-radius:18px;
+  padding:18px 22px;margin-bottom:6px;box-shadow:var(--card-shadow);
+}
+.h-ring{
+  flex:0 0 auto;width:52px;height:52px;border-radius:50%;position:relative;
+  display:flex;align-items:center;justify-content:center;
+  background:color-mix(in srgb,var(--ok) 14%,transparent);
+  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--ok) 55%,transparent),
+             0 0 18px -2px color-mix(in srgb,var(--ok) 45%,transparent);
+  color:var(--ok);transition:background .25s,box-shadow .25s,color .25s;
+}
+.h-ring svg{width:26px;height:26px;display:block;}
+.h-ring.warn{background:color-mix(in srgb,var(--warn) 14%,transparent);color:var(--warn);
+  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--warn) 55%,transparent),0 0 18px -2px color-mix(in srgb,var(--warn) 45%,transparent);}
+.h-ring.bad{background:color-mix(in srgb,var(--danger) 14%,transparent);color:var(--danger);
+  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--danger) 55%,transparent),0 0 18px -2px color-mix(in srgb,var(--danger) 45%,transparent);}
+.h-hero-txt{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;}
+.h-hero-title{font-size:21px;font-weight:650;letter-spacing:-.01em;color:var(--text);line-height:1.2;}
+.h-hero-sub{font-size:14px;color:var(--text2);margin-top:3px;line-height:1.4;}
+.h-hero-meta{flex:0 0 auto;text-align:right;display:flex;flex-direction:column;justify-content:center;gap:2px;}
+.h-hero-meta .hm-val{font-size:15px;font-weight:600;color:var(--text);font-variant-numeric:tabular-nums;}
+.h-hero-meta .hm-sub{font-size:12px;color:var(--text3);}
+
+/* Section label */
+.h-sec{font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--text3);margin:22px 4px 11px;}
+
+/* Grid of cards */
+.h-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:13px;}
+
+/* Card */
+.h-card{
+  display:flex;gap:13px;align-items:flex-start;
+  background:var(--bg2);border:1px solid var(--border);border-radius:16px;
+  padding:15px 16px;box-shadow:var(--card-shadow);
+}
+.h-ico{
+  flex:0 0 auto;width:36px;height:36px;border-radius:10px;
+  display:flex;align-items:center;justify-content:center;
+  background:color-mix(in srgb,var(--accent) 14%,transparent);color:var(--accent);
+}
+.h-ico svg{width:18px;height:18px;display:block;}
+.h-ico.blue{background:color-mix(in srgb,#5ac8fa 16%,transparent);color:#5ac8fa;}
+.h-ico.purple{background:color-mix(in srgb,#bf8cff 16%,transparent);color:#bf8cff;}
+.h-ico.warn{background:color-mix(in srgb,var(--warn) 16%,transparent);color:var(--warn);}
+.h-ico.ok{background:color-mix(in srgb,var(--ok) 16%,transparent);color:var(--ok);}
+.h-ico.bad{background:color-mix(in srgb,var(--danger) 16%,transparent);color:var(--danger);}
+.h-col{flex:1;min-width:0;display:flex;flex-direction:column;}
+.h-head{display:flex;align-items:center;gap:8px;min-height:36px;}
+.h-ttl{font-size:15px;font-weight:600;letter-spacing:-.01em;color:var(--text);flex:1;min-width:0;}
+.h-card.compact .h-ttl{font-size:14px;}
+.h-pill{
+  flex:0 0 auto;font-size:11px;font-weight:700;letter-spacing:.03em;
+  border-radius:7px;padding:2px 8px;text-transform:uppercase;white-space:nowrap;
+}
+.h-pill.ok{background:color-mix(in srgb,var(--ok) 15%,transparent);color:var(--ok);}
+.h-pill.warn{background:color-mix(in srgb,var(--warn) 16%,transparent);color:var(--warn);}
+.h-pill.bad{background:color-mix(in srgb,var(--danger) 16%,transparent);color:var(--danger);}
+.h-det{font-size:13px;color:var(--text2);margin-top:6px;line-height:1.45;font-variant-numeric:tabular-nums;}
+.h-det b{color:var(--text);font-weight:600;}
+.h-det .h-status-lbl{color:var(--text3);}
+.h-todo{
+  border-top:1px solid var(--border);margin-top:11px;padding-top:10px;
+  font-size:12.5px;color:var(--text2);line-height:1.5;
+}
+.h-todo .h-todo-h{font-weight:600;color:var(--text);}
+.h-todo b{color:var(--warn);font-weight:600;}
+.h-todo ul{margin:6px 0 0 16px;padding:0;}
+.h-todo li{margin-top:3px;}
+
+/* Hardware metric strip (gauge + value) */
+.h-metricstrip{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:13px;}
+.h-metric{
+  display:flex;align-items:center;gap:14px;
+  background:var(--bg2);border:1px solid var(--border);border-radius:16px;
+  padding:14px 16px;box-shadow:var(--card-shadow);
+}
+.h-gauge{
+  flex:0 0 auto;width:48px;height:48px;border-radius:50%;position:relative;
+  display:flex;align-items:center;justify-content:center;
+  background:conic-gradient(var(--g-col,var(--ok)) calc(var(--g-pct,0)*1%),var(--border2) 0);
+}
+.h-gauge::before{
+  content:"";position:absolute;width:37px;height:37px;border-radius:50%;background:var(--bg2);
+}
+.h-gauge .h-gauge-n{position:relative;font-size:12px;font-weight:700;color:var(--text);font-variant-numeric:tabular-nums;}
+.h-mcol{display:flex;flex-direction:column;justify-content:center;min-width:0;}
+.h-mcol .h-mval{font-size:19px;font-weight:650;color:var(--text);font-variant-numeric:tabular-nums;line-height:1.1;}
+.h-mcol .h-mlbl{font-size:12px;color:var(--text3);margin-top:2px;}
+.h-mcol .h-mval.ok{color:var(--ok);}
+.h-mcol .h-mval.warn{color:var(--warn);}
+.h-mcol .h-mval.bad{color:var(--danger);}
+
+/* Legend / note row under the health page */
+.h-note{margin-top:18px;font-size:12px;color:var(--text2);line-height:1.6;}
+.h-note b.ok{color:var(--ok);}
+.h-note b.warn{color:var(--warn);}
+.h-note b.bad{color:var(--danger);}
+
+/* Premium form layout (asterisk/dapnet/geoalarm) — replaces repeated inline styles */
+.h-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;align-items:center;}
+.h-form.wide{grid-template-columns:repeat(auto-fit,minmax(260px,1fr));align-items:stretch;}
+.h-form-pair{display:grid;grid-template-columns:130px 1fr;gap:10px;align-items:center;}
+.h-flabel{color:var(--muted);font-size:13px;}
+.h-flabel.top{align-self:flex-start;padding-top:8px;}
+.h-field{display:flex;flex-direction:column;gap:5px;min-width:0;}
+.h-field-label{color:var(--muted);font-size:12px;font-weight:650;}
+.h-finline{display:flex;align-items:center;gap:10px;}
+.h-finline .h-flabel-sm{color:var(--muted);font-size:12px;}
+.h-fopts{display:flex;gap:14px;flex-wrap:wrap;}
+.h-fopt{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px;}
+#page-maps .card-body{padding:16px 18px;}
+.maps-layout{display:grid;grid-template-columns:minmax(320px,1.55fr) minmax(260px,.85fr);gap:14px;align-items:stretch;}
+.maps-stage{position:relative;min-height:560px;border:1px solid var(--border);border-radius:var(--r);overflow:hidden;background:var(--bg1);cursor:grab;touch-action:none;}
+.maps-stage.dragging{cursor:grabbing;}
+.maps-tile-layer{position:absolute;inset:0;overflow:hidden;background:#cfe6ef;}
+.maps-tile{position:absolute;width:256px;height:256px;display:block;user-select:none;pointer-events:none;}
+.maps-marker-layer{position:absolute;inset:0;pointer-events:none;}
+.maps-marker{position:absolute;transform:translate(-50%,-100%);width:30px;height:36px;border:0;background:transparent;padding:0;pointer-events:auto;cursor:pointer;z-index:2;}
+.maps-controls{position:absolute;right:12px;top:12px;display:flex;flex-direction:column;gap:4px;z-index:4;}
+.maps-zoom-btn{width:34px;height:34px;border:1px solid var(--border2);border-radius:8px;background:color-mix(in srgb,var(--bg2) 92%,transparent);color:var(--text);font:900 20px/1 var(--mono);cursor:pointer;}
+.maps-zoom-btn:hover{background:var(--bg3);}
+.maps-attribution{position:absolute;right:8px;bottom:5px;z-index:2;padding:2px 6px;border-radius:5px;background:rgba(255,255,255,.76);color:#273142;font:600 10px var(--mono);}
+.maps-pin{display:flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:2px solid rgba(255,255,255,.72);box-shadow:0 3px 8px rgba(0,0,0,.26);}
+.maps-pin span{transform:rotate(45deg);font:800 10px var(--mono);color:#fff;text-transform:uppercase;}
+.maps-marker.active .maps-pin{outline:3px solid color-mix(in srgb,var(--accent2) 70%,transparent);outline-offset:3px;}
+.maps-pin.sds{background:var(--accent2);}
+.maps-pin.meshcom{background:var(--accent);}
+.maps-pin.geoalarm{background:var(--warn);}
+.maps-pin.alarm{background:var(--danger);}
+.maps-pin.focus{background:#8b5cf6;}
+.maps-pin.station{background:var(--ok);}
+.maps-popup{position:absolute;left:12px;bottom:12px;max-width:min(500px,calc(100% - 24px));padding:12px;background:color-mix(in srgb,var(--bg2) 94%,transparent);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--card-shadow);z-index:3;}
+.maps-popup-title{font-weight:800;color:var(--text);margin-bottom:4px;}
+.maps-popup-meta,.maps-list-meta{font:700 11px/1.5 var(--mono);color:var(--text3);}
+.maps-popup-detail{margin-top:8px;color:var(--text2);font-size:13px;line-height:1.45;}
+.maps-list{max-height:560px;overflow:auto;border:1px solid var(--border);border-radius:var(--r);background:var(--bg1);}
+.maps-list-row{display:grid;grid-template-columns:auto 1fr;gap:10px;padding:11px 12px;border-bottom:1px solid var(--border);cursor:pointer;}
+.maps-list-row:last-child{border-bottom:0;}
+.maps-list-row:hover,.maps-list-row.active{background:var(--bg3);}
+.maps-list-type{font:800 10px var(--mono);text-transform:uppercase;color:var(--text3);padding-top:3px;}
+.maps-list-title{font-weight:800;color:var(--text);}
+.maps-list-detail{font-size:12px;color:var(--text2);line-height:1.45;margin-top:4px;}
+.maps-empty{padding:28px;text-align:center;color:var(--text3);font:700 12px var(--mono);}
+.maps-source-filters{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:3px;}
+.maps-source-btn{padding:4px 9px;font-size:11px;line-height:1.15;}
+.maps-source-msg{display:block;margin-top:5px;color:var(--text3);font-size:12px;}
+@media(max-width:1100px){.maps-layout{grid-template-columns:1fr}.maps-stage{min-height:430px}.maps-list{max-height:360px;}}
 </style>
 </head>
 <body>
@@ -1752,76 +2261,85 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
        title="Click to update"></div>
 
   <div class="sidebar-nav">
+    <!-- MONITOR — live, read-mostly surfaces (ordered by glance-frequency). -->
     <div class="nav-section-label" data-i18n-section="monitor">MONITOR</div>
     <div class="nav-item active" onclick="showPage('stations',this)" id="nav-stations">
-      <span class="nav-icon">📡</span>
+      <span class="nav-icon" data-icon="radios"></span>
       <span class="nav-label" data-i18n="stations">RADIOS</span>
       <span class="nav-badge" id="badge-ms">0</span>
     </div>
     <div class="nav-item" onclick="showPage('calls',this)" id="nav-calls">
-      <span class="nav-icon">☎</span>
+      <span class="nav-icon" data-icon="calls"></span>
       <span class="nav-label" data-i18n="calls">CALLS</span>
       <span class="nav-badge" id="badge-calls" style="display:none">0</span>
     </div>
     <div class="nav-item" onclick="showPage('lastheard',this)" id="nav-lastheard">
-      <span class="nav-icon">🎙</span>
+      <span class="nav-icon" data-icon="lastheard"></span>
       <span class="nav-label" data-i18n="lastheard">LAST HEARD</span>
     </div>
-    <div class="nav-item" onclick="showPage('log',this)" id="nav-log">
-      <span class="nav-icon">📋</span>
-      <span class="nav-label" data-i18n="log">LOG</span>
-    </div>
-    <div class="nav-item" onclick="showPage('sdslog',this)" id="nav-sdslog">
-      <span class="nav-icon">✉</span>
-      <span class="nav-label" data-i18n="sdslog">SDS LOG</span>
-    </div>
     <div class="nav-item" onclick="showPage('rf',this)" id="nav-rf">
-      <span class="nav-icon">⚡</span>
+      <span class="nav-icon" data-icon="rf"></span>
       <span class="nav-label" data-i18n="rf">RF</span>
     </div>
     <div class="nav-item" onclick="showPage('health',this)" id="nav-health">
-      <span class="nav-icon">🩺</span>
+      <span class="nav-icon" data-icon="health"></span>
       <span class="nav-label">HEALTH</span>
     </div>
+    <div class="nav-item" onclick="showPage('log',this)" id="nav-log">
+      <span class="nav-icon" data-icon="log"></span>
+      <span class="nav-label" data-i18n="log">LOG</span>
+    </div>
+    <div class="nav-item" onclick="showPage('sdslog',this)" id="nav-sdslog">
+      <span class="nav-icon" data-icon="sdslog"></span>
+      <span class="nav-label" data-i18n="sdslog">SDS LOG</span>
+    </div>
+    <div class="nav-item" onclick="showPage('maps',this)" id="nav-maps">
+      <span class="nav-icon" data-icon="maps"></span>
+      <span class="nav-label" data-i18n="maps">Maps</span>
+    </div>
 
-    <div class="nav-section-label" data-i18n-section="manage">MANAGE</div>
+    <!-- INTEGRATIONS — external services (each hidden until its probe succeeds). -->
+    <div class="nav-section-label" data-i18n-section="integrations">INTEGRATIONS</div>
     <div class="nav-item" onclick="showPage('asterisk',this)" id="nav-asterisk">
-      <span class="nav-icon">☎</span>
+      <span class="nav-icon" data-icon="asterisk"></span>
       <span class="nav-label" data-i18n="asterisk">Asterisk SIP</span>
     </div>
     <div class="nav-item" onclick="showPage('dapnet',this)" id="nav-dapnet">
-      <span class="nav-icon">📟</span>
+      <span class="nav-icon" data-icon="dapnet"></span>
       <span class="nav-label" data-i18n="dapnet">DAPNET</span>
     </div>
     <div class="nav-item" onclick="showPage('echolink',this)" id="nav-echolink">
-      <span class="nav-icon">🔗</span>
+      <span class="nav-icon" data-icon="dapnet"></span>
       <span class="nav-label" data-i18n="echolink">EchoLink</span>
     </div>
     <div class="nav-item" onclick="showPage('meshcom',this)" id="nav-meshcom">
-      <span class="nav-icon">⌁</span>
+      <span class="nav-icon" data-icon="dapnet"></span>
       <span class="nav-label" data-i18n="meshcom">MeshCom</span>
     </div>
     <div class="nav-item" onclick="showPage('geoalarm',this)" id="nav-geoalarm">
-      <span class="nav-icon">◎</span>
+      <span class="nav-icon" data-icon="geoalarm"></span>
       <span class="nav-label" data-i18n="geoalarm">GeoAlarm</span>
     </div>
-    <div class="nav-item" onclick="showPage('config',this)" id="nav-config">
-      <span class="nav-icon">⚙</span>
-      <span class="nav-label" data-i18n="config">CONFIG</span>
-    </div>
     <div class="nav-item" onclick="showPage('telegram',this)" id="nav-telegram">
-      <span class="nav-icon">✈</span>
+      <span class="nav-icon" data-icon="telegram"></span>
       <span class="nav-label" data-i18n="telegram">Telegram</span>
     </div>
     <!-- WiFi tab is hidden until we confirm NetworkManager is available on
          the host. The probe runs once at dashboard boot via /api/wifi/available
          and toggles this element's display. -->
     <div class="nav-item" onclick="showPage('wifi',this)" id="nav-wifi" style="display:none">
-      <span class="nav-icon">📶</span>
+      <span class="nav-icon" data-icon="wifi"></span>
       <span class="nav-label" data-i18n="wifi">WIFI</span>
     </div>
+
+    <!-- SYSTEM — configure / operate the station. -->
+    <div class="nav-section-label" data-i18n-section="system_sec">SYSTEM</div>
+    <div class="nav-item" onclick="showPage('config',this)" id="nav-config">
+      <span class="nav-icon" data-icon="config"></span>
+      <span class="nav-label" data-i18n="config">CONFIG</span>
+    </div>
     <div class="nav-item" onclick="showPage('system',this)" id="nav-system">
-      <span class="nav-icon">🖥</span>
+      <span class="nav-icon" data-icon="system"></span>
       <span class="nav-label" data-i18n="system">SYSTEM</span>
     </div>
   </div>
@@ -1850,7 +2368,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
       <div class="cr-line" id="cr-ua">—</div>
     </div>
     <!-- Collapse toggle -->
-    <button class="sidebar-toggle" onclick="toggleSidebar()" title="Toggle sidebar">⇔</button>
+    <button class="sidebar-toggle" onclick="toggleSidebar()" title="Toggle sidebar" aria-label="Toggle sidebar"><span class="ico18" data-icon="collapse"></span></button>
   </div>
 </nav>
 
@@ -1858,8 +2376,17 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
 <div id="main">
   <!-- Topbar -->
   <div id="topbar">
-    <button id="sidebar-toggle-btn" onclick="openMobileSidebar()">☰</button>
+    <button id="sidebar-toggle-btn" onclick="openMobileSidebar()" aria-label="Menu"><span class="ico18" data-icon="hamburger"></span></button>
     <div class="topbar-title" id="topbar-title">Radios</div>
+
+    <!-- Calm always-visible station-state chips (BS / Brew / Emergency-if-active). -->
+    <div class="topbar-chips" aria-hidden="false">
+      <span class="pill pill-idle" id="chip-bs" title="Base station link"><span data-i18n="bs_label">BS</span></span>
+      <span class="pill pill-idle" id="chip-brew" title="Brew network"><span>Brew</span></span>
+      <span class="pill pill-danger" id="chip-emergency" style="display:none" title="Emergency active">
+        <span class="pill-icon" data-icon="emergency"></span><span data-i18n="emg_chip">EMERGENCY</span>
+      </span>
+    </div>
 
     <div class="topbar-right">
       <!-- Readability: opens an Apple-style level popover (Small/Medium/High/Ultra). -->
@@ -1926,24 +2453,26 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
         <button class="lang-btn" onclick="setLang('zh',this)">CN</button>
       </div>
       <!-- Logout: clears session cookie and redirects to /login. Hidden when auth is off. -->
-      <button class="logout-btn" id="logout-btn" onclick="doLogout()" title="Log out" style="display:none">⏻</button>
+      <button class="logout-btn" id="logout-btn" onclick="doLogout()" title="Log out" aria-label="Log out" style="display:none"><span class="ico18" data-icon="shutdown"></span></button>
       <!-- Login: shown only in anonymous public-overview mode (FH-FEAT-033). -->
-      <button class="logout-btn" id="login-btn" onclick="window.location='/login'" title="Log in" style="display:none">🔑</button>
+      <button class="logout-btn" id="login-btn" onclick="window.location='/login'" title="Log in" aria-label="Log in" style="display:none"><span class="ico18" data-icon="login"></span></button>
     </div>
   </div>
 
   <!-- Fallback config warning banner — hidden until JS shows it -->
-  <div id="fallback-banner" style="display:none;background:var(--danger);color:#fff;padding:10px 18px;font-size:13px;font-weight:600;align-items:center;gap:10px;flex-shrink:0">
-    <span style="font-size:18px">⚠️</span>
-    <div>
+  <div id="fallback-banner" class="banner banner-warn" style="display:none">
+    <span class="banner-ico" data-icon="alert"></span>
+    <div class="banner-body">
       <div data-i18n="fallback_title">FALLBACK CONFIG ACTIVE — Primary config failed to load</div>
-      <div id="fallback-reason" style="font-size:11px;font-weight:400;opacity:0.85;margin-top:2px"></div>
+      <div id="fallback-reason" class="banner-sub"></div>
     </div>
   </div>
 
-  <!-- Emergency banner — persistent while >=1 ISSI is in active emergency; populated by JS. -->
-  <div id="emergency-banner" style="display:none;background:var(--danger);color:#fff;padding:10px 18px;font-size:13px;font-weight:700;align-items:center;gap:12px;flex-shrink:0;animation:badge-emergency-pulse 1.2s ease-in-out infinite">
-    <span style="font-size:18px">🆘</span>
+  <!-- Emergency banner — persistent while >=1 ISSI is in active emergency; populated by JS.
+       Single steady danger dot (soft breathe), never a harsh flashing ring. -->
+  <div id="emergency-banner" class="banner banner-danger" style="display:none">
+    <span class="banner-dot" aria-hidden="true"></span>
+    <span class="banner-ico" data-icon="emergency"></span>
     <span data-i18n="emg_banner_title">EMERGENCY ACTIVE</span>
     <div id="emergency-banner-list" style="display:flex;flex-wrap:wrap;gap:8px"></div>
   </div>
@@ -1958,56 +2487,78 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
           <div class="stat-label">Radios</div>
           <div class="stat-value accent" id="pub-ms">—</div>
           <div class="stat-sub">registered</div>
-          <div class="stat-icon">📡</div>
+          <div class="stat-icon" data-icon="radios"></div>
         </div>
         <div class="stat-card blue">
           <div class="stat-label">Active Calls</div>
           <div class="stat-value blue" id="pub-calls">—</div>
           <div class="stat-sub">circuits in use</div>
-          <div class="stat-icon">☎</div>
+          <div class="stat-icon" data-icon="calls"></div>
         </div>
-        <div class="stat-card">
+        <div class="stat-card" id="pub-rf-card">
           <div class="stat-label">RF</div>
-          <div class="stat-value" id="pub-rf" style="font-size:20px">—</div>
+          <div class="stat-value is-text" id="pub-rf">—</div>
           <div class="stat-sub" id="pub-freq">—</div>
-          <div class="stat-icon">📶</div>
+          <div class="stat-icon" data-icon="rf"></div>
         </div>
-        <div class="stat-card">
+        <div class="stat-card" id="pub-brew-card">
           <div class="stat-label">Network</div>
-          <div class="stat-value" id="pub-brew" style="font-size:20px">—</div>
+          <div class="stat-value is-text" id="pub-brew">—</div>
           <div class="stat-sub" id="pub-ver">—</div>
-          <div class="stat-icon">🔗</div>
+          <div class="stat-icon" data-icon="network"></div>
         </div>
       </div>
       <div class="card">
         <div class="card-head"><div class="card-title">Cell Status</div></div>
-        <div style="padding:14px 18px;font-size:13px;opacity:.7">
-          Read-only public overview — log in for full access and controls.
+        <div class="card-body">
+          <div class="empty-state">
+            <span class="empty-ico" data-icon="login"></span>
+            <div class="empty-msg">Read-only public overview</div>
+            <div class="empty-sub">Log in for full access and controls.</div>
+          </div>
         </div>
       </div>
     </div>
 
     <!-- ── RADIOS ── -->
     <div class="page active" id="page-stations">
+      <!-- Hero summary -->
+      <div class="hero">
+        <span class="hero-dot is-idle" id="stations-hero-dot"></span>
+        <div class="hero-main">
+          <div class="hero-title" id="stations-hero-title" data-i18n="terminals">Radios</div>
+          <div class="hero-sub" id="stations-hero-sub" data-i18n="registered">registered</div>
+        </div>
+        <div class="hero-metrics">
+          <div class="hero-metric">
+            <div class="hero-metric-label" data-i18n="active_calls">Active Calls</div>
+            <div class="hero-metric-value" id="stations-hero-calls">0</div>
+          </div>
+          <div class="hero-metric">
+            <div class="hero-metric-label">BREW</div>
+            <div class="hero-metric-value" id="stations-hero-brew">—</div>
+          </div>
+        </div>
+      </div>
       <!-- Stat cards -->
       <div class="stat-grid">
         <div class="stat-card green">
           <div class="stat-label" data-i18n="terminals">Radios</div>
           <div class="stat-value accent" id="stat-ms">0</div>
           <div class="stat-sub" data-i18n="registered">registered</div>
-          <div class="stat-icon">📡</div>
+          <div class="stat-icon" data-icon="radios"></div>
         </div>
         <div class="stat-card blue">
           <div class="stat-label" data-i18n="active_calls">Active Calls</div>
           <div class="stat-value blue" id="stat-calls">0</div>
           <div class="stat-sub" data-i18n="circuits">circuits in use</div>
-          <div class="stat-icon">☎</div>
+          <div class="stat-icon" data-icon="calls"></div>
         </div>
-        <div class="stat-card" id="stat-brew-card">
+        <div class="stat-card is-danger" id="stat-brew-card">
           <div class="stat-label">BREW</div>
-          <div class="stat-value" id="stat-brew-val" style="font-size:20px;color:var(--danger)">OFFLINE</div>
+          <div class="stat-value is-text" id="stat-brew-val">OFFLINE</div>
           <div class="stat-sub" id="stat-brew-sub">—</div>
-          <div class="stat-icon">🔗</div>
+          <div class="stat-icon" data-icon="network"></div>
         </div>
       </div>
       <!-- TETRA BTS Details — static cell + RF identity from config.toml -->
@@ -2179,13 +2730,36 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
           </div>
         </div>
         <div class="card-body">
+          <div class="lastheard-filters">
+            <div class="mesh-msg-filter-field">
+              <span class="mesh-msg-filter-label">Source</span>
+              <div class="mesh-msg-filter-buttons">
+                <button class="btn btn-sm btn-primary" id="lh-source-local" onclick="toggleLastHeardSource('local')">local</button>
+                <button class="btn btn-sm btn-primary" id="lh-source-brew" onclick="toggleLastHeardSource('brew')">brew</button>
+                <button class="btn btn-sm btn-primary" id="lh-source-brew2" onclick="toggleLastHeardSource('brew2')">brew2</button>
+                <button class="btn btn-sm btn-primary" id="lh-source-asterisk" onclick="toggleLastHeardSource('asterisk')">asterisk</button>
+                <button class="btn btn-sm btn-primary" id="lh-source-echolink" onclick="toggleLastHeardSource('echolink')">echolink</button>
+              </div>
+            </div>
+            <label class="mesh-msg-filter-field">
+              <span class="mesh-msg-filter-label">ISSI regex</span>
+              <input type="search" id="lastheard-issi-filter" class="form-input" placeholder="2632585|DJ2TH" oninput="lastHeardFilterChanged()" spellcheck="false">
+            </label>
+            <label class="mesh-msg-filter-field">
+              <span class="mesh-msg-filter-label">Destination regex</span>
+              <input type="search" id="lastheard-dest-filter" class="form-input" placeholder="26200|91385" oninput="lastHeardFilterChanged()" spellcheck="false">
+            </label>
+            <span class="mesh-msg-filter-status" id="lastheard-filter-status">—</span>
+          </div>
           <div class="table-wrap">
             <table>
               <thead><tr>
                 <th data-i18n="th_time">Time</th>
                 <th data-i18n="th_issi">ISSI</th>
+                <th data-i18n="th_source">Source</th>
                 <th data-i18n="th_activity">Activity</th>
                 <th data-i18n="th_dest">Destination</th>
+                <th data-i18n="th_duration">Duration</th>
               </tr></thead>
               <tbody id="lastheard-tbody"></tbody>
             </table>
@@ -2199,6 +2773,10 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
       <div class="card">
         <div class="card-head">
           <div class="card-title" data-i18n="live_log">Live Log</div>
+          <div class="card-actions">
+            <button class="btn btn-sm" onclick="exportLog()"><span class="btn-icon" data-icon="export"></span><span data-i18n="export">Export</span></button>
+            <button class="btn btn-sm" onclick="clearLog()"><span class="btn-icon" data-icon="delete"></span><span data-i18n="clear">Clear</span></button>
+          </div>
         </div>
         <div id="log-container" class="log-wrap"></div>
         <div class="log-controls">
@@ -2212,10 +2790,6 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
             <input type="checkbox" id="log-autoscroll" checked>
             <span data-i18n="autoscroll">Auto-scroll</span>
           </label>
-          <div style="margin-left:auto;display:flex;gap:6px">
-            <button class="btn btn-sm" onclick="exportLog()" data-i18n="export">⤓ Export</button>
-            <button class="btn btn-sm" onclick="clearLog()" data-i18n="clear">Clear</button>
-          </div>
         </div>
       </div>
     </div>
@@ -2229,12 +2803,23 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
         <div class="card-head">
           <div class="card-title" data-i18n="sdslog">SDS Log</div>
           <div class="card-actions">
-            <button class="btn btn-sm" onclick="loadSdsLog()" data-i18n="sds_refresh">⟳ Refresh</button>
-            <button class="btn btn-sm" onclick="exportSdsLog()" data-i18n="export">⤓ Export</button>
-            <button class="btn btn-sm btn-danger" onclick="clearSdsLog()" data-i18n="clear">Clear</button>
+            <button class="btn btn-sm" onclick="loadSdsLog()"><span class="btn-icon" data-icon="restart"></span><span data-i18n="sds_refresh">Refresh</span></button>
+            <button class="btn btn-sm" onclick="exportSdsLog()"><span class="btn-icon" data-icon="export"></span><span data-i18n="export">Export</span></button>
+            <button class="btn btn-sm btn-danger" onclick="clearSdsLog()"><span class="btn-icon" data-icon="delete"></span><span data-i18n="clear">Clear</span></button>
           </div>
         </div>
         <div class="card-body">
+          <div class="sds-log-filters">
+            <label class="mesh-msg-filter-field">
+              <span class="mesh-msg-filter-label">From regex</span>
+              <input type="search" id="sdslog-from-filter" class="form-input" placeholder="2632585|DJ2TH" oninput="sdsLogFilterChanged()" spellcheck="false">
+            </label>
+            <label class="mesh-msg-filter-field">
+              <span class="mesh-msg-filter-label">TG regex</span>
+              <input type="search" id="sdslog-tg-filter" class="form-input" placeholder="26200|91102" oninput="sdsLogFilterChanged()" spellcheck="false">
+            </label>
+            <span class="mesh-msg-filter-status" id="sdslog-filter-status">—</span>
+          </div>
           <div class="table-wrap">
             <table>
               <thead><tr>
@@ -2262,6 +2847,25 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
          the radio. We do not rely on receive-side feedback. -->
     <div class="page" id="page-rf">
 
+      <!-- Hero summary -->
+      <div class="hero">
+        <span class="hero-dot is-idle" id="rf-hero-dot"></span>
+        <div class="hero-main">
+          <div class="hero-title" data-i18n="rf_spectrum">TX DSP Spectrum (pre-PA)</div>
+          <div class="hero-sub" id="rf-hero-sub" data-i18n="rf_waiting">waiting…</div>
+        </div>
+        <div class="hero-metrics">
+          <div class="hero-metric">
+            <div class="hero-metric-label" data-i18n="rf_freq">Center freq</div>
+            <div class="hero-metric-value" id="rf-hero-freq">—</div>
+          </div>
+          <div class="hero-metric">
+            <div class="hero-metric-label" data-i18n="rf_evm">EVM</div>
+            <div class="hero-metric-value" id="rf-hero-evm">—</div>
+          </div>
+        </div>
+      </div>
+
       <!-- Top stat strip: instantaneous big-number metrics -->
       <div class="rf-metrics">
         <div class="rf-metric">
@@ -2286,6 +2890,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
         </div>
       </div>
 
+      <div class="section-label" data-i18n="rf_visualizers">Visualizers</div>
       <!-- Visualizers grid: spectrum + constellation -->
       <div class="rf-grid">
         <div class="rf-panel">
@@ -2310,9 +2915,10 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
           <span data-i18n="rf_waterfall">TX Spectrum Waterfall</span>
           <span class="rf-hint" data-i18n="rf_hint_waterfall">rolling · viridis</span>
         </div>
-        <canvas id="rf-waterfall" class="rf-canvas" style="height:320px"></canvas>
+        <canvas id="rf-waterfall" class="rf-canvas tall"></canvas>
       </div>
 
+      <div class="section-label" data-i18n="rf_quality">Signal Quality</div>
       <!-- Signal Quality strip — derived metrics with health badges (good/warn/bad) -->
       <div class="rf-quality-card">
         <div class="rf-panel-title">
@@ -2323,26 +2929,27 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
           <div class="rf-qmetric" id="rf-q-evm-wrap">
             <div class="rf-qmetric-label" data-i18n="rf_evm">EVM</div>
             <div class="rf-qmetric-value" id="rf-evm">—</div>
-            <div class="rf-qmetric-bar"><div class="rf-qmetric-fill" id="rf-evm-bar"></div></div>
+            <div class="gauge"><div class="gauge-track"><div class="gauge-fill" id="rf-evm-bar"></div></div></div>
           </div>
           <div class="rf-qmetric" id="rf-q-papr-wrap">
             <div class="rf-qmetric-label" data-i18n="rf_papr">PAPR</div>
             <div class="rf-qmetric-value" id="rf-papr">—</div>
-            <div class="rf-qmetric-bar"><div class="rf-qmetric-fill" id="rf-papr-bar"></div></div>
+            <div class="gauge"><div class="gauge-track"><div class="gauge-fill" id="rf-papr-bar"></div></div></div>
           </div>
           <div class="rf-qmetric" id="rf-q-cl-wrap">
             <div class="rf-qmetric-label" data-i18n="rf_carrier">Carrier leak</div>
             <div class="rf-qmetric-value" id="rf-carrier">—</div>
-            <div class="rf-qmetric-bar"><div class="rf-qmetric-fill" id="rf-carrier-bar"></div></div>
+            <div class="gauge"><div class="gauge-track"><div class="gauge-fill" id="rf-carrier-bar"></div></div></div>
           </div>
           <div class="rf-qmetric" id="rf-q-obw-wrap">
             <div class="rf-qmetric-label" data-i18n="rf_obw">Occupied BW (99%)</div>
             <div class="rf-qmetric-value" id="rf-obw">—</div>
-            <div class="rf-qmetric-bar"><div class="rf-qmetric-fill" id="rf-obw-bar"></div></div>
+            <div class="gauge"><div class="gauge-track"><div class="gauge-fill" id="rf-obw-bar"></div></div></div>
           </div>
         </div>
       </div>
 
+      <div class="section-label" data-i18n="rf_hw_health">Hardware Health</div>
       <!-- Hardware Health — temperature + actual gain readback from the SDR. Updated every ~5s. -->
       <div class="rf-quality-card">
         <div class="rf-panel-title">
@@ -2354,6 +2961,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
             <div class="rf-qmetric-label" data-i18n="rf_temp">SDR Temperature</div>
             <div class="rf-hw-temp-value" id="rf-temp">—</div>
             <div class="rf-hw-temp-state" id="rf-temp-state">—</div>
+            <div class="gauge" id="rf-temp-gauge"><div class="gauge-track"><div class="gauge-fill" id="rf-temp-bar"></div></div></div>
           </div>
           <div class="rf-hw-gain-block">
             <div class="rf-qmetric-label" data-i18n="rf_tx_gain">TX Gain Stages (actual)</div>
@@ -2370,23 +2978,35 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
 
     <!-- ── ASTERISK SIP ── -->
     <div class="page" id="page-asterisk">
+      <div class="section-label" data-i18n="integrations">Integrations</div>
+      <!-- Connection hero — live REGISTER state as a calm status pill. -->
+      <div class="hero">
+        <span class="hero-dot is-idle" id="ast-hero-dot"></span>
+        <div class="hero-main">
+          <div class="hero-title" data-i18n="asterisk_title">Asterisk SIP</div>
+          <div class="hero-sub" id="ast-hero-sub">—</div>
+        </div>
+        <div class="hero-metrics">
+          <span class="pill pill-idle" id="ast-hero-pill">—</span>
+        </div>
+      </div>
       <div class="card">
         <div class="card-head">
           <div class="card-title" data-i18n="asterisk_title">Asterisk SIP</div>
           <div class="card-actions">
-            <button class="btn btn-sm" onclick="loadAsteriskStatus()" data-i18n="refresh">⟳ Refresh</button>
+            <button class="btn btn-sm" onclick="loadAsteriskStatus()"><span class="btn-icon" data-icon="restart"></span><span data-i18n="refresh">Refresh</span></button>
           </div>
         </div>
         <div class="card-body">
           <div class="stat-grid" style="margin-bottom:14px">
-            <div class="stat-card">
+            <div class="stat-card" id="ast-configured-card">
               <div class="stat-label" data-i18n="ast_configured">Configured</div>
-              <div class="stat-value" id="ast-configured">—</div>
+              <div class="stat-value is-text" id="ast-configured">—</div>
               <div class="stat-sub" id="ast-enabled">—</div>
             </div>
-            <div class="stat-card blue">
+            <div class="stat-card blue" id="ast-register-card">
               <div class="stat-label" data-i18n="ast_register">REGISTER</div>
-              <div class="stat-value blue" id="ast-register">—</div>
+              <div class="stat-value is-text blue" id="ast-register">—</div>
               <div class="stat-sub" id="ast-dialogs">—</div>
             </div>
           </div>
@@ -2395,6 +3015,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
             <div class="info-row"><div class="info-key" data-i18n="ast_remote">Remote Asterisk</div><div class="info-val" id="ast-remote">—</div></div>
             <div class="info-row"><div class="info-key" data-i18n="ast_rtp">RTP ports</div><div class="info-val" id="ast-rtp">—</div></div>
             <div class="info-row"><div class="info-key" data-i18n="ast_codec">Codec</div><div class="info-val" id="ast-codec">—</div></div>
+            <div class="info-row"><div class="info-key">Inbound setup timeout</div><div class="info-val" id="ast-setup-timeout">—</div></div>
             <div class="info-row"><div class="info-key" data-i18n="ast_last_rx">Last RX</div><div class="info-val" id="ast-last-rx">—</div></div>
             <div class="info-row"><div class="info-key" data-i18n="ast_last_tx">Last TX</div><div class="info-val" id="ast-last-tx">—</div></div>
             <div class="info-row"><div class="info-key" data-i18n="ast_last_error">Last error</div><div class="info-val" id="ast-last-error">—</div></div>
@@ -2406,8 +3027,8 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
         <div class="card-head">
           <div class="card-title">Snom SIP NOTIFY</div>
           <div class="card-actions">
-            <button class="btn btn-sm" onclick="loadSnomNotify()" data-i18n="refresh">⟳ Refresh</button>
-            <button class="btn btn-primary" onclick="saveSnomNotify()" data-i18n="save">Save</button>
+            <button class="btn btn-sm" onclick="loadSnomNotify()"><span class="btn-icon" data-icon="restart"></span><span data-i18n="refresh">Refresh</span></button>
+            <button class="btn btn-primary" onclick="saveSnomNotify()"><span class="btn-icon" data-icon="save"></span><span data-i18n="save">Save</span></button>
           </div>
         </div>
         <div class="card-body">
@@ -2416,45 +3037,45 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
             <span class="sw"><input type="checkbox" id="snom-enabled"><i></i></span>
           </label>
 
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;align-items:center;margin-top:14px">
-            <label style="color:var(--muted);font-size:13px">AMI host</label>
+          <div class="h-form" style="margin-top:14px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))">
+            <label class="h-flabel">AMI host</label>
             <input type="text" id="snom-ami-host" class="form-input" placeholder="127.0.0.1">
-            <label style="color:var(--muted);font-size:13px">AMI port</label>
+            <label class="h-flabel">AMI port</label>
             <input type="number" id="snom-ami-port" class="form-input" min="1" max="65535" placeholder="5038">
-            <label style="color:var(--muted);font-size:13px">AMI user</label>
+            <label class="h-flabel">AMI user</label>
             <input type="text" id="snom-ami-user" class="form-input" autocomplete="off" spellcheck="false" placeholder="flowstation">
-            <label style="color:var(--muted);font-size:13px">AMI password</label>
+            <label class="h-flabel">AMI password</label>
             <input type="password" id="snom-ami-password" class="form-input" autocomplete="new-password" spellcheck="false" oninput="snomPasswordDirty=true">
-            <label style="color:var(--muted);font-size:13px;align-self:flex-start;padding-top:8px">PJSIP endpoints</label>
+            <label class="h-flabel top">PJSIP endpoints</label>
             <textarea id="snom-endpoints" class="form-input" rows="3" placeholder="385&#10;386"></textarea>
           </div>
 
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin-top:16px">
+          <div class="h-form wide" style="margin-top:16px">
             <div>
               <label class="sw-row"><span class="sw-text">Notify TETRA SDS</span><span class="sw"><input type="checkbox" id="snom-notify-sds"><i></i></span></label>
-              <div style="display:flex;gap:14px;flex-wrap:wrap;margin:8px 0 10px;color:var(--muted);font-size:13px">
-                <label><input type="checkbox" id="snom-dir-rx"> RX</label>
-                <label><input type="checkbox" id="snom-dir-net"> NET</label>
-                <label><input type="checkbox" id="snom-dir-tx"> TX</label>
+              <div class="h-fopts" style="margin:8px 0 10px">
+                <label class="h-fopt"><input type="checkbox" id="snom-dir-rx"> RX</label>
+                <label class="h-fopt"><input type="checkbox" id="snom-dir-net"> NET</label>
+                <label class="h-fopt"><input type="checkbox" id="snom-dir-tx"> TX</label>
               </div>
-              <label style="color:var(--muted);font-size:13px">SDS ISSI whitelist</label>
+              <label class="h-flabel">SDS ISSI whitelist</label>
               <textarea id="snom-sds-issis" class="form-input" rows="4" placeholder="2632585&#10;9999"></textarea>
               <div class="help-text">Empty = every SDS. A match on source or destination ISSI is enough.</div>
             </div>
             <div>
               <label class="sw-row"><span class="sw-text">Notify DAPNET</span><span class="sw"><input type="checkbox" id="snom-notify-dapnet"><i></i></span></label>
-              <label style="color:var(--muted);font-size:13px">DAPNET RIC whitelist</label>
+              <label class="h-flabel">DAPNET RIC whitelist</label>
               <textarea id="snom-dapnet-rics" class="form-input" rows="4" placeholder="0632585&#10;0000200"></textarea>
               <div class="help-text">Empty = every DAPNET message. Leading zeros are preserved in config.</div>
             </div>
             <div>
               <label class="sw-row"><span class="sw-text">Notify Telegram</span><span class="sw"><input type="checkbox" id="snom-notify-telegram"><i></i></span></label>
-              <div style="display:grid;grid-template-columns:130px 1fr;gap:10px;align-items:center;margin-top:10px">
-                <label style="color:var(--muted);font-size:13px">Title prefix</label>
+              <div class="h-form-pair" style="margin-top:10px">
+                <label class="h-flabel">Title prefix</label>
                 <input type="text" id="snom-title-prefix" class="form-input" placeholder="FlowStation">
-                <label style="color:var(--muted);font-size:13px">Max text chars</label>
+                <label class="h-flabel">Max text chars</label>
                 <input type="number" id="snom-max-text" class="form-input" min="40" max="2000" placeholder="240">
-                <label style="color:var(--muted);font-size:13px">Timeout (s)</label>
+                <label class="h-flabel">Timeout (s)</label>
                 <input type="number" id="snom-timeout" class="form-input" min="1" max="30" placeholder="3">
               </div>
             </div>
@@ -2466,16 +3087,43 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
 
     <!-- ── DAPNET ── -->
     <div class="page" id="page-dapnet">
+      <div class="section-label" data-i18n="integrations">Integrations</div>
+      <!-- Connection hero — DAPNET feed state as a calm status pill. -->
+      <div class="hero">
+        <span class="hero-dot is-idle" id="dap-hero-dot"></span>
+        <div class="hero-main">
+          <div class="hero-title" data-i18n="dapnet_title">DAPNET</div>
+          <div class="hero-sub" id="dap-hero-sub">—</div>
+        </div>
+        <div class="hero-metrics">
+          <span class="pill pill-idle" id="dap-hero-pill">—</span>
+        </div>
+      </div>
       <div class="card">
         <div class="card-head">
           <div class="card-title" data-i18n="dapnet_log">DAPNET Log</div>
           <div class="card-actions">
-            <button class="btn btn-sm" onclick="loadDapnetLog()" data-i18n="refresh">⟳ Refresh</button>
-            <button class="btn btn-sm" onclick="exportDapnetLog()" data-i18n="export">⤓ Export</button>
-            <button class="btn btn-sm btn-danger" onclick="clearDapnetLog()" data-i18n="clear">Clear</button>
+            <button class="btn btn-sm" onclick="loadDapnetLog()"><span class="btn-icon" data-icon="restart"></span><span data-i18n="refresh">Refresh</span></button>
+            <button class="btn btn-sm" onclick="exportDapnetLog()"><span class="btn-icon" data-icon="export"></span><span data-i18n="export">Export</span></button>
+            <button class="btn btn-sm btn-danger" onclick="clearDapnetLog()"><span class="btn-icon" data-icon="delete"></span><span data-i18n="clear">Clear</span></button>
           </div>
         </div>
         <div class="card-body">
+          <div class="dapnet-log-filters">
+            <label class="mesh-msg-filter-field">
+              <span class="mesh-msg-filter-label">Callsign regex</span>
+              <input type="search" id="dapnetlog-callsign-filter" class="form-input" placeholder="DJ2TH|DB0.*" oninput="dapnetLogFilterChanged()" spellcheck="false">
+            </label>
+            <label class="mesh-msg-filter-field">
+              <span class="mesh-msg-filter-label">Recipient regex</span>
+              <input type="search" id="dapnetlog-recipient-filter" class="form-input" placeholder="0632585|0000200" oninput="dapnetLogFilterChanged()" spellcheck="false">
+            </label>
+            <label class="mesh-msg-filter-field">
+              <span class="mesh-msg-filter-label">Message regex</span>
+              <input type="search" id="dapnetlog-message-filter" class="form-input" placeholder="alarm|probe|^test" oninput="dapnetLogFilterChanged()" spellcheck="false">
+            </label>
+            <span class="mesh-msg-filter-status" id="dapnetlog-filter-status">—</span>
+          </div>
           <div class="table-wrap">
             <table>
               <thead><tr>
@@ -2501,7 +3149,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
         <div class="card-head">
           <div class="card-title" data-i18n="dapnet_title">DAPNET</div>
           <div class="card-actions">
-            <button class="btn btn-primary" onclick="saveDapnet()" data-i18n="save">Save</button>
+            <button class="btn btn-primary" onclick="saveDapnet()"><span class="btn-icon" data-icon="save"></span><span data-i18n="save">Save</span></button>
           </div>
         </div>
         <div class="card-body">
@@ -2514,33 +3162,33 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
             <span class="sw"><input type="checkbox" id="dap-rwth-enabled"><i></i></span>
           </label>
 
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;align-items:center;margin-top:14px">
-            <label style="color:var(--muted);font-size:13px">Poll interval (s)</label>
+          <div class="h-form" style="margin-top:14px">
+            <label class="h-flabel">Poll interval (s)</label>
             <input type="number" id="dap-poll" class="form-input" min="1" placeholder="30">
-            <label style="color:var(--muted);font-size:13px">Messages limit</label>
+            <label class="h-flabel">Messages limit</label>
             <input type="number" id="dap-limit" class="form-input" min="1" placeholder="100">
 
-            <label style="color:var(--muted);font-size:13px">Hampager API URL</label>
+            <label class="h-flabel">Hampager API URL</label>
             <input type="text" id="dap-api-url" class="form-input" placeholder="https://hampager.de/api/calls" style="grid-column:1 / -1;min-width:0">
 
-            <label style="color:var(--muted);font-size:13px">API username</label>
+            <label class="h-flabel">API username</label>
             <input type="text" id="dap-username" class="form-input" autocomplete="off" spellcheck="false">
-            <label style="color:var(--muted);font-size:13px">API password</label>
+            <label class="h-flabel">API password</label>
             <input type="password" id="dap-password" class="form-input" autocomplete="new-password" spellcheck="false" oninput="dapPasswordDirty=true">
 
-            <label style="color:var(--muted);font-size:13px">RWTH host</label>
+            <label class="h-flabel">RWTH host</label>
             <input type="text" id="dap-rwth-host" class="form-input" placeholder="dapnet.afu.rwth-aachen.de">
-            <label style="color:var(--muted);font-size:13px">RWTH port</label>
+            <label class="h-flabel">RWTH port</label>
             <input type="number" id="dap-rwth-port" class="form-input" min="1" max="65535" placeholder="43434">
 
-            <label style="color:var(--muted);font-size:13px">Device</label>
+            <label class="h-flabel">Device</label>
             <input type="text" id="dap-rwth-device" class="form-input" placeholder="FlowStation">
-            <label style="color:var(--muted);font-size:13px">Version</label>
+            <label class="h-flabel">Version</label>
             <input type="text" id="dap-rwth-version" class="form-input" placeholder="1.0">
 
-            <label style="color:var(--muted);font-size:13px">RWTH callsign</label>
+            <label class="h-flabel">RWTH callsign</label>
             <input type="text" id="dap-rwth-callsign" class="form-input" autocomplete="off" spellcheck="false" style="text-transform:uppercase">
-            <label style="color:var(--muted);font-size:13px">RWTH authkey</label>
+            <label class="h-flabel">RWTH authkey</label>
             <input type="password" id="dap-rwth-authkey" class="form-input" autocomplete="new-password" spellcheck="false" oninput="dapAuthDirty=true">
           </div>
           <div class="config-msg" id="dap-msg"></div>
@@ -2551,51 +3199,59 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
         <div class="card-head">
           <div class="card-title" data-i18n="dapnet_routing">Routing</div>
           <div class="card-actions">
-            <button class="btn btn-primary" onclick="saveDapnet()" data-i18n="save">Save</button>
+            <button class="btn btn-primary" onclick="saveDapnet()"><span class="btn-icon" data-icon="save"></span><span data-i18n="save">Save</span></button>
           </div>
         </div>
         <div class="card-body">
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px">
+          <div class="h-form wide">
             <div>
               <label class="sw-row"><span class="sw-text">Forward to SDS</span><span class="sw"><input type="checkbox" id="dap-forward-sds"><i></i></span></label>
-              <div style="display:grid;grid-template-columns:130px 1fr;gap:10px;align-items:center;margin-top:10px">
-                <label style="color:var(--muted);font-size:13px">Source ISSI</label>
+              <div class="h-form-pair" style="margin-top:10px">
+                <label class="h-flabel">Source ISSI</label>
                 <input type="number" id="dap-sds-source" class="form-input" min="1" max="16777215" placeholder="9999">
-                <label style="color:var(--muted);font-size:13px">Destination</label>
+                <label class="h-flabel">Destination</label>
                 <input type="number" id="dap-sds-dest" class="form-input" min="0" max="16777215" placeholder="ISSI or GSSI">
-                <label style="color:var(--muted);font-size:13px">Destination is group</label>
-                <label style="display:flex;align-items:center;gap:10px"><span class="sw"><input type="checkbox" id="dap-sds-group"><i></i></span><span style="color:var(--muted);font-size:12px">GSSI</span></label>
-                <label style="color:var(--muted);font-size:13px;align-self:flex-start;padding-top:8px">RIC → ISSI</label>
+                <label class="h-flabel">Destination is group</label>
+                <label class="h-finline"><span class="sw"><input type="checkbox" id="dap-sds-group"><i></i></span><span class="h-flabel-sm">GSSI</span></label>
+                <label class="h-flabel top">RIC → ISSI</label>
                 <textarea id="dap-ric-routes" class="form-input" rows="3" placeholder="0632585=2632585"></textarea>
-                <label style="color:var(--muted);font-size:13px;align-self:flex-start;padding-top:8px">RIC → GSSI</label>
+                <label class="h-flabel top">RIC → GSSI</label>
                 <textarea id="dap-ric-group-routes" class="form-input" rows="3" placeholder="0004520=80"></textarea>
-                <label style="color:var(--muted);font-size:13px;align-self:flex-start;padding-top:8px">SDS RIC filter</label>
+                <label class="h-flabel top">SDS RIC filter</label>
                 <textarea id="dap-sds-rics" class="form-input" rows="3" placeholder="0004520&#10;0000200"></textarea>
               </div>
             </div>
 
             <div>
               <label class="sw-row"><span class="sw-text">Forward to TPG2200 Call-Out</span><span class="sw"><input type="checkbox" id="dap-forward-callout"><i></i></span></label>
-              <div style="display:grid;grid-template-columns:130px 1fr;gap:10px;align-items:center;margin-top:10px">
-                <label style="color:var(--muted);font-size:13px">Source ISSI</label>
+              <div class="h-form-pair" style="margin-top:10px">
+                <label class="h-flabel">Source ISSI</label>
                 <input type="number" id="dap-callout-source" class="form-input" min="1" max="16777215" placeholder="9999">
-                <label style="color:var(--muted);font-size:13px">Destination</label>
+                <label class="h-flabel">Destination</label>
                 <input type="number" id="dap-callout-dest" class="form-input" min="0" max="16777215" placeholder="TPG2200 ISSI">
-                <label style="color:var(--muted);font-size:13px">Incident base</label>
-                <input type="number" id="dap-callout-incident" class="form-input" min="1" max="256" placeholder="2">
-                <label style="color:var(--muted);font-size:13px">Text prefix</label>
+                <label class="h-flabel">TPG RIC</label>
+                <input type="text" id="dap-callout-tpg-ric" class="form-input" placeholder="0x00090D10">
+                <label class="h-flabel">Call-Out ID base</label>
+                <input type="number" id="dap-callout-id" class="form-input" min="0" max="255" placeholder="33">
+                <label class="h-flabel">Priority / tone</label>
+                <input type="number" id="dap-callout-priority" class="form-input" min="0" max="15" placeholder="15">
+                <label class="h-flabel">Text prefix</label>
                 <input type="text" id="dap-callout-prefix" class="form-input" placeholder="DAPNET">
-                <label style="color:var(--muted);font-size:13px;align-self:flex-start;padding-top:8px">Call-Out RIC filter</label>
+                <label class="h-flabel top">Call-Out RIC filter</label>
                 <textarea id="dap-callout-rics" class="form-input" rows="3" placeholder="0004520"></textarea>
+                <label class="h-flabel top">TPG ISSI → priority</label>
+                <textarea id="dap-callout-issi-priorities" class="form-input" rows="3" placeholder="2632585=15"></textarea>
+                <label class="h-flabel top">TPG RIC → priority</label>
+                <textarea id="dap-callout-tpg-ric-priorities" class="form-input" rows="3" placeholder="0x00090D10=15"></textarea>
               </div>
             </div>
 
             <div>
               <label class="sw-row"><span class="sw-text">Forward to Telegram</span><span class="sw"><input type="checkbox" id="dap-forward-telegram"><i></i></span></label>
-              <div style="display:grid;grid-template-columns:130px 1fr;gap:10px;align-items:center;margin-top:10px">
-                <label style="color:var(--muted);font-size:13px">Telegram prefix</label>
+              <div class="h-form-pair" style="margin-top:10px">
+                <label class="h-flabel">Telegram prefix</label>
                 <input type="text" id="dap-telegram-prefix" class="form-input" placeholder="DAPNET">
-                <label style="color:var(--muted);font-size:13px;align-self:flex-start;padding-top:8px">Telegram RIC filter</label>
+                <label class="h-flabel top">Telegram RIC filter</label>
                 <textarea id="dap-telegram-rics" class="form-input" rows="3" placeholder="0004520"></textarea>
               </div>
               <div class="help-text" style="margin-top:10px">Uses the existing Telegram alert configuration and recipients.</div>
@@ -2612,14 +3268,14 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
           </div>
         </div>
         <div class="card-body">
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;align-items:center">
-            <label style="color:var(--muted);font-size:13px">Callsign recipients</label>
+          <div class="h-form">
+            <label class="h-flabel">Callsign recipients</label>
             <input type="text" id="dap-out-callsigns" class="form-input" placeholder="DJ2TH, DB0ABC">
-            <label style="color:var(--muted);font-size:13px">Transmitter groups</label>
+            <label class="h-flabel">Transmitter groups</label>
             <input type="text" id="dap-out-groups" class="form-input" placeholder="dl-all, regional">
-            <label style="color:var(--muted);font-size:13px">Emergency</label>
-            <label style="display:flex;align-items:center;gap:10px"><span class="sw"><input type="checkbox" id="dap-out-emergency"><i></i></span><span style="color:var(--muted);font-size:12px">Set emergency flag</span></label>
-            <label style="color:var(--muted);font-size:13px;align-self:flex-start;padding-top:8px">Message</label>
+            <label class="h-flabel">Emergency</label>
+            <label class="h-finline"><span class="sw"><input type="checkbox" id="dap-out-emergency"><i></i></span><span class="h-flabel-sm">Set emergency flag</span></label>
+            <label class="h-flabel top">Message</label>
             <textarea id="dap-out-text" class="form-input" rows="3" maxlength="80" placeholder="Message text"></textarea>
           </div>
           <div class="config-msg" id="dap-send-msg"></div>
@@ -2776,7 +3432,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
 
     <!-- ── MESHCOM ── -->
     <div class="page" id="page-meshcom">
-      <div class="card">
+      <div class="card" id="meshcom-config-card">
         <div class="card-head">
           <div class="card-title" data-i18n="meshcom_title">MeshCom</div>
           <div class="card-actions">
@@ -2830,7 +3486,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
         </div>
       </div>
 
-      <div class="card">
+      <div class="card" id="meshcom-routing-card">
         <div class="card-head">
           <div class="card-title">MeshCom Routing</div>
         </div>
@@ -2842,34 +3498,34 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
                 <span class="sw"><input type="checkbox" id="mesh-forward-sds"><i></i></span>
               </label>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
-                <input type="number" id="mesh-sds-source" class="form-input" min="1" max="16777215" placeholder="Source ISSI">
-                <input type="number" id="mesh-sds-dest" class="form-input" min="0" max="16777215" placeholder="Destination ISSI/GSSI">
+                <label class="h-field"><span class="h-field-label">SDS source ISSI</span><input type="number" id="mesh-sds-source" class="form-input" min="1" max="16777215" placeholder="9999"></label>
+                <label class="h-field"><span class="h-field-label">SDS destination ISSI/GSSI</span><input type="number" id="mesh-sds-dest" class="form-input" min="0" max="16777215" placeholder="0"></label>
               </div>
               <label style="display:flex;align-items:center;gap:10px;margin-top:10px"><span class="sw"><input type="checkbox" id="mesh-sds-group"><i></i></span><span style="color:var(--muted);font-size:12px">Destination is group/GSSI</span></label>
-              <textarea id="mesh-sds-sources" class="form-input" rows="3" placeholder="Allowed MeshCom sources, empty = all" style="margin-top:10px"></textarea>
+              <label class="h-field" style="margin-top:10px"><span class="h-field-label">SDS source filter</span><textarea id="mesh-sds-sources" class="form-input" rows="3" placeholder="Allowed MeshCom sources, empty = all"></textarea></label>
             </div>
             <div>
               <label class="sw-row">
                 <span class="sw-text">Forward MeshCom → SIP/Snom</span>
                 <span class="sw"><input type="checkbox" id="mesh-forward-sip"><i></i></span>
               </label>
-              <input type="text" id="mesh-sip-prefix" class="form-input" placeholder="Snom title prefix" style="margin-top:10px">
-              <textarea id="mesh-sip-sources" class="form-input" rows="3" placeholder="Allowed MeshCom sources, empty = all" style="margin-top:10px"></textarea>
+              <label class="h-field" style="margin-top:10px"><span class="h-field-label">Snom title prefix</span><input type="text" id="mesh-sip-prefix" class="form-input" placeholder="MeshCom"></label>
+              <label class="h-field" style="margin-top:10px"><span class="h-field-label">SIP/Snom source filter</span><textarea id="mesh-sip-sources" class="form-input" rows="3" placeholder="Allowed MeshCom sources, empty = all"></textarea></label>
             </div>
             <div>
               <label class="sw-row">
                 <span class="sw-text">Forward MeshCom → Telegram</span>
                 <span class="sw"><input type="checkbox" id="mesh-forward-telegram"><i></i></span>
               </label>
-              <input type="text" id="mesh-telegram-prefix" class="form-input" placeholder="Telegram prefix" style="margin-top:10px">
-              <textarea id="mesh-telegram-sources" class="form-input" rows="3" placeholder="Allowed MeshCom sources, empty = all" style="margin-top:10px"></textarea>
+              <label class="h-field" style="margin-top:10px"><span class="h-field-label">Telegram prefix</span><input type="text" id="mesh-telegram-prefix" class="form-input" placeholder="MeshCom"></label>
+              <label class="h-field" style="margin-top:10px"><span class="h-field-label">Telegram source filter</span><textarea id="mesh-telegram-sources" class="form-input" rows="3" placeholder="Allowed MeshCom sources, empty = all"></textarea></label>
             </div>
           </div>
           <div class="help-text" style="margin-top:10px">Source filters match MeshCom packet src values case-insensitively. Empty filters forward every MeshCom text message.</div>
         </div>
       </div>
 
-      <div class="card">
+      <div class="card" id="meshcom-send-card">
         <div class="card-head">
           <div class="card-title">Send MeshCom Message</div>
           <div class="card-actions">
@@ -2887,11 +3543,14 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
         </div>
       </div>
 
-      <div class="card">
+      <div class="card" id="meshcom-nodes-card">
         <div class="card-head">
           <div class="card-title">MeshCom Nodes</div>
           <div class="card-actions">
             <input type="text" id="mesh-node-filter" class="form-input" style="width:240px" placeholder="Search node, HW-ID or firmware" oninput="meshNodePageIndex=0;renderMeshcomNodes()">
+            <button class="btn btn-sm" onclick="loadMeshcomNodes()"><span class="btn-icon" data-icon="restart"></span><span data-i18n="refresh">Refresh</span></button>
+            <button class="btn btn-sm" onclick="exportMeshcomNodes()"><span class="btn-icon" data-icon="export"></span><span data-i18n="export">Export</span></button>
+            <button class="btn btn-sm btn-danger" onclick="clearMeshcomNodes()"><span class="btn-icon" data-icon="delete"></span><span data-i18n="clear">Clear</span></button>
           </div>
         </div>
         <div class="card-body">
@@ -2899,6 +3558,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
             <table>
               <thead><tr>
                 <th>Node</th>
+                <th>Via</th>
                 <th>Last seen</th>
                 <th>Position</th>
                 <th>Battery</th>
@@ -2917,11 +3577,41 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
         </div>
       </div>
 
-      <div class="card">
+      <div class="card" id="meshcom-messages-card">
         <div class="card-head">
           <div class="card-title">MeshCom Messages</div>
+          <div class="card-actions">
+            <button class="btn btn-sm" onclick="loadMeshcomMessages()"><span class="btn-icon" data-icon="restart"></span><span data-i18n="refresh">Refresh</span></button>
+            <button class="btn btn-sm" onclick="exportMeshcomMessages()"><span class="btn-icon" data-icon="export"></span><span data-i18n="export">Export</span></button>
+            <button class="btn btn-sm btn-danger" onclick="clearMeshcomMessages()"><span class="btn-icon" data-icon="delete"></span><span data-i18n="clear">Clear</span></button>
+          </div>
         </div>
         <div class="card-body">
+          <div class="mesh-msg-filters">
+            <div class="mesh-msg-filter-field">
+              <span class="mesh-msg-filter-label">Transport</span>
+              <div class="mesh-msg-filter-buttons">
+                <button class="btn btn-sm btn-primary" id="mesh-msg-filter-udp" onclick="toggleMeshMsgTransport('udp')">udp</button>
+                <button class="btn btn-sm btn-primary" id="mesh-msg-filter-lora" onclick="toggleMeshMsgTransport('lora')">lora</button>
+                <button class="btn btn-sm btn-primary" id="mesh-msg-filter-node" onclick="toggleMeshMsgTransport('node')">node</button>
+                <button class="btn btn-sm btn-primary" id="mesh-msg-filter-pos" onclick="toggleMeshMsgTransport('pos')">pos</button>
+                <button class="btn btn-sm btn-primary" id="mesh-msg-filter-time" onclick="toggleMeshMsgTransport('time')">time</button>
+              </div>
+            </div>
+            <label class="mesh-msg-filter-field">
+              <span class="mesh-msg-filter-label">Source filter</span>
+              <input type="search" id="mesh-msg-source-filter" class="form-input" placeholder="DJ2TH, OE1ABC-12" oninput="meshMsgFilterChanged()">
+            </label>
+            <label class="mesh-msg-filter-field">
+              <span class="mesh-msg-filter-label">Destination regex</span>
+              <input type="search" id="mesh-msg-dst-regex-filter" class="form-input" placeholder="\*|262|DJ2TH" oninput="meshMsgFilterChanged()" spellcheck="false">
+            </label>
+            <label class="mesh-msg-filter-field">
+              <span class="mesh-msg-filter-label">Message regex</span>
+              <input type="search" id="mesh-msg-regex-filter" class="form-input" placeholder="alarm|test|^CQ" oninput="meshMsgFilterChanged()" spellcheck="false">
+            </label>
+            <span class="mesh-msg-filter-status" id="mesh-msg-filter-status">—</span>
+          </div>
           <div class="table-wrap">
             <table>
               <thead><tr>
@@ -2929,6 +3619,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
                 <th data-i18n="th_dir">Dir</th>
                 <th data-i18n="th_type">Type</th>
                 <th>Source</th>
+                <th>Via</th>
                 <th>Destination</th>
                 <th data-i18n="th_message">Message</th>
                 <th>Paths</th>
@@ -2946,14 +3637,66 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
       </div>
     </div>
 
+    <!-- ── MAPS ── -->
+    <div class="page" id="page-maps">
+      <div class="section-label" data-i18n-section="monitor">Monitor</div>
+      <div class="hero">
+        <span class="hero-dot is-idle" id="maps-hero-dot"></span>
+        <div class="hero-main">
+          <div class="hero-title" data-i18n="maps_title">Maps</div>
+          <div class="hero-sub" id="maps-hero-sub">OpenStreetMap positions</div>
+        </div>
+        <div class="hero-metrics">
+          <span class="pill pill-idle" id="maps-count">0 markers</span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title" data-i18n="maps_title">Maps</div>
+          <div class="card-actions">
+            <button type="button" class="btn btn-sm" id="maps-latest-btn" aria-pressed="false">Latest only: OFF</button>
+            <button class="btn btn-sm" onclick="refreshMapsData()"><span class="btn-icon" data-icon="restart"></span><span data-i18n="refresh">Refresh</span></button>
+            <button class="btn btn-sm" onclick="openMapsOsm()">Open OSM</button>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="maps-layout">
+            <div class="maps-stage" id="maps-stage">
+              <div class="maps-tile-layer" id="maps-tile-layer"></div>
+              <div class="maps-marker-layer" id="maps-marker-layer"></div>
+              <div class="maps-controls">
+                <button class="maps-zoom-btn" onclick="mapsZoom(1)" title="Zoom in">+</button>
+                <button class="maps-zoom-btn" onclick="mapsZoom(-1)" title="Zoom out">−</button>
+              </div>
+              <div class="maps-attribution">© OpenStreetMap contributors</div>
+              <div class="maps-popup" id="maps-popup" style="display:none"></div>
+            </div>
+            <div class="maps-list" id="maps-list"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- ── GEOALARM ── -->
     <div class="page" id="page-geoalarm">
+      <div class="section-label" data-i18n="integrations">Integrations</div>
+      <!-- Connection hero — GeoAlarm enabled state as a calm status pill. -->
+      <div class="hero">
+        <span class="hero-dot is-idle" id="geo-hero-dot"></span>
+        <div class="hero-main">
+          <div class="hero-title" data-i18n="geoalarm_title">GeoAlarm</div>
+          <div class="hero-sub" id="geo-hero-sub">—</div>
+        </div>
+        <div class="hero-metrics">
+          <span class="pill pill-idle" id="geo-hero-pill">—</span>
+        </div>
+      </div>
       <div class="card">
         <div class="card-head">
           <div class="card-title" data-i18n="geoalarm_title">GeoAlarm</div>
           <div class="card-actions">
-            <button class="btn btn-sm" onclick="loadGeoalarm()" data-i18n="refresh">⟳ Refresh</button>
-            <button class="btn btn-primary" onclick="saveGeoalarm()" data-i18n="save">Save</button>
+            <button class="btn btn-sm" onclick="loadGeoalarm()"><span class="btn-icon" data-icon="restart"></span><span data-i18n="refresh">Refresh</span></button>
+            <button class="btn btn-primary" onclick="saveGeoalarm()"><span class="btn-icon" data-icon="save"></span><span data-i18n="save">Save</span></button>
           </div>
         </div>
         <div class="card-body">
@@ -2979,20 +3722,20 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
             <span class="sw-text">Enable GeoAlarm</span>
             <span class="sw"><input type="checkbox" id="geo-enabled"><i></i></span>
           </label>
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;align-items:center;margin-top:14px">
-            <label style="color:var(--muted);font-size:13px">FlowStation latitude</label>
+          <div class="h-form" style="margin-top:14px">
+            <label class="h-flabel">FlowStation latitude</label>
             <input type="number" id="geo-lat" class="form-input" step="0.000001" min="-90" max="90" placeholder="50.775346">
-            <label style="color:var(--muted);font-size:13px">FlowStation longitude</label>
+            <label class="h-flabel">FlowStation longitude</label>
             <input type="number" id="geo-lon" class="form-input" step="0.000001" min="-180" max="180" placeholder="6.083887">
-            <label style="color:var(--muted);font-size:13px">Radius / cooldown</label>
+            <label class="h-flabel">Radius / cooldown</label>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-              <input type="number" id="geo-radius-m" class="form-input" min="1" step="1" placeholder="500">
-              <input type="number" id="geo-cooldown" class="form-input" min="1" max="86400" placeholder="300">
+              <label class="h-field"><span class="h-field-label">Alarm radius (m)</span><input type="number" id="geo-radius-m" class="form-input" min="1" step="1" placeholder="500"></label>
+              <label class="h-field"><span class="h-field-label">Cooldown (s)</span><input type="number" id="geo-cooldown" class="form-input" min="1" max="86400" placeholder="300"></label>
             </div>
-            <label style="color:var(--muted);font-size:13px">Input sources</label>
-            <div style="display:flex;gap:14px;flex-wrap:wrap">
-              <label style="display:flex;align-items:center;gap:8px"><span class="sw"><input type="checkbox" id="geo-trigger-tetra"><i></i></span><span style="color:var(--muted);font-size:12px">TETRA LIP</span></label>
-              <label style="display:flex;align-items:center;gap:8px"><span class="sw"><input type="checkbox" id="geo-trigger-meshcom"><i></i></span><span style="color:var(--muted);font-size:12px">MeshCom</span></label>
+            <label class="h-flabel">Input sources</label>
+            <div class="h-fopts">
+              <label class="h-fopt"><span class="sw"><input type="checkbox" id="geo-trigger-tetra"><i></i></span><span class="h-flabel-sm">TETRA LIP</span></label>
+              <label class="h-fopt"><span class="sw"><input type="checkbox" id="geo-trigger-meshcom"><i></i></span><span class="h-flabel-sm">MeshCom</span></label>
             </div>
           </div>
           <div class="help-text" style="margin-top:10px">GeoAlarm fires when an allowed device enters the radius, then suppresses repeated alarms for the cooldown time.</div>
@@ -3005,21 +3748,29 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
           <div class="card-title">GeoAlarm Routing</div>
         </div>
         <div class="card-body">
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px">
+          <div class="h-form wide" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr))">
             <div>
               <label class="sw-row">
                 <span class="sw-text">Alarm → TPG2200</span>
                 <span class="sw"><input type="checkbox" id="geo-forward-tpg"><i></i></span>
               </label>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
-                <input type="number" id="geo-tpg-source" class="form-input" min="1" max="16777215" placeholder="Source ISSI">
-                <input type="number" id="geo-tpg-dest" class="form-input" min="0" max="16777215" placeholder="TPG ISSI">
+                <label class="h-field"><span class="h-field-label">Source ISSI</span><input type="number" id="geo-tpg-source" class="form-input" min="1" max="16777215" placeholder="9999"></label>
+                <label class="h-field"><span class="h-field-label">TPG2200 ISSI</span><input type="number" id="geo-tpg-dest" class="form-input" min="0" max="16777215" placeholder="0"></label>
               </div>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
-                <input type="number" id="geo-tpg-incident" class="form-input" min="1" max="256" placeholder="Incident base">
-                <input type="number" id="geo-tpg-max" class="form-input" min="8" max="160" placeholder="Max chars">
+                <label class="h-field"><span class="h-field-label">TPG RIC</span><input type="text" id="geo-tpg-ric" class="form-input" placeholder="0x00090D10"></label>
+                <label class="h-field"><span class="h-field-label">Max text chars</span><input type="number" id="geo-tpg-max" class="form-input" min="8" max="160" placeholder="80"></label>
               </div>
-              <input type="text" id="geo-tpg-prefix" class="form-input" placeholder="TPG text prefix" style="margin-top:10px">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
+                <label class="h-field"><span class="h-field-label">Call-Out ID base</span><input type="number" id="geo-tpg-id" class="form-input" min="0" max="255" placeholder="33"></label>
+                <label class="h-field"><span class="h-field-label">Priority / tone</span><input type="number" id="geo-tpg-priority" class="form-input" min="0" max="15" placeholder="15"></label>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
+                <label class="h-field"><span class="h-field-label">TPG ISSI → priority</span><textarea id="geo-tpg-issi-priorities" class="form-input" rows="2" placeholder="2632585=15"></textarea></label>
+                <label class="h-field"><span class="h-field-label">TPG RIC → priority</span><textarea id="geo-tpg-ric-priorities" class="form-input" rows="2" placeholder="0x00090D10=15"></textarea></label>
+              </div>
+              <label class="h-field" style="margin-top:10px"><span class="h-field-label">TPG text prefix</span><input type="text" id="geo-tpg-prefix" class="form-input" placeholder="GeoAlarm"></label>
             </div>
             <div>
               <label class="sw-row">
@@ -3027,22 +3778,22 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
                 <span class="sw"><input type="checkbox" id="geo-forward-sds"><i></i></span>
               </label>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
-                <input type="number" id="geo-sds-source" class="form-input" min="1" max="16777215" placeholder="Source ISSI">
-                <input type="number" id="geo-sds-dest" class="form-input" min="0" max="16777215" placeholder="Destination ISSI/GSSI">
+                <label class="h-field"><span class="h-field-label">Source ISSI</span><input type="number" id="geo-sds-source" class="form-input" min="1" max="16777215" placeholder="9999"></label>
+                <label class="h-field"><span class="h-field-label">Destination ISSI/GSSI</span><input type="number" id="geo-sds-dest" class="form-input" min="0" max="16777215" placeholder="0"></label>
               </div>
-              <label style="display:flex;align-items:center;gap:10px;margin-top:10px"><span class="sw"><input type="checkbox" id="geo-sds-group"><i></i></span><span style="color:var(--muted);font-size:12px">Destination is group/GSSI</span></label>
+              <label class="h-finline" style="margin-top:10px"><span class="sw"><input type="checkbox" id="geo-sds-group"><i></i></span><span class="h-flabel-sm">Destination is group/GSSI</span></label>
             </div>
             <div>
               <label class="sw-row">
                 <span class="sw-text">Alarm → SIP/Snom</span>
                 <span class="sw"><input type="checkbox" id="geo-forward-sip"><i></i></span>
               </label>
-              <input type="text" id="geo-sip-prefix" class="form-input" placeholder="Snom title prefix" style="margin-top:10px">
+              <label class="h-field" style="margin-top:10px"><span class="h-field-label">Snom title prefix</span><input type="text" id="geo-sip-prefix" class="form-input" placeholder="GeoAlarm"></label>
               <label class="sw-row" style="margin-top:14px">
                 <span class="sw-text">Alarm → Telegram</span>
                 <span class="sw"><input type="checkbox" id="geo-forward-telegram"><i></i></span>
               </label>
-              <input type="text" id="geo-telegram-prefix" class="form-input" placeholder="Telegram prefix" style="margin-top:10px">
+              <label class="h-field" style="margin-top:10px"><span class="h-field-label">Telegram prefix</span><input type="text" id="geo-telegram-prefix" class="form-input" placeholder="GeoAlarm"></label>
             </div>
           </div>
         </div>
@@ -3053,25 +3804,41 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
           <div class="card-title">GeoAlarm Filters</div>
         </div>
         <div class="card-body">
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px">
+          <div class="h-form wide">
             <div>
-              <label style="color:var(--muted);font-size:13px">TETRA ISSI whitelist</label>
+              <label class="h-flabel">TETRA ISSI whitelist</label>
               <textarea id="geo-tetra-white" class="form-input" rows="4" placeholder="empty = all TETRA ISSIs"></textarea>
             </div>
             <div>
-              <label style="color:var(--muted);font-size:13px">TETRA ISSI blacklist</label>
+              <label class="h-flabel">TETRA ISSI blacklist</label>
               <textarea id="geo-tetra-black" class="form-input" rows="4" placeholder="blocked ISSIs"></textarea>
             </div>
             <div>
-              <label style="color:var(--muted);font-size:13px">MeshCom source whitelist</label>
+              <label class="h-flabel">MeshCom source whitelist</label>
               <textarea id="geo-mesh-white" class="form-input" rows="4" placeholder="empty = all MeshCom sources"></textarea>
             </div>
             <div>
-              <label style="color:var(--muted);font-size:13px">MeshCom source blacklist</label>
+              <label class="h-flabel">MeshCom source blacklist</label>
               <textarea id="geo-mesh-black" class="form-input" rows="4" placeholder="blocked MeshCom sources"></textarea>
             </div>
+            <div>
+              <label class="h-flabel">Telegram TETRA ISSI whitelist</label>
+              <textarea id="geo-telegram-tetra-white" class="form-input" rows="4" placeholder="empty = all alarmed TETRA ISSIs"></textarea>
+            </div>
+            <div>
+              <label class="h-flabel">Telegram TETRA ISSI blacklist</label>
+              <textarea id="geo-telegram-tetra-black" class="form-input" rows="4" placeholder="do not forward these ISSIs to Telegram"></textarea>
+            </div>
+            <div>
+              <label class="h-flabel">Telegram MeshCom source whitelist</label>
+              <textarea id="geo-telegram-mesh-white" class="form-input" rows="4" placeholder="empty = all alarmed MeshCom sources"></textarea>
+            </div>
+            <div>
+              <label class="h-flabel">Telegram MeshCom source blacklist</label>
+              <textarea id="geo-telegram-mesh-black" class="form-input" rows="4" placeholder="do not forward these MeshCom sources to Telegram"></textarea>
+            </div>
           </div>
-          <div class="help-text" style="margin-top:10px">Whitelist empty means allow all. Blacklists always win. MeshCom source matching is case-insensitive.</div>
+          <div class="help-text" style="margin-top:10px">Whitelist empty means allow all. Blacklists always win. The first four filters decide whether GeoAlarm fires at all; Telegram filters only limit the Telegram forwarding path. MeshCom source matching is case-insensitive.</div>
         </div>
       </div>
 
@@ -3086,6 +3853,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
                 <th data-i18n="th_time">Time</th>
                 <th>Source</th>
                 <th>Device</th>
+                <th>Via</th>
                 <th>Distance</th>
                 <th>Position</th>
                 <th>Status</th>
@@ -3105,14 +3873,17 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
 
     <!-- ── CONFIG ── -->
     <div class="page" id="page-config">
+      <div class="section-label" data-i18n="cfg_sec_configuration">Configuration</div>
       <div class="card">
         <div class="card-head">
           <div class="card-title">config.toml</div>
           <div class="card-actions">
-            <button class="btn btn-warn" onclick="restartService()" data-i18n="restart">⟳ Restart</button>
-            <button class="btn btn-danger" onclick="shutdownService()" data-i18n="shutdown">⏻ Shutdown</button>
-            <button class="btn" id="update-btn" onclick="startUpdate()" data-i18n="update">⬆ Update</button>
-            <button class="btn btn-primary" onclick="saveConfig()" data-i18n="save">Save</button>
+            <button class="btn btn-primary" onclick="saveConfig()"><span class="btn-icon" data-icon="save"></span><span data-i18n="save">Save</span></button>
+            <span class="btn-group danger-group">
+              <button class="btn btn-warn" onclick="restartService()"><span class="btn-icon" data-icon="restart"></span><span data-i18n="restart">Restart</span></button>
+              <button class="btn btn-danger" onclick="shutdownService()"><span class="btn-icon" data-icon="shutdown"></span><span data-i18n="shutdown">Shutdown</span></button>
+              <button class="btn" id="update-btn" onclick="startUpdate()"><span class="btn-icon" data-icon="update"></span><span data-i18n="update">Update</span></button>
+            </span>
           </div>
         </div>
         <div class="card-body">
@@ -3125,12 +3896,13 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
            Editable access-control list. Empty list = open network (any ISSI may
            register). Changes apply immediately at runtime AND are written back to
            config.toml so they survive a restart. -->
+      <div class="section-label" data-i18n="cfg_sec_access">Access Control</div>
       <div class="card">
         <div class="card-head">
           <div class="card-title" data-i18n="whitelist_title">ISSI Whitelist</div>
           <div class="card-actions">
             <span id="whitelist-status" class="badge" style="margin-right:8px"></span>
-            <button class="btn btn-primary" onclick="saveWhitelist()" data-i18n="save">Save</button>
+            <button class="btn btn-primary" onclick="saveWhitelist()"><span class="btn-icon" data-icon="save"></span><span data-i18n="save">Save</span></button>
           </div>
         </div>
         <div class="card-body">
@@ -3143,7 +3915,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
             <input type="number" id="whitelist-input" class="form-input" min="1" max="16777215"
                    placeholder="e.g. 2260571" style="flex:1;min-width:160px"
                    onkeydown="if(event.key==='Enter'){addWhitelistEntry();}">
-            <button class="btn" onclick="addWhitelistEntry()" data-i18n="whitelist_add">+ Add ISSI</button>
+            <button class="btn" onclick="addWhitelistEntry()"><span class="btn-icon" data-icon="add"></span><span data-i18n="whitelist_add">Add ISSI</span></button>
           </div>
           <div id="whitelist-chips" style="display:flex;gap:8px;flex-wrap:wrap;min-height:32px"></div>
           <div class="config-msg" id="whitelist-msg"></div>
@@ -3155,11 +3927,12 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
            service ISSI and gets a decoded reply. Periodic: auto-sends a station's METAR
            to a chosen ISSI/GSSI at an interval. Toggles + targets editable here; applies
            instantly and persists to config.toml. -->
+      <div class="section-label" data-i18n="cfg_sec_wx">WX / METAR</div>
       <div class="card">
         <div class="card-head">
           <div class="card-title" data-i18n="wx_title">WX / METAR Service</div>
           <div class="card-actions">
-            <button class="btn btn-primary" onclick="saveWx()" data-i18n="save">Save</button>
+            <button class="btn btn-primary" onclick="saveWx()"><span class="btn-icon" data-icon="save"></span><span data-i18n="save">Save</span></button>
           </div>
         </div>
         <div class="card-body">
@@ -3169,41 +3942,44 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
             ISSI or talkgroup at a set interval. Data from aviationweather.gov.
           </div>
 
-          <label class="sw-row">
-            <span class="sw-text" data-i18n="wx_enabled">Enable on-demand METAR responder</span>
-            <span class="sw"><input type="checkbox" id="wx-enabled"><i></i></span>
-          </label>
-
-          <div style="display:flex;gap:8px;align-items:center;margin:12px 0 18px;flex-wrap:wrap">
-            <label style="color:var(--muted);font-size:13px;min-width:140px" data-i18n="wx_service_issi">Service ISSI</label>
-            <input type="number" id="wx-service-issi" class="form-input" min="1" max="16777215"
-                   placeholder="9998" style="flex:1;min-width:140px">
-          </div>
-
-          <hr style="border:none;border-top:1px solid var(--border);margin:14px 0">
-
-          <label class="sw-row" style="margin-bottom:8px">
-            <span class="sw-text" data-i18n="wx_periodic_enabled">Enable periodic auto-broadcast</span>
-            <span class="sw"><input type="checkbox" id="wx-periodic-enabled"><i></i></span>
-          </label>
-
-          <div style="display:grid;grid-template-columns:140px 1fr;gap:10px;align-items:center">
-            <label style="color:var(--muted);font-size:13px" data-i18n="wx_periodic_icao">Station ICAO</label>
-            <input type="text" id="wx-periodic-icao" class="form-input" maxlength="4" placeholder="LROP" style="text-transform:uppercase">
-
-            <label style="color:var(--muted);font-size:13px" data-i18n="wx_periodic_dest">Destination</label>
-            <input type="number" id="wx-periodic-issi" class="form-input" min="1" max="16777215" placeholder="ISSI or GSSI">
-
-            <label style="color:var(--muted);font-size:13px" data-i18n="wx_periodic_isgroup">Destination is group</label>
-            <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
-              <span class="sw"><input type="checkbox" id="wx-periodic-isgroup"><i></i></span>
-              <span style="color:var(--muted);font-size:12px" data-i18n="wx_periodic_isgroup_hint">(GSSI instead of individual ISSI)</span>
+          <div class="group-list" style="margin-bottom:18px">
+            <label class="field" style="cursor:pointer">
+              <span class="field-label" data-i18n="wx_enabled">Enable on-demand METAR responder</span>
+              <span class="field-control"><span class="sw"><input type="checkbox" id="wx-enabled"><i></i></span></span>
             </label>
-
-            <label style="color:var(--muted);font-size:13px" data-i18n="wx_periodic_interval">Interval (seconds)</label>
-            <input type="number" id="wx-periodic-interval" class="form-input" min="300" placeholder="1800">
+            <div class="field">
+              <span class="field-label" data-i18n="wx_service_issi">Service ISSI</span>
+              <span class="field-control"><input type="number" id="wx-service-issi" class="form-input" min="1" max="16777215"
+                     placeholder="9998" style="width:160px"></span>
+            </div>
           </div>
-          <div style="color:var(--muted);font-size:11px;margin-top:6px" data-i18n="wx_interval_hint">Minimum 300 s (5 min) to avoid hammering the weather API.</div>
+
+          <div class="group-list">
+            <label class="field" style="cursor:pointer">
+              <span class="field-label" data-i18n="wx_periodic_enabled">Enable periodic auto-broadcast</span>
+              <span class="field-control"><span class="sw"><input type="checkbox" id="wx-periodic-enabled"><i></i></span></span>
+            </label>
+            <div class="field">
+              <span class="field-label" data-i18n="wx_periodic_icao">Station ICAO</span>
+              <span class="field-control"><input type="text" id="wx-periodic-icao" class="form-input" maxlength="4" placeholder="LROP" style="text-transform:uppercase;width:160px"></span>
+            </div>
+            <div class="field">
+              <span class="field-label" data-i18n="wx_periodic_dest">Destination</span>
+              <span class="field-control"><input type="number" id="wx-periodic-issi" class="form-input" min="1" max="16777215" placeholder="ISSI or GSSI" style="width:160px"></span>
+            </div>
+            <label class="field" style="cursor:pointer">
+              <span class="field-label" data-i18n="wx_periodic_isgroup">Destination is group</span>
+              <span class="field-control">
+                <span style="color:var(--muted);font-size:12px" data-i18n="wx_periodic_isgroup_hint">(GSSI instead of individual ISSI)</span>
+                <span class="sw"><input type="checkbox" id="wx-periodic-isgroup"><i></i></span>
+              </span>
+            </label>
+            <div class="field">
+              <span class="field-label" data-i18n="wx_periodic_interval">Interval (seconds)</span>
+              <span class="field-control"><input type="number" id="wx-periodic-interval" class="form-input" min="300" placeholder="1800" style="width:160px"></span>
+              <span class="field-hint" data-i18n="wx_interval_hint">Minimum 300 s (5 min) to avoid hammering the weather API.</span>
+            </div>
+          </div>
           <div class="config-msg" id="wx-msg"></div>
         </div>
       </div>
@@ -3215,12 +3991,13 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
          which categories to receive, and saves. Applies instantly and persists to
          config.toml. -->
     <div class="page" id="page-telegram">
+      <div class="section-label" data-i18n="integrations">Integrations</div>
       <div class="card">
         <div class="card-head">
           <div class="card-title" data-i18n="tg_title">Telegram Alerts</div>
           <div class="card-actions">
-            <button class="btn" onclick="testTelegram()" data-i18n="tg_test">Send test</button>
-            <button class="btn btn-primary" onclick="saveTelegram()" data-i18n="save">Save</button>
+            <button class="btn" onclick="testTelegram()"><span class="btn-icon" data-icon="telegram"></span><span data-i18n="tg_test">Send test</span></button>
+            <button class="btn btn-primary" onclick="saveTelegram()"><span class="btn-icon" data-icon="save"></span><span data-i18n="save">Save</span></button>
           </div>
         </div>
         <div class="card-body">
@@ -3237,11 +4014,13 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
 
       <div class="card">
         <div class="card-head"><div class="card-title" data-i18n="tg_howto_title">Setup — 4 steps</div></div>
-        <div class="card-body" style="color:var(--muted);font-size:13px;line-height:1.7">
-          <div data-i18n="tg_step1">1. In Telegram, open @BotFather, send /newbot and copy the bot token.</div>
-          <div data-i18n="tg_step2">2. Paste the token below and click Verify.</div>
-          <div data-i18n="tg_step3">3. Send your bot any message, e.g. /start.</div>
-          <div data-i18n="tg_step4">4. Click Detect Chat ID, add your chat, then Save.</div>
+        <div class="card-body">
+          <div class="steps">
+            <div class="step"><span class="step-num"></span><span class="step-body" data-i18n="tg_step1">In Telegram, open @BotFather, send /newbot and copy the bot token.</span></div>
+            <div class="step"><span class="step-num"></span><span class="step-body" data-i18n="tg_step2">Paste the token below and click Verify.</span></div>
+            <div class="step"><span class="step-num"></span><span class="step-body" data-i18n="tg_step3">Send your bot any message, e.g. /start.</span></div>
+            <div class="step"><span class="step-num"></span><span class="step-body" data-i18n="tg_step4">Click Detect Chat ID, add your chat, then Save.</span></div>
+          </div>
         </div>
       </div>
 
@@ -3255,7 +4034,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
             <input type="text" id="tg-token" class="form-input" placeholder="123456789:AA…"
                    autocomplete="off" spellcheck="false" oninput="tgTokenDirty=true"
                    style="flex:1;min-width:220px">
-            <button class="btn" onclick="verifyTelegram()" data-i18n="tg_verify">Verify</button>
+            <button class="btn" onclick="verifyTelegram()"><span class="btn-icon" data-icon="search"></span><span data-i18n="tg_verify">Verify</span></button>
           </div>
           <div id="tg-verify-status" style="margin-top:8px;font-size:13px;min-height:18px"></div>
         </div>
@@ -3268,10 +4047,10 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
             Every alert is sent to each recipient.
           </div>
           <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
-            <button class="btn" onclick="detectTelegramChats()" data-i18n="tg_detect">📥 Detect Chat ID</button>
+            <button class="btn" onclick="detectTelegramChats()"><span class="btn-icon" data-icon="detect"></span><span data-i18n="tg_detect">Detect Chat ID</span></button>
             <input type="number" id="tg-chat-input" class="form-input" placeholder="-1001234567890"
                    style="flex:1;min-width:180px" onkeydown="if(event.key==='Enter'){addRecipient();}">
-            <button class="btn" onclick="addRecipient()" data-i18n="tg_add">+ Add</button>
+            <button class="btn" onclick="addRecipient()"><span class="btn-icon" data-icon="add"></span><span data-i18n="tg_add">Add</span></button>
           </div>
           <div id="tg-detected" style="margin-bottom:10px"></div>
           <div id="tg-chips" style="display:flex;gap:8px;flex-wrap:wrap;min-height:32px"></div>
@@ -3287,6 +4066,12 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
           <label class="sw-row"><span class="sw-text" data-i18n="tg_cat_t351">Radio dropped (no T351 response)</span><span class="sw"><input type="checkbox" id="tg-t351"><i></i></span></label>
           <label class="sw-row"><span class="sw-text" data-i18n="tg_cat_lip">LIP/APRS position beacon</span><span class="sw"><input type="checkbox" id="tg-lip"><i></i></span></label>
           <label class="sw-row"><span class="sw-text" data-i18n="tg_cat_backhaul">Brew backhaul up/down</span><span class="sw"><input type="checkbox" id="tg-backhaul"><i></i></span></label>
+          <label class="sw-row"><span class="sw-text" data-i18n="tg_cat_brew_register">Brew ISSI REGISTER</span><span class="sw"><input type="checkbox" id="tg-brew-register"><i></i></span></label>
+          <div class="form-grid" style="grid-template-columns:repeat(3,minmax(180px,1fr));gap:12px;margin:0 0 10px 0">
+            <label class="h-field"><span class="h-field-label" data-i18n="tg_brew_register_prefix">Brew REGISTER prefix</span><input type="text" id="tg-brew-register-prefix" class="form-input" placeholder="Brew REGISTER"></label>
+            <label class="h-field"><span class="h-field-label" data-i18n="tg_brew_register_white">Brew REGISTER ISSI whitelist</span><textarea id="tg-brew-register-white" class="form-input" rows="3" placeholder="empty = all Brew REGISTER ISSIs"></textarea></label>
+            <label class="h-field"><span class="h-field-label" data-i18n="tg_brew_register_black">Brew REGISTER ISSI blacklist</span><textarea id="tg-brew-register-black" class="form-input" rows="3" placeholder="never alert these ISSIs"></textarea></label>
+          </div>
           <label class="sw-row"><span class="sw-text" data-i18n="tg_cat_logs">Critical log (warnings/errors)</span><span class="sw"><input type="checkbox" id="tg-logs"><i></i></span></label>
         </div>
       </div>
@@ -3298,27 +4083,27 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
          attached to a nav button when /api/wifi/available reports true so
          we never tease functionality the host can't deliver. -->
     <div class="page" id="page-wifi">
+      <div class="section-label" data-i18n="integrations">Integrations</div>
       <!-- Status card: who we're connected to right now, IP, signal -->
       <div class="card">
         <div class="card-head">
           <div class="card-title" data-i18n="wifi_status">Current connection</div>
           <div class="card-actions">
             <button class="btn btn-sm" id="wifi-radio-btn" onclick="wifiToggleRadio()" data-i18n="wifi_radio_off">Disable WiFi</button>
-            <button class="btn btn-sm" onclick="wifiRefresh()" data-i18n="wifi_refresh">↻ Refresh</button>
+            <button class="btn btn-sm" onclick="wifiRefresh()"><span class="btn-icon" data-icon="restart"></span><span data-i18n="wifi_refresh">Refresh</span></button>
           </div>
         </div>
-        <div class="card-body">
-          <div class="wifi-status-grid" id="wifi-status-grid">
+        <div class="card-body" style="padding:0">
+          <!-- Connection safety warning: changing WiFi while connected through
+               it can lock the operator out of the dashboard. -->
+          <div class="banner banner-warn">
+            <span class="banner-ico" data-icon="alert"></span>
+            <div class="banner-body" data-i18n="wifi_warn_lose_access">If you're connected to the dashboard via WiFi, changing networks may temporarily disconnect you. Make sure you have a backup access path (Ethernet or known good network).</div>
+          </div>
+          <div class="wifi-status-grid" id="wifi-status-grid" style="padding:16px 18px">
             <div class="wifi-status-loading" data-i18n="wifi_loading">Loading…</div>
           </div>
         </div>
-      </div>
-
-      <!-- Connection safety warning: changing WiFi while connected through
-           it can lock the operator out of the dashboard. We show this
-           prominently above the actionable cards. -->
-      <div class="callout wifi-warn" data-i18n="wifi_warn_lose_access">
-        ⚠ If you're connected to the dashboard via WiFi, changing networks may temporarily disconnect you. Make sure you have a backup access path (Ethernet or known good network).
       </div>
 
       <!-- Saved profiles: networks NM already has credentials for. Each row
@@ -3343,8 +4128,8 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
         <div class="card-head">
           <div class="card-title" data-i18n="wifi_visible">Available networks</div>
           <div class="card-actions">
-            <button class="btn btn-sm" onclick="wifiShowHiddenModal()" data-i18n="wifi_add_hidden">+ Hidden network</button>
-            <button class="btn btn-sm" onclick="wifiScan()" data-i18n="wifi_scan">↻ Scan</button>
+            <button class="btn btn-sm" onclick="wifiShowHiddenModal()"><span class="btn-icon" data-icon="add"></span><span data-i18n="wifi_add_hidden">Hidden network</span></button>
+            <button class="btn btn-sm" onclick="wifiScan()"><span class="btn-icon" data-icon="restart"></span><span data-i18n="wifi_scan">Scan</span></button>
           </div>
         </div>
         <div class="card-body">
@@ -3356,14 +4141,14 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
     </div>
 
     <!-- WiFi password modal — used both when joining a visible network with
-         security and when adding a hidden network manually. -->
-    <div id="wifi-modal" class="wifi-modal" style="display:none">
-      <div class="wifi-modal-box">
-        <div class="wifi-modal-head">
-          <div class="wifi-modal-title" id="wifi-modal-title">Connect</div>
-          <button class="wifi-modal-x" onclick="wifiCloseModal()">×</button>
+         security and when adding a hidden network manually. Unified .sheet. -->
+    <div id="wifi-modal" class="sheet-overlay">
+      <div class="sheet">
+        <div class="sheet-head">
+          <div class="sheet-title" id="wifi-modal-title">Connect</div>
+          <button class="sheet-close" onclick="wifiCloseModal()"><span data-icon="close"></span></button>
         </div>
-        <div class="wifi-modal-body">
+        <div class="sheet-body">
           <div class="wifi-modal-row" id="wifi-modal-ssid-row">
             <label for="wifi-modal-ssid" data-i18n="wifi_ssid">SSID</label>
             <input id="wifi-modal-ssid" type="text" autocomplete="off" spellcheck="false">
@@ -3378,62 +4163,85 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
             </label>
           </div>
           <div class="wifi-modal-msg" id="wifi-modal-msg"></div>
-        </div>
-        <div class="wifi-modal-foot">
-          <button class="btn" onclick="wifiCloseModal()" data-i18n="cancel">Cancel</button>
-          <button class="btn btn-primary" id="wifi-modal-ok" onclick="wifiModalSubmit()" data-i18n="wifi_connect">Connect</button>
+          <div class="wifi-modal-foot">
+            <button class="btn" onclick="wifiCloseModal()" data-i18n="cancel">Cancel</button>
+            <button class="btn btn-primary" id="wifi-modal-ok" onclick="wifiModalSubmit()" data-i18n="wifi_connect">Connect</button>
+          </div>
         </div>
       </div>
     </div>
 
     <!-- ── SYSTEM ── -->
     <div class="page" id="page-health">
-      <div style="max-width:1100px">
-        <div id="health-hero" style="display:flex;align-items:center;gap:16px;padding:18px 20px;border-radius:14px;border:1px solid var(--border,#2a2f3a);background:var(--bg2,#161a22);margin-bottom:18px">
-          <div id="health-hero-dot" style="width:44px;height:44px;border-radius:50%;flex:0 0 auto;background:#3a3f4a"></div>
-          <div style="flex:1;min-width:0">
-            <div id="health-hero-title" style="font-size:22px;font-weight:700;color:var(--text)">Station health</div>
-            <div id="health-hero-sub" style="font-size:14px;color:var(--text2,#9aa4b2);margin-top:3px">Waiting for the first health snapshot…</div>
+      <div class="h-wrap">
+        <div id="health-hero" class="h-hero">
+          <div id="health-hero-dot" class="h-ring">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
           </div>
-          <div style="text-align:right;color:var(--text2,#9aa4b2);font-size:13px;flex:0 0 auto">
-            <div id="health-uptime">—</div>
-            <div id="health-action" style="margin-top:4px"></div>
+          <div class="h-hero-txt">
+            <div id="health-hero-title" class="h-hero-title">Station health</div>
+            <div id="health-hero-sub" class="h-hero-sub">Waiting for the first health snapshot…</div>
+          </div>
+          <div class="h-hero-meta">
+            <div id="health-uptime" class="hm-val">—</div>
+            <div id="health-action" class="hm-sub"></div>
           </div>
         </div>
-        <div id="health-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px"></div>
-        <div style="margin-top:18px;font-size:13px;font-weight:700;color:var(--text);letter-spacing:.04em;text-transform:uppercase">Integrations</div>
-        <div id="health-integrations-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px;margin-top:10px">
+        <div class="h-sec">System domains</div>
+        <div id="health-grid" class="h-grid"></div>
+        <div class="h-sec">Integrations</div>
+        <div id="health-integrations-grid" class="h-grid">
           <div class="sds-empty" style="padding:12px 0">Loading integration health…</div>
         </div>
-        <div style="margin-top:16px;font-size:12px;color:var(--text2,#9aa4b2);line-height:1.6">
+        <div class="h-note">
           Auto-refreshes every few seconds. Levels:
-          <b style="color:#3fb950">OK</b> · <b style="color:var(--warn)">DEGRADED</b> · <b style="color:var(--danger)">CRITICAL</b>.
+          <b class="ok">OK</b> · <b class="warn">DEGRADED</b> · <b class="bad">CRITICAL</b>.
           The software watchdog (auto-restart when the core loop stalls) is configured in the <code>[health]</code> section.
         </div>
       </div>
     </div>
 
     <div class="page" id="page-system">
+      <!-- System hero — at-a-glance BTS / Brew / uptime / CPU temp summary. -->
+      <div class="hero">
+        <span class="hero-dot is-idle" id="sysHeroDot"></span>
+        <div class="hero-main">
+          <div class="hero-title" id="sysHeroTitle" data-i18n="sys_title">System</div>
+          <div class="hero-sub" id="sysHeroSub">—</div>
+        </div>
+        <div class="hero-metrics">
+          <div class="hero-metric">
+            <div class="hero-metric-label" data-i18n="sys_uptime">Uptime</div>
+            <div class="hero-metric-value" id="sysHeroUptime">—</div>
+          </div>
+          <div class="hero-metric">
+            <div class="hero-metric-label" data-i18n="sys_temp">CPU Temp</div>
+            <div class="hero-metric-value" id="sysHeroTemp">—</div>
+          </div>
+        </div>
+      </div>
+
       <!-- BTS + Brew status -->
+      <div class="section-label" data-i18n="sys_sec_status">Status</div>
       <div class="stat-grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr))">
-        <div class="stat-card green">
+        <div class="stat-card is-danger" id="sysBtsCard">
           <div class="stat-label" data-i18n="sys_bts">BTS Connection</div>
-          <div class="stat-value" id="sysBtsStatus" style="font-size:18px;color:var(--danger)">OFFLINE</div>
+          <div class="stat-value is-text" id="sysBtsStatus">OFFLINE</div>
           <div class="stat-sub" id="sysBtsIp">—</div>
         </div>
-        <div class="stat-card blue">
+        <div class="stat-card is-danger" id="sysBrewCard">
           <div class="stat-label">BREW</div>
-          <div class="stat-value" id="sysBrewStatus" style="font-size:18px;color:var(--danger)">OFFLINE</div>
+          <div class="stat-value is-text" id="sysBrewStatus">OFFLINE</div>
           <div class="stat-sub" id="sysBrewBadge">—</div>
         </div>
-        <div class="stat-card">
+        <div class="stat-card is-idle">
           <div class="stat-label" data-i18n="sys_uptime">Uptime</div>
-          <div class="stat-value" id="sysUptime" style="font-size:20px;color:var(--text2)">—</div>
+          <div class="stat-value is-text" id="sysUptime">—</div>
           <div class="stat-sub" id="sysHostname">—</div>
         </div>
-        <div class="stat-card" id="cpu-temp-card" style="display:none">
+        <div class="stat-card is-warn" id="cpu-temp-card" style="display:none">
           <div class="stat-label" data-i18n="sys_temp">CPU Temp</div>
-          <div class="stat-value" id="sysCpuTemp" style="font-size:20px;color:var(--warn)">—</div>
+          <div class="stat-value is-text" id="sysCpuTemp">—</div>
           <div class="stat-sub" id="sysCpuTempSub">—</div>
         </div>
       </div>
@@ -3450,6 +4258,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
       </div>
 
       <!-- System info + CPU/RAM -->
+      <div class="section-label" data-i18n="sys_sec_host">Host</div>
       <div class="card">
         <div class="card-head">
           <div class="card-title" data-i18n="sys_info">System Info</div>
@@ -3458,7 +4267,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
               <input type="checkbox" id="sys-autorefresh" onchange="toggleSysAutoRefresh(this.checked)" style="cursor:pointer">
               <span data-i18n="sys_autorefresh">Auto-refresh 5s</span>
             </label>
-            <button class="btn btn-sm" onclick="loadSystemInfo()">↻ Refresh</button>
+            <button class="btn btn-sm" onclick="loadSystemInfo()"><span class="btn-icon" data-icon="restart"></span><span data-i18n="sys_refresh">Refresh</span></button>
           </div>
         </div>
         <div class="card-body">
@@ -3468,46 +4277,48 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
           <div class="info-row"><div class="info-key" data-i18n="sys_cpu">CPU</div><div class="info-val" id="sysCpu">—</div></div>
           <div class="info-row">
             <div class="info-key" data-i18n="sys_cpu_load">CPU Load</div>
-            <div class="info-val" style="display:flex;align-items:center;gap:8px">
-              <div style="flex:1;height:6px;background:var(--bg4);border-radius:3px;overflow:hidden;max-width:120px">
-                <div id="sysCpuBar" style="height:100%;width:0%;background:var(--accent);border-radius:3px;transition:width 0.3s"></div>
+            <div class="info-val" style="flex:1;max-width:220px">
+              <div class="gauge" id="sysCpuGauge">
+                <div class="gauge-track"><div class="gauge-fill" id="sysCpuBar"></div></div>
+                <span class="gauge-value" id="sysCpuPct">—</span>
               </div>
-              <span id="sysCpuPct" style="font-family:var(--mono);font-size:12px;color:var(--text2)">—</span>
             </div>
           </div>
           <div class="info-row">
             <div class="info-key" data-i18n="sys_ram">RAM</div>
-            <div class="info-val" style="display:flex;align-items:center;gap:8px">
-              <div style="flex:1;height:6px;background:var(--bg4);border-radius:3px;overflow:hidden;max-width:120px">
-                <div id="sysRamBar" style="height:100%;width:0%;background:var(--accent2);border-radius:3px;transition:width 0.3s"></div>
+            <div class="info-val" style="flex:1;max-width:260px">
+              <div class="gauge is-info" id="sysRamGauge">
+                <div class="gauge-track"><div class="gauge-fill" id="sysRamBar"></div></div>
+                <span class="gauge-value" id="sysRamVal" style="min-width:118px">—</span>
               </div>
-              <span id="sysRamVal" style="font-family:var(--mono);font-size:12px;color:var(--text2)">—</span>
             </div>
           </div>
         </div>
       </div>
 
       <!-- RF / SDR Hardware -->
+      <div class="section-label" data-i18n="sys_sec_radio">Radio Hardware</div>
       <div class="card">
         <div class="card-head">
           <div class="card-title" data-i18n="sys_rf">RF Hardware (SoapySDR)</div>
           <div class="card-actions">
-            <button class="btn btn-sm" onclick="loadSystemInfo()">↻ Probe</button>
+            <button class="btn btn-sm" onclick="loadSystemInfo()"><span class="btn-icon" data-icon="search"></span><span data-i18n="sys_probe">Probe</span></button>
           </div>
         </div>
         <div class="card-body">
-          <pre id="sysSoapy" style="font-family:var(--mono);font-size:11px;color:var(--text2);white-space:pre-wrap;word-break:break-all;margin:0;padding:0">—</pre>
+          <pre id="sysSoapy" class="terminal">—</pre>
         </div>
       </div>
 
       <!-- Host hardware sensors (temps, voltages, currents, power) -->
       <!-- Populated from /sys via sys_telemetry. Layout adapts: if no sensors are
            found (non-Linux, locked-down kernel) the whole card is hidden. -->
+      <div class="section-label" id="sys-sensors-label" data-i18n="sys_sec_sensors" style="display:none">Sensors</div>
       <div class="card" id="sys-sensors-card" style="display:none">
         <div class="card-head">
           <div class="card-title" data-i18n="sys_sensors">Host Hardware Sensors</div>
           <div class="card-actions">
-            <span id="sys-sensors-power-total" style="font-family:var(--mono);font-size:12px;color:#c8a4f5;font-weight:600"></span>
+            <span id="sys-sensors-power-total" style="font-family:var(--mono);font-size:12px;color:var(--accent2);font-weight:600"></span>
           </div>
         </div>
         <div class="card-body" style="padding:14px 18px">
@@ -3517,11 +4328,12 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
       </div>
 
       <!-- Config profiles -->
+      <div class="section-label" data-i18n="sys_sec_profiles">Profiles</div>
       <div class="card">
         <div class="card-head">
           <div class="card-title" data-i18n="sys_profiles">Config Profiles</div>
           <div class="card-actions">
-            <button class="btn btn-sm" onclick="loadConfigProfiles()">↻ Refresh</button>
+            <button class="btn btn-sm" onclick="loadConfigProfiles()"><span class="btn-icon" data-icon="restart"></span><span data-i18n="sys_refresh">Refresh</span></button>
           </div>
         </div>
         <div class="card-body" style="padding:14px 18px">
@@ -3530,12 +4342,13 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
       </div>
 
       <!-- Live SDS Broadcast -->
+      <div class="section-label" data-i18n="sys_sec_sds">SDS Broadcast</div>
       <div class="card">
         <div class="card-head">
-          <div class="card-title">📢 Live SDS Broadcast</div>
+          <div class="card-title" style="display:flex;align-items:center;gap:7px"><span class="btn-icon" data-icon="broadcast" style="margin:0;width:14px;height:14px"></span>Live SDS Broadcast</div>
           <div class="card-actions">
-            <button class="btn btn-sm" onclick="loadLiveSds()">↻ Refresh</button>
-            <button class="btn btn-sm btn-danger" onclick="clearAllLiveSds()" id="live-sds-clear-btn" style="display:none" data-i18n="live_sds_clear_all">Clear All</button>
+            <button class="btn btn-sm" onclick="loadLiveSds()"><span class="btn-icon" data-icon="restart"></span><span data-i18n="sys_refresh">Refresh</span></button>
+            <button class="btn btn-sm btn-danger" onclick="clearAllLiveSds()" id="live-sds-clear-btn" style="display:none"><span class="btn-icon" data-icon="delete"></span><span data-i18n="live_sds_clear_all">Clear All</span></button>
           </div>
         </div>
         <div class="card-body" style="padding:14px 18px">
@@ -3549,7 +4362,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
               <label class="form-label" data-i18n="live_sds_repeat">Repeat (0=∞)</label>
               <input type="number" id="live-sds-repeat" class="form-input" value="0" min="0" max="999" style="width:100%">
             </div>
-            <button class="btn btn-primary" onclick="addLiveSds()" data-i18n="live_sds_send">📢 Broadcast</button>
+            <button class="btn btn-primary" onclick="addLiveSds()"><span class="btn-icon" data-icon="broadcast"></span><span data-i18n="live_sds_send">Broadcast</span></button>
           </div>
           <div id="live-sds-list" style="margin-top:14px"></div>
         </div>
@@ -3562,8 +4375,8 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
 <!-- ── Edit Profile Modal ── -->
 <div class="modal-overlay" id="edit-profile-modal">
   <div class="modal" style="width:min(700px,95vw);max-height:90vh;display:flex;flex-direction:column">
-    <div class="modal-title">
-      ✏️ <span data-i18n="profile_edit_title">Edit Config Profile</span>:
+    <div class="modal-title" style="display:flex;align-items:center;gap:7px">
+      <span class="btn-icon" data-icon="edit" style="margin:0"></span><span data-i18n="profile_edit_title">Edit Config Profile</span>:
       <span id="edit-profile-name" style="color:var(--accent);font-family:var(--mono);font-size:14px"></span>
     </div>
     <div style="flex:1;overflow:hidden;display:flex;flex-direction:column;gap:8px;min-height:0">
@@ -3605,8 +4418,16 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
         <input type="number" id="sds-callout-source" class="form-input" value="9999" min="1">
       </div>
       <div class="form-row">
-        <label class="form-label" data-i18n="sds_callout_incident">Vorfallnummer</label>
-        <input type="number" id="sds-callout-incident" class="form-input" value="1" min="1" max="256">
+        <label class="form-label" data-i18n="sds_callout_id">Call-Out ID</label>
+        <input type="number" id="sds-callout-id" class="form-input" value="33" min="0" max="255">
+      </div>
+      <div class="form-row">
+        <label class="form-label" data-i18n="sds_callout_ric">TPG RIC</label>
+        <input type="text" id="sds-callout-ric" class="form-input" value="0x00090D10">
+      </div>
+      <div class="form-row">
+        <label class="form-label" data-i18n="sds_callout_priority">Priority / Ton</label>
+        <input type="number" id="sds-callout-priority" class="form-input" value="15" min="0" max="15">
       </div>
       <div class="form-row">
         <label class="form-label" data-i18n="sds_callout_text">Alarmtext</label>
@@ -3617,7 +4438,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
         <input type="text" id="sds-callout-raw" class="form-input" placeholder="C3 00 09 0D 10 11 27 0F 02 30 8D 41 4C 41 52 4D">
       </div>
       <div class="form-row" style="font-size:12px;color:var(--muted);line-height:1.45" data-i18n="sds_callout_help">
-        Vorfall 1-15 use the confirmed byte formula (N &lt;&lt; 4) | 0x01: 1=11, 2=21, 3=31, 4=41. Vorfall 16-256 use the extended one-byte selector. Raw Hex overrides automatic payload generation.
+        TPG RIC is written into the Call-Out payload address bytes. Call-Out ID is the raw ID byte 0..255. Priority/Ton is the raw priority byte 0..15. Raw Hex overrides automatic payload generation.
       </div>
     </div>
     <div class="modal-actions">
@@ -3664,16 +4485,88 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
 </div>
 
 <script>
+// ── Icon system (SF-Symbols-style, design-language v3) ────────────────────
+// One cohesive family: 24×24 viewBox, fill=none, stroke=currentColor,
+// stroke-width 1.8, round caps/joins — monochrome so each glyph inherits the
+// adjacent text colour and auto-themes. svgIcon(name[,size]) returns an inline
+// <svg> string; status is conveyed by the dot, never the icon. The Tabs phase
+// reuses ICONS / svgIcon verbatim for every emoji site.
+const ICONS = {
+  // nav — monitor
+  radios:'<path d="M5 14a9 9 0 0 1 9-9"/><path d="M5 14a5.5 5.5 0 0 1 5.5-5.5"/><circle cx="6.5" cy="12.5" r="1.6"/><path d="M7.5 13.5 13 19"/>',
+  calls:'<path d="M6.5 4.5h3l1.2 3.2-1.7 1.3a11 11 0 0 0 4.7 4.7l1.3-1.7 3.2 1.2v3a1.5 1.5 0 0 1-1.6 1.5A13.5 13.5 0 0 1 5 6.1 1.5 1.5 0 0 1 6.5 4.5Z"/>',
+  lastheard:'<path d="M4 12h2M8 8v8M12 5v14M16 8v8M20 12h-2"/>',
+  log:'<rect x="5" y="4" width="14" height="16" rx="2.5"/><path d="M9 9h6M9 13h6M9 17h3"/>',
+  sdslog:'<path d="M4.5 6.5A1.5 1.5 0 0 1 6 5h12a1.5 1.5 0 0 1 1.5 1.5v8A1.5 1.5 0 0 1 18 16H9l-4 3v-3a1.5 1.5 0 0 1-.5-1.1Z"/>',
+  rf:'<circle cx="12" cy="12" r="2"/><path d="M7.8 7.8a6 6 0 0 0 0 8.4M16.2 7.8a6 6 0 0 1 0 8.4M5 5a9 9 0 0 0 0 14M19 5a9 9 0 0 1 0 14"/>',
+  health:'<path d="M3 12h3l2-5 3 10 2.5-7 1.5 2h6"/>',
+  // nav — integrations / system
+  config:'<circle cx="12" cy="12" r="3"/><path d="M12 2.5v2.5M12 19v2.5M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2.5 12H5M19 12h2.5M4.2 19.8 6 18M18 6l1.8-1.8"/>',
+  telegram:'<path d="M20 4 3.5 11.2l6 2.1M20 4l-2.8 14-7-3.6M20 4 9.6 13.6M9.6 13.6V18l2.6-2.6"/>',
+  wifi:'<path d="M4.5 9a11 11 0 0 1 15 0M7.5 12.5a6.5 6.5 0 0 1 9 0"/><circle cx="12" cy="16.5" r="1.2" fill="currentColor" stroke="none"/>',
+  system:'<rect x="6" y="6" width="12" height="12" rx="2.5"/><rect x="9.5" y="9.5" width="5" height="5" rx="1"/><path d="M9 3.5v2.5M15 3.5v2.5M9 18v2.5M15 18v2.5M3.5 9H6M3.5 15H6M18 9h2.5M18 15h2.5"/>',
+  asterisk:'<circle cx="12" cy="12" r="7.5"/><path d="M12 7.5v9M8.1 9.75l7.8 4.5M15.9 9.75l-7.8 4.5"/>',
+  dapnet:'<path d="M6.5 16v-4a5.5 5.5 0 0 1 11 0v4l1.5 2h-14Z"/><path d="M10.5 18.5a1.6 1.6 0 0 0 3 0"/>',
+  maps:'<path d="M9 18 4 20.5V6.5L9 4l6 2.5 5-2.5v14L15 20.5 9 18Z"/><path d="M9 4v14M15 6.5v14"/>',
+  geoalarm:'<path d="M12 21s6.5-5.4 6.5-10.5A6.5 6.5 0 0 0 5.5 10.5C5.5 15.6 12 21 12 21Z"/><circle cx="12" cy="10.3" r="2.3"/>',
+  overview:'<rect x="4" y="4" width="7" height="7" rx="1.6"/><rect x="13" y="4" width="7" height="7" rx="1.6"/><rect x="4" y="13" width="7" height="7" rx="1.6"/><rect x="13" y="13" width="7" height="7" rx="1.6"/>',
+  // kpi / domain
+  network:'<path d="M9.5 14.5 14.5 9.5M8 12l-1.8 1.8a3.4 3.4 0 0 0 4.8 4.8L13 16.5M16 11.5l1.8-1.8a3.4 3.4 0 0 0-4.8-4.8L11 6.5"/>',
+  backhaul:'<path d="M5 12a7 7 0 0 1 7-7M5 12a4 4 0 0 1 4-4"/><circle cx="6" cy="11" r="1.4"/><path d="M16 8l4 4M15 13l-3 3 5 0Z"/>',
+  congestion:'<path d="M6 19v-5M12 19V8M18 19v-9"/>',
+  // actions
+  save:'<path d="M5 12.5 10 17.5 19 7"/>',
+  restart:'<path d="M19 12a7 7 0 1 1-2.1-5"/><path d="M17 4v3.5h-3.5"/>',
+  shutdown:'<path d="M12 4v7"/><path d="M7.5 7.2a7 7 0 1 0 9 0"/>',
+  update:'<path d="M12 19V6M7 11l5-5 5 5"/><path d="M6 4h12"/>',
+  edit:'<path d="M14.5 5.5 18.5 9.5 8 20H4v-4Z"/><path d="M13 7 17 11"/>',
+  add:'<path d="M12 5v14M5 12h14"/>',
+  delete:'<path d="M5 7h14M9 7V5h6v2M6.5 7l.8 12a1.5 1.5 0 0 0 1.5 1.4h6.4a1.5 1.5 0 0 0 1.5-1.4L17.5 7"/>',
+  export:'<path d="M12 4v10M8 10l4 4 4-4M5 18h14"/>',
+  search:'<circle cx="11" cy="11" r="6"/><path d="m20 20-3.5-3.5"/>',
+  detect:'<path d="M4 14v4.5a1.5 1.5 0 0 0 1.5 1.5h13a1.5 1.5 0 0 0 1.5-1.5V14M8 11l4 4 4-4M12 4v11"/>',
+  broadcast:'<path d="M4 10v4l9 4V6Z"/><path d="M13 8a4 4 0 0 1 0 8M6 14v3.5a1.5 1.5 0 0 0 3 0V15"/>',
+  // status / domain
+  alert:'<path d="M12 4.5 21 19H3Z"/><path d="M12 10v4M12 16.5v.2"/>',
+  emergency:'<path d="M12 3 19 6v5c0 4.5-3 7.6-7 9-4-1.4-7-4.5-7-9V6Z"/><path d="M12 8v4M12 15v.2"/>',
+  power:'<path d="M13 3 5 13h6l-1 8 8-10h-6Z"/>',
+  login:'<circle cx="8" cy="12" r="3.5"/><path d="M11.5 12H20M17 12v3M20 12v2.5"/>',
+  // chrome
+  collapse:'<path d="M14 7l-5 5 5 5"/><path d="M19 5v14"/>',
+  hamburger:'<path d="M4 7h16M4 12h16M4 17h16"/>',
+  close:'<path d="M6 6l12 12M18 6 6 18"/>',
+};
+// Glyphs that read better at a heavier weight (checkmarks, plus, close).
+const ICON_BOLD = { save:1, add:1 };
+function svgIcon(name, size){
+  const body = ICONS[name]; if(body===undefined) return '';
+  const sw = ICON_BOLD[name] ? 2 : 1.8;
+  const px = size ? ' width="'+size+'" height="'+size+'"' : '';
+  return '<svg viewBox="0 0 24 24"'+px+' fill="none" stroke="currentColor" stroke-width="'+sw+
+         '" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+body+'</svg>';
+}
+// Filled selection marker (▶ in selected-TG rows) — own fill, no stroke.
+const ICON_MARKER = '<svg viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true"><path d="M8 5l11 7-11 7Z"/></svg>';
+// Paint every declarative icon slot ([data-icon="name"]) from the ICONS map.
+// Keeps the nav/header markup DRY; the Tabs phase can drop more [data-icon] slots.
+function paintIcons(root){
+  (root||document).querySelectorAll('[data-icon]').forEach(function(el){
+    if(el.dataset.iconPainted) return;
+    el.innerHTML = svgIcon(el.getAttribute('data-icon'));
+    el.dataset.iconPainted = '1';
+  });
+}
+
 // ── i18n ─────────────────────────────────────────────────────────────────
 const LANGS={
   en:{
     bts_ip:'BTS IP',offline:'OFFLINE',online:'ONLINE',
     brew_online:'ONLINE',brew_offline:'OFFLINE',
-    stations:'Radios',calls:'Calls',lastheard:'Last Heard',log:'Log',rf:'RF',health:'Health',asterisk:'Asterisk SIP',dapnet:'DAPNET',echolink:'EchoLink',echolink_title:'EchoLink',meshcom:'MeshCom',meshcom_title:'MeshCom',geoalarm:'GeoAlarm',geoalarm_title:'GeoAlarm',config:'Config',
-    sdslog:'SDS Log',th_dir:'Dir',th_from:'From',th_to:'To',th_message:'Message',no_sds:'No SDS messages yet',sds_refresh:'⟳ Refresh',
+    stations:'Radios',calls:'Calls',lastheard:'Last Heard',log:'Log',rf:'RF',health:'Health',asterisk:'Asterisk SIP',dapnet:'DAPNET',echolink:'EchoLink',echolink_title:'EchoLink',meshcom:'MeshCom',meshcom_title:'MeshCom',maps:'Maps',maps_title:'Maps',geoalarm:'GeoAlarm',geoalarm_title:'GeoAlarm',config:'Config',
+    sdslog:'SDS Log',th_dir:'Dir',th_from:'From',th_to:'To',th_message:'Message',no_sds:'No SDS messages yet',sds_refresh:'Refresh',
     rf_freq:'Center freq',rf_rate:'Sample rate',rf_rms:'RMS',rf_peak:'Peak',rf_age:'Snapshot',
     rf_waiting:'waiting…',rf_live:'live',rf_stale:'stale',
-    rf_spectrum:'TX DSP Spectrum (pre-PA)',rf_constellation:'TX DSP Constellation',
+    rf_visualizers:'Visualizers',rf_spectrum:'TX DSP Spectrum (pre-PA)',rf_constellation:'TX DSP Constellation',
     rf_hint_spectrum:'live · 512-bin FFT',rf_hint_constellation:'π/4-DQPSK',
     rf_waterfall:'TX Spectrum Waterfall',rf_hint_waterfall:'rolling · viridis',
     rf_quality:'Signal Quality',rf_hint_quality:'measured pre-PA · derived from same DSP snapshot',
@@ -3697,8 +4590,8 @@ const LANGS={
     readability:'Readability',size_small:'Small',size_small_d:'Compact · normal contrast',size_medium:'Medium',size_medium_d:'Default · comfortable',size_high:'High',size_high_d:'Larger · stronger contrast',size_ultra:'Ultra',size_ultra_d:'Largest · maximum contrast',sdr:'SDR',power:'Power',
     no_terminals:'No radios registered',no_calls:'No active calls',
     live_log:'Live Log',autoscroll:'Auto-scroll',filter_all:'All',
-    clear:'Clear',export:'⤓ Export',restart:'⟳ Restart',shutdown:'⏻ Shutdown',save:'Save',
-    whitelist_title:'ISSI Whitelist',whitelist_add:'+ Add ISSI',whitelist_empty:'List empty — open network (any radio may register).',
+    clear:'Clear',export:'Export',restart:'Restart',shutdown:'Shutdown',save:'Save',
+    cfg_sec_configuration:'Configuration',cfg_sec_access:'Access Control',cfg_sec_wx:'WX / METAR',whitelist_title:'ISSI Whitelist',whitelist_add:'Add ISSI',whitelist_empty:'List empty — open network (any radio may register).',
     whitelist_help:'When the list is empty, any radio may register (open network). When non-empty, only the listed ISSIs are accepted; all others are rejected. Changes apply instantly and persist across restarts.',
     whitelist_enforced:'ENFORCED',whitelist_open:'OPEN',whitelist_invalid:'Enter a valid ISSI (1–16777215).',
     wx_title:'WX / METAR Service',wx_help:'Built-in weather service. Radios send an SDS like "METAR LROP" to the service ISSI to get a decoded report. Optionally auto-send a fixed station\'s METAR to an ISSI or talkgroup at a set interval. Data from aviationweather.gov.',
@@ -3708,12 +4601,14 @@ const LANGS={
     sds_title:'⬡ Send SDS Message',sds_dest:'Destination ISSI',
     sds_callout_enable:'TPG2200 Call-Out / Send alarm',
     sds_callout_source:'Source ISSI',
-    sds_callout_incident:'Incident number',
+    sds_callout_id:'Call-Out ID',
+    sds_callout_ric:'TPG RIC',
+    sds_callout_priority:'Priority / tone',
     sds_callout_text:'Alarm text',
     sds_callout_raw:'Raw Hex Payload optional',
-    sds_callout_help:'Incidents 1-15 use the confirmed byte formula (N << 4) | 0x01: 1=11, 2=21, 3=31, 4=41. Incidents 16-256 use the extended one-byte selector. Raw Hex overrides automatic payload generation.',
+    sds_callout_help:'TPG RIC is written into the Call-Out payload address bytes. Call-Out ID is the raw ID byte 0..255. Priority/tone is the raw priority byte 0..15. Raw Hex overrides automatic payload generation.',
     live_sds_desc:'Broadcast a text message to all radios on the cell, repeating at the Home Mode Display interval. Repeats until deleted or the repeat count is reached.',
-    live_sds_text:'Message text (max 251 chars)',live_sds_repeat:'Repeat (0=∞)',live_sds_send:'📢 Broadcast',
+    live_sds_text:'Message text (max 251 chars)',live_sds_repeat:'Repeat (0=∞)',live_sds_send:'Broadcast',
     live_sds_clear_all:'Clear All',live_sds_empty:'No active broadcasts.',
     live_sds_sent:'sent',live_sds_times:'×',live_sds_forever:'∞',live_sds_delete:'✕',
     fallback_title:'⚠ FALLBACK CONFIG ACTIVE — Primary config failed to load',
@@ -3724,19 +4619,19 @@ const LANGS={
     th_status:'Status',th_last_seen:'Last seen',th_actions:'Actions',
     th_id:'ID',th_type:'Type',th_caller:'Caller',
     th_dest:'Destination',th_speaker:'Speaker',th_duration:'Duration',
-    th_time:'Time',th_activity:'Activity',
+    th_time:'Time',th_source:'Source',th_activity:'Activity',
     last_heard_title:'Last Heard',no_activity:'No activity yet',
     act_call_group:'Group Call',act_call_individual:'P2P Call',act_sds:'SDS',
     online_badge:'ONLINE',kick:'Kick',sds:'SDS',
     call_group:'GROUP',call_p2p_s:'P2P-S',call_p2p_d:'P2P-D',call_emergency:'EMERGENCY',
-    emg_banner_title:'EMERGENCY ACTIVE',emg_clear:'Clear',confirm_clear_emergency:'Clear emergency for ISSI {issi}?',
+    emg_banner_title:'EMERGENCY ACTIVE',integrations:'Integrations',integ_enabled:'Enabled',integ_disabled:'Disabled',integ_error:'Error',system_sec:'System',emg_chip:'EMERGENCY',bs_label:'BS',emg_clear:'Clear',confirm_clear_emergency:'Clear emergency for ISSI {issi}?',
     confirm_kick:'Kick ISSI {issi}?\nTerminal will be deregistered and forced to re-attach.',
     dgna:'DGNA',dgna_title:'Dynamic group assignment',dgna_modal_title:'⬡ Dynamic Group Assignment',dgna_issi:'Terminal ISSI',dgna_current:'Current groups',dgna_gssi:'Group (GSSI)',dgna_assign:'Assign',dgna_deassign:'Deassign',
     confirm_restart:'Restart FlowStation?\nAll active calls will be dropped.',
     confirm_shutdown:'Shutdown FlowStation?\nThe service will stop and must be restarted manually.',
     confirm_logout:'Log out?',
     saved:'✓ Saved — restart to apply.',save_fail:'✗ Save failed',conn_error:'Connection error.',
-    update:'⬆ Update',update_available:'Update available',update_title:'OTA Update — github.com/razvanzeces/flowstation',
+    update:'Update',update_available:'Update available',update_title:'OTA Update — github.com/razvanzeces/flowstation',
     update_confirm:'Pull latest from main and rebuild?\nThe service will restart automatically.',
     update_running:'Updating… do not close this window.',
     update_done_ok:'✓ Update complete. Restarting…',
@@ -3745,45 +4640,48 @@ const LANGS={
     system:'System',sys_info:'System Info',sys_hostname:'Hostname',sys_uptime:'Uptime',
     sys_version:'FS Version',sys_os:'OS',sys_config:'Active Config',
     sys_cpu:'CPU',sys_cpu_load:'CPU Load',sys_ram:'RAM',sys_temp:'CPU Temp',
-    wifi:'WiFi',wifi_status:'Current connection',wifi_saved:'Saved networks',wifi_visible:'Available networks',wifi_loading:'Loading…',wifi_scanning:'Scanning…',wifi_no_device:'No WiFi device detected on this host.',wifi_radio_disabled:'WiFi radio is disabled.',wifi_not_connected:'Not connected to any network.',wifi_no_saved:'No saved networks.',wifi_no_networks:'No networks in range.',wifi_ssid:'Network',wifi_signal:'Signal',wifi_ip:'IP address',wifi_actions:'Actions',wifi_disconnect:'Disconnect',wifi_connect:'Connect',wifi_connect_to:'Connect to',wifi_connecting:'Connecting…',wifi_connected:'CONNECTED',wifi_connected_ok:'Connected.',wifi_saved_tag:'SAVED',wifi_open:'OPEN',wifi_forget:'Forget',wifi_confirm_forget:'Forget network',wifi_password:'Password',wifi_hidden:'Hidden network (SSID not broadcast)',wifi_add_hidden:'+ Hidden network',wifi_scan:'↻ Scan',wifi_refresh:'↻ Refresh',wifi_radio_off:'Disable WiFi',wifi_radio_on:'Enable WiFi',wifi_warn_lose_access:'⚠ If connected to the dashboard via WiFi, changing networks may temporarily disconnect you. Make sure you have a backup access path (Ethernet or known good network).',wifi_err_no_ssid:'SSID required',cancel:'Cancel',sys_sensors:'Host Hardware Sensors',sys_sensors_empty:'No sensors detected on this host.',sys_rf:'RF Hardware (SoapySDR)',sys_autorefresh:'Auto-refresh 5s',
+    wifi:'WiFi',wifi_status:'Current connection',wifi_saved:'Saved networks',wifi_visible:'Available networks',wifi_loading:'Loading…',wifi_scanning:'Scanning…',wifi_no_device:'No WiFi device detected on this host.',wifi_radio_disabled:'WiFi radio is disabled.',wifi_not_connected:'Not connected to any network.',wifi_no_saved:'No saved networks.',wifi_no_networks:'No networks in range.',wifi_ssid:'Network',wifi_signal:'Signal',wifi_ip:'IP address',wifi_actions:'Actions',wifi_disconnect:'Disconnect',wifi_connect:'Connect',wifi_connect_to:'Connect to',wifi_connecting:'Connecting…',wifi_connected:'CONNECTED',wifi_connected_ok:'Connected.',wifi_saved_tag:'SAVED',wifi_open:'OPEN',wifi_forget:'Forget',wifi_confirm_forget:'Forget network',wifi_password:'Password',wifi_hidden:'Hidden network (SSID not broadcast)',wifi_add_hidden:'Hidden network',wifi_scan:'Scan',wifi_refresh:'Refresh',wifi_radio_off:'Disable WiFi',wifi_radio_on:'Enable WiFi',wifi_warn_lose_access:'If connected to the dashboard via WiFi, changing networks may temporarily disconnect you. Make sure you have a backup access path (Ethernet or known good network).',wifi_err_no_ssid:'SSID required',cancel:'Cancel',sys_sensors:'Host Hardware Sensors',sys_sensors_empty:'No sensors detected on this host.',sys_rf:'RF Hardware (SoapySDR)',sys_autorefresh:'Auto-refresh 5s',
     profile_edit_title:'Edit Config Profile',profile_edit_btn:'Edit',
     profile_edit_save_ok:'✓ Saved',profile_edit_save_fail:'✗ Save failed',
     sys_os:'OS',sys_version:'FS Version',sys_config:'Active Config',
     sys_profiles:'Config Profiles',sys_activate:'Activate & Restart',
     sys_active_badge:'ACTIVE',sys_no_profiles:'No .toml profiles found in config directory.',
     sys_activate_confirm:'Switch to profile "{name}" and restart?\nCurrent config will be backed up.',
+    sys_title:'System',sys_sec_status:'Status',sys_sec_host:'Host',sys_sec_radio:'Radio Hardware',sys_sec_sensors:'Sensors',sys_sec_profiles:'Profiles',sys_sec_sds:'SDS Broadcast',sys_refresh:'Refresh',sys_probe:'Probe',sys_temp_hot:'HOT',sys_temp_warm:'Warm',sys_temp_ok:'OK',
     sys_bts:'BTS Connection',
     telegram:'Telegram',tg_title:'Telegram Alerts',
     tg_help:'Get instant Telegram messages when something happens on the station — a radio attaches or drops, the backhaul goes up or down, a position beacon arrives, or the stack logs a warning/error.',
     tg_enabled:'Enable Telegram alerts',
     tg_test:'Send test',tg_testing:'Sending test…',tg_test_ok:'✓ Test sent to {n} chat(s)',
     tg_howto_title:'Setup — 4 steps',
-    tg_step1:'1. In Telegram, open @BotFather, send /newbot and follow the prompts. Copy the bot token it gives you.',
-    tg_step2:'2. Paste the token below and click Verify — you should see your bot\'s @username.',
-    tg_step3:'3. Open a chat with your new bot (or add it to a group) and send it any message, e.g. /start.',
-    tg_step4:'4. Click "Detect Chat ID", add your chat to the recipients, then Save. Use "Send test" to confirm.',
+    tg_step1:'In Telegram, open @BotFather, send /newbot and follow the prompts. Copy the bot token it gives you.',
+    tg_step2:'Paste the token below and click Verify — you should see your bot\'s @username.',
+    tg_step3:'Open a chat with your new bot (or add it to a group) and send it any message, e.g. /start.',
+    tg_step4:'Click "Detect Chat ID", add your chat to the recipients, then Save. Use "Send test" to confirm.',
     tg_bot_title:'Bot token',
     tg_bot_help:'The token from @BotFather looks like 123456789:AAExampleTokenString. It is stored masked and never shown in full again.',
     tg_verify:'Verify',tg_verifying:'Verifying…',
     tg_recipients_title:'Recipients (Chat IDs)',
     tg_recipients_help:'Every alert is sent to each recipient. A positive ID is a private chat; a negative ID is a group or channel.',
-    tg_detect:'📥 Detect Chat ID',tg_detecting:'Reading recent messages…',
+    tg_detect:'Detect Chat ID',tg_detecting:'Reading recent messages…',
     tg_detect_none:'No recent messages found. Send your bot a message first, then try again.',
     tg_detect_found:'Chats that messaged your bot — click Add:',
     tg_add:'Add',tg_no_recipients:'No recipients yet.',tg_invalid_chat:'Enter a valid Chat ID.',
     tg_categories_title:'Alert categories',
-    tg_cat_connect:'🟢 Radio connected',tg_cat_disconnect:'🔴 Radio disconnected',
-    tg_cat_t351:'📴 Radio dropped (no T351 response)',tg_cat_lip:'📍 LIP/APRS position beacon',
-    tg_cat_backhaul:'🛰 Brew backhaul up/down',tg_cat_logs:'🚨 Critical log (warnings/errors)',
+    tg_cat_connect:'Radio connected',tg_cat_disconnect:'Radio disconnected',
+    tg_cat_t351:'Radio dropped (no T351 response)',tg_cat_lip:'LIP/APRS position beacon',
+    tg_cat_backhaul:'Brew backhaul up/down',tg_cat_brew_register:'Brew ISSI REGISTER',
+    tg_brew_register_prefix:'Brew REGISTER prefix',tg_brew_register_white:'Brew REGISTER ISSI whitelist',tg_brew_register_black:'Brew REGISTER ISSI blacklist',
+    tg_cat_logs:'Critical log (warnings/errors)',
   },
   ro:{
     bts_ip:'IP BTS',offline:'DECONECTAT',online:'CONECTAT',
     brew_online:'ONLINE',brew_offline:'OFFLINE',
     stations:'Radiouri',calls:'Apeluri',lastheard:'Ultima Activitate',log:'Log',rf:'RF',health:'Health',echolink:'EchoLink',echolink_title:'EchoLink',config:'Config',
-    sdslog:'Jurnal SDS',th_dir:'Dir',th_from:'De la',th_to:'Către',th_message:'Mesaj',no_sds:'Niciun mesaj SDS încă',sds_refresh:'⟳ Reîmprospătează',
+    sdslog:'Jurnal SDS',th_dir:'Dir',th_from:'De la',th_to:'Către',th_message:'Mesaj',no_sds:'Niciun mesaj SDS încă',sds_refresh:'Reîmprospătează',
     rf_freq:'Frecvență centru',rf_rate:'Rată eșantion',rf_rms:'RMS',rf_peak:'Vârf',rf_age:'Captură',
     rf_waiting:'în așteptare…',rf_live:'live',rf_stale:'expirat',
-    rf_spectrum:'Spectru TX DSP (pre-PA)',rf_constellation:'Constelație TX DSP',
+    rf_visualizers:'Vizualizatoare',rf_spectrum:'Spectru TX DSP (pre-PA)',rf_constellation:'Constelație TX DSP',
     rf_hint_spectrum:'live · FFT 512-bin',rf_hint_constellation:'π/4-DQPSK',
     rf_waterfall:'Cascadă Spectru TX',rf_hint_waterfall:'derulant · viridis',
     rf_quality:'Calitate Semnal',rf_hint_quality:'măsurat pre-PA · din același snapshot DSP',
@@ -3803,8 +4701,8 @@ const LANGS={
     readability:'Lizibilitate',size_small:'Mic',size_small_d:'Compact · contrast normal',size_medium:'Mediu',size_medium_d:'Implicit · confortabil',size_high:'Mare',size_high_d:'Mai mare · contrast sporit',size_ultra:'Ultra',size_ultra_d:'Cel mai mare · contrast maxim',sdr:'SDR',power:'Consum',
     no_terminals:'Niciun radio înregistrat',no_calls:'Niciun apel activ',
     live_log:'Log Live',autoscroll:'Auto-scroll',filter_all:'Toate',
-    clear:'Șterge',export:'⤓ Export',restart:'⟳ Repornire',shutdown:'⏻ Oprire',save:'Salvează',
-    whitelist_title:'Listă albă ISSI',whitelist_add:'+ Adaugă ISSI',whitelist_empty:'Listă goală — rețea deschisă (orice radio se poate înregistra).',
+    clear:'Șterge',export:'Export',restart:'Repornire',shutdown:'Oprire',save:'Salvează',
+    cfg_sec_configuration:'Configurație',cfg_sec_access:'Control acces',cfg_sec_wx:'WX / METAR',whitelist_title:'Listă albă ISSI',whitelist_add:'Adaugă ISSI',whitelist_empty:'Listă goală — rețea deschisă (orice radio se poate înregistra).',
     whitelist_help:'Când lista e goală, orice radio se poate înregistra (rețea deschisă). Când are intrări, doar ISSI-urile listate sunt acceptate; restul sunt respinse. Modificările se aplică instant și persistă după repornire.',
     whitelist_enforced:'ACTIVĂ',whitelist_open:'DESCHISĂ',whitelist_invalid:'Introdu un ISSI valid (1–16777215).',
     wx_title:'Serviciu WX / METAR',wx_help:'Serviciu meteo integrat. Radiourile trimit un SDS de forma "METAR LROP" către ISSI-ul serviciului și primesc raportul decodat. Opțional, trimite automat METAR-ul unei stații fixe către un ISSI sau grup la interval. Date de la aviationweather.gov.',
@@ -3812,7 +4710,7 @@ const LANGS={
     wx_periodic_icao:'Cod ICAO stație',wx_periodic_dest:'Destinație',wx_periodic_isgroup:'Destinația e grup',wx_periodic_isgroup_hint:'(GSSI în loc de ISSI individual)',
     wx_periodic_interval:'Interval (secunde)',wx_interval_hint:'Minim 300 s (5 min) ca să nu suprasolicităm API-ul meteo.',wx_periodic_incomplete:'Setează și ICAO stație și destinație pentru modul periodic.',
     live_sds_desc:'Transmite un mesaj text către toate radiourile din celulă, repetând la intervalul Home Mode Display.',
-    live_sds_text:'Text mesaj (max 251 caractere)',live_sds_repeat:'Repetări (0=∞)',live_sds_send:'📢 Broadcast',
+    live_sds_text:'Text mesaj (max 251 caractere)',live_sds_repeat:'Repetări (0=∞)',live_sds_send:'Broadcast',
     live_sds_clear_all:'Șterge Tot',live_sds_empty:'Niciun broadcast activ.',
     live_sds_sent:'trimis',live_sds_times:'×',live_sds_forever:'∞',live_sds_delete:'✕',
     fallback_title:'⚠ CONFIG DE REZERVĂ ACTIV — Config principal nu a putut fi încărcat',
@@ -3824,19 +4722,19 @@ const LANGS={
     th_status:'Status',th_last_seen:'Văzut',th_actions:'Acțiuni',
     th_id:'ID',th_type:'Tip',th_caller:'Apelant',
     th_dest:'Destinatar',th_speaker:'Vorbitor',th_duration:'Durată',
-    th_time:'Oră',th_activity:'Activitate',
+    th_time:'Oră',th_source:'Sursă',th_activity:'Activitate',
     last_heard_title:'Ultima Activitate',no_activity:'Nicio activitate încă',
     act_call_group:'Apel Grup',act_call_individual:'Apel P2P',act_sds:'SDS',
     online_badge:'ONLINE',kick:'Kick',sds:'SDS',
     call_group:'GRUP',call_p2p_s:'P2P-S',call_p2p_d:'P2P-D',call_emergency:'URGENȚĂ',
-    emg_banner_title:'URGENȚĂ ACTIVĂ',emg_clear:'Anulează',confirm_clear_emergency:'Anulezi urgența pentru ISSI {issi}?',
+    emg_banner_title:'URGENȚĂ ACTIVĂ',integrations:'Integrări',integ_enabled:'Activat',integ_disabled:'Dezactivat',integ_error:'Eroare',system_sec:'Sistem',emg_chip:'URGENȚĂ',bs_label:'BS',emg_clear:'Anulează',confirm_clear_emergency:'Anulezi urgența pentru ISSI {issi}?',
     confirm_kick:'Kick ISSI {issi}?\nTerminalul va fi deînregistrat și forțat să se reconecteze.',
     dgna:'DGNA',dgna_title:'Atribuire dinamică de grup',dgna_modal_title:'⬡ Atribuire dinamică de grup',dgna_issi:'ISSI terminal',dgna_current:'Grupuri curente',dgna_gssi:'Grup (GSSI)',dgna_assign:'Atribuie',dgna_deassign:'Retrage',
     confirm_restart:'Repornire FlowStation?\nToate apelurile active vor fi întrerupte.',
     confirm_shutdown:'Oprire FlowStation?\nServiciul se va opri și trebuie repornit manual.',
     confirm_logout:'Deconectare?',
     saved:'✓ Salvat — repornire pentru aplicare.',save_fail:'✗ Salvare eșuată',conn_error:'Eroare de conexiune.',
-    update:'⬆ Update',update_available:'Actualizare disponibilă',update_title:'Update OTA — github.com/razvanzeces/flowstation',
+    update:'Update',update_available:'Actualizare disponibilă',update_title:'Update OTA — github.com/razvanzeces/flowstation',
     update_confirm:'Descarcă ultima versiune din main și recompilează?\nServiciul va reporni automat.',
     update_running:'Se actualizează… nu închide fereastra.',
     update_done_ok:'✓ Update finalizat. Se repornește…',
@@ -3845,44 +4743,47 @@ const LANGS={
     system:'Sistem',sys_info:'Info Sistem',sys_hostname:'Hostname',sys_uptime:'Uptime',
     sys_os:'OS',sys_version:'Versiune FS',sys_config:'Config Activ',
     sys_cpu:'CPU',sys_cpu_load:'Încărcare CPU',sys_ram:'RAM',sys_temp:'Temp CPU',
-    wifi:'WiFi',wifi_status:'Conexiunea curentă',wifi_saved:'Rețele salvate',wifi_visible:'Rețele disponibile',wifi_loading:'Se încarcă…',wifi_scanning:'Se scanează…',wifi_no_device:'Niciun dispozitiv WiFi detectat.',wifi_radio_disabled:'Radioul WiFi este dezactivat.',wifi_not_connected:'Neconectat la nicio rețea.',wifi_no_saved:'Nicio rețea salvată.',wifi_no_networks:'Nicio rețea în rază.',wifi_ssid:'Rețea',wifi_signal:'Semnal',wifi_ip:'Adresă IP',wifi_actions:'Acțiuni',wifi_disconnect:'Deconectează',wifi_connect:'Conectează',wifi_connect_to:'Conectează la',wifi_connecting:'Se conectează…',wifi_connected:'CONECTAT',wifi_connected_ok:'Conectat.',wifi_saved_tag:'SALVAT',wifi_open:'DESCHIS',wifi_forget:'Uită',wifi_confirm_forget:'Uită rețeaua',wifi_password:'Parolă',wifi_hidden:'Rețea ascunsă (SSID nedifuzat)',wifi_add_hidden:'+ Rețea ascunsă',wifi_scan:'↻ Scanează',wifi_refresh:'↻ Reîncarcă',wifi_radio_off:'Dezactivează WiFi',wifi_radio_on:'Activează WiFi',wifi_warn_lose_access:'⚠ Dacă ești conectat la dashboard prin WiFi, schimbarea rețelei te poate deconecta temporar. Asigură-te că ai o cale alternativă (Ethernet sau rețea de încredere).',wifi_err_no_ssid:'SSID necesar',cancel:'Anulează',sys_sensors:'Senzori Hardware Gazdă',sys_sensors_empty:'Niciun senzor detectat.',sys_rf:'Hardware RF (SoapySDR)',sys_autorefresh:'Auto-refresh 5s',
+    wifi:'WiFi',wifi_status:'Conexiunea curentă',wifi_saved:'Rețele salvate',wifi_visible:'Rețele disponibile',wifi_loading:'Se încarcă…',wifi_scanning:'Se scanează…',wifi_no_device:'Niciun dispozitiv WiFi detectat.',wifi_radio_disabled:'Radioul WiFi este dezactivat.',wifi_not_connected:'Neconectat la nicio rețea.',wifi_no_saved:'Nicio rețea salvată.',wifi_no_networks:'Nicio rețea în rază.',wifi_ssid:'Rețea',wifi_signal:'Semnal',wifi_ip:'Adresă IP',wifi_actions:'Acțiuni',wifi_disconnect:'Deconectează',wifi_connect:'Conectează',wifi_connect_to:'Conectează la',wifi_connecting:'Se conectează…',wifi_connected:'CONECTAT',wifi_connected_ok:'Conectat.',wifi_saved_tag:'SALVAT',wifi_open:'DESCHIS',wifi_forget:'Uită',wifi_confirm_forget:'Uită rețeaua',wifi_password:'Parolă',wifi_hidden:'Rețea ascunsă (SSID nedifuzat)',wifi_add_hidden:'Rețea ascunsă',wifi_scan:'Scanează',wifi_refresh:'Reîncarcă',wifi_radio_off:'Dezactivează WiFi',wifi_radio_on:'Activează WiFi',wifi_warn_lose_access:'Dacă ești conectat la dashboard prin WiFi, schimbarea rețelei te poate deconecta temporar. Asigură-te că ai o cale alternativă (Ethernet sau rețea de încredere).',wifi_err_no_ssid:'SSID necesar',cancel:'Anulează',sys_sensors:'Senzori Hardware Gazdă',sys_sensors_empty:'Niciun senzor detectat.',sys_rf:'Hardware RF (SoapySDR)',sys_autorefresh:'Auto-refresh 5s',
     profile_edit_title:'Editare Profil Config',profile_edit_btn:'Editează',
     profile_edit_save_ok:'✓ Salvat',profile_edit_save_fail:'✗ Salvare eșuată',
     sys_profiles:'Profile Config',sys_activate:'Activează & Repornire',
     sys_active_badge:'ACTIV',sys_no_profiles:'Niciun profil .toml găsit în directorul config.',
     sys_activate_confirm:'Comutare la profilul "{name}" și repornire?\nConfig-ul curent va fi salvat.',
+    sys_title:'Sistem',sys_sec_status:'Stare',sys_sec_host:'Gazdă',sys_sec_radio:'Hardware radio',sys_sec_sensors:'Senzori',sys_sec_profiles:'Profiluri',sys_sec_sds:'Difuzare SDS',sys_refresh:'Reîncarcă',sys_probe:'Sondează',sys_temp_hot:'FIERBINTE',sys_temp_warm:'Cald',sys_temp_ok:'OK',
     sys_bts:'Conexiune BTS',
     telegram:'Telegram',tg_title:'Alerte Telegram',
     tg_help:'Primește mesaje Telegram instant când se întâmplă ceva pe stație — un radio se conectează sau cade, backhaul-ul urcă/coboară, sosește o baliză de poziție, sau stack-ul logează un avertisment/eroare.',
     tg_enabled:'Activează alertele Telegram',
     tg_test:'Trimite test',tg_testing:'Se trimite testul…',tg_test_ok:'✓ Test trimis către {n} conversație(i)',
     tg_howto_title:'Configurare — 4 pași',
-    tg_step1:'1. În Telegram, deschide @BotFather, trimite /newbot și urmează pașii. Copiază token-ul botului.',
-    tg_step2:'2. Lipește token-ul mai jos și apasă Verifică — ar trebui să vezi @username-ul botului tău.',
-    tg_step3:'3. Deschide o conversație cu botul (sau adaugă-l într-un grup) și trimite-i orice mesaj, ex. /start.',
-    tg_step4:'4. Apasă „Detectează Chat ID", adaugă conversația la destinatari, apoi Salvează. Folosește „Trimite test" pentru confirmare.',
+    tg_step1:'În Telegram, deschide @BotFather, trimite /newbot și urmează pașii. Copiază token-ul botului.',
+    tg_step2:'Lipește token-ul mai jos și apasă Verifică — ar trebui să vezi @username-ul botului tău.',
+    tg_step3:'Deschide o conversație cu botul (sau adaugă-l într-un grup) și trimite-i orice mesaj, ex. /start.',
+    tg_step4:'Apasă „Detectează Chat ID", adaugă conversația la destinatari, apoi Salvează. Folosește „Trimite test" pentru confirmare.',
     tg_bot_title:'Token bot',
     tg_bot_help:'Token-ul de la @BotFather arată ca 123456789:AAExempluToken. Este stocat mascat și nu mai e afișat integral.',
     tg_verify:'Verifică',tg_verifying:'Se verifică…',
     tg_recipients_title:'Destinatari (Chat ID-uri)',
     tg_recipients_help:'Fiecare alertă e trimisă către toți destinatarii. Un ID pozitiv e o conversație privată; unul negativ e un grup sau canal.',
-    tg_detect:'📥 Detectează Chat ID',tg_detecting:'Se citesc mesajele recente…',
+    tg_detect:'Detectează Chat ID',tg_detecting:'Se citesc mesajele recente…',
     tg_detect_none:'Niciun mesaj recent. Trimite întâi un mesaj botului, apoi încearcă din nou.',
     tg_detect_found:'Conversații care au scris botului — apasă Adaugă:',
     tg_add:'Adaugă',tg_no_recipients:'Niciun destinatar încă.',tg_invalid_chat:'Introdu un Chat ID valid.',
     tg_categories_title:'Categorii de alerte',
-    tg_cat_connect:'🟢 Radio conectat',tg_cat_disconnect:'🔴 Radio deconectat',
-    tg_cat_t351:'📴 Radio căzut (fără răspuns T351)',tg_cat_lip:'📍 Baliză poziție LIP/APRS',
-    tg_cat_backhaul:'🛰 Backhaul Brew up/down',tg_cat_logs:'🚨 Log critic (avertismente/erori)',
+    tg_cat_connect:'Radio conectat',tg_cat_disconnect:'Radio deconectat',
+    tg_cat_t351:'Radio căzut (fără răspuns T351)',tg_cat_lip:'Baliză poziție LIP/APRS',
+    tg_cat_backhaul:'Backhaul Brew up/down',tg_cat_brew_register:'REGISTER ISSI prin Brew',
+    tg_brew_register_prefix:'Prefix REGISTER Brew',tg_brew_register_white:'Whitelist ISSI REGISTER Brew',tg_brew_register_black:'Blacklist ISSI REGISTER Brew',
+    tg_cat_logs:'Log critic (avertismente/erori)',
   },
   de:{
     bts_ip:'BTS-IP',offline:'OFFLINE',online:'ONLINE',
     brew_online:'ONLINE',brew_offline:'OFFLINE',
-    stations:'Radios',calls:'Anrufe',lastheard:'Zuletzt Gehört',log:'Log',rf:'RF',health:'Health',asterisk:'Asterisk SIP',dapnet:'DAPNET',echolink:'EchoLink',echolink_title:'EchoLink',meshcom:'MeshCom',meshcom_title:'MeshCom',geoalarm:'GeoAlarm',geoalarm_title:'GeoAlarm',config:'Config',
-    sdslog:'SDS-Log',th_dir:'Ri.',th_from:'Von',th_to:'An',th_message:'Nachricht',no_sds:'Noch keine SDS-Nachrichten',sds_refresh:'⟳ Aktualisieren',
+    stations:'Radios',calls:'Anrufe',lastheard:'Zuletzt Gehört',log:'Log',rf:'RF',health:'Health',asterisk:'Asterisk SIP',dapnet:'DAPNET',echolink:'EchoLink',echolink_title:'EchoLink',meshcom:'MeshCom',meshcom_title:'MeshCom',maps:'Maps',maps_title:'Maps',geoalarm:'GeoAlarm',geoalarm_title:'GeoAlarm',config:'Config',
+    sdslog:'SDS-Log',th_dir:'Ri.',th_from:'Von',th_to:'An',th_message:'Nachricht',no_sds:'Noch keine SDS-Nachrichten',sds_refresh:'Aktualisieren',
     rf_freq:'Mittenfrequenz',rf_rate:'Abtastrate',rf_rms:'RMS',rf_peak:'Spitze',rf_age:'Aufnahme',
     rf_waiting:'wartet…',rf_live:'live',rf_stale:'veraltet',
-    rf_spectrum:'TX-DSP-Spektrum (vor PA)',rf_constellation:'TX-DSP-Konstellation',
+    rf_visualizers:'Visualisierungen',rf_spectrum:'TX-DSP-Spektrum (vor PA)',rf_constellation:'TX-DSP-Konstellation',
     rf_hint_spectrum:'live · 512-bin FFT',rf_hint_constellation:'π/4-DQPSK',
     rf_waterfall:'TX-Spektrum-Wasserfall',rf_hint_waterfall:'rollend · viridis',
     rf_quality:'Signalqualität',rf_hint_quality:'gemessen vor PA · aus selbem DSP-Snapshot',
@@ -3902,8 +4803,8 @@ const LANGS={
     registered_terminals:'Registrierte Radios',
     no_terminals:'Keine Radios registriert',no_calls:'Keine aktiven Anrufe',
     live_log:'Live-Log',autoscroll:'Auto-Scroll',filter_all:'Alle',
-    clear:'Löschen',export:'⤓ Exportieren',restart:'⟳ Neustart',shutdown:'⏻ Herunterfahren',save:'Speichern',
-    whitelist_title:'ISSI-Whitelist',whitelist_add:'+ ISSI hinzufügen',whitelist_empty:'Liste leer — offenes Netz (jedes Funkgerät darf sich anmelden).',
+    clear:'Löschen',export:'Exportieren',restart:'Neustart',shutdown:'Herunterfahren',save:'Speichern',
+    cfg_sec_configuration:'Konfiguration',cfg_sec_access:'Zugriffskontrolle',cfg_sec_wx:'WX / METAR',whitelist_title:'ISSI-Whitelist',whitelist_add:'ISSI hinzufügen',whitelist_empty:'Liste leer — offenes Netz (jedes Funkgerät darf sich anmelden).',
     whitelist_help:'Ist die Liste leer, darf sich jedes Funkgerät anmelden (offenes Netz). Bei Einträgen werden nur die gelisteten ISSIs akzeptiert; alle anderen werden abgewiesen. Änderungen wirken sofort und bleiben nach Neustart erhalten.',
     whitelist_enforced:'AKTIV',whitelist_open:'OFFEN',whitelist_invalid:'Gültige ISSI eingeben (1–16777215).',
     wx_title:'WX / METAR-Dienst',wx_help:'Integrierter Wetterdienst. Funkgeräte senden eine SDS wie "METAR LROP" an die Dienst-ISSI und erhalten einen dekodierten Bericht. Optional automatisches Senden des METAR einer festen Station an eine ISSI oder Gruppe in Intervallen. Daten von aviationweather.gov.',
@@ -3911,35 +4812,37 @@ const LANGS={
     wx_periodic_icao:'Stations-ICAO',wx_periodic_dest:'Ziel',wx_periodic_isgroup:'Ziel ist Gruppe',wx_periodic_isgroup_hint:'(GSSI statt einzelner ISSI)',
     wx_periodic_interval:'Intervall (Sekunden)',wx_interval_hint:'Mindestens 300 s (5 Min), um die Wetter-API nicht zu überlasten.',wx_periodic_incomplete:'Stations-ICAO und Ziel für den periodischen Modus setzen.',
     live_sds_desc:'Sendet eine Textnachricht an alle Funkgeräte der Zelle, wiederholt im Home-Mode-Display-Intervall.',
-    live_sds_text:'Nachrichtentext (max. 251 Zeichen)',live_sds_repeat:'Wiederh. (0=∞)',live_sds_send:'📢 Senden',
+    live_sds_text:'Nachrichtentext (max. 251 Zeichen)',live_sds_repeat:'Wiederh. (0=∞)',live_sds_send:'Senden',
     live_sds_clear_all:'Alle löschen',live_sds_empty:'Keine aktiven Broadcasts.',
     live_sds_sent:'gesendet',live_sds_times:'×',live_sds_forever:'∞',live_sds_delete:'✕',
     fallback_title:'⚠ FALLBACK-KONFIGURATION AKTIV — Primäre Konfiguration konnte nicht geladen werden',
     sds_title:'⬡ SDS-Nachricht senden',sds_dest:'Ziel-ISSI',
     sds_callout_enable:'TPG2200 Call-Out / Alarm senden',
     sds_callout_source:'Source ISSI',
-    sds_callout_incident:'Vorfallnummer',
+    sds_callout_id:'Call-Out ID',
+    sds_callout_ric:'TPG RIC',
+    sds_callout_priority:'Priority / Ton',
     sds_callout_text:'Alarmtext',
     sds_callout_raw:'Raw Hex Payload optional',
-    sds_callout_help:'Vorfall 1-15 nutzen die bestätigte Byte-Formel (N << 4) | 0x01: 1=11, 2=21, 3=31, 4=41. Vorfall 16-256 nutzen den erweiterten Ein-Byte-Selector. Raw Hex überschreibt die automatische Payload.',
+    sds_callout_help:'TPG RIC wird in die Call-Out-Adressbytes geschrieben. Call-Out ID ist das direkte ID-Byte 0..255. Priority/Ton ist das direkte Priority-Byte 0..15. Raw Hex überschreibt die automatische Payload.',
     sds_msg_label:'Nachricht',cancel:'Abbrechen',send:'Senden',
     th_issi:'ISSI',th_groups:'Gruppen',th_ee:'Energiesparen',th_signal:'Signal',
     th_status:'Status',th_last_seen:'Zuletzt',th_actions:'Aktionen',
     th_id:'ID',th_type:'Typ',th_caller:'Anrufer',
     th_dest:'Ziel',th_speaker:'Sprecher',th_duration:'Dauer',
-    th_time:'Zeit',th_activity:'Aktivität',
+    th_time:'Zeit',th_source:'Quelle',th_activity:'Aktivität',
     last_heard_title:'Zuletzt Gehört',no_activity:'Noch keine Aktivität',
     act_call_group:'Gruppenruf',act_call_individual:'P2P-Ruf',act_sds:'SDS',
     online_badge:'ONLINE',kick:'Entfernen',sds:'SDS',
     call_group:'GRUPPE',call_p2p_s:'P2P-S',call_p2p_d:'P2P-D',call_emergency:'NOTRUF',
-    emg_banner_title:'NOTFALL AKTIV',emg_clear:'Löschen',confirm_clear_emergency:'Notfall für ISSI {issi} löschen?',
+    emg_banner_title:'NOTFALL AKTIV',integrations:'Integrationen',integ_enabled:'Aktiviert',integ_disabled:'Deaktiviert',integ_error:'Fehler',system_sec:'System',emg_chip:'NOTFALL',bs_label:'BS',emg_clear:'Löschen',confirm_clear_emergency:'Notfall für ISSI {issi} löschen?',
     confirm_kick:'ISSI {issi} entfernen?\nDas Terminal wird abgemeldet und zur Neuanmeldung gezwungen.',
     dgna:'DGNA',dgna_title:'Dynamische Gruppenzuweisung',dgna_modal_title:'⬡ Dynamische Gruppenzuweisung',dgna_issi:'Terminal-ISSI',dgna_current:'Aktuelle Gruppen',dgna_gssi:'Gruppe (GSSI)',dgna_assign:'Zuweisen',dgna_deassign:'Entfernen',
     confirm_restart:'FlowStation neu starten?\nAlle aktiven Anrufe werden beendet.',
     confirm_shutdown:'FlowStation herunterfahren?\nDer Dienst wird gestoppt und muss manuell neu gestartet werden.',
     confirm_logout:'Abmelden?',
     saved:'✓ Gespeichert — Neustart zum Anwenden.',save_fail:'✗ Fehler beim Speichern',conn_error:'Verbindungsfehler.',
-    update:'⬆ Update',update_available:'Update verfügbar',update_title:'OTA-Update — github.com/razvanzeces/flowstation',
+    update:'Update',update_available:'Update verfügbar',update_title:'OTA-Update — github.com/razvanzeces/flowstation',
     update_confirm:'Neueste Version von main holen und neu bauen?\nDer Dienst startet automatisch neu.',
     update_running:'Aktualisierung läuft… Fenster nicht schließen.',
     update_done_ok:'✓ Update abgeschlossen. Neustart…',
@@ -3948,22 +4851,27 @@ const LANGS={
     system:'System',sys_info:'Systeminfo',sys_hostname:'Hostname',sys_uptime:'Laufzeit',
     sys_os:'OS',sys_version:'FS-Version',sys_config:'Aktive Konfig',
     sys_cpu:'CPU',sys_cpu_load:'CPU-Auslastung',sys_ram:'RAM',sys_temp:'CPU-Temp',
-    wifi:'WLAN',wifi_status:'Aktuelle Verbindung',wifi_saved:'Gespeicherte Netzwerke',wifi_visible:'Verfügbare Netzwerke',wifi_loading:'Wird geladen…',wifi_scanning:'Suche läuft…',wifi_no_device:'Kein WLAN-Gerät erkannt.',wifi_radio_disabled:'WLAN-Funk ist deaktiviert.',wifi_not_connected:'Mit keinem Netzwerk verbunden.',wifi_no_saved:'Keine gespeicherten Netzwerke.',wifi_no_networks:'Keine Netzwerke in Reichweite.',wifi_ssid:'Netzwerk',wifi_signal:'Signal',wifi_ip:'IP-Adresse',wifi_actions:'Aktionen',wifi_disconnect:'Trennen',wifi_connect:'Verbinden',wifi_connect_to:'Verbinden mit',wifi_connecting:'Verbinde…',wifi_connected:'VERBUNDEN',wifi_connected_ok:'Verbunden.',wifi_saved_tag:'GESPEICHERT',wifi_open:'OFFEN',wifi_forget:'Vergessen',wifi_confirm_forget:'Netzwerk vergessen',wifi_password:'Passwort',wifi_hidden:'Verstecktes Netzwerk (SSID nicht gesendet)',wifi_add_hidden:'+ Verstecktes Netzwerk',wifi_scan:'↻ Suchen',wifi_refresh:'↻ Aktualisieren',wifi_radio_off:'WLAN deaktivieren',wifi_radio_on:'WLAN aktivieren',wifi_warn_lose_access:'⚠ Wenn Sie über WLAN mit dem Dashboard verbunden sind, kann ein Netzwerkwechsel die Verbindung trennen. Stellen Sie sicher, dass Sie einen alternativen Zugang haben.',wifi_err_no_ssid:'SSID erforderlich',cancel:'Abbrechen',sys_sensors:'Host-Hardware-Sensoren',sys_sensors_empty:'Keine Sensoren erkannt.',sys_rf:'RF-Hardware (SoapySDR)',sys_autorefresh:'Auto-Aktualisierung 5s',
+    wifi:'WLAN',wifi_status:'Aktuelle Verbindung',wifi_saved:'Gespeicherte Netzwerke',wifi_visible:'Verfügbare Netzwerke',wifi_loading:'Wird geladen…',wifi_scanning:'Suche läuft…',wifi_no_device:'Kein WLAN-Gerät erkannt.',wifi_radio_disabled:'WLAN-Funk ist deaktiviert.',wifi_not_connected:'Mit keinem Netzwerk verbunden.',wifi_no_saved:'Keine gespeicherten Netzwerke.',wifi_no_networks:'Keine Netzwerke in Reichweite.',wifi_ssid:'Netzwerk',wifi_signal:'Signal',wifi_ip:'IP-Adresse',wifi_actions:'Aktionen',wifi_disconnect:'Trennen',wifi_connect:'Verbinden',wifi_connect_to:'Verbinden mit',wifi_connecting:'Verbinde…',wifi_connected:'VERBUNDEN',wifi_connected_ok:'Verbunden.',wifi_saved_tag:'GESPEICHERT',wifi_open:'OFFEN',wifi_forget:'Vergessen',wifi_confirm_forget:'Netzwerk vergessen',wifi_password:'Passwort',wifi_hidden:'Verstecktes Netzwerk (SSID nicht gesendet)',wifi_add_hidden:'Verstecktes Netzwerk',wifi_scan:'Suchen',wifi_refresh:'Aktualisieren',wifi_radio_off:'WLAN deaktivieren',wifi_radio_on:'WLAN aktivieren',wifi_warn_lose_access:'Wenn Sie über WLAN mit dem Dashboard verbunden sind, kann ein Netzwerkwechsel die Verbindung trennen. Stellen Sie sicher, dass Sie einen alternativen Zugang haben.',wifi_err_no_ssid:'SSID erforderlich',cancel:'Abbrechen',sys_sensors:'Host-Hardware-Sensoren',sys_sensors_empty:'Keine Sensoren erkannt.',sys_rf:'RF-Hardware (SoapySDR)',sys_autorefresh:'Auto-Aktualisierung 5s',
     profile_edit_title:'Konfigprofil bearbeiten',profile_edit_btn:'Bearbeiten',
     profile_edit_save_ok:'✓ Gespeichert',profile_edit_save_fail:'✗ Speichern fehlgeschlagen',
     sys_profiles:'Konfigprofile',sys_activate:'Aktivieren & Neustart',
     sys_active_badge:'AKTIV',sys_no_profiles:'Keine .toml-Profile im Konfigverzeichnis gefunden.',
     sys_activate_confirm:'Zum Profil "{name}" wechseln und neu starten?\nAktuelle Konfig wird gesichert.',
+    sys_title:'System',sys_sec_status:'Status',sys_sec_host:'Host',sys_sec_radio:'Funk-Hardware',sys_sec_sensors:'Sensoren',sys_sec_profiles:'Profile',sys_sec_sds:'SDS-Rundsendung',sys_refresh:'Aktualisieren',sys_probe:'Prüfen',sys_temp_hot:'HEISS',sys_temp_warm:'Warm',sys_temp_ok:'OK',
     sys_bts:'BTS-Verbindung',
+    tg_cat_brew_register:'Brew ISSI REGISTER',
+    tg_brew_register_prefix:'Brew REGISTER-Prefix',
+    tg_brew_register_white:'Brew REGISTER ISSI-Whitelist',
+    tg_brew_register_black:'Brew REGISTER ISSI-Blacklist',
   },
   es:{
     bts_ip:'IP BTS',offline:'SIN CONEXIÓN',online:'EN LÍNEA',
     brew_online:'EN LÍNEA',brew_offline:'SIN CONEXIÓN',
     stations:'Radios',calls:'Llamadas',lastheard:'Última Actividad',log:'Log',rf:'RF',health:'Health',echolink:'EchoLink',echolink_title:'EchoLink',config:'Config',
-    sdslog:'Registro SDS',th_dir:'Dir',th_from:'De',th_to:'Para',th_message:'Mensaje',no_sds:'Aún no hay mensajes SDS',sds_refresh:'⟳ Actualizar',
+    sdslog:'Registro SDS',th_dir:'Dir',th_from:'De',th_to:'Para',th_message:'Mensaje',no_sds:'Aún no hay mensajes SDS',sds_refresh:'Actualizar',
     rf_freq:'Frecuencia central',rf_rate:'Tasa de muestreo',rf_rms:'RMS',rf_peak:'Pico',rf_age:'Captura',
     rf_waiting:'esperando…',rf_live:'en vivo',rf_stale:'obsoleto',
-    rf_spectrum:'Espectro TX DSP (pre-PA)',rf_constellation:'Constelación TX DSP',
+    rf_visualizers:'Visualizadores',rf_spectrum:'Espectro TX DSP (pre-PA)',rf_constellation:'Constelación TX DSP',
     rf_hint_spectrum:'en vivo · FFT 512-bin',rf_hint_constellation:'π/4-DQPSK',
     rf_waterfall:'Cascada Espectro TX',rf_hint_waterfall:'desplazándose · viridis',
     rf_quality:'Calidad de Señal',rf_hint_quality:'medido pre-PA · del mismo snapshot DSP',
@@ -3979,8 +4887,8 @@ const LANGS={
     registered_terminals:'Radios Registrados',
     no_terminals:'No hay radios registrados',no_calls:'No hay llamadas activas',
     live_log:'Log en Vivo',autoscroll:'Auto-desplaz.',filter_all:'Todos',
-    clear:'Limpiar',export:'⤓ Exportar',restart:'⟳ Reiniciar',shutdown:'⏻ Apagar',save:'Guardar',
-    whitelist_title:'Lista blanca ISSI',whitelist_add:'+ Añadir ISSI',whitelist_empty:'Lista vacía — red abierta (cualquier radio puede registrarse).',
+    clear:'Limpiar',export:'Exportar',restart:'Reiniciar',shutdown:'Apagar',save:'Guardar',
+    cfg_sec_configuration:'Configuración',cfg_sec_access:'Control de acceso',cfg_sec_wx:'WX / METAR',whitelist_title:'Lista blanca ISSI',whitelist_add:'Añadir ISSI',whitelist_empty:'Lista vacía — red abierta (cualquier radio puede registrarse).',
     whitelist_help:'Cuando la lista está vacía, cualquier radio puede registrarse (red abierta). Con entradas, solo se aceptan los ISSI listados; el resto se rechazan. Los cambios se aplican al instante y persisten tras reiniciar.',
     whitelist_enforced:'ACTIVA',whitelist_open:'ABIERTA',whitelist_invalid:'Introduce un ISSI válido (1–16777215).',
     wx_title:'Servicio WX / METAR',wx_help:'Servicio meteorológico integrado. Las radios envían un SDS como "METAR LROP" al ISSI del servicio y reciben un informe decodificado. Opcionalmente envía automáticamente el METAR de una estación fija a un ISSI o grupo a intervalos. Datos de aviationweather.gov.',
@@ -3988,7 +4896,7 @@ const LANGS={
     wx_periodic_icao:'ICAO de estación',wx_periodic_dest:'Destino',wx_periodic_isgroup:'El destino es grupo',wx_periodic_isgroup_hint:'(GSSI en vez de ISSI individual)',
     wx_periodic_interval:'Intervalo (segundos)',wx_interval_hint:'Mínimo 300 s (5 min) para no saturar la API meteorológica.',wx_periodic_incomplete:'Indica ICAO de estación y destino para el modo periódico.',
     live_sds_desc:'Transmite un mensaje de texto a todos los radios de la celda, repitiéndose al intervalo de Home Mode Display.',
-    live_sds_text:'Texto del mensaje (máx. 251 caracteres)',live_sds_repeat:'Repetir (0=∞)',live_sds_send:'📢 Difundir',
+    live_sds_text:'Texto del mensaje (máx. 251 caracteres)',live_sds_repeat:'Repetir (0=∞)',live_sds_send:'Difundir',
     live_sds_clear_all:'Borrar Todo',live_sds_empty:'No hay difusiones activas.',
     live_sds_sent:'enviado',live_sds_times:'×',live_sds_forever:'∞',live_sds_delete:'✕',
     fallback_title:'⚠ CONFIGURACIÓN DE RESERVA ACTIVA — No se pudo cargar la configuración principal',
@@ -3998,19 +4906,19 @@ const LANGS={
     th_status:'Estado',th_last_seen:'Visto',th_actions:'Acciones',
     th_id:'ID',th_type:'Tipo',th_caller:'Llamante',
     th_dest:'Destino',th_speaker:'Hablante',th_duration:'Duración',
-    th_time:'Hora',th_activity:'Actividad',
+    th_time:'Hora',th_source:'Origen',th_activity:'Actividad',
     last_heard_title:'Última Actividad',no_activity:'Sin actividad aún',
     act_call_group:'Llamada Grupo',act_call_individual:'Llamada P2P',act_sds:'SDS',
     online_badge:'EN LÍNEA',kick:'Expulsar',sds:'SDS',
     call_group:'GRUPO',call_p2p_s:'P2P-S',call_p2p_d:'P2P-D',call_emergency:'EMERGENCIA',
-    emg_banner_title:'EMERGENCIA ACTIVA',emg_clear:'Borrar',confirm_clear_emergency:'¿Borrar emergencia para ISSI {issi}?',
+    emg_banner_title:'EMERGENCIA ACTIVA',integrations:'Integraciones',integ_enabled:'Activado',integ_disabled:'Desactivado',integ_error:'Error',system_sec:'Sistema',emg_chip:'EMERGENCIA',bs_label:'BS',emg_clear:'Borrar',confirm_clear_emergency:'¿Borrar emergencia para ISSI {issi}?',
     confirm_kick:'¿Expulsar ISSI {issi}?\nEl terminal será desregistrado y forzado a reconectarse.',
     dgna:'DGNA',dgna_title:'Asignación dinámica de grupo',dgna_modal_title:'⬡ Asignación dinámica de grupo',dgna_issi:'ISSI del terminal',dgna_current:'Grupos actuales',dgna_gssi:'Grupo (GSSI)',dgna_assign:'Asignar',dgna_deassign:'Quitar',
     confirm_restart:'¿Reiniciar FlowStation?\nTodas las llamadas activas se interrumpirán.',
     confirm_shutdown:'¿Apagar FlowStation?\nEl servicio se detendrá y deberá reiniciarse manualmente.',
     confirm_logout:'¿Cerrar sesión?',
     saved:'✓ Guardado — reinicia para aplicar.',save_fail:'✗ Error al guardar',conn_error:'Error de conexión.',
-    update:'⬆ Update',update_available:'Actualización disponible',update_title:'Actualización OTA — github.com/razvanzeces/flowstation',
+    update:'Update',update_available:'Actualización disponible',update_title:'Actualización OTA — github.com/razvanzeces/flowstation',
     update_confirm:'¿Obtener la última versión de main y recompilar?\nEl servicio se reiniciará automáticamente.',
     update_running:'Actualizando… no cierres esta ventana.',
     update_done_ok:'✓ Actualización completa. Reiniciando…',
@@ -4019,22 +4927,23 @@ const LANGS={
     system:'Sistema',sys_info:'Info del Sistema',sys_hostname:'Hostname',sys_uptime:'Tiempo activo',
     sys_os:'OS',sys_version:'Versión FS',sys_config:'Config Activa',
     sys_cpu:'CPU',sys_cpu_load:'Carga CPU',sys_ram:'RAM',sys_temp:'Temp CPU',
-    wifi:'WiFi',wifi_status:'Conexión actual',wifi_saved:'Redes guardadas',wifi_visible:'Redes disponibles',wifi_loading:'Cargando…',wifi_scanning:'Escaneando…',wifi_no_device:'No se detectó dispositivo WiFi.',wifi_radio_disabled:'Radio WiFi desactivada.',wifi_not_connected:'No conectado a ninguna red.',wifi_no_saved:'Sin redes guardadas.',wifi_no_networks:'Sin redes en rango.',wifi_ssid:'Red',wifi_signal:'Señal',wifi_ip:'Dirección IP',wifi_actions:'Acciones',wifi_disconnect:'Desconectar',wifi_connect:'Conectar',wifi_connect_to:'Conectar a',wifi_connecting:'Conectando…',wifi_connected:'CONECTADO',wifi_connected_ok:'Conectado.',wifi_saved_tag:'GUARDADO',wifi_open:'ABIERTO',wifi_forget:'Olvidar',wifi_confirm_forget:'Olvidar red',wifi_password:'Contraseña',wifi_hidden:'Red oculta (SSID no difundido)',wifi_add_hidden:'+ Red oculta',wifi_scan:'↻ Escanear',wifi_refresh:'↻ Actualizar',wifi_radio_off:'Desactivar WiFi',wifi_radio_on:'Activar WiFi',wifi_warn_lose_access:'⚠ Si estás conectado al dashboard vía WiFi, cambiar de red puede desconectarte temporalmente. Asegúrate de tener una vía de acceso alternativa.',wifi_err_no_ssid:'SSID requerido',cancel:'Cancelar',sys_sensors:'Sensores del Sistema',sys_sensors_empty:'No se detectaron sensores.',sys_rf:'Hardware RF (SoapySDR)',sys_autorefresh:'Auto-actualización 5s',
+    wifi:'WiFi',wifi_status:'Conexión actual',wifi_saved:'Redes guardadas',wifi_visible:'Redes disponibles',wifi_loading:'Cargando…',wifi_scanning:'Escaneando…',wifi_no_device:'No se detectó dispositivo WiFi.',wifi_radio_disabled:'Radio WiFi desactivada.',wifi_not_connected:'No conectado a ninguna red.',wifi_no_saved:'Sin redes guardadas.',wifi_no_networks:'Sin redes en rango.',wifi_ssid:'Red',wifi_signal:'Señal',wifi_ip:'Dirección IP',wifi_actions:'Acciones',wifi_disconnect:'Desconectar',wifi_connect:'Conectar',wifi_connect_to:'Conectar a',wifi_connecting:'Conectando…',wifi_connected:'CONECTADO',wifi_connected_ok:'Conectado.',wifi_saved_tag:'GUARDADO',wifi_open:'ABIERTO',wifi_forget:'Olvidar',wifi_confirm_forget:'Olvidar red',wifi_password:'Contraseña',wifi_hidden:'Red oculta (SSID no difundido)',wifi_add_hidden:'Red oculta',wifi_scan:'Escanear',wifi_refresh:'Actualizar',wifi_radio_off:'Desactivar WiFi',wifi_radio_on:'Activar WiFi',wifi_warn_lose_access:'Si estás conectado al dashboard vía WiFi, cambiar de red puede desconectarte temporalmente. Asegúrate de tener una vía de acceso alternativa.',wifi_err_no_ssid:'SSID requerido',cancel:'Cancelar',sys_sensors:'Sensores del Sistema',sys_sensors_empty:'No se detectaron sensores.',sys_rf:'Hardware RF (SoapySDR)',sys_autorefresh:'Auto-actualización 5s',
     profile_edit_title:'Editar Perfil Config',profile_edit_btn:'Editar',
     profile_edit_save_ok:'✓ Guardado',profile_edit_save_fail:'✗ Error al guardar',
     sys_profiles:'Perfiles de Config',sys_activate:'Activar y Reiniciar',
     sys_active_badge:'ACTIVO',sys_no_profiles:'No se encontraron perfiles .toml en el directorio.',
     sys_activate_confirm:'¿Cambiar al perfil "{name}" y reiniciar?\nLa config actual será respaldada.',
+    sys_title:'Sistema',sys_sec_status:'Estado',sys_sec_host:'Host',sys_sec_radio:'Hardware de radio',sys_sec_sensors:'Sensores',sys_sec_profiles:'Perfiles',sys_sec_sds:'Difusión SDS',sys_refresh:'Actualizar',sys_probe:'Sondear',sys_temp_hot:'CALIENTE',sys_temp_warm:'Templado',sys_temp_ok:'OK',
     sys_bts:'Conexión BTS',
   },
   hu:{
     bts_ip:'BTS IP',offline:'OFFLINE',online:'ONLINE',
     brew_online:'ONLINE',brew_offline:'OFFLINE',
     stations:'Rádiók',calls:'Hívások',lastheard:'Utoljára Hallott',log:'Napló',rf:'RF',health:'Health',echolink:'EchoLink',echolink_title:'EchoLink',config:'Konfig',
-    sdslog:'SDS Napló',th_dir:'Irány',th_from:'Feladó',th_to:'Címzett',th_message:'Üzenet',no_sds:'Még nincs SDS üzenet',sds_refresh:'⟳ Frissítés',
+    sdslog:'SDS Napló',th_dir:'Irány',th_from:'Feladó',th_to:'Címzett',th_message:'Üzenet',no_sds:'Még nincs SDS üzenet',sds_refresh:'Frissítés',
     rf_freq:'Központi frekvencia',rf_rate:'Mintavételezési ráta',rf_rms:'RMS',rf_peak:'Csúcs',rf_age:'Pillanatkép',
     rf_waiting:'várakozás…',rf_live:'élő',rf_stale:'elavult',
-    rf_spectrum:'TX DSP spektrum (PA előtt)',rf_constellation:'TX DSP konstelláció',
+    rf_visualizers:'Vizualizációk',rf_spectrum:'TX DSP spektrum (PA előtt)',rf_constellation:'TX DSP konstelláció',
     rf_hint_spectrum:'élő · 512-bin FFT',rf_hint_constellation:'π/4-DQPSK',
     rf_waterfall:'TX Spektrum Vízesés',rf_hint_waterfall:'gördülő · viridis',
     rf_quality:'Jelminőség',rf_hint_quality:'PA előtt mérve · ugyanazon DSP pillanatképből',
@@ -4050,8 +4959,8 @@ const LANGS={
     registered_terminals:'Regisztrált rádiók',
     no_terminals:'Nincs regisztrált rádió',no_calls:'Nincs aktív hívás',
     live_log:'Élő napló',autoscroll:'Automatikus görgetés',filter_all:'Mind',
-    clear:'Törlés',export:'⤓ Exportálás',restart:'⟳ Újraindítás',shutdown:'⏻ Leállítás',save:'Mentés',
-    whitelist_title:'ISSI engedélyezőlista',whitelist_add:'+ ISSI hozzáadása',whitelist_empty:'Üres lista — nyílt hálózat (bármely rádió regisztrálhat).',
+    clear:'Törlés',export:'Exportálás',restart:'Újraindítás',shutdown:'Leállítás',save:'Mentés',
+    cfg_sec_configuration:'Konfiguráció',cfg_sec_access:'Hozzáférés-vezérlés',cfg_sec_wx:'WX / METAR',whitelist_title:'ISSI engedélyezőlista',whitelist_add:'ISSI hozzáadása',whitelist_empty:'Üres lista — nyílt hálózat (bármely rádió regisztrálhat).',
     whitelist_help:'Ha a lista üres, bármely rádió regisztrálhat (nyílt hálózat). Ha vannak elemek, csak a listázott ISSI-k engedélyezettek; a többit elutasítja. A módosítások azonnal érvénybe lépnek és újraindítás után is megmaradnak.',
     whitelist_enforced:'AKTÍV',whitelist_open:'NYÍLT',whitelist_invalid:'Adjon meg érvényes ISSI-t (1–16777215).',
     wx_title:'WX / METAR szolgáltatás',wx_help:'Beépített időjárás-szolgáltatás. A rádiók "METAR LROP" formájú SDS-t küldenek a szolgáltatás ISSI-jére, és dekódolt jelentést kapnak. Opcionálisan automatikusan elküldi egy rögzített állomás METAR-ját egy ISSI-re vagy csoportra adott időközönként. Adatok: aviationweather.gov.',
@@ -4064,19 +4973,19 @@ const LANGS={
     th_status:'Állapot',th_last_seen:'Utoljára látva',th_actions:'Műveletek',
     th_id:'ID',th_type:'Típus',th_caller:'Hívó',
     th_dest:'Cél',th_speaker:'Beszélő',th_duration:'Időtartam',
-    th_time:'Idő',th_activity:'Tevékenység',
+    th_time:'Idő',th_source:'Forrás',th_activity:'Tevékenység',
     last_heard_title:'Utoljára hallott',no_activity:'Még nincs tevékenység',
     act_call_group:'Csoportos hívás',act_call_individual:'P2P hívás',act_sds:'SDS',
     online_badge:'ONLINE',kick:'Kizárás',sds:'SDS',
     call_group:'CSOPORT',call_p2p_s:'P2P-S',call_p2p_d:'P2P-D',call_emergency:'VÉSZHÍVÁS',
-    emg_banner_title:'VÉSZHELYZET AKTÍV',emg_clear:'Törlés',confirm_clear_emergency:'Vészhelyzet törlése ISSI {issi}?',
+    emg_banner_title:'VÉSZHELYZET AKTÍV',integrations:'Integrációk',integ_enabled:'Engedélyezve',integ_disabled:'Letiltva',integ_error:'Hiba',system_sec:'Rendszer',emg_chip:'VÉSZHELYZET',bs_label:'BS',emg_clear:'Törlés',confirm_clear_emergency:'Vészhelyzet törlése ISSI {issi}?',
     confirm_kick:'ISSI {issi} kizárása?\nA terminál törlésre kerül és újra kell csatlakoznia.',
     dgna:'DGNA',dgna_title:'Dinamikus csoport-hozzárendelés',dgna_modal_title:'⬡ Dinamikus csoport-hozzárendelés',dgna_issi:'Terminál ISSI',dgna_current:'Jelenlegi csoportok',dgna_gssi:'Csoport (GSSI)',dgna_assign:'Hozzárendel',dgna_deassign:'Eltávolít',
     confirm_restart:'Újraindítja a FlowStation-t?\nAz összes aktív hívás megszakad.',
     confirm_shutdown:'Leállítja a FlowStation-t?\nA szolgáltatást kézzel kell újraindítani.',
     confirm_logout:'Kijelentkezik?',
     saved:'✓ Mentve — újraindítás szükséges az alkalmazáshoz.',save_fail:'✗ Mentési hiba',conn_error:'Kapcsolódási hiba.',
-    update:'⬆ Frissítés',update_available:'Elérhető frissítés',update_title:'OTA frissítés — github.com/razvanzeces/flowstation',
+    update:'Frissítés',update_available:'Elérhető frissítés',update_title:'OTA frissítés — github.com/razvanzeces/flowstation',
     update_confirm:'Letölti a legújabb verziót a main ágból és újraépíti?\nA szolgáltatás automatikusan újraindul.',
     update_running:'Frissítés folyamatban… ne zárja be az ablakot.',
     update_done_ok:'✓ Frissítés kész. Újraindul…',
@@ -4087,17 +4996,18 @@ const LANGS={
     sys_profiles:'Konfig profilok',sys_activate:'Aktiválás és újraindítás',
     sys_active_badge:'AKTÍV',sys_no_profiles:'Nem található .toml profil a könyvtárban.',
     sys_activate_confirm:'Váltás a(z) "{name}" profilra és újraindítás?\nAz aktuális konfig mentésre kerül.',
+    sys_title:'Rendszer',sys_sec_status:'Állapot',sys_sec_host:'Gazda',sys_sec_radio:'Rádió hardver',sys_sec_sensors:'Szenzorok',sys_sec_profiles:'Profilok',sys_sec_sds:'SDS sugárzás',sys_refresh:'Frissítés',sys_probe:'Vizsgálat',sys_temp_hot:'FORRÓ',sys_temp_warm:'Meleg',sys_temp_ok:'OK',
     sys_bts:'BTS kapcsolat',
-    wifi:'WiFi',wifi_status:'Jelenlegi kapcsolat',wifi_saved:'Mentett hálózatok',wifi_visible:'Elérhető hálózatok',wifi_loading:'Betöltés…',wifi_scanning:'Keresés…',wifi_no_device:'Nem észlelhető WiFi eszköz.',wifi_radio_disabled:'WiFi rádió letiltva.',wifi_not_connected:'Nincs kapcsolat hálózathoz.',wifi_no_saved:'Nincs mentett hálózat.',wifi_no_networks:'Nincs hálózat hatótávolságon belül.',wifi_ssid:'Hálózat',wifi_signal:'Jelerősség',wifi_ip:'IP-cím',wifi_actions:'Műveletek',wifi_disconnect:'Bontás',wifi_connect:'Csatlakozás',wifi_connect_to:'Csatlakozás:',wifi_connecting:'Csatlakozás…',wifi_connected:'KAPCSOLÓDVA',wifi_connected_ok:'Csatlakoztatva.',wifi_saved_tag:'MENTETT',wifi_open:'NYITOTT',wifi_forget:'Elfelejtés',wifi_confirm_forget:'Hálózat elfelejtése',wifi_password:'Jelszó',wifi_hidden:'Rejtett hálózat (SSID nem sugárzott)',wifi_add_hidden:'+ Rejtett hálózat',wifi_scan:'↻ Keresés',wifi_refresh:'↻ Frissítés',wifi_radio_off:'WiFi letiltása',wifi_radio_on:'WiFi engedélyezése',wifi_warn_lose_access:'⚠ Ha WiFi-n keresztül csatlakozol a vezérlőpulthoz, a hálózat módosítása lecsatlakoztathat. Biztosíts alternatív hozzáférést.',wifi_err_no_ssid:'SSID szükséges',cancel:'Mégse',sys_sensors:'Gazdagép szenzorok',sys_sensors_empty:'Nem észlelhetők szenzorok.',
+    wifi:'WiFi',wifi_status:'Jelenlegi kapcsolat',wifi_saved:'Mentett hálózatok',wifi_visible:'Elérhető hálózatok',wifi_loading:'Betöltés…',wifi_scanning:'Keresés…',wifi_no_device:'Nem észlelhető WiFi eszköz.',wifi_radio_disabled:'WiFi rádió letiltva.',wifi_not_connected:'Nincs kapcsolat hálózathoz.',wifi_no_saved:'Nincs mentett hálózat.',wifi_no_networks:'Nincs hálózat hatótávolságon belül.',wifi_ssid:'Hálózat',wifi_signal:'Jelerősség',wifi_ip:'IP-cím',wifi_actions:'Műveletek',wifi_disconnect:'Bontás',wifi_connect:'Csatlakozás',wifi_connect_to:'Csatlakozás:',wifi_connecting:'Csatlakozás…',wifi_connected:'KAPCSOLÓDVA',wifi_connected_ok:'Csatlakoztatva.',wifi_saved_tag:'MENTETT',wifi_open:'NYITOTT',wifi_forget:'Elfelejtés',wifi_confirm_forget:'Hálózat elfelejtése',wifi_password:'Jelszó',wifi_hidden:'Rejtett hálózat (SSID nem sugárzott)',wifi_add_hidden:'Rejtett hálózat',wifi_scan:'Keresés',wifi_refresh:'Frissítés',wifi_radio_off:'WiFi letiltása',wifi_radio_on:'WiFi engedélyezése',wifi_warn_lose_access:'Ha WiFi-n keresztül csatlakozol a vezérlőpulthoz, a hálózat módosítása lecsatlakoztathat. Biztosíts alternatív hozzáférést.',wifi_err_no_ssid:'SSID szükséges',cancel:'Mégse',sys_sensors:'Gazdagép szenzorok',sys_sensors_empty:'Nem észlelhetők szenzorok.',
   },
   zh:{
     bts_ip:'BTS IP',offline:'离线',online:'在线',
     brew_online:'在线',brew_offline:'离线',
     stations:'终端',calls:'通话',lastheard:'最近通话',log:'日志',rf:'RF',health:'Health',echolink:'EchoLink',echolink_title:'EchoLink',config:'配置',
-    sdslog:'SDS日志',th_dir:'方向',th_from:'发件',th_to:'收件',th_message:'消息',no_sds:'暂无SDS消息',sds_refresh:'⟳ 刷新',
+    sdslog:'SDS日志',th_dir:'方向',th_from:'发件',th_to:'收件',th_message:'消息',no_sds:'暂无SDS消息',sds_refresh:'刷新',
     rf_freq:'中心频率',rf_rate:'采样率',rf_rms:'RMS',rf_peak:'峰值',rf_age:'快照',
     rf_waiting:'等待中…',rf_live:'实时',rf_stale:'已过期',
-    rf_spectrum:'TX DSP 频谱（功放前）',rf_constellation:'TX DSP 星座图',
+    rf_visualizers:'可视化',rf_spectrum:'TX DSP 频谱（功放前）',rf_constellation:'TX DSP 星座图',
     rf_hint_spectrum:'实时 · 512 点 FFT',rf_hint_constellation:'π/4-DQPSK',
     rf_waterfall:'TX 频谱瀑布图',rf_hint_waterfall:'滚动 · viridis 配色',
     rf_quality:'信号质量',rf_hint_quality:'功放前测量 · 来自同一 DSP 快照',
@@ -4113,8 +5023,8 @@ const LANGS={
     registered_terminals:'已注册终端',
     no_terminals:'暂无终端注册',no_calls:'无活跃通话',
     live_log:'实时日志',autoscroll:'自动滚动',filter_all:'全部',
-    clear:'清除',export:'⤓ 导出',restart:'⟳ 重启',shutdown:'⏻ 关机',save:'保存',
-    whitelist_title:'ISSI 白名单',whitelist_add:'+ 添加 ISSI',whitelist_empty:'列表为空 — 开放网络（任何电台均可注册）。',
+    clear:'清除',export:'导出',restart:'重启',shutdown:'关机',save:'保存',
+    cfg_sec_configuration:'配置',cfg_sec_access:'访问控制',cfg_sec_wx:'WX / METAR',whitelist_title:'ISSI 白名单',whitelist_add:'添加 ISSI',whitelist_empty:'列表为空 — 开放网络（任何电台均可注册）。',
     whitelist_help:'列表为空时，任何电台均可注册（开放网络）。有条目时，仅接受列出的 ISSI，其余一律拒绝。更改即时生效并在重启后保留。',
     whitelist_enforced:'已启用',whitelist_open:'开放',whitelist_invalid:'请输入有效的 ISSI（1–16777215）。',
     wx_title:'WX / METAR 服务',wx_help:'内置气象服务。电台向服务 ISSI 发送如 "METAR LROP" 的 SDS 即可获得解码报告。可选择按间隔自动向 ISSI 或群组发送固定台站的 METAR。数据来自 aviationweather.gov。',
@@ -4123,7 +5033,7 @@ const LANGS={
     wx_periodic_interval:'间隔（秒）',wx_interval_hint:'最少 300 秒（5 分钟），以免频繁请求气象 API。',wx_periodic_incomplete:'定时模式需同时设置台站 ICAO 和目标。',
     sds_title:'⬡ 发送 SDS 短消息',sds_dest:'目标 ISSI',
     live_sds_desc:'向本小区所有终端广播文本消息，按 Home Mode Display 间隔重复发送。直到删除或达到重复次数为止。',
-    live_sds_text:'消息内容（最多 251 字符）',live_sds_repeat:'重复次数 (0=无限)',live_sds_send:'📢 广播',
+    live_sds_text:'消息内容（最多 251 字符）',live_sds_repeat:'重复次数 (0=无限)',live_sds_send:'广播',
     live_sds_clear_all:'清除全部',live_sds_empty:'暂无广播任务。',
     live_sds_sent:'已发送',live_sds_times:'次',live_sds_forever:'∞',live_sds_delete:'删除',
     fallback_title:'⚠ 正在使用后备配置 — 主配置加载失败',
@@ -4132,19 +5042,19 @@ const LANGS={
     th_status:'状态',th_last_seen:'最后在线',th_actions:'操作',
     th_id:'ID',th_type:'类型',th_caller:'主叫',
     th_dest:'被叫',th_speaker:'讲话者',th_duration:'时长',
-    th_time:'时间',th_activity:'活动',
+    th_time:'时间',th_source:'来源',th_activity:'活动',
     last_heard_title:'最近通话记录',no_activity:'暂无活动记录',
     act_call_group:'组呼',act_call_individual:'点对点',act_sds:'SDS',
     online_badge:'在线',kick:'踢下线',sds:'SDS',
     call_group:'组呼',call_p2p_s:'P2P-S',call_p2p_d:'P2P-D',call_emergency:'紧急呼叫',
-    emg_banner_title:'紧急状态激活',emg_clear:'清除',confirm_clear_emergency:'清除 ISSI {issi} 的紧急状态？',
+    emg_banner_title:'紧急状态激活',integrations:'集成',integ_enabled:'已启用',integ_disabled:'已禁用',integ_error:'错误',system_sec:'系统',emg_chip:'紧急',bs_label:'BS',emg_clear:'清除',confirm_clear_emergency:'清除 ISSI {issi} 的紧急状态？',
     confirm_kick:'确定踢下 ISSI {issi}？\n终端将被注销并强制重新注册。',
     dgna:'DGNA',dgna_title:'动态组分配',dgna_modal_title:'⬡ 动态组分配',dgna_issi:'终端 ISSI',dgna_current:'当前组',dgna_gssi:'组 (GSSI)',dgna_assign:'分配',dgna_deassign:'移除',
     confirm_restart:'确定重启 FlowStation？\n所有正在进行的通话将被中断。',
     confirm_shutdown:'确定关闭 FlowStation？\n服务将停止，需要手动重启。',
     confirm_logout:'确定注销吗？',
     saved:'✓ 已保存 — 重启后生效',save_fail:'✗ 保存失败',conn_error:'连接错误',
-    update:'⬆ 更新',update_available:'有可用更新',update_title:'OTA 在线更新 — github.com/razvanzeces/flowstation',
+    update:'更新',update_available:'有可用更新',update_title:'OTA 在线更新 — github.com/razvanzeces/flowstation',
     update_confirm:'是否从 main 分支拉取最新代码并重新构建？\n服务将自动重启。',
     update_running:'正在更新… 请不要关闭此窗口',
     update_done_ok:'✓ 更新完成，正在重启…',
@@ -4153,12 +5063,13 @@ const LANGS={
     system:'系统',sys_info:'系统信息',sys_hostname:'主机名',sys_uptime:'运行时间',
     sys_version:'FS 版本',sys_os:'操作系统',sys_config:'当前配置',
     sys_cpu:'CPU',sys_cpu_load:'CPU 负载',sys_ram:'内存',sys_temp:'CPU 温度',
-    wifi:'WiFi',wifi_status:'当前连接',wifi_saved:'已保存的网络',wifi_visible:'可用网络',wifi_loading:'加载中…',wifi_scanning:'扫描中…',wifi_no_device:'未检测到 WiFi 设备。',wifi_radio_disabled:'WiFi 已禁用。',wifi_not_connected:'未连接任何网络。',wifi_no_saved:'无已保存的网络。',wifi_no_networks:'范围内无可用网络。',wifi_ssid:'网络',wifi_signal:'信号',wifi_ip:'IP 地址',wifi_actions:'操作',wifi_disconnect:'断开',wifi_connect:'连接',wifi_connect_to:'连接到',wifi_connecting:'连接中…',wifi_connected:'已连接',wifi_connected_ok:'已连接。',wifi_saved_tag:'已保存',wifi_open:'开放',wifi_forget:'忘记',wifi_confirm_forget:'忘记网络',wifi_password:'密码',wifi_hidden:'隐藏网络 (SSID 不广播)',wifi_add_hidden:'+ 隐藏网络',wifi_scan:'↻ 扫描',wifi_refresh:'↻ 刷新',wifi_radio_off:'禁用 WiFi',wifi_radio_on:'启用 WiFi',wifi_warn_lose_access:'⚠ 如果您通过 WiFi 连接到仪表板,更换网络可能会暂时断开您的连接。请确保有备用访问方式。',wifi_err_no_ssid:'需要 SSID',cancel:'取消',sys_sensors:'主机硬件传感器',sys_sensors_empty:'未检测到传感器。',sys_rf:'RF 硬件 (SoapySDR)',sys_autorefresh:'自动刷新 5秒',
+    wifi:'WiFi',wifi_status:'当前连接',wifi_saved:'已保存的网络',wifi_visible:'可用网络',wifi_loading:'加载中…',wifi_scanning:'扫描中…',wifi_no_device:'未检测到 WiFi 设备。',wifi_radio_disabled:'WiFi 已禁用。',wifi_not_connected:'未连接任何网络。',wifi_no_saved:'无已保存的网络。',wifi_no_networks:'范围内无可用网络。',wifi_ssid:'网络',wifi_signal:'信号',wifi_ip:'IP 地址',wifi_actions:'操作',wifi_disconnect:'断开',wifi_connect:'连接',wifi_connect_to:'连接到',wifi_connecting:'连接中…',wifi_connected:'已连接',wifi_connected_ok:'已连接。',wifi_saved_tag:'已保存',wifi_open:'开放',wifi_forget:'忘记',wifi_confirm_forget:'忘记网络',wifi_password:'密码',wifi_hidden:'隐藏网络 (SSID 不广播)',wifi_add_hidden:'隐藏网络',wifi_scan:'扫描',wifi_refresh:'刷新',wifi_radio_off:'禁用 WiFi',wifi_radio_on:'启用 WiFi',wifi_warn_lose_access:'如果您通过 WiFi 连接到仪表板,更换网络可能会暂时断开您的连接。请确保有备用访问方式。',wifi_err_no_ssid:'需要 SSID',cancel:'取消',sys_sensors:'主机硬件传感器',sys_sensors_empty:'未检测到传感器。',sys_rf:'RF 硬件 (SoapySDR)',sys_autorefresh:'自动刷新 5秒',
     profile_edit_title:'编辑配置文件',profile_edit_btn:'编辑',
     profile_edit_save_ok:'✓ 已保存',profile_edit_save_fail:'✗ 保存失败',
     sys_profiles:'配置文件',sys_activate:'激活并重启',
     sys_active_badge:'当前使用',sys_no_profiles:'配置目录中未找到 .toml 配置文件。',
     sys_activate_confirm:'切换到配置文件 "{name}" 并重启？\n当前配置将被备份。',
+    sys_title:'系统',sys_sec_status:'状态',sys_sec_host:'主机',sys_sec_radio:'射频硬件',sys_sec_sensors:'传感器',sys_sec_profiles:'配置档案',sys_sec_sds:'SDS 广播',sys_refresh:'刷新',sys_probe:'探测',sys_temp_hot:'过热',sys_temp_warm:'温热',sys_temp_ok:'正常',
     sys_bts:'BTS 连接',
   },
 };
@@ -4258,7 +5169,7 @@ function closeMobileSidebar(){
 }
 
 // ── Page navigation ───────────────────────────────────────────────────────
-const PAGE_TITLES={stations:'stations',calls:'calls',lastheard:'lastheard',log:'log',sdslog:'sdslog',rf:'rf',health:'health',asterisk:'asterisk',dapnet:'dapnet',echolink:'echolink',meshcom:'meshcom',geoalarm:'geoalarm',config:'config',system:'system'};
+const PAGE_TITLES={stations:'stations',calls:'calls',lastheard:'lastheard',log:'log',sdslog:'sdslog',rf:'rf',health:'health',asterisk:'asterisk',dapnet:'dapnet',echolink:'echolink',meshcom:'meshcom',maps:'maps',geoalarm:'geoalarm',config:'config',system:'system'};
 function showPage(name,el){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
@@ -4273,6 +5184,7 @@ function showPage(name,el){
   if(name==='dapnet'){loadDapnet();loadDapnetLog();}
   if(name==='echolink'){loadEcholink();}
   if(name==='meshcom'){loadMeshcom();}
+  if(name==='maps'){bindMapsControls();refreshMapsData();}
   if(name==='geoalarm'){loadGeoalarm();}
   if(name==='config'){loadConfig();loadWhitelist();loadWx();}
   if(name==='telegram'){loadTelegram();}
@@ -4502,7 +5414,7 @@ function wifiShowPasswordModal(ssid, isOpen){
   pskRow.style.display = isOpen ? 'none' : '';
   hiddenRow.style.display = 'none';
   title.textContent = `${t('wifi_connect_to')||'Connect to'}: ${ssid}`;
-  document.getElementById('wifi-modal').style.display = 'flex';
+  document.getElementById('wifi-modal').classList.add('open'); paintIcons(document.getElementById('wifi-modal'));
   if(!isOpen) setTimeout(()=>pskInput.focus(), 50);
 }
 
@@ -4526,12 +5438,12 @@ function wifiShowHiddenModal(){
   pskRow.style.display = '';
   hiddenRow.style.display = '';
   title.textContent = t('wifi_add_hidden')||'Add hidden network';
-  document.getElementById('wifi-modal').style.display = 'flex';
+  document.getElementById('wifi-modal').classList.add('open'); paintIcons(document.getElementById('wifi-modal'));
   setTimeout(()=>ssidInput.focus(), 50);
 }
 
 function wifiCloseModal(){
-  document.getElementById('wifi-modal').style.display = 'none';
+  document.getElementById('wifi-modal').classList.remove('open');
 }
 
 async function wifiModalSubmit(){
@@ -4594,7 +5506,7 @@ async function wifiCall(url, body){
 function escAttr(s){ return String(s).replace(/&/g,'&amp;').replace(/'/g,"&#39;").replace(/"/g,'&quot;'); }
 
 // ── State + WS ────────────────────────────────────────────────────────────
-let ws=null,state={ms:{},calls:{},emergencies:{},lastHeard:[],sdsLog:[],dapnetLog:[],echolinkDirectory:[],echolinkDirectoryStatus:'',meshcomNodes:[],meshcomMessages:[],geoalarmEvents:[],brewOnline:false,brewVer:0},sdsDest=0;
+let ws=null,state={ms:{},calls:{},emergencies:{},lastHeard:[],sdsLog:[],dapnetLog:[],echolinkDirectory:[],echolinkDirectoryStatus:'',meshcomNodes:[],meshcomMessages:[],geoalarmEvents:[],geoalarmConfig:null,brewOnline:false,brewVer:0,brewStatus:null,brewStatusLoadedAt:0},sdsDest=0;
 
 // ── RadioID callsigns (indicativ) ──────────────────────────────────────────────
 // issi -> {cs:"CALLSIGN", fl:"🇷🇴"} (found; fl is the country flag emoji from the prefix, or "")
@@ -4602,7 +5514,7 @@ let ws=null,state={ms:{},calls:{},emergencies:{},lastHeard:[],sdsLog:[],dapnetLo
 let callsigns={};
 let _csInflight=false;
 // Render an ISSI with its RadioID callsign (and country flag, when known) appended.
-function idCell(issi){const c=callsigns[issi];if(!c||!c.cs)return `<code>${issi}</code>`;const fl=c.fl?c.fl+' ':'';return `<code>${issi}</code> <span class="callsign">${fl}${c.cs}</span>`;}
+function idCell(issi){const c=callsigns[issi];if(!c||!c.cs)return `<code>${issi}</code>`;const fl=c.fl?c.fl+' ':'';return `<code>${issi}</code> <span class="callsign">${fl}${escHtml(c.cs)}</span>`;}
 // Resolve callsigns for every ISSI currently on screen we have not looked up yet. On-demand: the
 // server fetches unknowns from RadioID in the background and caches them locally; pending IDs are
 // omitted from the response and retried on the next tick. Found/absent results are cached here.
@@ -4644,6 +5556,7 @@ function renderEmergencyBanner(){
   const titleEl=b.querySelector('[data-i18n="emg_banner_title"]');
   if(titleEl)titleEl.textContent=t('emg_banner_title');
   const arr=Object.values(state.emergencies||{});
+  syncTopbarChips();
   if(!arr.length){b.style.display='none';list.innerHTML='';return;}
   b.style.display='flex';
   list.innerHTML=arr.sort((a,b)=>a.issi-b.issi).map(e=>{
@@ -4656,31 +5569,124 @@ function renderEmergencyBanner(){
 }
 function clearEmergency(issi){if(!confirm(t('confirm_clear_emergency',{issi})))return;wsSend({type:'emergency_clear',issi});}
 
-function setBrewStatus(online,version){
-  state.brewOnline=online;state.brewVer=version||0;
+// ── Topbar status chips (BS / Brew / Emergency) — calm always-visible state.
+// Mirrors the footer LEDs + emergency state onto the .pill chips in the header.
+let brewStatusFetchInFlight=false;
+function configuredBrewServers(){
+  const servers=(state.brewStatus&&state.brewStatus.servers)||[];
+  return servers.filter(function(s){return s&&s.configured;});
+}
+function brewUiSummary(online,version){
+  const servers=configuredBrewServers();
+  if(servers.length>1){
+    const connected=servers.filter(function(s){return !!s.connected;}).length;
+    const total=servers.length;
+    const all=connected===total;
+    const any=connected>0;
+    const statusText=connected+'/'+total+' '+t('brew_online');
+    const detail=servers.map(function(s){
+      return (s.title||s.entity||'Brew')+': '+(s.connected?t('brew_online'):t('brew_offline'));
+    }).join(' · ');
+    return {
+      online:any,
+      multi:true,
+      cardClass:all?'is-info':(any?'is-warn':'is-danger'),
+      pillClass:all?'pill-info':(any?'pill-warn':'pill-idle'),
+      value:statusText,
+      detail,
+      hero:connected+'/'+total,
+      chip:'Brew '+connected+'/'+total,
+      badge:connected+'/'+total,
+    };
+  }
+  return {
+    online,
+    multi:false,
+    cardClass:online?'is-info':'is-danger',
+    pillClass:online?'pill-info':'pill-idle',
+    value:online?t('brew_online'):t('brew_offline'),
+    detail:online?`Brew v${version||0}`:'—',
+    hero:online?`v${version||0}`:t('brew_offline'),
+    chip:online?('Brew v'+(version||0)):'Brew',
+    badge:online?('v'+(version||0)):'',
+  };
+}
+async function refreshBrewServerStatus(force){
+  const now=Date.now();
+  if(brewStatusFetchInFlight)return;
+  if(!force&&state.brewStatusLoadedAt&&now-state.brewStatusLoadedAt<5000)return;
+  brewStatusFetchInFlight=true;
+  try{
+    const r=await fetch('/api/brew/status');
+    if(r.ok){
+      state.brewStatus=await r.json();
+      state.brewStatusLoadedAt=Date.now();
+      renderBrewStatus();
+    }
+  }catch{}finally{
+    brewStatusFetchInFlight=false;
+  }
+}
+function syncTopbarChips(){
+  const led=document.getElementById('connLed');
+  const bsOn=!!(led&&led.classList.contains('on'));
+  const bs=document.getElementById('chip-bs');
+  if(bs){
+    bs.className='pill '+(bsOn?'pill-ok':'pill-idle');
+    const lbl=bs.querySelector('[data-i18n="bs_label"]');
+    if(lbl)lbl.textContent='BS '+(bsOn?t('online'):t('offline'));
+  }
+  const brew=document.getElementById('chip-brew');
+  if(brew){
+    const summary=brewUiSummary(state.brewOnline,state.brewVer);
+    brew.className='pill '+summary.pillClass;
+    const span=brew.querySelector('span');
+    if(span)span.textContent=summary.chip;
+  }
+  const emg=document.getElementById('chip-emergency');
+  if(emg)emg.style.display=Object.keys(state.emergencies||{}).length?'inline-flex':'none';
+}
+
+function renderBrewStatus(){
+  const summary=brewUiSummary(state.brewOnline,state.brewVer);
   const led=document.getElementById('brewLed');
   const txt=document.getElementById('brewText');
   const vbadge=document.getElementById('brewVerBadge');
-  if(online){
+  if(summary.online){
     led.classList.add('on');
-    txt.textContent=t('brew_online');txt.style.color='var(--accent2)';
-    if(vbadge){
-      const v=version||0;
-      vbadge.textContent='v'+v;vbadge.style.display='inline-block';
-      if(v>=1){vbadge.style.background='rgba(0,212,168,0.15)';vbadge.style.color='var(--accent)';vbadge.style.border='1px solid rgba(0,212,168,0.4)';}
-      else{vbadge.style.background='rgba(255,178,36,0.15)';vbadge.style.color='var(--warn)';vbadge.style.border='1px solid rgba(255,178,36,0.4)';}
-    }
+    txt.textContent=summary.value;txt.style.color=summary.multi&&summary.cardClass==='is-warn'?'var(--warn)':'var(--accent2)';
   } else {
-    led.classList.remove('on');txt.textContent=t('brew_offline');txt.style.color='';
-    if(vbadge)vbadge.style.display='none';
+    led.classList.remove('on');txt.textContent=summary.value;txt.style.color='';
   }
-  // Update stat card
+  if(vbadge){
+    if(summary.badge){
+      vbadge.textContent=summary.badge;vbadge.style.display='inline-block';
+      const warn=summary.cardClass==='is-warn';
+      const ok=summary.cardClass==='is-info';
+      vbadge.style.background=ok?'rgba(0,212,168,0.15)':(warn?'rgba(255,178,36,0.15)':'rgba(255,76,76,0.15)');
+      vbadge.style.color=ok?'var(--accent)':(warn?'var(--warn)':'var(--danger)');
+      vbadge.style.border=ok?'1px solid rgba(0,212,168,0.4)':(warn?'1px solid rgba(255,178,36,0.4)':'1px solid rgba(255,76,76,0.4)');
+    } else {
+      vbadge.style.display='none';
+    }
+  }
+  // Update stat card — state via ONE class (kills inline color split).
   const bv=document.getElementById('stat-brew-val');
   const bs=document.getElementById('stat-brew-sub');
-  if(bv){bv.textContent=online?t('brew_online'):t('brew_offline');bv.style.color=online?'var(--accent2)':'var(--danger)';}
-  if(bs)bs.textContent=online?`Brew v${version||0}`:'—';
+  const bcard=document.getElementById('stat-brew-card');
+  if(bv){bv.textContent=summary.value;}
+  if(bcard){bcard.classList.remove('is-info','is-warn','is-danger');bcard.classList.add(summary.cardClass);}
+  if(bs)bs.textContent=summary.detail;
+  const hb=document.getElementById('stations-hero-brew');
+  if(hb)hb.textContent=summary.hero;
   // System panel
-  updateSysBtsPanel(document.getElementById('connLed').classList.contains('on'),online,version||0);
+  updateSysBtsPanel(document.getElementById('connLed').classList.contains('on'),state.brewOnline,state.brewVer||0);
+  syncTopbarChips();
+}
+function setBrewStatus(online,version){
+  state.brewOnline=online;state.brewVer=version||0;
+  renderBrewStatus();
+  refreshBrewServerStatus(false);
 }
 
 function connect(){
@@ -4690,13 +5696,17 @@ function connect(){
     document.getElementById('connLed').classList.add('on');
     const ct=document.getElementById('connText');ct.textContent=t('online');ct.style.color='var(--accent)';
     updateSysBtsPanel(true,state.brewOnline,state.brewVer);
+    syncTopbarChips();
     ws.send(JSON.stringify({type:'subscribe'}));
+    refreshBrewServerStatus(true);
   };
   ws.onclose=()=>{
     document.getElementById('connLed').classList.remove('on');
     const ct=document.getElementById('connText');ct.textContent=t('offline');ct.style.color='var(--danger)';
+    state.brewStatus=null;state.brewStatusLoadedAt=0;
     setBrewStatus(false,0);
     updateSysBtsPanel(false,false,0);
+    syncTopbarChips();
     setTimeout(connect,3000);
   };
   ws.onmessage=(e)=>{try{handleMsg(JSON.parse(e.data));}catch{}};
@@ -4774,8 +5784,10 @@ function handleMsg(msg){
       }
       renderCalls();renderLastHeard();break;
     case 'call_ended':
+      {const c=state.calls[msg.call_id];
+       if(c&&c.started_at)updateLastHeardDuration(msg.call_id,Math.max(0,Math.floor((Date.now()-c.started_at)/1000)));}
       tsClearCall(msg.call_id);updateTsBlocks();
-      delete state.calls[msg.call_id];renderCalls();break;
+      delete state.calls[msg.call_id];renderCalls();renderLastHeard();break;
     case 'ts_voice':
       tsVoice(msg.ts);break;
     case 'speaker_changed':
@@ -4791,19 +5803,27 @@ function handleMsg(msg){
       if(state.ms[msg.issi])state.ms[msg.issi].energy_saving_mode=msg.mode;
       renderStations();break;
     case 'last_heard':
-      pushLastHeard({issi:msg.issi,activity:msg.activity,dest:msg.dest,ts:new Date().toTimeString().slice(0,8)});
+      pushLastHeard({issi:msg.issi,activity:msg.activity,dest:msg.dest,source:msg.source,ts:new Date().toTimeString().slice(0,8)});
       renderLastHeard();break;
     case 'log':appendLog(msg);break;
     case 'sds_log':
       if(!state.sdsLog)state.sdsLog=[];
       state.sdsLog.unshift({ts:nowStamp(),direction:msg.direction,source_issi:msg.source_issi,dest_issi:msg.dest_issi,is_group:msg.is_group,protocol_id:msg.protocol_id,text:msg.text});
       if(state.sdsLog.length>500)state.sdsLog.pop();
-      renderSdsLog();refreshCallsigns();break;
+      renderSdsLog();renderMapsIfActive();refreshCallsigns();break;
     case 'dapnet_log':
       if(!state.dapnetLog)state.dapnetLog=[];
       state.dapnetLog.unshift({ts:nowStamp(),direction:msg.direction,id:msg.id,callsign:msg.callsign,recipient:msg.recipient,text:msg.text,priority:msg.priority,paths:msg.paths||[]});
       if(state.dapnetLog.length>500)state.dapnetLog.pop();
       renderDapnetLog();break;
+    case 'meshcom_message':
+      if(!state.meshcomMessages)state.meshcomMessages=[];
+      state.meshcomMessages.unshift(meshNormalizeRouteItem({ts:msg.ts||nowStamp(),direction:msg.direction,msg_type:msg.msg_type,src_type:msg.src_type,src:msg.src,via:msg.via||[],dst:msg.dst,msg:msg.msg,msg_id:msg.msg_id,paths:msg.paths||[],lat:msg.lat,lon:msg.lon,alt:msg.alt,batt:msg.batt,rssi:msg.rssi,snr:msg.snr}));
+      if(state.meshcomMessages.length>10000)state.meshcomMessages.pop();
+      renderMeshcomMessages();renderMapsIfActive();break;
+    case 'meshcom_node':
+      upsertMeshcomNode(msg);
+      renderMeshcomNodes();renderMapsIfActive();break;
     case 'tx_visual':handleTxVisual(msg);break;
     case 'tx_quality':handleTxQuality(msg);break;
     case 'sdr_health':handleSdrHealth(msg);break;
@@ -4822,34 +5842,115 @@ function handleMsg(msg){
 // Small battery-with-bolt glyph — conveys "Energy Economy" (power-saving) at a glance.
 const EE_ICON='<svg viewBox="0 0 24 24" width="9" height="9" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" style="vertical-align:-1px;margin-right:3px;flex-shrink:0"><rect x="2" y="7" width="16" height="10" rx="2"/><path d="M22 10v4" stroke-linecap="round"/><path d="M10.5 9.5 8 13h3l-2.5 3.5" fill="none" stroke-linecap="round"/></svg>';
 function eeLabel(mode){
-  if(!mode||mode===0)return '<span style="color:var(--text3);font-size:10px">—</span>';
+  if(!mode||mode===0)return '<span class="muted" style="font-size:10px">—</span>';
   const labels=['','EG1','EG2','EG3','EG4','EG5','EG6','EG7'];
-  const colors=['','var(--accent)','var(--accent)','var(--accent2)','var(--accent2)','var(--warn)','var(--danger)','var(--danger)'];
+  // Severity tier → .pill variant (no inline color literals).
+  const variants=['','pill-ok','pill-ok','pill-info','pill-info','pill-warn','pill-danger','pill-danger'];
   const tips=['','~1s','~2s','~3s','~4s','~5s','~6s','~7s'];
-  const col=colors[mode]||'var(--text2)';
-  return `<span class="badge" title="Energy Economy Mode ${mode} — wake ${tips[mode]}" style="display:inline-flex;align-items:center;background:color-mix(in srgb,${col} 12%,transparent);border-color:${col};color:${col};font-size:9px">${EE_ICON}${labels[mode]}</span>`;
+  const v=variants[mode]||'pill-idle';
+  return `<span class="pill ${v} no-dot" title="Energy Economy Mode ${mode} — wake ${tips[mode]}"><span class="pill-icon">${EE_ICON}</span>${labels[mode]}</span>`;
 }
 function lastSeenLabel(secs){
-  if(secs==null)return'—';
-  if(secs<5)return'<span style="color:var(--accent)">now</span>';
-  if(secs<60)return`<span style="color:var(--accent2)">${secs}s</span>`;
-  if(secs<3600)return`<span style="color:var(--text2)">${Math.floor(secs/60)}m${secs%60}s</span>`;
-  return`<span style="color:var(--warn)">${Math.floor(secs/3600)}h${Math.floor((secs%3600)/60)}m</span>`;
+  if(secs==null)return'<span class="muted num">—</span>';
+  if(secs<5)return'<span class="num" style="color:var(--ok)">now</span>';
+  if(secs<60)return`<span class="num accent">${secs}s</span>`;
+  if(secs<3600)return`<span class="num">${Math.floor(secs/60)}m${secs%60}s</span>`;
+  return`<span class="num" style="color:var(--warn)">${Math.floor(secs/3600)}h${Math.floor((secs%3600)/60)}m</span>`;
 }
 function pushLastHeard(entry){
   const now=new Date().toTimeString().slice(0,8);
-  state.lastHeard.unshift({ts:entry.ts||now,issi:entry.issi,activity:entry.activity,dest:entry.dest||0});
+  state.lastHeard.unshift({
+    ts:entry.ts||now,
+    issi:entry.issi,
+    activity:entry.activity,
+    dest:entry.dest||0,
+    source:entry.source||'local',
+    call_id:entry.call_id??null,
+    duration_secs:entry.duration_secs??null
+  });
   if(state.lastHeard.length>50)state.lastHeard.length=50;
 }
+function updateLastHeardDuration(callId,durationSecs){
+  if(callId==null||durationSecs==null)return;
+  state.lastHeard.forEach(e=>{if(e.call_id!=null&&Number(e.call_id)===Number(callId)&&e.duration_secs==null)e.duration_secs=durationSecs;});
+}
 function activityBadge(activity){
-  if(activity==='call_group')return`<span class="badge badge-blue">${t('act_call_group')}</span>`;
-  if(activity==='call_individual')return`<span class="badge badge-yellow">${t('act_call_individual')}</span>`;
-  if(activity==='sds')return`<span class="badge" style="background:rgba(180,100,255,0.15);color:#c87aff;border-color:rgba(180,100,255,0.4)">${t('act_sds')}</span>`;
-  return`<span class="badge badge-dim">${activity}</span>`;
+  if(activity==='call_group')return`<span class="pill pill-info">${t('act_call_group')}</span>`;
+  if(activity==='call_individual')return`<span class="pill pill-warn">${t('act_call_individual')}</span>`;
+  if(activity==='sds')return`<span class="pill pill-info">${t('act_sds')}</span>`;
+  return`<span class="pill pill-idle">${activity}</span>`;
 }
 function rssiColor(v){if(v==null)return'var(--text3)';if(v>-20)return'var(--accent)';if(v>-30)return'var(--accent2)';if(v>-40)return'var(--warn)';return'var(--danger)';}
 function rssiPct(v){if(v==null)return 0;return Math.max(0,Math.min(100,(v+60)/50*100));}
+// Map RSSI to a .gauge threshold class (no JS color literals): strong=ok,
+// usable=info, marginal=warn, weak/none=danger/idle.
+function rssiGaugeClass(v){if(v==null)return'is-idle';if(v>-20)return'';if(v>-30)return'is-info';if(v>-40)return'is-warn';return'is-danger';}
 function escHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function sourceBadge(source){
+  const v=String(source||'local').toLowerCase();
+  const cls={local:'pill-ok',brew:'pill-info',brew2:'pill-info',asterisk:'pill-warn',echolink:'pill-info'}[v]||'pill-idle';
+  return`<span class="pill ${cls}">${escHtml(v)}</span>`;
+}
+function lastHeardDuration(entry){
+  let secs=entry.duration_secs;
+  if((secs==null||Number.isNaN(Number(secs)))&&entry.call_id!=null&&state.calls[entry.call_id]?.started_at){
+    secs=Math.max(0,Math.floor((Date.now()-state.calls[entry.call_id].started_at)/1000));
+  }
+  if(secs==null||Number.isNaN(Number(secs)))return'<span class="muted">—</span>';
+  return`<span class="num accent">${formatDur(Math.max(0,Math.floor(Number(secs))))}</span>`;
+}
+const LAST_HEARD_SOURCES=['local','brew','brew2','asterisk','echolink'];
+let lastHeardSourceVisible={local:true,brew:true,brew2:true,asterisk:true,echolink:true};
+function lastHeardRegex(id,label){
+  const raw=(document.getElementById(id)?.value||'').trim();
+  if(!raw)return null;
+  try{return new RegExp(raw,'i');}
+  catch(e){return {error:`${label}: ${e.message||'invalid regex'}`};}
+}
+function lastHeardIdText(id){
+  const c=callsigns[id];
+  return [id,c&&c.cs?c.cs:''].filter(v=>v!==null&&v!==undefined&&String(v).length).join(' ');
+}
+function lastHeardSourceAllowed(entry){
+  const source=String(entry.source||'local').toLowerCase();
+  return lastHeardSourceVisible[source]!==false;
+}
+function updateLastHeardSourceButtons(){
+  LAST_HEARD_SOURCES.forEach(source=>{
+    const btn=document.getElementById(`lh-source-${source}`);
+    const enabled=lastHeardSourceVisible[source]!==false;
+    if(btn){btn.classList.toggle('btn-primary',enabled);btn.classList.toggle('btn-danger',!enabled);}
+  });
+}
+function lastHeardFiltered(){
+  const status=document.getElementById('lastheard-filter-status');
+  const issiRe=lastHeardRegex('lastheard-issi-filter','ISSI');
+  const destRe=lastHeardRegex('lastheard-dest-filter','Destination');
+  const broken=[issiRe,destRe].find(re=>re&&re.error);
+  if(broken){
+    updateLastHeardSourceButtons();
+    if(status){status.textContent=`Regex error: ${broken.error}`;status.classList.add('is-error');}
+    return [];
+  }
+  const rows=(state.lastHeard||[]).filter(e=>{
+    if(!lastHeardSourceAllowed(e))return false;
+    if(issiRe&&!issiRe.test(lastHeardIdText(e.issi)))return false;
+    if(destRe&&!destRe.test(e.dest?lastHeardIdText(e.dest):''))return false;
+    return true;
+  });
+  if(status){
+    const total=(state.lastHeard||[]).length;
+    status.textContent=`${rows.length} / ${total}`;
+    status.classList.remove('is-error');
+  }
+  updateLastHeardSourceButtons();
+  return rows;
+}
+function lastHeardFilterChanged(){renderLastHeard();}
+function toggleLastHeardSource(source){
+  lastHeardSourceVisible[source]=!(lastHeardSourceVisible[source]!==false);
+  renderLastHeard();
+}
 function renderAll(){renderStations();renderCalls();renderLastHeard();updateTsBlocks();}
 
 // ── TS Visualizer ─────────────────────────────────────────────────────────
@@ -5003,10 +6104,19 @@ function renderStations(){
   document.getElementById('badge-ms').textContent=msCount;
   const bc=document.getElementById('badge-calls');
   if(bc){bc.textContent=callCount;bc.style.display=callCount?'flex':'none';}
+  // Hero summary
+  const hd=document.getElementById('stations-hero-dot');
+  const ht=document.getElementById('stations-hero-title');
+  const hs=document.getElementById('stations-hero-sub');
+  const hc=document.getElementById('stations-hero-calls');
+  if(hd){hd.className='hero-dot '+(msCount?'is-ok':'is-idle');}
+  if(ht)ht.textContent=msCount+' '+t('terminals');
+  if(hs)hs.textContent=msCount?t('registered'):t('no_terminals');
+  if(hc)hc.textContent=callCount;
   const tb=document.getElementById('ms-tbody');
-  if(!ms.length){tb.innerHTML=`<tr><td colspan="7"><div class="empty-state"><div class="empty-icon">📡</div><div class="empty-text">${t('no_terminals')}</div></div></td></tr>`;return;}
+  if(!ms.length){tb.innerHTML=`<tr><td colspan="7"><div class="empty-state"><span class="empty-ico">${svgIcon('radios')}</span><div class="empty-msg">${t('no_terminals')}</div></div></td></tr>`;return;}
   tb.innerHTML=ms.sort((a,b)=>a.issi-b.issi).map(m=>{
-    const r=m.rssi_dbfs,rL=r!=null?`${r.toFixed(1)} dBFS`:'—',pct=rssiPct(r),col=rssiColor(r);
+    const r=m.rssi_dbfs,rL=r!=null?`${r.toFixed(1)} dBFS`:'—',pct=rssiPct(r),gcls=rssiGaugeClass(r);
     let grps;
     const gl=m.groups||[],sel=m.selected_group;
     // The selected/active TG (the one the MS last keyed up on) is rendered as a solid blue
@@ -5014,7 +6124,7 @@ function renderStations(){
     // on a call sel is null — so right after a restart all groups show dim (scanned), without
     // implying the station is actively on any of them.
     const gBadge=g=>g===sel
-      ?`<span class="badge badge-blue" style="font-weight:700;font-size:9px" title="${t('tg_selected')}">▶ ${g}</span>`
+      ?`<span class="badge badge-blue" style="font-weight:700;font-size:9px" title="${t('tg_selected')}"><span class="tg-marker">${ICON_MARKER}</span>${g}</span>`
       :`<span class="badge badge-dim" style="font-size:9px">${g}</span>`;
     if(gl.length>1){
       const gList=gl.slice().sort((a,b)=>(b===sel)-(a===sel)||a-b).map(gBadge).join(' ');
@@ -5039,8 +6149,8 @@ function renderStations(){
     return`<tr${emg?' class="row-emergency"':''}>
       <td>${emg?'<span class="badge badge-emergency">'+t('call_emergency')+'</span> ':''}${idCell(m.issi)}</td><td>${grps}</td>
       <td class="col-mobile-hide">${eeLabel(m.energy_saving_mode||0)}</td>
-      <td><div class="rssi-bar"><div class="rssi-track"><div class="rssi-fill" style="width:${pct}%;background:${col}"></div></div><span class="rssi-val" style="color:${col}">${rL}</span></div></td>
-      <td><span class="badge badge-green">${t('online_badge')}</span></td>
+      <td><div class="gauge ${gcls}"><div class="gauge-track"><div class="gauge-fill" style="width:${pct}%"></div></div><span class="gauge-value">${rL}</span></div></td>
+      <td><span class="pill pill-ok">${t('online_badge')}</span></td>
       <td class="col-mobile-hide">${lastSeenLabel(ls)}</td>
       <td><button class="btn btn-sm" onclick="openSds(${m.issi})">${t('sds')}</button> <button class="btn btn-sm" onclick="openDgna(${m.issi})" title="${t('dgna_title')}">${t('dgna')}</button> <button class="btn btn-sm btn-danger" onclick="kickMs(${m.issi})">${t('kick')}</button>${emg?` <button class="btn btn-sm btn-danger" onclick="clearEmergency(${m.issi})">${t('emg_clear')}</button>`:''}</td>
     </tr>`;
@@ -5050,32 +6160,34 @@ function renderStations(){
 function renderCalls(){
   document.getElementById('stat-calls').textContent=Object.keys(state.calls).length;
   const tb=document.getElementById('calls-tbody'),calls=Object.values(state.calls);
-  if(!calls.length){tb.innerHTML=`<tr><td colspan="6"><div class="empty-state"><div class="empty-icon">☎</div><div class="empty-text">${t('no_calls')}</div></div></td></tr>`;return;}
+  if(!calls.length){tb.innerHTML=`<tr><td colspan="6"><div class="empty-state"><span class="empty-ico">${svgIcon('calls')}</span><div class="empty-msg">${t('no_calls')}</div></div></td></tr>`;return;}
   tb.innerHTML=calls.map(c=>{
     const dur=Math.floor((Date.now()-(c.started_at||Date.now()))/1000);
     const mm=String(Math.floor(dur/60)).padStart(2,'0'),ss=String(dur%60).padStart(2,'0');
-    const badge=c.call_type==='group'?'badge-blue':'badge-yellow';
+    const pillv=c.call_type==='group'?'pill-info':'pill-warn';
     const label=c.call_type==='group'?t('call_group'):(c.simplex?t('call_p2p_s'):t('call_p2p_d'));
     const to=c.call_type==='group'?`GSSI ${c.gssi}`:idCell(c.called_issi);
-    const spk=c.active_speaker?idCell(c.active_speaker):'<span style="color:var(--text3)">—</span>';
+    const spk=c.active_speaker?idCell(c.active_speaker):'<span class="muted">—</span>';
     // Emergency call = ETSI call priority 15 (terminal emergency button). Flag it prominently.
     const emg=(c.priority||0)>=15;
-    const emgBadge=emg?`<span class="badge badge-emergency">${t('call_emergency')}</span> `:'';
-    return`<tr${emg?' class="row-emergency"':''}><td class="col-mobile-hide"><code>${c.call_id}</code></td><td>${emgBadge}<span class="badge ${badge}">${label}</span></td><td>${c.caller_issi?idCell(c.caller_issi):'—'}</td><td>${to}</td><td>${spk}</td><td style="font-family:var(--mono);font-size:12px;color:var(--accent2);font-weight:600">${mm}:${ss}</td></tr>`;
+    const emgBadge=emg?`<span class="pill pill-danger"><span class="pill-icon">${svgIcon('emergency')}</span>${t('call_emergency')}</span> `:'';
+    return`<tr${emg?' class="row-emergency"':''}><td class="col-mobile-hide"><code>${c.call_id}</code></td><td>${emgBadge}<span class="pill ${pillv}">${label}</span></td><td>${c.caller_issi?idCell(c.caller_issi):'<span class="muted">—</span>'}</td><td>${to}</td><td>${spk}</td><td><span class="num accent">${mm}:${ss}</span></td></tr>`;
   }).join('');
 }
 
 function renderLastHeard(){
   const tb=document.getElementById('lastheard-tbody');
   if(!tb)return;
-  if(!state.lastHeard.length){tb.innerHTML=`<tr><td colspan="4"><div class="empty-state"><div class="empty-icon">🎙</div><div class="empty-text">${t('no_activity')}</div></div></td></tr>`;return;}
-  tb.innerHTML=state.lastHeard.map(e=>{
-    const destStr=e.dest?`<code>${e.dest}</code>`:'<span style="color:var(--text3)">—</span>';
+  const total=(state.lastHeard||[]).length;
+  const rows=lastHeardFiltered();
+  if(!rows.length){tb.innerHTML=`<tr><td colspan="6"><div class="empty-state"><span class="empty-ico">${svgIcon('lastheard')}</span><div class="empty-msg">${total?'No matching activity':t('no_activity')}</div></div></td></tr>`;return;}
+  tb.innerHTML=rows.map(e=>{
+    const destStr=e.dest?`<code>${e.dest}</code>`:'<span class="muted">—</span>';
     const isOnline=!!state.ms[e.issi];
-    const issiHtml=`${idCell(e.issi)}${isOnline?` <span class="badge badge-green" style="font-size:9px">${t('online_badge')}</span>`:''}`;
+    const issiHtml=`${idCell(e.issi)}${isOnline?` <span class="pill pill-ok">${t('online_badge')}</span>`:''}`;
     return`<tr>
-      <td style="font-family:var(--mono);font-size:11px;color:var(--text2)">${e.ts}</td>
-      <td>${issiHtml}</td><td>${activityBadge(e.activity)}</td><td>${destStr}</td>
+      <td><span class="num">${e.ts}</span></td>
+      <td>${issiHtml}</td><td>${sourceBadge(e.source)}</td><td>${activityBadge(e.activity)}</td><td>${destStr}</td><td>${lastHeardDuration(e)}</td>
     </tr>`;
   }).join('');
 }
@@ -5088,6 +6200,7 @@ function _p2(n){return String(n).padStart(2,'0');}
 function nowStamp(){const d=new Date();return `${d.getFullYear()}-${_p2(d.getMonth()+1)}-${_p2(d.getDate())} ${_p2(d.getHours())}:${_p2(d.getMinutes())}:${_p2(d.getSeconds())}`;}
 const LOG_PAGE_SIZE=50;
 let sdsLogPageIndex=0,dapnetLogPageIndex=0,echolinkDirectoryPageIndex=0,meshNodePageIndex=0,meshMsgPageIndex=0,geoalarmPageIndex=0;
+let meshMsgShowUdp=true,meshMsgShowLora=true,meshMsgShowNode=true,meshMsgShowPos=true,meshMsgShowTime=true;
 function setLogPager(id,page,total){
   const el=document.getElementById(id);if(!el)return;
   if(!total){el.textContent='Page 0 / 0 · 0';return;}
@@ -5116,8 +6229,8 @@ function downloadTextFile(filename,text){
 // Human label for known SDS protocol-identifier bytes so binary payloads (no decoded text)
 // still read meaningfully. 0x02/0x09/0x82/0x89 = text; 0x0A = LIP position; 0xDC = Home Mode Display.
 function pidLabel(pid){const m={2:'text',9:'text',10:'LIP position',12:'concat',128:'text',130:'text',137:'text',218:'status',220:'home-display'};return m[pid]||('PID '+pid);}
-const SDS_DIR={rx:['badge-green','RX'],net:['badge-blue','NET'],tx:['badge-yellow','TX']};
-function dirBadge(dir){const x=SDS_DIR[dir]||['badge-dim',(dir||'?').toUpperCase()];return `<span class="badge ${x[0]}">${x[1]}</span>`;}
+const SDS_DIR={rx:['pill-ok','RX'],net:['pill-info','NET'],tx:['pill-warn','TX']};
+function dirBadge(dir){const x=SDS_DIR[dir]||['pill-idle',(dir||'?').toUpperCase()];return `<span class="pill ${x[0]}">${x[1]}</span>`;}
 function lipPositionFromText(text){
   const m=String(text||'').match(/^LIP position:\s*(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/);
   if(!m)return null;
@@ -5125,13 +6238,518 @@ function lipPositionFromText(text){
   if(!Number.isFinite(lat)||!Number.isFinite(lon)||lat<-90||lat>90||lon<-180||lon>180)return null;
   return {lat,lon};
 }
+const MAP_SOURCE_KEYS=['sds','meshcom','geoalarm','station'];
+const MAP_SOURCE_LABELS={sds:'SDS/LIP',meshcom:'MeshCom',geoalarm:'GeoAlarm',station:'FlowStation'};
+function mapsLoadSourceFilters(){
+  const defaults={sds:true,meshcom:true,geoalarm:true,station:true};
+  try{
+    const raw=JSON.parse(localStorage.getItem('maps_source_filters')||'{}');
+    MAP_SOURCE_KEYS.forEach(k=>{if(typeof raw[k]==='boolean')defaults[k]=raw[k];});
+  }catch{}
+  return defaults;
+}
+let mapsCurrentMarkers=[],mapsSelectedIndex=-1,mapsCurrentBounds=null,mapsCurrentView=null,mapsFocus=null,mapsFocusMarker=null,mapsUserCenter=null,mapsUserZoom=null,mapsDrag=null,mapsWheelDelta=0,mapsLatestOnly=localStorage.getItem('maps_latest_only')==='1',mapsSourceFilters=mapsLoadSourceFilters();
+function mapsNumber(v){
+  if(v===null||v===undefined||v==='')return NaN;
+  if(typeof v==='string'){
+    const s=v.trim();
+    if(!s)return NaN;
+    return Number((s.includes(',')&&!s.includes('.'))?s.replace(',','.'):s);
+  }
+  return Number(v);
+}
+function mapsCoordValue(obj,keys){
+  if(!obj)return NaN;
+  for(const k of keys){
+    const n=mapsNumber(obj[k]);
+    if(Number.isFinite(n))return n;
+  }
+  return NaN;
+}
+function mapsLat(obj){return mapsCoordValue(obj,['lat','latitude']);}
+function mapsLon(obj){return mapsCoordValue(obj,['lon','lng','long','longitude']);}
+function validMapLatLon(lat,lon){
+  const la=mapsNumber(lat),lo=mapsNumber(lon);
+  return Number.isFinite(la)&&Number.isFinite(lo)&&la>=-90&&la<=90&&lo>=-180&&lo<=180;
+}
+function mapLinkHtml(lat,lon,label){
+  const la=mapsNumber(lat),lo=mapsNumber(lon);
+  if(!validMapLatLon(la,lo))return escHtml(label||'map');
+  return `<a class="sds-map-link" href="javascript:void(0)" onclick="event.preventDefault();openMapsAt(${la},${lo})">${escHtml(label||`${la.toFixed(5)}, ${lo.toFixed(5)}`)}</a>`;
+}
+function openMapsAt(lat,lon){
+  const la=mapsNumber(lat),lo=mapsNumber(lon);
+  if(!validMapLatLon(la,lo))return;
+  mapsFocus={lat:la,lon:lo};
+  mapsFocusMarker={type:'focus',title:'Selected position',lat:la,lon:lo,detail:'Position opened from another dashboard table',meta:'dashboard link',ts:nowStamp(),key:`focus:${la.toFixed(6)}:${lo.toFixed(6)}`};
+  mapsUserCenter={lat:la,lon:lo};
+  showPage('maps',document.getElementById('nav-maps'));
+}
+function mapsActive(){
+  return !!document.getElementById('page-maps')?.classList.contains('active');
+}
+function renderMapsIfActive(){
+  if(!mapsActive())return;
+  renderMapsPage();
+  if(typeof requestAnimationFrame==='function')requestAnimationFrame(()=>{if(mapsActive())renderMapsPage();});
+}
+function mapsMarker(type,title,lat,lon,detail,meta,ts,key){
+  const la=mapsNumber(lat),lo=mapsNumber(lon);
+  if(!validMapLatLon(la,lo))return null;
+  if(Math.abs(la)<0.000001&&Math.abs(lo)<0.000001)return null;
+  return {type,title:title||'Position',lat:la,lon:lo,detail:detail||'',meta:meta||'',ts:ts||'',key:key||`${type}:${title||'Position'}`};
+}
+function mapsLatLonUsable(lat,lon){
+  const la=mapsNumber(lat),lo=mapsNumber(lon);
+  return validMapLatLon(la,lo)&&!(Math.abs(la)<0.000001&&Math.abs(lo)<0.000001);
+}
+function mapsGeoCenterFromText(text){
+  const m=String(text||'').match(/(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/);
+  if(!m)return null;
+  const lat=Number(m[1]),lon=Number(m[2]);
+  return mapsLatLonUsable(lat,lon)?{lat,lon}:null;
+}
+function mapsStationPosition(){
+  const geoCfg=state.geoalarmConfig||{};
+  const candidates=[
+    {lat:geoCfg.flowstation_lat,lon:geoCfg.flowstation_lon},
+    {lat:geoCfg.flowstation_latitude,lon:geoCfg.flowstation_longitude},
+    mapsGeoCenterFromText(geoCfg.runtime&&geoCfg.runtime.center),
+    mapsGeoCenterFromText(document.getElementById('geo-center')?.textContent),
+    {lat:document.getElementById('geo-lat')?.value,lon:document.getElementById('geo-lon')?.value},
+  ].filter(Boolean);
+  return candidates.find(p=>mapsLatLonUsable(p.lat,p.lon))||null;
+}
+function mapsRawCounts(){
+  return {
+    sds:(state.sdsLog||[]).length,
+    meshMessages:(state.meshcomMessages||[]).length,
+    meshNodes:(state.meshcomNodes||[]).length,
+    geo:(state.geoalarmEvents||[]).length,
+  };
+}
+function mapsRawCountsText(c){
+  return `${c.sds} SDS · ${c.meshMessages} Mesh msg · ${c.meshNodes} Mesh nodes · ${c.geo} GeoAlarm`;
+}
+function mapsCollect(){
+  const station=[],items=[];
+  const fsPos=mapsStationPosition();
+  const fs=fsPos?mapsMarker('station','FlowStation',fsPos.lat,fsPos.lon,'Station position from GeoAlarm FlowStation latitude/longitude','GeoAlarm config','','station:flowstation'):null;
+  if(fs)station.push(fs);
+  if(mapsFocusMarker)station.push(mapsFocusMarker);
+  (state.sdsLog||[]).forEach(e=>{
+    const lip=lipPositionFromText(e.text);
+    if(!lip)return;
+    const cs=callsigns[e.source_issi]?.cs;
+    const src=[e.source_issi,cs].filter(Boolean).join(' ');
+    const marker=mapsMarker('sds',`TETRA LIP ${src||'—'}`,lip.lat,lip.lon,
+      `SDS ${String(e.direction||'').toUpperCase()} ${e.source_issi||'—'} → ${e.dest_issi||'—'}${e.is_group?' group':''}`,
+      'SDS/LIP',e.ts,`sds:${e.source_issi||src||'unknown'}`);
+    if(marker)items.push(marker);
+  });
+  (state.meshcomNodes||[]).forEach(n=>{
+    const src=meshOrigin(n)||'—';
+    const via=meshRouteParts(n).via;
+    const detail=[n.last_type,via.length?`via ${via.join(', ')}`:'',meshRfText(n),n.batt!==null&&n.batt!==undefined?`Battery ${meshBatteryText(n.batt)}`:''].filter(v=>v&&v!=='—').join(' · ');
+    const marker=mapsMarker('meshcom',`MeshCom node ${src}`,mapsLat(n),mapsLon(n),detail||'MeshCom node position','MeshCom node',n.last_seen,`meshcom:${src||'unknown'}`);
+    if(marker)items.push(marker);
+  });
+  (state.meshcomMessages||[]).forEach(m=>{
+    const detail=m.msg||'MeshCom position packet';
+    const src=meshOrigin(m)||'—';
+    const via=meshRouteParts(m).via;
+    const meta=[`MeshCom ${m.src_type||m.msg_type||'packet'}`,src?`from ${src}`:'',via.length?`via ${via.join(', ')}`:'',m.dst?`to ${m.dst}`:''].filter(Boolean).join(' · ');
+    const marker=mapsMarker('meshcom',`MeshCom ${src}`,mapsLat(m),mapsLon(m),detail,meta,m.ts,`meshcom:${src||'unknown'}`);
+    if(marker)items.push(marker);
+  });
+  (state.geoalarmEvents||[]).forEach(e=>{
+    const distance=mapsNumber(e.distance_m);
+    const via=Array.isArray(e.via)?e.via.filter(Boolean):[];
+    const detail=[e.inside_radius?'inside radius':'outside radius',via.length?`via ${via.join(', ')}`:'',Number.isFinite(distance)?`${distance.toFixed(0)} m`:null,meshPathsText(e.paths)].filter(Boolean).join(' · ');
+    const marker=mapsMarker(e.alarmed?'alarm':'geoalarm',`GeoAlarm ${e.device||'—'}`,mapsLat(e),mapsLon(e),detail,e.source||'GeoAlarm',e.ts,`geoalarm:${e.source||'unknown'}:${e.device||'unknown'}`);
+    if(marker)items.push(marker);
+  });
+  items.sort((a,b)=>String(b.ts||'').localeCompare(String(a.ts||'')));
+  return station.concat(items);
+}
+function mapsLatestMarkers(markers){
+  if(!mapsLatestOnly)return markers;
+  const latest=[],seen=new Set();
+  markers.forEach(m=>{
+    const key=m.key||`${m.type}:${m.title}`;
+    if(seen.has(key))return;
+    seen.add(key);
+    latest.push(m);
+  });
+  return latest;
+}
+function mapsSourceForMarker(m){
+  if(!m)return '';
+  if(m.type==='sds')return 'sds';
+  if(m.type==='meshcom')return 'meshcom';
+  if(m.type==='geoalarm'||m.type==='alarm')return 'geoalarm';
+  if(m.type==='station')return 'station';
+  return '';
+}
+function mapsApplySourceFilters(markers){
+  return markers.filter(m=>{
+    const source=mapsSourceForMarker(m);
+    return !source||mapsSourceFilters[source]!==false;
+  });
+}
+function mapsAnySourceEnabled(){
+  return MAP_SOURCE_KEYS.some(k=>mapsSourceFilters[k]!==false);
+}
+function mapsSaveSourceFilters(){
+  localStorage.setItem('maps_source_filters',JSON.stringify(mapsSourceFilters));
+}
+function toggleMapsSource(source){
+  if(!MAP_SOURCE_KEYS.includes(source))return;
+  mapsSourceFilters[source]=mapsSourceFilters[source]===false;
+  mapsSaveSourceFilters();
+  mapsUserCenter=null;
+  mapsUserZoom=null;
+  updateMapsSourceButtons();
+  renderMapsIfActive();
+}
+function mapsSourceButtonsHtml(message=''){
+  const buttons=MAP_SOURCE_KEYS.map(k=>{
+    const on=mapsSourceFilters[k]!==false;
+    return `<button type="button" class="btn btn-sm maps-source-btn ${on?'btn-primary':''}" aria-pressed="${on?'true':'false'}" onclick="toggleMapsSource('${k}')">${escHtml(MAP_SOURCE_LABELS[k]||k)}</button>`;
+  }).join('');
+  return `<div class="maps-source-filters">${buttons}</div>${message?`<span class="maps-source-msg">${escHtml(message)}</span>`:''}`;
+}
+function mapsSourceMessage(markerCount,rawTotal){
+  if(markerCount)return '';
+  if(!mapsAnySourceEnabled())return 'All marker sources hidden';
+  return rawTotal?`No usable coordinates yet (${mapsRawCountsText(mapsRawCounts())})`:'No positions collected yet';
+}
+function updateMapsSourceButtons(){
+  const sub=document.getElementById('maps-hero-sub');
+  if(!sub)return;
+  const markerCount=mapsCurrentMarkers.length;
+  const rawCounts=mapsRawCounts();
+  const rawTotal=rawCounts.sds+rawCounts.meshMessages+rawCounts.meshNodes+rawCounts.geo;
+  sub.innerHTML=mapsSourceButtonsHtml(mapsSourceMessage(markerCount,rawTotal));
+}
+function meshPathsText(paths){
+  return Array.isArray(paths)&&paths.length?paths.join(', '):'';
+}
+function mapsClampLat(lat){return Math.max(-85,Math.min(85,Number(lat)||0));}
+function mapsClampLon(lon){
+  let lo=mapsNumber(lon);
+  if(!Number.isFinite(lo))return 0;
+  while(lo<-180)lo+=360;
+  while(lo>180)lo-=360;
+  return lo;
+}
+function mapsMercX(lon){return (mapsClampLon(lon)+180)/360;}
+function mapsMercY(lat){
+  const r=mapsClampLat(lat)*Math.PI/180;
+  return (1-Math.log(Math.tan(r)+1/Math.cos(r))/Math.PI)/2;
+}
+function mapsZoomForSpan(span){
+  if(span<0.01)return 16;
+  if(span<0.04)return 14;
+  if(span<0.15)return 12;
+  if(span<0.8)return 10;
+  if(span<4)return 8;
+  return 6;
+}
+function mapsBounds(markers){
+  const valid=markers.filter(m=>validMapLatLon(m.lat,m.lon));
+  if(!valid.length)return {minLon:5.5,minLat:47,maxLon:15.5,maxLat:55.5,centerLat:51.2,centerLon:10.4,zoom:6};
+  let minLat=90,maxLat=-90,minLon=180,maxLon=-180;
+  valid.forEach(m=>{minLat=Math.min(minLat,m.lat);maxLat=Math.max(maxLat,m.lat);minLon=Math.min(minLon,m.lon);maxLon=Math.max(maxLon,m.lon);});
+  const latSpan=Math.max(0.01,maxLat-minLat),lonSpan=Math.max(0.01,maxLon-minLon);
+  const latPad=Math.max(0.01,latSpan*0.18),lonPad=Math.max(0.01,lonSpan*0.18);
+  minLat=Math.max(-85,minLat-latPad);maxLat=Math.min(85,maxLat+latPad);
+  minLon=Math.max(-180,minLon-lonPad);maxLon=Math.min(180,maxLon+lonPad);
+  return {minLon,minLat,maxLon,maxLat,centerLat:(minLat+maxLat)/2,centerLon:(minLon+maxLon)/2,zoom:mapsZoomForSpan(Math.max(maxLat-minLat,maxLon-minLon))};
+}
+function mapsOsmUrl(m){
+  return `https://www.openstreetmap.org/?mlat=${encodeURIComponent(m.lat)}&mlon=${encodeURIComponent(m.lon)}#map=16/${encodeURIComponent(m.lat)}/${encodeURIComponent(m.lon)}`;
+}
+function mapsOsmBoundsUrl(b){
+  const z=mapsCurrentView?.zoom||b.zoom||mapsFitZoom(b);
+  const lat=mapsCurrentView?.centerLat??b.centerLat;
+  const lon=mapsCurrentView?.centerLon??b.centerLon;
+  return `https://www.openstreetmap.org/#map=${z}/${encodeURIComponent(lat)}/${encodeURIComponent(lon)}`;
+}
+function mapsWorldPx(lat,lon,zoom){
+  const scale=256*Math.pow(2,zoom);
+  return {x:mapsMercX(lon)*scale,y:mapsMercY(lat)*scale};
+}
+function mapsWorldToLatLon(x,y,zoom){
+  const scale=256*Math.pow(2,zoom);
+  const lon=mapsClampLon((Number(x)/scale)*360-180);
+  const n=Math.PI-2*Math.PI*(Number(y)/scale);
+  const lat=mapsClampLat((180/Math.PI)*Math.atan(0.5*(Math.exp(n)-Math.exp(-n))));
+  return {lat,lon};
+}
+function mapsViewCenter(b){
+  if(mapsUserCenter&&mapsLatLonUsable(mapsUserCenter.lat,mapsUserCenter.lon))return mapsUserCenter;
+  return {lat:b.centerLat,lon:b.centerLon};
+}
+const MAP_TILE_HOSTS=['https://tile.openstreetmap.org','https://a.tile.openstreetmap.org','https://b.tile.openstreetmap.org','https://c.tile.openstreetmap.org'];
+function mapsTileUrl(zoom,x,y,attempt){
+  const host=MAP_TILE_HOSTS[Math.max(0,Math.min(MAP_TILE_HOSTS.length-1,Number(attempt)||0))];
+  return `${host}/${zoom}/${x}/${y}.png`;
+}
+function mapsTileError(img){
+  const next=(Number(img.dataset.attempt)||0)+1;
+  if(next>=MAP_TILE_HOSTS.length){img.style.display='none';return;}
+  img.dataset.attempt=String(next);
+  img.src=mapsTileUrl(img.dataset.zoom,img.dataset.x,img.dataset.y,next);
+}
+function mapsFitZoom(b){
+  const stage=document.getElementById('maps-stage');
+  const w=stage?.clientWidth||900,h=stage?.clientHeight||560;
+  const xSpan=Math.max(0.000001,Math.abs(mapsMercX(b.maxLon)-mapsMercX(b.minLon)));
+  const ySpan=Math.max(0.000001,Math.abs(mapsMercY(b.minLat)-mapsMercY(b.maxLat)));
+  for(let z=18;z>=2;z--){
+    const scale=256*Math.pow(2,z);
+    if(xSpan*scale<=w*0.82&&ySpan*scale<=h*0.82)return z;
+  }
+  return 2;
+}
+function mapsRenderTiles(b){
+  const stage=document.getElementById('maps-stage');
+  const layer=document.getElementById('maps-tile-layer');
+  if(!stage||!layer)return null;
+  const w=stage.clientWidth||900,h=stage.clientHeight||560;
+  const zoom=Math.max(2,Math.min(18,mapsUserZoom??mapsFitZoom(b)));
+  const centerLatLon=mapsViewCenter(b);
+  const center=mapsWorldPx(centerLatLon.lat,centerLatLon.lon,zoom);
+  const left=center.x-w/2,top=center.y-h/2;
+  const tileCount=Math.pow(2,zoom);
+  const minX=Math.floor(left/256),maxX=Math.floor((left+w)/256);
+  const minY=Math.floor(top/256),maxY=Math.floor((top+h)/256);
+  const tiles=[];
+  for(let x=minX;x<=maxX;x++){
+    const wrappedX=((x%tileCount)+tileCount)%tileCount;
+    for(let y=minY;y<=maxY;y++){
+      if(y<0||y>=tileCount)continue;
+      tiles.push(`<img class="maps-tile" alt="" data-zoom="${zoom}" data-x="${wrappedX}" data-y="${y}" data-attempt="0" onerror="mapsTileError(this)" src="${mapsTileUrl(zoom,wrappedX,y,0)}" style="left:${(x*256-left).toFixed(2)}px;top:${(y*256-top).toFixed(2)}px">`);
+    }
+  }
+  layer.innerHTML=tiles.join('');
+  return {zoom,left,top,width:w,height:h,centerLat:centerLatLon.lat,centerLon:centerLatLon.lon};
+}
+function mapsMarkerPos(m,view){
+  const p=mapsWorldPx(m.lat,m.lon,view.zoom);
+  return {left:p.x-view.left,top:p.y-view.top};
+}
+function mapsZoom(delta,anchorEvent=null){
+  const stage=document.getElementById('maps-stage');
+  const base=mapsCurrentView?.zoom??(mapsCurrentBounds?mapsFitZoom(mapsCurrentBounds):8);
+  const next=Math.max(2,Math.min(18,base+delta));
+  if(next===base)return;
+  if(stage&&mapsCurrentView&&anchorEvent){
+    const rect=stage.getBoundingClientRect();
+    const sx=Math.max(0,Math.min(rect.width,anchorEvent.clientX-rect.left));
+    const sy=Math.max(0,Math.min(rect.height,anchorEvent.clientY-rect.top));
+    const anchor=mapsWorldToLatLon(mapsCurrentView.left+sx,mapsCurrentView.top+sy,base);
+    const anchorWorld=mapsWorldPx(anchor.lat,anchor.lon,next);
+    mapsUserZoom=next;
+    mapsUserCenter=mapsWorldToLatLon(anchorWorld.x-sx+(stage.clientWidth||900)/2,anchorWorld.y-sy+(stage.clientHeight||560)/2,next);
+  }else{
+    if(mapsCurrentView)mapsUserCenter={lat:mapsCurrentView.centerLat,lon:mapsCurrentView.centerLon};
+    mapsUserZoom=next;
+  }
+  renderMapsPage();
+}
+function mapsWheel(e){
+  if(!mapsActive())return;
+  e.preventDefault();
+  mapsWheelDelta+=Math.max(-0.5,Math.min(0.5,-e.deltaY/100));
+  if(Math.abs(mapsWheelDelta)<1)return;
+  const step=mapsWheelDelta>0?1:-1;
+  mapsWheelDelta-=step;
+  mapsZoom(step,e);
+}
+function mapsPointerDown(e){
+  if(e.button!==0)return;
+  if(e.target.closest('.maps-marker,.maps-controls,.maps-popup,a,button'))return;
+  const stage=document.getElementById('maps-stage');
+  if(!stage||!mapsCurrentView)return;
+  mapsDrag={id:e.pointerId,startX:e.clientX,startY:e.clientY,left:mapsCurrentView.left,top:mapsCurrentView.top,zoom:mapsCurrentView.zoom};
+  stage.classList.add('dragging');
+  try{stage.setPointerCapture(e.pointerId);}catch{}
+  e.preventDefault();
+}
+function mapsPointerMove(e){
+  if(!mapsDrag||e.pointerId!==mapsDrag.id)return;
+  const stage=document.getElementById('maps-stage');
+  if(!stage)return;
+  const dx=e.clientX-mapsDrag.startX,dy=e.clientY-mapsDrag.startY;
+  mapsUserCenter=mapsWorldToLatLon(mapsDrag.left-dx+(stage.clientWidth||900)/2,mapsDrag.top-dy+(stage.clientHeight||560)/2,mapsDrag.zoom);
+  mapsUserZoom=mapsDrag.zoom;
+  renderMapsPage();
+}
+function mapsPointerUp(e){
+  if(!mapsDrag||e.pointerId!==mapsDrag.id)return;
+  const stage=document.getElementById('maps-stage');
+  if(stage){
+    stage.classList.remove('dragging');
+    try{stage.releasePointerCapture(e.pointerId);}catch{}
+  }
+  mapsDrag=null;
+}
+function mapsInitial(m){
+  if(m.type==='station')return 'FS';
+  if(m.type==='focus')return 'F';
+  if(m.type==='sds')return 'S';
+  if(m.type==='meshcom')return 'M';
+  if(m.type==='alarm')return '!';
+  return 'G';
+}
+function mapsTypeLabel(m){
+  if(m.type==='station')return 'station';
+  if(m.type==='focus')return 'focus';
+  if(m.type==='sds')return 'sds';
+  if(m.type==='meshcom')return 'mesh';
+  if(m.type==='alarm')return 'alarm';
+  return 'geo';
+}
+function mapsNearestIndex(markers,focus){
+  if(!focus||!markers.length)return -1;
+  let best=-1,bestD=Infinity;
+  markers.forEach((m,i)=>{
+    const d=Math.pow(m.lat-focus.lat,2)+Math.pow(m.lon-focus.lon,2);
+    if(d<bestD){bestD=d;best=i;}
+  });
+  return best;
+}
+function mapsVisibleMarkers(markers){
+  const groups=new Map();
+  markers.forEach((m,index)=>{
+    const key=`${m.type}:${m.lat.toFixed(5)}:${m.lon.toFixed(5)}`;
+    const existing=groups.get(key);
+    if(existing){existing.count++;return;}
+    groups.set(key,{...m,index,count:1});
+  });
+  return [...groups.values()];
+}
+function mapsMarkerText(m){
+  if(m.count&&m.count>1)return m.count>99?'99':String(m.count);
+  return mapsInitial(m);
+}
+function updateMapsLatestButton(){
+  const btn=document.getElementById('maps-latest-btn');
+  if(!btn)return;
+  btn.classList.toggle('btn-primary',mapsLatestOnly);
+  btn.setAttribute('aria-pressed',mapsLatestOnly?'true':'false');
+  btn.textContent=mapsLatestOnly?'Latest only: ON':'Latest only: OFF';
+}
+function bindMapsControls(){
+  const btn=document.getElementById('maps-latest-btn');
+  if(btn&&!btn.dataset.bound){
+    btn.dataset.bound='1';
+    btn.addEventListener('click',e=>{
+      e.preventDefault();
+      e.stopPropagation();
+      toggleMapsLatestOnly();
+    });
+  }
+  const stage=document.getElementById('maps-stage');
+  if(stage&&!stage.dataset.panBound){
+    stage.dataset.panBound='1';
+    stage.addEventListener('wheel',mapsWheel,{passive:false});
+    stage.addEventListener('pointerdown',mapsPointerDown);
+    stage.addEventListener('pointermove',mapsPointerMove);
+    stage.addEventListener('pointerup',mapsPointerUp);
+    stage.addEventListener('pointercancel',mapsPointerUp);
+    stage.addEventListener('pointerleave',mapsPointerUp);
+  }
+  updateMapsLatestButton();
+  updateMapsSourceButtons();
+}
+function toggleMapsLatestOnly(){
+  mapsLatestOnly=!mapsLatestOnly;
+  localStorage.setItem('maps_latest_only',mapsLatestOnly?'1':'0');
+  mapsUserCenter=null;
+  mapsUserZoom=null;
+  updateMapsLatestButton();
+  renderMapsIfActive();
+}
+function renderMapsPage(){
+  const allMarkers=mapsCollect();
+  const sourceMarkers=mapsApplySourceFilters(allMarkers);
+  const markers=mapsLatestMarkers(sourceMarkers);
+  const visibleMarkers=mapsVisibleMarkers(markers);
+  const rawCounts=mapsRawCounts();
+  const rawTotal=rawCounts.sds+rawCounts.meshMessages+rawCounts.meshNodes+rawCounts.geo;
+  mapsCurrentMarkers=markers;
+  mapsCurrentBounds=mapsBounds(markers);
+  mapsCurrentView=mapsRenderTiles(mapsCurrentBounds);
+  const layer=document.getElementById('maps-marker-layer');
+  const list=document.getElementById('maps-list');
+  const count=document.getElementById('maps-count');
+  const sub=document.getElementById('maps-hero-sub');
+  const dot=document.getElementById('maps-hero-dot');
+  updateMapsLatestButton();
+  if(count)count.textContent=markers.length
+    ? (mapsLatestOnly?`${markers.length} latest · ${sourceMarkers.length} enabled entries`:`${visibleMarkers.length} positions · ${markers.length} enabled entries`)
+    : `${rawTotal} records · 0 positions`;
+  if(sub)sub.innerHTML=mapsSourceButtonsHtml(mapsSourceMessage(markers.length,rawTotal));
+  if(dot){dot.classList.toggle('is-ok',markers.length>0);dot.classList.toggle('is-idle',!markers.length);}
+  if(layer&&mapsCurrentView){
+    layer.innerHTML=visibleMarkers.map((m,i)=>{
+      const p=mapsMarkerPos(m,mapsCurrentView);
+      return `<button class="maps-marker" id="maps-marker-${m.index}" style="left:${p.left.toFixed(2)}px;top:${p.top.toFixed(2)}px" onclick="selectMapMarker(${m.index})" title="${escHtml(m.count>1?`${m.title} · ${m.count} entries`:m.title)}"><span class="maps-pin ${escHtml(m.type)}"><span>${escHtml(mapsMarkerText(m))}</span></span></button>`;
+    }).join('');
+  } else if(layer){
+    layer.innerHTML='';
+  }
+  if(list){
+    list.innerHTML=markers.length?markers.map((m,i)=>`<div class="maps-list-row" id="maps-row-${i}" onclick="selectMapMarker(${i})">
+      <div class="maps-list-type">${escHtml(mapsTypeLabel(m))}</div>
+      <div>
+        <div class="maps-list-title">${escHtml(m.title)}</div>
+        <div class="maps-list-meta">${m.ts?escHtml(m.ts)+' · ':''}${m.lat.toFixed(6)}, ${m.lon.toFixed(6)}</div>
+        ${m.detail?`<div class="maps-list-detail">${escHtml(m.detail)}</div>`:''}
+      </div>
+    </div>`).join(''):'<div class="maps-empty">No positions yet</div>';
+  }
+  const focusIdx=mapsNearestIndex(markers,mapsFocus);
+  const idx=focusIdx>=0?focusIdx:(markers.length?Math.max(0,Math.min(mapsSelectedIndex,markers.length-1)):-1);
+  selectMapMarker(idx,false);
+  mapsFocus=null;
+}
+function selectMapMarker(index,scroll=true){
+  mapsSelectedIndex=index;
+  document.querySelectorAll('.maps-marker,.maps-list-row').forEach(el=>el.classList.remove('active'));
+  const popup=document.getElementById('maps-popup');
+  const m=mapsCurrentMarkers[index];
+  if(!m){if(popup)popup.style.display='none';return;}
+  document.getElementById(`maps-marker-${index}`)?.classList.add('active');
+  const row=document.getElementById(`maps-row-${index}`);
+  row?.classList.add('active');
+  if(scroll)row?.scrollIntoView({block:'nearest'});
+  if(popup){
+    popup.style.display='block';
+    popup.innerHTML=`<div class="maps-popup-title">${escHtml(m.title)}</div>
+      <div class="maps-popup-meta">${escHtml(mapsTypeLabel(m))}${m.ts?' · '+escHtml(m.ts):''} · ${m.lat.toFixed(6)}, ${m.lon.toFixed(6)}</div>
+      ${m.meta?`<div class="maps-popup-meta">${escHtml(m.meta)}</div>`:''}
+      ${m.detail?`<div class="maps-popup-detail">${escHtml(m.detail)}</div>`:''}
+      <div style="margin-top:9px"><a class="sds-map-link" href="${mapsOsmUrl(m)}" target="_blank" rel="noopener noreferrer">Open in OpenStreetMap</a></div>`;
+  }
+}
+function openMapsOsm(){
+  const m=mapsCurrentMarkers[mapsSelectedIndex];
+  window.open(m?mapsOsmUrl(m):mapsOsmBoundsUrl(mapsCurrentBounds||mapsBounds([])),'_blank','noopener,noreferrer');
+}
+function refreshMapsData(){
+  renderMapsIfActive();
+  Promise.allSettled([loadSdsLog(),loadMeshcomNodes(),loadMeshcomMessages(),loadGeoalarm()]).then(()=>renderMapsIfActive());
+}
 function sdsMessageBody(e){
   if(e.text&&e.text.length){
     const lip=lipPositionFromText(e.text);
     if(lip){
       const label=`LIP position: ${lip.lat.toFixed(6)}, ${lip.lon.toFixed(6)}`;
-      const url=`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${lip.lat.toFixed(6)},${lip.lon.toFixed(6)}`)}`;
-      return `<a class="sds-map-link" href="${url}" target="_blank" rel="noopener noreferrer">${escHtml(label)}</a>`;
+      return mapLinkHtml(lip.lat,lip.lon,label);
     }
     return escHtml(e.text);
   }
@@ -5140,28 +6758,64 @@ function sdsMessageBody(e){
 function sdsRow(e){
   const to=e.is_group?`<code>${e.dest_issi}</code> <span class="sds-empty">grp</span>`:idCell(e.dest_issi);
   const body=sdsMessageBody(e);
-  return `<tr><td class="sds-time">${escHtml(e.ts||'')}</td><td>${dirBadge(e.direction)}</td><td>${idCell(e.source_issi)}</td><td>${to}</td><td class="sds-msg">${body}</td></tr>`;
+  return `<tr><td class="sds-time num">${escHtml(e.ts||'')}</td><td>${dirBadge(e.direction)}</td><td>${idCell(e.source_issi)}</td><td>${to}</td><td class="sds-msg">${body}</td></tr>`;
 }
+function sdsLogRegex(id,label){
+  const raw=(document.getElementById(id)?.value||'').trim();
+  if(!raw)return null;
+  try{return new RegExp(raw,'i');}
+  catch(e){return {error:`${label}: ${e.message||'invalid regex'}`};}
+}
+function sdsLogFromText(e){
+  const c=callsigns[e.source_issi];
+  return [e.source_issi,c&&c.cs?c.cs:''].filter(v=>v!==null&&v!==undefined&&String(v).length).join(' ');
+}
+function sdsLogTgText(e){
+  return e.is_group?String(e.dest_issi||''):'';
+}
+function sdsLogFiltered(){
+  const status=document.getElementById('sdslog-filter-status');
+  const fromRe=sdsLogRegex('sdslog-from-filter','From');
+  const tgRe=sdsLogRegex('sdslog-tg-filter','TG');
+  const broken=[fromRe,tgRe].find(re=>re&&re.error);
+  if(broken){
+    if(status){status.textContent=`Regex error: ${broken.error}`;status.classList.add('is-error');}
+    return [];
+  }
+  const rows=(state.sdsLog||[]).filter(e=>{
+    if(fromRe&&!fromRe.test(sdsLogFromText(e)))return false;
+    if(tgRe&&!tgRe.test(sdsLogTgText(e)))return false;
+    return true;
+  });
+  if(status){
+    const total=(state.sdsLog||[]).length;
+    status.textContent=`${rows.length} / ${total}`;
+    status.classList.remove('is-error');
+  }
+  return rows;
+}
+function sdsLogFilterChanged(){sdsLogPageIndex=0;renderSdsLog();}
 function renderSdsLog(){
   const tb=document.getElementById('sdslog-tbody');if(!tb)return;
-  const rows=state.sdsLog||[];
+  const total=(state.sdsLog||[]).length;
+  const rows=sdsLogFiltered();
   sdsLogPageIndex=clampLogPage(sdsLogPageIndex,rows.length);
   setLogPager('sdslog-page',sdsLogPageIndex,rows.length);
-  if(!rows.length){tb.innerHTML=`<tr><td colspan="5" class="sds-empty" style="text-align:center;padding:24px">${t('no_sds')}</td></tr>`;return;}
+  if(!rows.length){tb.innerHTML=`<tr><td colspan="5" class="sds-empty" style="text-align:center;padding:24px">${total?'No matching SDS messages':t('no_sds')}</td></tr>`;return;}
   const start=sdsLogPageIndex*LOG_PAGE_SIZE;
   tb.innerHTML=rows.slice(start,start+LOG_PAGE_SIZE).map(sdsRow).join('');
 }
 async function loadSdsLog(){
-  try{const r=await fetch('/api/sds-log');if(!r.ok)return;state.sdsLog=await r.json();sdsLogPageIndex=0;renderSdsLog();refreshCallsigns();}catch{}
+  try{const r=await fetch('/api/sds-log');if(!r.ok)return;state.sdsLog=await r.json();sdsLogPageIndex=0;renderSdsLog();renderMapsIfActive();refreshCallsigns();}catch{}
 }
 function sdsLogPrevPage(){sdsLogPageIndex--;renderSdsLog();}
 function sdsLogNextPage(){sdsLogPageIndex++;renderSdsLog();}
 async function clearSdsLog(){
   if(!confirm('Clear SDS Log?'))return;
-  try{const r=await fetch('/api/sds-log',{method:'DELETE'});if(!r.ok)return;state.sdsLog=[];sdsLogPageIndex=0;renderSdsLog();}catch{}
+  try{const r=await fetch('/api/sds-log',{method:'DELETE'});if(!r.ok)return;state.sdsLog=[];sdsLogPageIndex=0;renderSdsLog();renderMapsIfActive();}catch{}
 }
 function exportSdsLog(){
-  const rows=state.sdsLog||[];
+  const rows=sdsLogFiltered();
   if(!rows.length)return;
   const lines=['TIME\tDIR\tFROM\tTO\tGROUP\tPID\tMESSAGE'];
   for(const e of rows){
@@ -5193,6 +6847,22 @@ function dapNum(id,def,min,max){
   if(!Number.isFinite(n))return def;
   return Math.max(min,Math.min(max,n));
 }
+function tpgRicText(v){
+  const n=Number(v);
+  if(!Number.isFinite(n))return '0x00090D10';
+  return '0x'+(n>>>0).toString(16).toUpperCase().padStart(8,'0');
+}
+function parseTpgRicValue(raw){
+  const s=String(raw||'').trim();
+  if(!s)return null;
+  const n=s.toLowerCase().startsWith('0x')?parseInt(s.slice(2),16):parseInt(s,10);
+  if(!Number.isFinite(n)||n<0||n>0xFFFFFFFF)return null;
+  return n>>>0;
+}
+function tpgRicInput(id,def){
+  const parsed=parseTpgRicValue(dapVal(id));
+  return parsed===null?def:parsed;
+}
 function dapList(id){return dapVal(id).split(/[\s,]+/).map(s=>s.trim()).filter(Boolean);}
 function dapRicRoutesText(routes){
   return Object.keys(routes||{}).sort().map(k=>`${k}=${routes[k]}`).join('\n');
@@ -5209,6 +6879,27 @@ function dapRicRoutesBody(id,label){
     const issi=parseInt(m[2],10);
     if(!Number.isFinite(issi)||issi<1||issi>16777215){setDapMsg(`Invalid SSI in ${label} route: ${line}`,false);return null;}
     out[m[1]]=issi;
+  }
+  return out;
+}
+function dapPriorityRoutesBody(id,label,keyLabel,min,max){
+  const raw=dapVal(id);
+  const out={};
+  if(!raw)return out;
+  for(const lineRaw of raw.split(/\n+/)){
+    const line=lineRaw.trim();
+    if(!line||line.startsWith('#'))continue;
+    const m=line.match(/^([0-9A-Fa-fxX]+)\s*=\s*([0-9]+)$/);
+    if(!m){setDapMsg(`Invalid ${label} priority route: ${line}`,false);return null;}
+    const priority=parseInt(m[2],10);
+    if(!Number.isFinite(priority)||priority<0||priority>15){setDapMsg(`Invalid priority in ${label} route: ${line}`,false);return null;}
+    if(keyLabel==='ISSI'){
+      const issi=parseInt(m[1],10);
+      if(!Number.isFinite(issi)||issi<min||issi>max){setDapMsg(`Invalid ISSI in ${label} route: ${line}`,false);return null;}
+      out[String(issi)]=priority;
+    }else{
+      out[m[1]]=priority;
+    }
   }
   return out;
 }
@@ -5239,15 +6930,42 @@ function dapPaths(paths){
   if(!p.length)return '<span class="sds-empty">—</span>';
   return p.map(x=>`<span class="badge badge-blue" style="font-size:10px">${escHtml(x)}</span>`).join(' ');
 }
+function dapnetLogRegex(id,label){
+  const raw=(document.getElementById(id)?.value||'').trim();
+  if(!raw)return null;
+  try{return new RegExp(raw,'i');}
+  catch(e){return {error:`${label}: ${e.message||'invalid regex'}`};}
+}
+function dapnetLogFiltered(){
+  const status=document.getElementById('dapnetlog-filter-status');
+  const filters=[
+    {label:'Callsign',re:dapnetLogRegex('dapnetlog-callsign-filter','Callsign'),value:e=>e.callsign||''},
+    {label:'Recipient',re:dapnetLogRegex('dapnetlog-recipient-filter','Recipient'),value:e=>e.recipient||''},
+    {label:'Message',re:dapnetLogRegex('dapnetlog-message-filter','Message'),value:e=>e.text||''},
+  ];
+  const broken=filters.find(f=>f.re&&f.re.error);
+  if(broken){
+    if(status){status.textContent=`Regex error: ${broken.re.error}`;status.classList.add('is-error');}
+    return [];
+  }
+  const rows=(state.dapnetLog||[]).filter(e=>filters.every(f=>!f.re||f.re.test(String(f.value(e)))));
+  if(status){
+    const total=(state.dapnetLog||[]).length;
+    status.textContent=`${rows.length} / ${total}`;
+    status.classList.remove('is-error');
+  }
+  return rows;
+}
+function dapnetLogFilterChanged(){dapnetLogPageIndex=0;renderDapnetLog();}
 function dapnetRow(e){
   return `<tr><td class="sds-time">${escHtml(e.ts||'')}</td><td>${dirBadge(e.direction)}</td><td>${escHtml(e.callsign||'')}</td><td>${escHtml(e.recipient||'')}</td><td>${dapPaths(e.paths)}</td><td class="sds-msg">${escHtml(e.text||'')}</td></tr>`;
 }
 function renderDapnetLog(){
   const tb=document.getElementById('dapnetlog-tbody');if(!tb)return;
-  const rows=state.dapnetLog||[];
+  const rows=dapnetLogFiltered();
   dapnetLogPageIndex=clampLogPage(dapnetLogPageIndex,rows.length);
   setLogPager('dapnetlog-page',dapnetLogPageIndex,rows.length);
-  if(!rows.length){tb.innerHTML=`<tr><td colspan="6" class="sds-empty" style="text-align:center;padding:24px">No DAPNET messages yet</td></tr>`;return;}
+  if(!rows.length){tb.innerHTML=`<tr><td colspan="6" class="sds-empty" style="text-align:center;padding:24px">No matching DAPNET messages</td></tr>`;return;}
   const start=dapnetLogPageIndex*LOG_PAGE_SIZE;
   tb.innerHTML=rows.slice(start,start+LOG_PAGE_SIZE).map(dapnetRow).join('');
 }
@@ -5261,7 +6979,7 @@ async function clearDapnetLog(){
   try{const r=await fetch('/api/dapnet-log',{method:'DELETE'});if(!r.ok)return;state.dapnetLog=[];dapnetLogPageIndex=0;renderDapnetLog();}catch{}
 }
 function exportDapnetLog(){
-  const rows=state.dapnetLog||[];
+  const rows=dapnetLogFiltered();
   if(!rows.length)return;
   const lines=['TIME\tDIR\tCALLSIGN\tRECIPIENT\tPATHS\tMESSAGE'];
   for(const e of rows){
@@ -5307,13 +7025,21 @@ async function loadDapnet(){
     dapSet('dap-sds-rics',dapRicListText(d.sds_allowed_rics));
     dapSet('dap-callout-source',d.callout_source_issi||9999);
     dapSet('dap-callout-dest',d.callout_dest_issi||0);
-    dapSet('dap-callout-incident',d.callout_incident_base||2);
+    dapSet('dap-callout-tpg-ric',tpgRicText(d.callout_tpg_ric??0x00090D10));
+    dapSet('dap-callout-id',(d.callout_id_base??d.callout_incident_base??33));
+    dapSet('dap-callout-priority',d.callout_priority??15);
     dapSet('dap-callout-prefix',d.callout_text_prefix||'DAPNET');
     dapSet('dap-callout-rics',dapRicListText(d.callout_allowed_rics));
+    dapSet('dap-callout-issi-priorities',dapRicRoutesText(d.callout_issi_priorities));
+    dapSet('dap-callout-tpg-ric-priorities',dapRicRoutesText(d.callout_tpg_ric_priorities));
     dapSet('dap-telegram-prefix',d.telegram_prefix||'DAPNET');
     dapSet('dap-telegram-rics',dapRicListText(d.telegram_allowed_rics));
+    // Hero pill — DAPNET has no live link probe; reflect the enabled feed state.
+    setIntegrationHero('dap', !!d.enabled, !!d.enabled,
+      d.enabled?t('integ_enabled'):t('integ_disabled'),
+      d.api_url||d.rwth_core_host||'');
     setDapMsg('',true);
-  }catch{setDapMsg(t('conn_error'),false);}
+  }catch{setDapMsg(t('conn_error'),false);setIntegrationHero('dap',false,false,t('conn_error'),'');}
 }
 async function saveDapnet(){
   const ricRoutes=dapRicRoutesBody('dap-ric-routes','RIC to ISSI');
@@ -5326,6 +7052,10 @@ async function saveDapnet(){
   if(calloutRics===null)return;
   const telegramRics=dapRicListBody('dap-telegram-rics','Telegram');
   if(telegramRics===null)return;
+  const calloutIssiPriorities=dapPriorityRoutesBody('dap-callout-issi-priorities','Call-Out ISSI','ISSI',1,16777215);
+  if(calloutIssiPriorities===null)return;
+  const calloutTpgRicPriorities=dapPriorityRoutesBody('dap-callout-tpg-ric-priorities','Call-Out TPG RIC','TPG_RIC',0,0);
+  if(calloutTpgRicPriorities===null)return;
   const body={
     enabled:document.getElementById('dap-enabled').checked,
     rwth_core_enabled:document.getElementById('dap-rwth-enabled').checked,
@@ -5349,9 +7079,13 @@ async function saveDapnet(){
     sds_allowed_rics:sdsRics,
     callout_source_issi:dapNum('dap-callout-source',9999,1,16777215),
     callout_dest_issi:dapNum('dap-callout-dest',0,0,16777215),
-    callout_incident_base:dapNum('dap-callout-incident',2,1,256),
+    callout_tpg_ric:tpgRicInput('dap-callout-tpg-ric',0x00090D10),
+    callout_id_base:dapNum('dap-callout-id',33,0,255),
+    callout_priority:dapNum('dap-callout-priority',15,0,15),
     callout_text_prefix:dapVal('dap-callout-prefix')||'DAPNET',
     callout_allowed_rics:calloutRics,
+    callout_issi_priorities:calloutIssiPriorities,
+    callout_tpg_ric_priorities:calloutTpgRicPriorities,
     telegram_prefix:dapVal('dap-telegram-prefix')||'DAPNET',
     telegram_allowed_rics:telegramRics
   };
@@ -5567,10 +7301,9 @@ async function echolinkDisconnect(){
 
 function meshMapLink(lat,lon,label){
   if(lat===null||lat===undefined||lon===null||lon===undefined)return '—';
-  const la=Number(lat),lo=Number(lon);
-  if(!Number.isFinite(la)||!Number.isFinite(lo))return '—';
-  const url=`https://maps.google.com/?q=${encodeURIComponent(la+','+lo)}`;
-  return `<a class="sds-map-link" href="${url}" target="_blank" rel="noopener noreferrer">${escHtml(label||`${la.toFixed(5)}, ${lo.toFixed(5)}`)}</a>`;
+  const la=mapsNumber(lat),lo=mapsNumber(lon);
+  if(!validMapLatLon(la,lo))return '—';
+  return mapLinkHtml(la,lo,label||`${la.toFixed(5)}, ${lo.toFixed(5)}`);
 }
 function meshRfText(row){
   const parts=[];
@@ -5596,21 +7329,69 @@ function meshPaths(paths){
   if(!Array.isArray(paths)||!paths.length)return '<span class="sds-empty">—</span>';
   return paths.map(p=>`<span class="badge badge-blue" style="font-size:10px">${escHtml(p)}</span>`).join(' ');
 }
+function meshRouteParts(item){
+  const raw=String(item?.src||'').trim();
+  let via=Array.isArray(item?.via)?item.via.map(v=>String(v||'').trim()).filter(Boolean):[];
+  if(!via.length&&raw.includes(',')){
+    const parts=raw.split(',').map(v=>v.trim()).filter(Boolean);
+    return {src:parts.shift()||raw,via:parts};
+  }
+  return {src:raw,via};
+}
+function meshOrigin(item){return meshRouteParts(item).src;}
+function meshNormalizeRouteItem(item){
+  const route=meshRouteParts(item);
+  return Object.assign({},item,{src:route.src||item?.src,via:route.via});
+}
+function meshRouteBadge(value){
+  const text=String(value||'').trim();
+  if(!text||text==='—')return '<span class="sds-empty">—</span>';
+  return `<span class="badge badge-blue" style="font-size:10px">${escHtml(text)}</span>`;
+}
+function meshVia(item){
+  const via=meshRouteParts(item).via;
+  if(!via.length)return '<span class="sds-empty">—</span>';
+  return via.map(meshRouteBadge).join(' ');
+}
 function meshNodeFiltered(){
   const q=(document.getElementById('mesh-node-filter')?.value||'').trim().toUpperCase();
   const rows=(state.meshcomNodes||[]).slice().sort((a,b)=>String(b.last_seen||'').localeCompare(String(a.last_seen||'')));
   if(!q)return rows;
   return rows.filter(n=>
-    String(n.src||'').toUpperCase().includes(q) ||
+    meshOrigin(n).toUpperCase().includes(q) ||
     String(n.hw_id||'').toUpperCase().includes(q) ||
     String(n.firmware||'').toUpperCase().includes(q) ||
     String(n.fw_sub||'').toUpperCase().includes(q)
   );
 }
+function upsertMeshcomNode(update){
+  if(!update||!update.src)return;
+  if(!state.meshcomNodes)state.meshcomNodes=[];
+  const updateSrc=meshOrigin(update);
+  const idx=state.meshcomNodes.findIndex(n=>meshOrigin(n)===updateSrc);
+  if(idx>=0){
+    const node=Object.assign({},state.meshcomNodes[idx],{
+      src:updateSrc,
+      via:meshRouteParts(update).via,
+      last_seen:update.last_seen,
+      last_type:update.last_type
+    });
+    ['lat','lon','alt','batt','rssi','snr','firmware','fw_sub','hw_id'].forEach(k=>{
+      if(update[k]!==null&&update[k]!==undefined&&update[k]!=='')node[k]=update[k];
+    });
+    state.meshcomNodes.splice(idx,1);
+    state.meshcomNodes.unshift(node);
+  } else {
+    state.meshcomNodes.unshift(Object.assign({},update,{src:updateSrc,via:meshRouteParts(update).via}));
+  }
+  if(state.meshcomNodes.length>65535)state.meshcomNodes.pop();
+}
 function meshNodeRow(n){
   const fw=[n.firmware,n.fw_sub].filter(Boolean).join(' / ')||'—';
+  const src=meshOrigin(n)||'—';
   return `<tr>
-    <td><span class="badge badge-blue" style="font-size:10px">${escHtml(n.src||'—')}</span><div class="sds-empty">${escHtml(n.last_type||'')}</div></td>
+    <td>${meshRouteBadge(src)}<div class="sds-empty">${escHtml(n.last_type||'')}</div></td>
+    <td>${meshVia(n)}</td>
     <td class="sds-time">${escHtml(n.last_seen||'—')}</td>
     <td>${meshMapLink(n.lat,n.lon)}</td>
     <td>${meshBatteryText(n.batt)}</td>
@@ -5624,37 +7405,157 @@ function renderMeshcomNodes(){
   const rows=meshNodeFiltered();
   meshNodePageIndex=clampLogPage(meshNodePageIndex,rows.length);
   setLogPager('mesh-nodes-page',meshNodePageIndex,rows.length);
-  if(!rows.length){tb.innerHTML=`<tr><td colspan="7" class="sds-empty" style="text-align:center;padding:24px">No MeshCom nodes yet</td></tr>`;return;}
+  if(!rows.length){tb.innerHTML=`<tr><td colspan="8" class="sds-empty" style="text-align:center;padding:24px">No MeshCom nodes yet</td></tr>`;return;}
   const start=meshNodePageIndex*LOG_PAGE_SIZE;
   tb.innerHTML=rows.slice(start,start+LOG_PAGE_SIZE).map(meshNodeRow).join('');
 }
 function meshNodePrevPage(){meshNodePageIndex--;renderMeshcomNodes();}
 function meshNodeNextPage(){meshNodePageIndex++;renderMeshcomNodes();}
+async function loadMeshcomNodes(){
+  try{const r=await fetch('/api/meshcom-nodes');if(!r.ok)return;state.meshcomNodes=(await r.json()).map(meshNormalizeRouteItem);meshNodePageIndex=0;renderMeshcomNodes();renderMapsIfActive();}catch{}
+}
+async function clearMeshcomNodes(){
+  if(!confirm('Clear MeshCom Nodes?'))return;
+  try{const r=await fetch('/api/meshcom-nodes',{method:'DELETE'});if(!r.ok)return;state.meshcomNodes=[];meshNodePageIndex=0;renderMeshcomNodes();renderMapsIfActive();}catch{}
+}
+function exportMeshcomNodes(){
+  const rows=meshNodeFiltered();
+  const lines=['time\tnode\tvia\ttype\tposition\tbattery\trf\tfirmware\thw_id'];
+  rows.forEach(n=>{
+    const pos=(n.lat!==null&&n.lat!==undefined&&n.lon!==null&&n.lon!==undefined)?(`${n.lat},${n.lon}`):'';
+    const fw=[n.firmware,n.fw_sub].filter(Boolean).join(' / ');
+    lines.push([n.last_seen||'',meshOrigin(n)||'',meshRouteParts(n).via.join(','),n.last_type||'',pos,meshBatteryText(n.batt),meshRfText(n),fw,n.hw_id||''].join('\t'));
+  });
+  downloadTextFile(`flowstation-meshcom-nodes-${logExportStamp()}.txt`,lines.join('\n')+'\n');
+}
 function meshMsgRow(m){
   const msgText=m.msg?escHtml(m.msg):(m.lat!==null&&m.lat!==undefined&&m.lon!==null&&m.lon!==undefined?'<span class="sds-empty">[position]</span>':'');
   const posRf=[meshMapLink(m.lat,m.lon,'map'),meshRfText(m)].filter(x=>x&&x!=='—').join(' · ')||'—';
+  const src=meshOrigin(m)||'—';
   return `<tr>
     <td class="sds-time">${escHtml(m.ts||'')}</td>
     <td>${dirBadge(m.direction)}</td>
     <td><span class="badge" style="font-size:10px">${escHtml(m.msg_type||'unknown')}</span></td>
-    <td>${escHtml(m.src||'—')}<div class="sds-empty">${escHtml(m.src_type||'')}</div></td>
+    <td>${meshRouteBadge(src)}<div class="sds-empty">${escHtml(m.src_type||'')}</div></td>
+    <td>${meshVia(m)}</td>
     <td>${escHtml(m.dst||'—')}</td>
     <td class="sds-msg">${msgText}</td>
     <td>${meshPaths(m.paths)}</td>
     <td class="sds-time">${posRf}</td>
   </tr>`;
 }
+function meshMsgTransport(m){
+  return String(m.src_type||m.msg_type||'').trim().toLowerCase();
+}
+function meshMsgIsUdp(m){return meshMsgTransport(m)==='udp';}
+function meshMsgIsLora(m){return meshMsgTransport(m)==='lora';}
+function meshMsgIsNode(m){return meshMsgTransport(m)==='node';}
+function meshMsgIsPos(m){return String(m.msg_type||'').trim().toLowerCase()==='pos';}
+function meshMsgIsTime(m){return String(m.src||'').trim().toUpperCase().startsWith('OE1XAR')&&String(m.msg||'').trim().startsWith('{CET}');}
+function meshMsgSourceMatches(m,raw){
+  const q=String(raw||'').trim().toUpperCase();
+  if(!q)return true;
+  const hay=meshOrigin(m).toUpperCase();
+  const parts=q.split(/[\s,]+/).filter(Boolean);
+  return !parts.length||parts.some(part=>hay.includes(part));
+}
+function meshMsgRegexFromInput(id){
+  const raw=(document.getElementById(id)?.value||'').trim();
+  if(!raw)return null;
+  try{return new RegExp(raw,'i');}
+  catch(e){return {error:e.message||'invalid regex'};}
+}
+function meshMsgRegex(){return meshMsgRegexFromInput('mesh-msg-regex-filter');}
+function meshMsgDstRegex(){return meshMsgRegexFromInput('mesh-msg-dst-regex-filter');}
+function updateMeshMsgFilterButtons(){
+  const udp=document.getElementById('mesh-msg-filter-udp');
+  const lora=document.getElementById('mesh-msg-filter-lora');
+  const node=document.getElementById('mesh-msg-filter-node');
+  const pos=document.getElementById('mesh-msg-filter-pos');
+  const time=document.getElementById('mesh-msg-filter-time');
+  if(udp){udp.classList.toggle('btn-primary',meshMsgShowUdp);udp.classList.toggle('btn-danger',!meshMsgShowUdp);}
+  if(lora){lora.classList.toggle('btn-primary',meshMsgShowLora);lora.classList.toggle('btn-danger',!meshMsgShowLora);}
+  if(node){node.classList.toggle('btn-primary',meshMsgShowNode);node.classList.toggle('btn-danger',!meshMsgShowNode);}
+  if(pos){pos.classList.toggle('btn-primary',meshMsgShowPos);pos.classList.toggle('btn-danger',!meshMsgShowPos);}
+  if(time){time.classList.toggle('btn-primary',meshMsgShowTime);time.classList.toggle('btn-danger',!meshMsgShowTime);}
+}
+function meshMsgFiltered(){
+  const sourceRaw=document.getElementById('mesh-msg-source-filter')?.value||'';
+  const dstRegex=meshMsgDstRegex();
+  const regex=meshMsgRegex();
+  const status=document.getElementById('mesh-msg-filter-status');
+  if((dstRegex&&dstRegex.error)||(regex&&regex.error)){
+    updateMeshMsgFilterButtons();
+    const message=dstRegex&&dstRegex.error?`Destination regex error: ${dstRegex.error}`:`Message regex error: ${regex.error}`;
+    if(status){status.textContent=message;status.classList.add('is-error');}
+    return [];
+  }
+  const rows=(state.meshcomMessages||[]).filter(m=>{
+    if(!meshMsgShowUdp&&meshMsgIsUdp(m))return false;
+    if(!meshMsgShowLora&&meshMsgIsLora(m))return false;
+    if(!meshMsgShowNode&&meshMsgIsNode(m))return false;
+    if(!meshMsgShowPos&&meshMsgIsPos(m))return false;
+    if(!meshMsgShowTime&&meshMsgIsTime(m))return false;
+    if(!meshMsgSourceMatches(m,sourceRaw))return false;
+    if(dstRegex&&!dstRegex.test(String(m.dst||'')))return false;
+    if(regex&&!regex.test(String(m.msg||'')))return false;
+    return true;
+  });
+  if(status){
+    const total=(state.meshcomMessages||[]).length;
+    status.textContent=`${rows.length} / ${total}`;
+    status.classList.remove('is-error');
+  }
+  updateMeshMsgFilterButtons();
+  return rows;
+}
+function meshMsgFilterChanged(){meshMsgPageIndex=0;renderMeshcomMessages();}
+function toggleMeshMsgTransport(kind){
+  if(kind==='udp')meshMsgShowUdp=!meshMsgShowUdp;
+  if(kind==='lora')meshMsgShowLora=!meshMsgShowLora;
+  if(kind==='node')meshMsgShowNode=!meshMsgShowNode;
+  if(kind==='pos')meshMsgShowPos=!meshMsgShowPos;
+  if(kind==='time')meshMsgShowTime=!meshMsgShowTime;
+  meshMsgFilterChanged();
+}
 function renderMeshcomMessages(){
   const tb=document.getElementById('mesh-msgs-tbody');if(!tb)return;
-  const rows=state.meshcomMessages||[];
+  const rows=meshMsgFiltered();
   meshMsgPageIndex=clampLogPage(meshMsgPageIndex,rows.length);
   setLogPager('mesh-msgs-page',meshMsgPageIndex,rows.length);
-  if(!rows.length){tb.innerHTML=`<tr><td colspan="8" class="sds-empty" style="text-align:center;padding:24px">No MeshCom packets yet</td></tr>`;return;}
+  if(!rows.length){tb.innerHTML=`<tr><td colspan="9" class="sds-empty" style="text-align:center;padding:24px">No matching MeshCom packets</td></tr>`;return;}
   const start=meshMsgPageIndex*LOG_PAGE_SIZE;
   tb.innerHTML=rows.slice(start,start+LOG_PAGE_SIZE).map(meshMsgRow).join('');
 }
 function meshMsgPrevPage(){meshMsgPageIndex--;renderMeshcomMessages();}
 function meshMsgNextPage(){meshMsgPageIndex++;renderMeshcomMessages();}
+async function loadMeshcomMessages(){
+  try{const r=await fetch('/api/meshcom-messages');if(!r.ok)return;state.meshcomMessages=(await r.json()).map(meshNormalizeRouteItem);meshMsgPageIndex=0;renderMeshcomMessages();renderMapsIfActive();}catch{}
+}
+async function clearMeshcomMessages(){
+  if(!confirm('Clear MeshCom Messages?'))return;
+  try{const r=await fetch('/api/meshcom-messages',{method:'DELETE'});if(!r.ok)return;state.meshcomMessages=[];meshMsgPageIndex=0;renderMeshcomMessages();renderMapsIfActive();}catch{}
+}
+function exportMeshcomMessages(){
+  const rows=meshMsgFiltered();
+  const lines=['time\tdir\ttype\tsource\tvia\tdestination\tmessage\tpaths\tposition\trf'];
+  rows.forEach(m=>{
+    const pos=(m.lat!==null&&m.lat!==undefined&&m.lon!==null&&m.lon!==undefined)?(`${m.lat},${m.lon}`):'';
+    lines.push([
+      m.ts||'',
+      String(m.direction||'').toUpperCase(),
+      m.msg_type||'',
+      [meshOrigin(m)||'',m.src_type?`(${m.src_type})`:''].filter(Boolean).join(' '),
+      meshRouteParts(m).via.join(','),
+      m.dst||'',
+      m.msg||'',
+      Array.isArray(m.paths)?m.paths.join(','):'',
+      pos,
+      meshRfText(m)
+    ].join('\t'));
+  });
+  downloadTextFile(`flowstation-meshcom-messages-${logExportStamp()}.txt`,lines.join('\n')+'\n');
+}
 async function loadMeshcom(){
   try{
     const r=await fetch('/api/meshcom');
@@ -5687,11 +7588,8 @@ async function loadMeshcom(){
     dapSet('mesh-last-rx',rt.last_rx||'—');
     dapSet('mesh-last-tx',rt.last_tx||'—');
     dapSet('mesh-last-error',rt.last_error||'—');
-    state.meshcomNodes=d.nodes||[];
-    state.meshcomMessages=d.messages||[];
-    meshNodePageIndex=0;meshMsgPageIndex=0;
-    renderMeshcomNodes();
-    renderMeshcomMessages();
+    loadMeshcomNodes();
+    loadMeshcomMessages();
     setMeshMsg('',true);
   }catch{setMeshMsg(t('conn_error'),false);}
 }
@@ -5747,10 +7645,12 @@ function geoEventRow(e){
   const status=e.alarmed
     ? '<span class="badge badge-green" style="font-size:10px">ALARM</span>'
     : (e.inside_radius?'<span class="badge badge-blue" style="font-size:10px">inside</span>':'<span class="badge" style="font-size:10px">outside</span>');
+  const via=Array.isArray(e.via)?e.via.map(v=>String(v||'').trim()).filter(Boolean):[];
   return `<tr>
     <td class="sds-time">${escHtml(e.ts||'')}</td>
     <td>${escHtml(e.source||'—')}</td>
     <td>${escHtml(e.device||'—')}</td>
+    <td>${via.length?via.map(v=>`<span class="badge badge-blue" style="font-size:10px">${escHtml(v)}</span>`).join(' '):'<span class="sds-empty">—</span>'}</td>
     <td class="sds-time">${Number(e.distance_m||0).toFixed(0)} m</td>
     <td>${meshMapLink(e.lat,e.lon,'map')}</td>
     <td>${status}</td>
@@ -5762,7 +7662,7 @@ function renderGeoalarmEvents(){
   const rows=state.geoalarmEvents||[];
   geoalarmPageIndex=clampLogPage(geoalarmPageIndex,rows.length);
   setLogPager('geo-events-page',geoalarmPageIndex,rows.length);
-  if(!rows.length){tb.innerHTML=`<tr><td colspan="7" class="sds-empty" style="text-align:center;padding:24px">No GeoAlarm events yet</td></tr>`;return;}
+  if(!rows.length){tb.innerHTML=`<tr><td colspan="8" class="sds-empty" style="text-align:center;padding:24px">No GeoAlarm events yet</td></tr>`;return;}
   const start=geoalarmPageIndex*LOG_PAGE_SIZE;
   tb.innerHTML=rows.slice(start,start+LOG_PAGE_SIZE).map(geoEventRow).join('');
 }
@@ -5788,12 +7688,20 @@ async function loadGeoalarm(){
     dapSet('geo-tetra-black',geoIssiListText(d.tetra_issi_blacklist));
     dapSet('geo-mesh-white',meshSourceListText(d.meshcom_source_whitelist));
     dapSet('geo-mesh-black',meshSourceListText(d.meshcom_source_blacklist));
+    dapSet('geo-telegram-tetra-white',geoIssiListText(d.telegram_tetra_issi_whitelist));
+    dapSet('geo-telegram-tetra-black',geoIssiListText(d.telegram_tetra_issi_blacklist));
+    dapSet('geo-telegram-mesh-white',meshSourceListText(d.telegram_meshcom_source_whitelist));
+    dapSet('geo-telegram-mesh-black',meshSourceListText(d.telegram_meshcom_source_blacklist));
     dapSet('geo-sds-source',d.sds_source_issi||9999);
     dapSet('geo-sds-dest',d.sds_dest_issi||0);
     dapCheck('geo-sds-group',d.sds_dest_is_group);
     dapSet('geo-tpg-source',d.tpg2200_source_issi||9999);
     dapSet('geo-tpg-dest',d.tpg2200_dest_issi||0);
-    dapSet('geo-tpg-incident',d.tpg2200_incident_base||1);
+    dapSet('geo-tpg-ric',tpgRicText(d.tpg2200_ric??0x00090D10));
+    dapSet('geo-tpg-id',(d.tpg2200_callout_id_base??d.tpg2200_incident_base??33));
+    dapSet('geo-tpg-priority',d.tpg2200_priority??15);
+    dapSet('geo-tpg-issi-priorities',dapRicRoutesText(d.tpg2200_issi_priorities));
+    dapSet('geo-tpg-ric-priorities',dapRicRoutesText(d.tpg2200_ric_priorities));
     dapSet('geo-tpg-prefix',d.tpg2200_text_prefix||'GeoAlarm');
     dapSet('geo-tpg-max',d.tpg2200_max_text_chars||80);
     dapSet('geo-sip-prefix',d.sip_title_prefix||'GeoAlarm');
@@ -5805,17 +7713,32 @@ async function loadGeoalarm(){
     dapSet('geo-last-position',rt.last_position||'—');
     dapSet('geo-last-alarm',rt.last_alarm||'—');
     dapSet('geo-last-error',rt.last_error||'—');
+    // Hero pill — reflect the enabled state; warn when enabled but a last error is present.
+    const geoErr=rt.last_error&&rt.last_error!=='—';
+    setIntegrationHero('geo', !!d.enabled, !!d.enabled&&!geoErr,
+      d.enabled?(geoErr?t('integ_error'):t('integ_enabled')):t('integ_disabled'),
+      rt.center||`${d.flowstation_lat??0}, ${d.flowstation_lon??0}`);
+    state.geoalarmConfig=d;
     state.geoalarmEvents=d.events||[];
     geoalarmPageIndex=0;
     renderGeoalarmEvents();
+    renderMapsIfActive();
     setGeoMsg('',true);
-  }catch{setGeoMsg(t('conn_error'),false);}
+  }catch{setGeoMsg(t('conn_error'),false);setIntegrationHero('geo',false,false,t('conn_error'),'');}
 }
 async function saveGeoalarm(){
   const tetraWhite=geoIssiListBody('geo-tetra-white','whitelist');
   if(tetraWhite===null)return;
   const tetraBlack=geoIssiListBody('geo-tetra-black','blacklist');
   if(tetraBlack===null)return;
+  const telegramTetraWhite=geoIssiListBody('geo-telegram-tetra-white','Telegram whitelist');
+  if(telegramTetraWhite===null)return;
+  const telegramTetraBlack=geoIssiListBody('geo-telegram-tetra-black','Telegram blacklist');
+  if(telegramTetraBlack===null)return;
+  const tpgIssiPriorities=dapPriorityRoutesBody('geo-tpg-issi-priorities','GeoAlarm TPG ISSI','ISSI',0,16777215);
+  if(tpgIssiPriorities===null)return;
+  const tpgRicPriorities=dapPriorityRoutesBody('geo-tpg-ric-priorities','GeoAlarm TPG RIC','TPG_RIC',0,0);
+  if(tpgRicPriorities===null)return;
   const body={
     enabled:document.getElementById('geo-enabled').checked,
     flowstation_lat:geoFloat('geo-lat',0,-90,90),
@@ -5832,12 +7755,20 @@ async function saveGeoalarm(){
     tetra_issi_blacklist:tetraBlack,
     meshcom_source_whitelist:meshSourceListBody('geo-mesh-white'),
     meshcom_source_blacklist:meshSourceListBody('geo-mesh-black'),
+    telegram_tetra_issi_whitelist:telegramTetraWhite,
+    telegram_tetra_issi_blacklist:telegramTetraBlack,
+    telegram_meshcom_source_whitelist:meshSourceListBody('geo-telegram-mesh-white'),
+    telegram_meshcom_source_blacklist:meshSourceListBody('geo-telegram-mesh-black'),
     sds_source_issi:dapNum('geo-sds-source',9999,1,16777215),
     sds_dest_issi:dapNum('geo-sds-dest',0,0,16777215),
     sds_dest_is_group:document.getElementById('geo-sds-group').checked,
     tpg2200_source_issi:dapNum('geo-tpg-source',9999,1,16777215),
     tpg2200_dest_issi:dapNum('geo-tpg-dest',0,0,16777215),
-    tpg2200_incident_base:dapNum('geo-tpg-incident',1,1,256),
+    tpg2200_ric:tpgRicInput('geo-tpg-ric',0x00090D10),
+    tpg2200_callout_id_base:dapNum('geo-tpg-id',33,0,255),
+    tpg2200_priority:dapNum('geo-tpg-priority',15,0,15),
+    tpg2200_issi_priorities:tpgIssiPriorities,
+    tpg2200_ric_priorities:tpgRicPriorities,
     tpg2200_text_prefix:dapVal('geo-tpg-prefix')||'GeoAlarm',
     tpg2200_max_text_chars:dapNum('geo-tpg-max',80,8,160),
     sip_title_prefix:dapVal('geo-sip-prefix')||'GeoAlarm',
@@ -5857,7 +7788,7 @@ async function sendMeshcomMessage(){
   try{
     const r=await fetch('/api/meshcom/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
     const d=await r.json();
-    if(d.ok){setMeshSendMsg('✓ Sent',true);document.getElementById('mesh-out-msg').value='';setTimeout(loadMeshcom,300);}
+    if(d.ok){setMeshSendMsg('✓ Sent',true);document.getElementById('mesh-out-msg').value='';setTimeout(()=>{loadMeshcom();loadMeshcomMessages();},300);}
     else setMeshSendMsg('✗ '+(d.error||'Send failed'),false);
   }catch{setMeshSendMsg(t('conn_error'),false);}
 }
@@ -5918,13 +7849,37 @@ async function loadAsteriskStatus(){
     set('ast-remote', rt.remote||c.remote);
     set('ast-rtp', rt.rtp_port_range||c.rtp_port_range);
     set('ast-codec', rt.codec||c.codec);
+    set('ast-setup-timeout', (c.inbound_setup_timeout_secs??20)+'s');
     set('ast-last-rx', rt.last_rx);
     set('ast-last-tx', rt.last_tx);
     set('ast-last-error', rt.last_error);
+    // Hero connection pill — driven by the live REGISTER state.
+    const enabled=!!(c.enabled||rt.enabled);
+    const reg=(rt.register_status||'').toLowerCase();
+    const registered=/regist|ok|online|200/.test(reg)&&!/fail|error|unreach|timeout/.test(reg);
+    setIntegrationHero('ast', enabled, registered, rt.register_status||(enabled?t('offline'):'disabled'),
+      (c.configured||rt.configured)?(rt.sip_listen||c.sip_listen||''):'');
+    const cc=document.getElementById('ast-configured-card');
+    if(cc){cc.classList.remove('is-ok','is-danger','is-idle');cc.classList.add((c.configured||rt.configured)?'is-ok':'is-idle');}
+    const rc=document.getElementById('ast-register-card');
+    if(rc){rc.classList.remove('is-ok','is-warn','is-danger','is-idle');rc.classList.add(registered?'is-ok':enabled?'is-warn':'is-idle');}
   }catch(e){
     set('ast-configured','—');set('ast-enabled','status unavailable');set('ast-register','—');
     set('ast-last-error',t('conn_error'));
+    setIntegrationHero('ast', false, false, t('conn_error'), '');
   }
+}
+// Shared helper: drive an integration tab's hero dot + connection pill from
+// (enabled, connected) state. Calm severity language: connected=ok, enabled-but-down=warn,
+// disabled=idle. No color literals — all via .hero-dot/.pill variants.
+function setIntegrationHero(prefix, enabled, connected, pillText, subText){
+  const dot=document.getElementById(prefix+'-hero-dot');
+  const pill=document.getElementById(prefix+'-hero-pill');
+  const sub=document.getElementById(prefix+'-hero-sub');
+  const lvl=!enabled?'idle':connected?'ok':'warn';
+  if(dot) dot.className='hero-dot is-'+lvl;
+  if(pill){pill.className='pill pill-'+lvl;pill.textContent=pillText||'—';}
+  if(sub&&subText!=null) sub.textContent=subText||'—';
 }
 
 let snomPasswordDirty=false;
@@ -6149,6 +8104,10 @@ async function loadTelegram(){
     document.getElementById('tg-t351').checked=!!d.alert_t351;
     document.getElementById('tg-lip').checked=!!d.alert_lip;
     document.getElementById('tg-backhaul').checked=!!d.alert_backhaul;
+    document.getElementById('tg-brew-register').checked=!!d.alert_brew_register;
+    document.getElementById('tg-brew-register-prefix').value=d.brew_register_prefix||'Brew REGISTER';
+    document.getElementById('tg-brew-register-white').value=geoIssiListText(d.brew_register_issi_whitelist);
+    document.getElementById('tg-brew-register-black').value=geoIssiListText(d.brew_register_issi_blacklist);
     document.getElementById('tg-logs').checked=!!d.alert_critical_logs;
     document.getElementById('tg-verify-status').textContent='';
     document.getElementById('tg-detected').innerHTML='';
@@ -6200,6 +8159,10 @@ async function detectTelegramChats(){
   }catch{box.innerHTML='<span style="color:var(--danger);font-size:13px">'+t('conn_error')+'</span>';}
 }
 async function saveTelegram(){
+  const brewWhite=geoIssiListBody('tg-brew-register-white','Brew REGISTER whitelist');
+  if(brewWhite===null)return;
+  const brewBlack=geoIssiListBody('tg-brew-register-black','Brew REGISTER blacklist');
+  if(brewBlack===null)return;
   const body={
     enabled:document.getElementById('tg-enabled').checked,
     chat_ids:tgChats,
@@ -6208,6 +8171,10 @@ async function saveTelegram(){
     alert_t351:document.getElementById('tg-t351').checked,
     alert_lip:document.getElementById('tg-lip').checked,
     alert_backhaul:document.getElementById('tg-backhaul').checked,
+    alert_brew_register:document.getElementById('tg-brew-register').checked,
+    brew_register_prefix:(document.getElementById('tg-brew-register-prefix').value||'Brew REGISTER').trim()||'Brew REGISTER',
+    brew_register_issi_whitelist:brewWhite,
+    brew_register_issi_blacklist:brewBlack,
     alert_critical_logs:document.getElementById('tg-logs').checked
   };
   const tok=tgTokenField();if(tok)body.bot_token=tok;
@@ -6236,10 +8203,10 @@ async function restartService(){if(!confirm(t('confirm_restart')))return;wsSend(
 async function shutdownService(){if(!confirm(t('confirm_shutdown')))return;wsSend({type:'shutdown'});}
 function kickMs(issi){if(!confirm(t('confirm_kick',{issi})))return;wsSend({type:'kick',issi});}
 function toggleSdsCallout(){const on=document.getElementById('sds-callout').checked;document.getElementById('sds-callout-fields').style.display=on?'block':'none';}
-function resetSdsCallout(){document.getElementById('sds-callout').checked=false;document.getElementById('sds-callout-source').value='9999';document.getElementById('sds-callout-incident').value='1';document.getElementById('sds-callout-text').value='ALARM';document.getElementById('sds-callout-raw').value='';toggleSdsCallout();}
+function resetSdsCallout(){document.getElementById('sds-callout').checked=false;document.getElementById('sds-callout-source').value='9999';document.getElementById('sds-callout-id').value='33';document.getElementById('sds-callout-ric').value='0x00090D10';document.getElementById('sds-callout-priority').value='15';document.getElementById('sds-callout-text').value='ALARM';document.getElementById('sds-callout-raw').value='';toggleSdsCallout();}
 function openSds(issi){sdsDest=issi;document.getElementById('sds-dest').value=issi;document.getElementById('sds-msg').value='';resetSdsCallout();document.getElementById('sds-modal').classList.add('open');}
 function closeSdsModal(){document.getElementById('sds-modal').classList.remove('open');}
-function sendSds(){const dest=parseInt(document.getElementById('sds-dest').value);if(!dest)return;if(document.getElementById('sds-callout').checked){const source=parseInt(document.getElementById('sds-callout-source').value)||9999;const incident=Math.max(1,Math.min(256,parseInt(document.getElementById('sds-callout-incident').value)||1));const alarmText=document.getElementById('sds-callout-text').value.trim()||'ALARM';const rawhex=document.getElementById('sds-callout-raw').value.trim();wsSend({type:'sds_callout',dest_issi:dest,source_issi:source,incident,message:alarmText,raw_hex:rawhex});closeSdsModal();return;}const msg=document.getElementById('sds-msg').value.trim();if(!msg)return;wsSend({type:'sds',dest_issi:dest,message:msg});closeSdsModal();}
+function sendSds(){const dest=parseInt(document.getElementById('sds-dest').value);if(!dest)return;if(document.getElementById('sds-callout').checked){const source=parseInt(document.getElementById('sds-callout-source').value)||9999;const calloutId=Math.max(0,Math.min(255,parseInt(document.getElementById('sds-callout-id').value)||0));const tpgRic=tpgRicInput('sds-callout-ric',0x00090D10);const priority=Math.max(0,Math.min(15,parseInt(document.getElementById('sds-callout-priority').value)||0));const alarmText=document.getElementById('sds-callout-text').value.trim()||'ALARM';const rawhex=document.getElementById('sds-callout-raw').value.trim();wsSend({type:'sds_callout',dest_issi:dest,source_issi:source,tpg_ric:tpgRic,callout_id:calloutId,priority,message:alarmText,raw_hex:rawhex});closeSdsModal();return;}const msg=document.getElementById('sds-msg').value.trim();if(!msg)return;wsSend({type:'sds',dest_issi:dest,message:msg});closeSdsModal();}
 function openDgna(issi){document.getElementById('dgna-issi').value=issi;document.getElementById('dgna-gssi').value='';const cur=document.getElementById('dgna-current');const gl=(state.ms[issi]&&state.ms[issi].groups)||[];cur.innerHTML=gl.length?gl.slice().sort((a,b)=>a-b).map(g=>`<span class="badge badge-blue" style="font-size:10px">${g}</span>`).join(''):'<span class="badge badge-dim">—</span>';document.getElementById('dgna-modal').classList.add('open');}
 function closeDgnaModal(){document.getElementById('dgna-modal').classList.remove('open');}
 function sendDgna(attach){const issi=parseInt(document.getElementById('dgna-issi').value),gssi=parseInt(document.getElementById('dgna-gssi').value);if(!issi||!gssi)return;wsSend({type:'dgna',issi,gssi,attach});closeDgnaModal();}
@@ -6370,14 +8337,15 @@ async function loadSystemInfo(){
       }
     }
 
-    // CPU
+    // CPU — gauge fill width + threshold state class on the .gauge wrapper.
     const cpuEl=document.getElementById('sysCpu');
     if(cpuEl) cpuEl.textContent=(sysData.cpu_model||'—')+(sysData.cpu_cores?` (${sysData.cpu_cores} cores)`:'');
     const cpuPct=sysData.cpu_pct||0;
     const cpuBarEl=document.getElementById('sysCpuBar');
     const cpuPctEl=document.getElementById('sysCpuPct');
+    const cpuGauge=document.getElementById('sysCpuGauge');
     if(cpuBarEl) cpuBarEl.style.width=cpuPct+'%';
-    if(cpuBarEl) cpuBarEl.style.background=cpuPct>80?'var(--danger)':cpuPct>60?'var(--warn)':'var(--accent)';
+    if(cpuGauge) cpuGauge.className='gauge'+(cpuPct>80?' is-danger':cpuPct>60?' is-warn':'');
     if(cpuPctEl) cpuPctEl.textContent=cpuPct+'%';
 
     // RAM
@@ -6386,19 +8354,21 @@ async function loadSystemInfo(){
     const ramPct=ramTotal>0?Math.round(ramUsed/ramTotal*100):0;
     const ramBarEl=document.getElementById('sysRamBar');
     const ramValEl=document.getElementById('sysRamVal');
+    const ramGauge=document.getElementById('sysRamGauge');
     if(ramBarEl) ramBarEl.style.width=ramPct+'%';
-    if(ramBarEl) ramBarEl.style.background=ramPct>85?'var(--danger)':ramPct>70?'var(--warn)':'var(--accent2)';
+    if(ramGauge) ramGauge.className='gauge'+(ramPct>85?' is-danger':ramPct>70?' is-warn':' is-info');
     if(ramValEl) ramValEl.textContent=`${ramUsed} / ${ramTotal} MB (${ramPct}%)`;
 
-    // Temperature
+    // Temperature — state via stat-card class, hot label without emoji.
     const tempCard=document.getElementById('cpu-temp-card');
     const tempEl=document.getElementById('sysCpuTemp');
     const tempSub=document.getElementById('sysCpuTempSub');
     if(sysData.cpu_temp_c!=null){
-      const t=sysData.cpu_temp_c.toFixed(1);
-      if(tempCard) tempCard.style.display='';
-      if(tempEl){ tempEl.textContent=t+'°C'; tempEl.style.color=sysData.cpu_temp_c>75?'var(--danger)':sysData.cpu_temp_c>60?'var(--warn)':'var(--accent)';}
-      if(tempSub) tempSub.textContent=sysData.cpu_temp_c>75?'⚠ HOT':sysData.cpu_temp_c>60?'Warm':'OK';
+      const tv=sysData.cpu_temp_c.toFixed(1);
+      const hot=sysData.cpu_temp_c>75, warm=sysData.cpu_temp_c>60;
+      if(tempCard){ tempCard.style.display=''; tempCard.className='stat-card '+(hot?'is-danger':warm?'is-warn':'is-ok'); }
+      if(tempEl){ tempEl.textContent=tv+'°C'; }
+      if(tempSub) tempSub.textContent=hot?t('sys_temp_hot'):warm?t('sys_temp_warm'):t('sys_temp_ok');
     } else {
       if(tempCard) tempCard.style.display='none';
     }
@@ -6408,6 +8378,7 @@ async function loadSystemInfo(){
     if(soapyEl) soapyEl.textContent=sysData.soapy_info||'—';
 
     updateSystemUptime();
+    updateSysHero();
   }catch(e){console.error('loadSystemInfo',e);}
 }
 function updateSystemUptime(){
@@ -6416,6 +8387,26 @@ function updateSystemUptime(){
   const d=Math.floor(u/86400),h=Math.floor((u%86400)/3600),m=Math.floor((u%3600)/60),s=u%60;
   let str='';if(d>0)str+=d+'d ';if(h>0||d>0)str+=h+'h ';if(m>0||h>0||d>0)str+=m+'m ';str+=s+'s';
   document.getElementById('sysUptime').textContent=str;
+  const hu=document.getElementById('sysHeroUptime');if(hu)hu.textContent=str;
+}
+// Mirror the System tab's key state into its hero banner.
+function updateSysHero(){
+  const dot=document.getElementById('sysHeroDot');
+  const sub=document.getElementById('sysHeroSub');
+  const tempV=document.getElementById('sysHeroTemp');
+  const btsCard=document.getElementById('sysBtsCard');
+  const btsOnline=btsCard&&btsCard.classList.contains('is-ok');
+  const brewSummary=brewUiSummary(state.brewOnline,state.brewVer);
+  if(dot) dot.className='hero-dot '+(btsOnline?'is-ok':'is-danger');
+  if(sub){
+    const host=(sysData&&sysData.hostname)||document.getElementById('sysHostname').textContent||'—';
+    sub.textContent=(btsOnline?t('online'):t('offline'))+' · '+brewSummary.value+' · '+host;
+  }
+  if(tempV){
+    const tc=document.getElementById('sysCpuTemp');
+    const card=document.getElementById('cpu-temp-card');
+    tempV.textContent=(card&&card.style.display!=='none'&&tc)?tc.textContent:'—';
+  }
 }
 
 async function loadConfigProfiles(){
@@ -6454,14 +8445,20 @@ async function activateProfile(name){
 }
 
 function updateSysBtsPanel(online,brewOnline,brewVer){
+  const summary=brewUiSummary(brewOnline,brewVer);
   const ipEl=document.getElementById('sysBtsIp');
   const stEl=document.getElementById('sysBtsStatus');
   const bsEl=document.getElementById('sysBrewStatus');
   const bdEl=document.getElementById('sysBrewBadge');
+  const btsCard=document.getElementById('sysBtsCard');
+  const brewCard=document.getElementById('sysBrewCard');
   if(ipEl)ipEl.textContent=online?location.hostname:'—';
-  if(stEl){stEl.textContent=online?t('online'):t('offline');stEl.style.color=online?'var(--accent)':'var(--danger)';}
-  if(bsEl){bsEl.textContent=brewOnline?t('brew_online'):t('brew_offline');bsEl.style.color=brewOnline?'var(--accent2)':'var(--danger)';}
-  if(bdEl){bdEl.textContent=brewOnline?`Brew v${brewVer||0}`:'—';}
+  if(stEl)stEl.textContent=online?t('online'):t('offline');
+  if(btsCard)btsCard.className='stat-card '+(online?'is-ok':'is-danger');
+  if(bsEl)bsEl.textContent=summary.value;
+  if(brewCard)brewCard.className='stat-card '+summary.cardClass;
+  if(bdEl){bdEl.textContent=summary.detail;}
+  updateSysHero();
 }
 
 // ── Edit Profile (inactive config) ───────────────────────────────────────
@@ -6620,6 +8617,7 @@ setInterval(()=>{
   if(el)el.textContent=os+' · '+br;
 })();
 if(sidebarCollapsed)document.getElementById('sidebar').classList.add('collapsed');
+paintIcons();
 setLang(currentLang);
 setTheme(currentTheme);
 applyUiSize();
@@ -6737,6 +8735,11 @@ function handleTxVisual(msg){
   setText('rf-rms',  isFinite(rms)  ? rms.toFixed(1)  +' dBFS' : '—');
   setText('rf-peak', isFinite(peak) ? peak.toFixed(1) +' dBFS' : '—');
   setText('rf-age',  t('rf_live')||'live');
+  // Hero summary
+  setText('rf-hero-freq', isFinite(freqMHz) && freqMHz>0 ? freqMHz.toFixed(3)+' MHz' : '—');
+  setText('rf-hero-sub',  t('rf_live')||'live');
+  const rhd=document.getElementById('rf-hero-dot');
+  if(rhd) rhd.className='hero-dot is-ok';
 
   // Visual feeds redraw on every message — that's the whole point.
   const spec = (msg.spectrum_db_tenths || []).map(v => v / 10);
@@ -6756,6 +8759,7 @@ function handleTxQuality(msg){
   // Show only the operationally-relevant TX metrics. DC offset + IQ amplitude/phase
   // imbalance are modulator-calibration diagnostics and were trimmed from the UI.
   paintQuality('rf-evm',     'rf-q-evm-wrap',  fmtPct(evm, 2),       evalEvm(evm));
+  setText('rf-hero-evm', fmtPct(evm, 2));
   paintQuality('rf-papr',    'rf-q-papr-wrap', fmtDb(papr, 1),       evalPapr(papr));
   paintQuality('rf-carrier', 'rf-q-cl-wrap',   fmtDb(cl, 1, true),   evalCarrierLeakage(cl));
   paintQuality('rf-obw',     'rf-q-obw-wrap',  fmtKhz(obw),          evalObw(obw));
@@ -6769,20 +8773,30 @@ function handleSdrHealth(msg){
   // at room temp (~45-55°C) reads "nominal", >65 is "warm", >80 is "hot".
   const tempEl = document.getElementById('rf-temp');
   const stateEl = document.getElementById('rf-temp-state');
+  const tempGauge = document.getElementById('rf-temp-gauge');
+  const tempBar = document.getElementById('rf-temp-bar');
   if(tempEl && stateEl){
     if(msg.temperature_c == null){
       tempEl.textContent = '—';
       stateEl.textContent = t('rf_temp_na')||'no sensor';
       stateEl.className = 'rf-hw-temp-state';
+      if(tempGauge){ tempGauge.classList.remove('is-warn','is-danger','is-info'); tempGauge.classList.add('is-idle'); }
+      if(tempBar) tempBar.style.width = '0%';
     } else {
       const tc = msg.temperature_c;
       tempEl.textContent = tc.toFixed(1) + ' °C';
-      let cls = 'nominal', label = t('rf_temp_nominal')||'nominal';
-      if(tc < 20){ cls='cold'; label = t('rf_temp_cold')||'cold'; }
-      else if(tc > 80){ cls='hot'; label = t('rf_temp_hot')||'hot'; }
-      else if(tc > 65){ cls='warm'; label = t('rf_temp_warm')||'warm'; }
+      let cls = 'nominal', label = t('rf_temp_nominal')||'nominal', gcls='';
+      if(tc < 20){ cls='cold'; label = t('rf_temp_cold')||'cold'; gcls='is-info'; }
+      else if(tc > 80){ cls='hot'; label = t('rf_temp_hot')||'hot'; gcls='is-danger'; }
+      else if(tc > 65){ cls='warm'; label = t('rf_temp_warm')||'warm'; gcls='is-warn'; }
       stateEl.textContent = label;
       stateEl.className = 'rf-hw-temp-state ' + cls;
+      if(tempGauge){
+        tempGauge.classList.remove('is-warn','is-danger','is-info','is-idle');
+        if(gcls) tempGauge.classList.add(gcls);
+      }
+      // Map 0-100°C onto the track (clamped).
+      if(tempBar) tempBar.style.width = Math.max(0,Math.min(100,tc)).toFixed(0) + '%';
     }
   }
   renderGainList('rf-tx-gains', msg.tx_gains || []);
@@ -6842,9 +8856,36 @@ const HEALTH_ADVICE = {
            'Reduce broadcast/SDS load until the queues drain.'] },
   },
 };
-function healthColor(lvl){ return lvl==='critical' ? 'var(--danger)' : (lvl==='degraded' ? 'var(--warn)' : '#3fb950'); }
+function healthColor(lvl){ return lvl==='critical' ? 'var(--danger)' : (lvl==='degraded' ? 'var(--warn)' : 'var(--ok)'); }
+// Map a health level to the premium status class suffix used by .h-pill / .h-ring / .h-ico.
+function healthLevelClass(lvl){ return lvl==='critical' ? 'bad' : (lvl==='degraded' ? 'warn' : 'ok'); }
 function healthDomainLabel(d){ return ({service:'Core loop',backhaul:'Backhaul (Brew)',radios:'Radios',congestion:'Congestion'})[d] || d; }
-function healthDomainIcon(d){ return ({service:'🔄',backhaul:'🛰️',radios:'📻',congestion:'📊'})[d] || '•'; }
+// Clean inline SVGs replace the old emoji domain icons. {svg, accent} where accent
+// drives the tinted .h-ico colour (default accent / blue / purple for domain variety).
+const HEALTH_SVG = {
+  service:{svg:'<path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/>',accent:''},
+  backhaul:{svg:'<path d="M4.93 4.93a14 14 0 0 0 0 14.14M19.07 4.93a14 14 0 0 1 0 14.14M8.46 8.46a7 7 0 0 0 0 7.08M15.54 8.46a7 7 0 0 1 0 7.08"/><circle cx="12" cy="12" r="1.5"/>',accent:'blue'},
+  radios:{svg:'<rect x="3" y="9" width="13" height="11" rx="1.5"/><path d="M16 4 9 9"/><circle cx="7.5" cy="14.5" r="2.5"/><path d="M19 10v9"/>',accent:'purple'},
+  congestion:{svg:'<path d="M3 3v18h18"/><rect x="7" y="11" width="3" height="6"/><rect x="13" y="7" width="3" height="10"/>',accent:''},
+};
+function healthDomainSvg(d){
+  const m = HEALTH_SVG[d] || {svg:'<circle cx="12" cy="12" r="3"/>',accent:''};
+  return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+m.svg+'</svg>';
+}
+function healthDomainAccent(d){ return (HEALTH_SVG[d]||{}).accent || ''; }
+// Inline SVGs for the integration cards (replace ☎ 📟 ◎).
+const INTEGRATION_SVG = {
+  brew:'<path d="M4.93 4.93a14 14 0 0 0 0 14.14M19.07 4.93a14 14 0 0 1 0 14.14M8.46 8.46a7 7 0 0 0 0 7.08M15.54 8.46a7 7 0 0 1 0 7.08"/><circle cx="12" cy="12" r="1.5"/>',
+  asterisk:'<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/>',
+  dapnet:'<rect x="5" y="2" width="14" height="20" rx="2"/><path d="M9 6h6M9 10h6M9 14h3"/>',
+  echolink:'<path d="M10 13a5 5 0 0 0 7.07 0l2.12-2.12a5 5 0 0 0-7.07-7.07L11 4.93"/><path d="M14 11a5 5 0 0 0-7.07 0L4.81 13.12a5 5 0 0 0 7.07 7.07L13 19.07"/>',
+  meshcom:'<circle cx="12" cy="12" r="2"/><path d="M12 4v3M12 17v3M4 12h3M17 12h3M6.34 6.34l2.12 2.12M15.54 15.54l2.12 2.12M17.66 6.34l-2.12 2.12M8.46 15.54l-2.12 2.12"/>',
+  geoalarm:'<path d="M12 21s-7-5.5-7-11a7 7 0 0 1 14 0c0 5.5-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/>',
+};
+function integrationSvg(key){
+  const p = INTEGRATION_SVG[key] || '<circle cx="12" cy="12" r="3"/>';
+  return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+p+'</svg>';
+}
 function healthDur(s){ s=Math.max(0,Math.floor(s||0)); const d=Math.floor(s/86400),h=Math.floor((s%86400)/3600),m=Math.floor((s%3600)/60);
   return d>0 ? (d+'d '+h+'h') : (h>0 ? (h+'h '+m+'m') : (m+'m')); }
 
@@ -6857,7 +8898,8 @@ function renderHealthTab(h){
   const sub   = document.getElementById('health-hero-sub');
   const up    = document.getElementById('health-uptime');
   const act   = document.getElementById('health-action');
-  if(dot)   dot.style.background = healthColor(overall);
+  // Hero ring: status-tinted via class (was a bg colour) — keeps the SVG check inside.
+  if(dot)   dot.className = 'h-ring ' + healthLevelClass(overall);
   if(title) title.textContent = 'Station health: ' + overall.toUpperCase();
   const bad = (h.domains||[]).filter(function(d){return d.level!=='ok';});
   if(sub) sub.textContent = bad.length
@@ -6870,43 +8912,64 @@ function renderHealthTab(h){
   (h.domains||[]).forEach(function(d){
     const branch = HEALTH_ADVICE[d.domain] || {};
     const adv = branch[d.level] || branch.degraded || { why:'', do:[] };
-    const col = healthColor(d.level);
+    const lvlCls = healthLevelClass(d.level);
+    const accent = d.level==='ok' ? healthDomainAccent(d.domain) : lvlCls;
     const card = document.createElement('div');
-    card.style.cssText = 'border:1px solid var(--border,#2a2f3a);border-left:4px solid '+col+';border-radius:12px;padding:14px 16px;background:var(--bg2,#161a22)';
-    let doHtml = '';
+    card.className = 'h-card';
+    let todoHtml = '';
     if(d.level!=='ok' && adv.do && adv.do.length){
-      doHtml = '<div style="margin-top:10px;font-size:13px;color:var(--text)"><b>What to do</b>'
-             + '<ul style="margin:6px 0 0 18px;padding:0;color:var(--text2,#9aa4b2);line-height:1.55">'
+      todoHtml = '<div class="h-todo"><span class="h-todo-h">What to do</span><ul>'
              + adv.do.map(function(x){return '<li>'+escHtml(x)+'</li>';}).join('')
              + '</ul></div>';
     }
     card.innerHTML =
-      '<div style="display:flex;align-items:center;gap:8px">'
-        + '<span style="font-size:18px">'+healthDomainIcon(d.domain)+'</span>'
-        + '<span style="font-weight:700;color:var(--text);flex:1">'+escHtml(healthDomainLabel(d.domain))+'</span>'
-        + '<span style="font-size:11px;font-weight:700;letter-spacing:.5px;color:'+col+';border:1px solid '+col+';border-radius:6px;padding:2px 8px">'+(d.level||'').toUpperCase()+'</span>'
-      + '</div>'
-      + '<div style="margin-top:8px;font-size:13px;color:var(--text2,#9aa4b2)"><span style="opacity:.6">Status:</span> '+escHtml(d.detail||'')+'</div>'
-      + (adv.why ? '<div style="margin-top:6px;font-size:13px;color:var(--text2,#9aa4b2);line-height:1.5">'+escHtml(adv.why)+'</div>' : '')
-      + doHtml;
+      '<div class="h-ico '+accent+'">'+healthDomainSvg(d.domain)+'</div>'
+      + '<div class="h-col">'
+        + '<div class="h-head">'
+          + '<span class="h-ttl">'+escHtml(healthDomainLabel(d.domain))+'</span>'
+          + '<span class="h-pill '+lvlCls+'">'+(d.level||'').toUpperCase()+'</span>'
+        + '</div>'
+        + '<div class="h-det"><span class="h-status-lbl">Status:</span> '+escHtml(d.detail||'')+'</div>'
+        + (adv.why ? '<div class="h-det">'+escHtml(adv.why)+'</div>' : '')
+        + todoHtml
+      + '</div>';
     grid.appendChild(card);
   });
 }
 
-let healthIntegrationState={asterisk:null,dapnet:null,echolink:null,meshcom:null,geoalarm:null,lastLoad:0};
-function integrationHealthCard(title,icon,level,detail,extra){
-  const col=healthColor(level);
+let healthIntegrationState={brew:null,asterisk:null,dapnet:null,echolink:null,meshcom:null,geoalarm:null,lastLoad:0};
+// title, iconKey (brew|asterisk|dapnet|echolink|meshcom|geoalarm), accent (blue|purple|''), level, detail, extra.
+function integrationHealthCard(title,iconKey,accent,level,detail,extra){
+  const lvlCls = healthLevelClass(level);
+  const icoCls = level==='ok' ? accent : lvlCls;
   const card=document.createElement('div');
-  card.style.cssText='border:1px solid var(--border,#2a2f3a);border-left:4px solid '+col+';border-radius:12px;padding:14px 16px;background:var(--bg2,#161a22)';
+  card.className='h-card compact';
   card.innerHTML=
-    '<div style="display:flex;align-items:center;gap:8px">'
-      + '<span style="font-size:18px">'+icon+'</span>'
-      + '<span style="font-weight:700;color:var(--text);flex:1">'+escHtml(title)+'</span>'
-      + '<span style="font-size:11px;font-weight:700;letter-spacing:.5px;color:'+col+';border:1px solid '+col+';border-radius:6px;padding:2px 8px">'+level.toUpperCase()+'</span>'
-    + '</div>'
-    + '<div style="margin-top:8px;font-size:13px;color:var(--text2,#9aa4b2)"><span style="opacity:.6">Status:</span> '+escHtml(detail||'')+'</div>'
-    + (extra?'<div style="margin-top:6px;font-size:13px;color:var(--text2,#9aa4b2);line-height:1.5">'+escHtml(extra)+'</div>':'');
+    '<div class="h-ico '+icoCls+'">'+integrationSvg(iconKey)+'</div>'
+    + '<div class="h-col">'
+      + '<div class="h-head">'
+        + '<span class="h-ttl">'+escHtml(title)+'</span>'
+        + '<span class="h-pill '+lvlCls+'">'+level.toUpperCase()+'</span>'
+      + '</div>'
+      + '<div class="h-det"><span class="h-status-lbl">Status:</span> '+escHtml(detail||'')+'</div>'
+      + (extra?'<div class="h-det">'+escHtml(extra)+'</div>':'')
+    + '</div>';
   return card;
+}
+function classifyBrewHealth(server){
+  if(!server||!server.configured)return {level:'ok',detail:'not configured',extra:'No config section for this Brew server.'};
+  const allow=(server.local_issi_allowlist||[]).filter(function(v){return v!==null&&v!==undefined;});
+  const block=(server.local_issi_blocklist||[]).filter(function(v){return v!==null&&v!==undefined;});
+  let level=server.connected?'ok':'degraded';
+  const detail=(server.connected?'connected':'disconnected')+' · '+(server.endpoint||((server.host||'—')+':'+(server.port||'—')));
+  const parts=[];
+  parts.push((server.feature_sds_enabled?'SDS on':'SDS off'));
+  parts.push((server.feature_rssi_export?'RSSI on':'RSSI off'));
+  if(allow.length)parts.push('ISSI allow '+allow.join(', '));
+  if(block.length)parts.push('ISSI block '+block.join(', '));
+  if(!allow.length&&server.entity==='brew2')parts.push('missing local_issi_allowlist');
+  if(!allow.length&&server.entity==='brew2')level='degraded';
+  return {level,detail,extra:parts.join(' · ')};
 }
 function classifyAsteriskHealth(data){
   const c=(data&&data.config)||{},rt=(data&&data.runtime)||{};
@@ -6941,7 +9004,6 @@ function classifyDapnetHealth(data){
   } else {
     notes.push('RWTH receive feed disabled');
   }
-  if(!paths.length)notes.push('no forwarding path enabled');
   if(notes.length)level='degraded';
   const status=rt.rwth_core_status||(data.rwth_core_enabled?'enabled':'disabled');
   const detail='RWTH '+status+' · '+(paths.length?paths.join(', '):'no forwarding');
@@ -6999,47 +9061,62 @@ function renderHealthIntegrations(){
   const grid=document.getElementById('health-integrations-grid');
   if(!grid)return;
   grid.innerHTML='';
+  if(healthIntegrationState.brew){
+    const servers=(healthIntegrationState.brew.servers||[]).filter(function(server){return server.configured;});
+    if(servers.length){
+      servers.forEach(function(server){
+        const b=classifyBrewHealth(server);
+        grid.appendChild(integrationHealthCard(server.title||server.entity||'Brew','brew','blue',b.level,b.detail,b.extra));
+      });
+    } else {
+      grid.appendChild(integrationHealthCard('Brew','brew','blue','ok','not configured','No Brew backhaul section is active.'));
+    }
+  } else {
+    grid.appendChild(integrationHealthCard('Brew','brew','blue','degraded','status unavailable','Wait for the next refresh.'));
+  }
   if(healthIntegrationState.asterisk){
     const a=classifyAsteriskHealth(healthIntegrationState.asterisk);
-    grid.appendChild(integrationHealthCard('Asterisk SIP','☎',a.level,a.detail,a.extra));
+    grid.appendChild(integrationHealthCard('Asterisk SIP','asterisk','',a.level,a.detail,a.extra));
   } else {
-    grid.appendChild(integrationHealthCard('Asterisk SIP','☎','degraded','status unavailable','Open the Asterisk SIP page or wait for the next refresh.'));
+    grid.appendChild(integrationHealthCard('Asterisk SIP','asterisk','','degraded','status unavailable','Open the Asterisk SIP page or wait for the next refresh.'));
   }
   if(healthIntegrationState.dapnet){
     const d=classifyDapnetHealth(healthIntegrationState.dapnet);
-    grid.appendChild(integrationHealthCard('DAPNET','📟',d.level,d.detail,d.extra));
+    grid.appendChild(integrationHealthCard('DAPNET','dapnet','blue',d.level,d.detail,d.extra));
   } else {
-    grid.appendChild(integrationHealthCard('DAPNET','📟','degraded','status unavailable','Open the DAPNET page or wait for the next refresh.'));
+    grid.appendChild(integrationHealthCard('DAPNET','dapnet','blue','degraded','status unavailable','Open the DAPNET page or wait for the next refresh.'));
   }
   if(healthIntegrationState.echolink){
     const e=classifyEcholinkHealth(healthIntegrationState.echolink);
-    grid.appendChild(integrationHealthCard('EchoLink','🔗',e.level,e.detail,e.extra));
+    grid.appendChild(integrationHealthCard('EchoLink','echolink','blue',e.level,e.detail,e.extra));
   } else {
-    grid.appendChild(integrationHealthCard('EchoLink','🔗','degraded','status unavailable','Open the EchoLink page or wait for the next refresh.'));
+    grid.appendChild(integrationHealthCard('EchoLink','echolink','blue','degraded','status unavailable','Open the EchoLink page or wait for the next refresh.'));
   }
   if(healthIntegrationState.meshcom){
     const m=classifyMeshcomHealth(healthIntegrationState.meshcom);
-    grid.appendChild(integrationHealthCard('MeshCom','⌁',m.level,m.detail,m.extra));
+    grid.appendChild(integrationHealthCard('MeshCom','meshcom','purple',m.level,m.detail,m.extra));
   } else {
-    grid.appendChild(integrationHealthCard('MeshCom','⌁','degraded','status unavailable','Open the MeshCom page or wait for the next refresh.'));
+    grid.appendChild(integrationHealthCard('MeshCom','meshcom','purple','degraded','status unavailable','Open the MeshCom page or wait for the next refresh.'));
   }
   if(healthIntegrationState.geoalarm){
     const g=classifyGeoalarmHealth(healthIntegrationState.geoalarm);
-    grid.appendChild(integrationHealthCard('GeoAlarm','◎',g.level,g.detail,g.extra));
+    grid.appendChild(integrationHealthCard('GeoAlarm','geoalarm','purple',g.level,g.detail,g.extra));
   } else {
-    grid.appendChild(integrationHealthCard('GeoAlarm','◎','degraded','status unavailable','Open the GeoAlarm page or wait for the next refresh.'));
+    grid.appendChild(integrationHealthCard('GeoAlarm','geoalarm','purple','degraded','status unavailable','Open the GeoAlarm page or wait for the next refresh.'));
   }
 }
 async function loadHealthIntegrations(){
   healthIntegrationState.lastLoad=Date.now();
   try{
-    const [ast,dap,el,mesh,geo]=await Promise.all([
+    const [brew,ast,dap,el,mesh,geo]=await Promise.all([
+      fetch('/api/brew/status').then(r=>r.ok?r.json():null).catch(()=>null),
       fetch('/api/asterisk/status').then(r=>r.ok?r.json():null).catch(()=>null),
       fetch('/api/dapnet').then(r=>r.ok?r.json():null).catch(()=>null),
       fetch('/api/echolink').then(r=>r.ok?r.json():null).catch(()=>null),
       fetch('/api/meshcom').then(r=>r.ok?r.json():null).catch(()=>null),
       fetch('/api/geoalarm').then(r=>r.ok?r.json():null).catch(()=>null)
     ]);
+    healthIntegrationState.brew=brew;
     healthIntegrationState.asterisk=ast;
     healthIntegrationState.dapnet=dap;
     healthIntegrationState.echolink=el;
@@ -7095,13 +9172,16 @@ function handleSysHealth(msg){
   const totEl = document.getElementById('sys-sensors-power-total');
   if(!card || !grid) return;
 
+  const sensLabel = document.getElementById('sys-sensors-label');
   const sensors = (msg && msg.sensors) || [];
   if(sensors.length === 0){
     // Nothing detected — leave the card hidden so we don't clutter the System tab.
     card.style.display = 'none';
+    if(sensLabel) sensLabel.style.display = 'none';
     return;
   }
   card.style.display = '';
+  if(sensLabel) sensLabel.style.display = '';
 
   if(empty) empty.style.display = 'none';
 
@@ -7126,7 +9206,7 @@ function handleSysHealth(msg){
   // Power total in card header
   if(totEl){
     if(typeof msg.total_power_w === 'number' && isFinite(msg.total_power_w) && msg.total_power_w > 0){
-      totEl.textContent = '⚡ ' + msg.total_power_w.toFixed(2) + ' W total';
+      totEl.innerHTML = '<span class="btn-icon" style="margin:0 4px 0 0;width:13px;height:13px;vertical-align:-2px">'+svgIcon('power')+'</span>' + msg.total_power_w.toFixed(2) + ' W total';
     } else {
       totEl.textContent = '';
     }
@@ -7148,11 +9228,11 @@ function sensorUnit(kind){
 function sensorColor(kind, v){
   if(kind === 'temperature'){
     if(v >= 80) return 'var(--danger)';
-    if(v >= 65) return '#f5a623';
-    if(v >= 50) return 'var(--accent)';
+    if(v >= 65) return 'var(--warn)';
+    if(v >= 50) return 'var(--ok)';
     return 'var(--accent2)';
   }
-  if(kind === 'power') return '#c8a4f5';
+  if(kind === 'power') return 'var(--accent2)';
   return 'var(--text)';
 }
 
@@ -7239,9 +9319,17 @@ function paintQuality(valueId, wrapId, valueText, evalResult){
   setText(valueId, valueText);
   const wrap = document.getElementById(wrapId);
   if(!wrap) return;
+  // Keep rf-q-* on the wrap (drives the value-text color), and mirror the
+  // threshold onto the shared .gauge as is-warn/is-danger (good = default --ok).
   wrap.classList.remove('rf-q-good','rf-q-warn','rf-q-bad');
   wrap.classList.add('rf-q-' + evalResult.status);
-  const bar = wrap.querySelector('.rf-qmetric-fill');
+  const gauge = wrap.querySelector('.gauge');
+  if(gauge){
+    gauge.classList.remove('is-warn','is-danger');
+    if(evalResult.status==='warn') gauge.classList.add('is-warn');
+    else if(evalResult.status==='bad') gauge.classList.add('is-danger');
+  }
+  const bar = wrap.querySelector('.gauge-fill');
   if(bar) bar.style.width = evalResult.pct.toFixed(0) + '%';
 }
 
@@ -7531,6 +9619,7 @@ async function checkUpdate(){
 // endpoints. Probe one privileged endpoint: 401 => anonymous (public mode);
 // 200 => either a no-auth deployment or an authenticated admin — behave as before.
 async function boot(){
+  bindMapsControls();
   const hasAuthMarker = document.cookie.split(';').some(c=>c.trim().startsWith('fs_auth='));
   let anonymous = false;
   if(!hasAuthMarker){
@@ -7543,6 +9632,8 @@ async function boot(){
   // instead of waiting for the user to open the System tab.
   loadSystemInfo();
   loadBtsInfo();        // TETRA BTS Details card on the default (Radios) page
+  refreshBrewServerStatus(true);
+  setInterval(()=>refreshBrewServerStatus(true),10000);
   wifiProbeAvailable(); // toggles the WiFi nav item
   checkUpdate();
 }
@@ -7569,6 +9660,11 @@ async function pollPublic(){
     setT('pub-rf', d.rf_active ? 'Active' : 'Idle');
     setT('pub-brew', d.brew_online ? 'Online' : 'Offline');
     setT('pub-ver', d.stack_version || '—');
+    const STAT_STATES=['is-ok','is-idle','is-info','is-warn','is-danger'];
+    const rfc=document.getElementById('pub-rf-card');
+    if(rfc){ rfc.classList.remove(...STAT_STATES); rfc.classList.add(d.rf_active?'is-ok':'is-idle'); }
+    const pbc=document.getElementById('pub-brew-card');
+    if(pbc){ pbc.classList.remove(...STAT_STATES); pbc.classList.add(d.brew_online?'is-info':'is-danger'); }
   }catch{/* silent */}
 }
 boot();

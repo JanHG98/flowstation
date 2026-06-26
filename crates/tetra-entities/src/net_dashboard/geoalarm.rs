@@ -7,9 +7,21 @@ fn toml_escape(s: &str) -> String {
 }
 
 fn u32_set_toml(values: &std::collections::BTreeSet<u32>) -> String {
+    values.iter().map(|v| v.to_string()).collect::<Vec<_>>().join(", ")
+}
+
+fn u32_priority_map_toml(values: &std::collections::BTreeMap<u32, u8>) -> String {
     values
         .iter()
-        .map(|v| v.to_string())
+        .map(|(issi, priority)| format!("\"{}\" = {}", issi, priority))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+fn tpg_ric_priority_map_toml(values: &std::collections::BTreeMap<u32, u8>) -> String {
+    values
+        .iter()
+        .map(|(ric, priority)| format!("\"0x{ric:08X}\" = {}", priority))
         .collect::<Vec<_>>()
         .join(", ")
 }
@@ -23,10 +35,7 @@ fn string_set_toml(values: &std::collections::BTreeSet<String>) -> String {
 }
 
 /// Rewrite (or insert) the `[geoalarm]` section in the TOML file. A `.geoalarm.bak` backup is made.
-pub fn write_geoalarm_to_toml(
-    config_path: &str,
-    ov: &GeoalarmRuntimeOverride,
-) -> std::io::Result<()> {
+pub fn write_geoalarm_to_toml(config_path: &str, ov: &GeoalarmRuntimeOverride) -> std::io::Result<()> {
     let original = std::fs::read_to_string(config_path)?;
     let section = format!(
         "[geoalarm]\n\
@@ -44,13 +53,21 @@ pub fn write_geoalarm_to_toml(
          tetra_issi_whitelist = [{}]\n\
          tetra_issi_blacklist = [{}]\n\
          meshcom_source_whitelist = [{}]\n\
-         meshcom_source_blacklist = [{}]\n\n\
+         meshcom_source_blacklist = [{}]\n\
+         telegram_tetra_issi_whitelist = [{}]\n\
+         telegram_tetra_issi_blacklist = [{}]\n\
+         telegram_meshcom_source_whitelist = [{}]\n\
+         telegram_meshcom_source_blacklist = [{}]\n\n\
          sds_source_issi = {}\n\
          sds_dest_issi = {}\n\
          sds_dest_is_group = {}\n\n\
          tpg2200_source_issi = {}\n\
          tpg2200_dest_issi = {}\n\
-         tpg2200_incident_base = {}\n\
+         tpg2200_ric = {}\n\
+         tpg2200_callout_id_base = {}\n\
+         tpg2200_priority = {}\n\
+         tpg2200_issi_priorities = {{{}}}\n\
+         tpg2200_ric_priorities = {{{}}}\n\
          tpg2200_text_prefix = \"{}\"\n\
          tpg2200_max_text_chars = {}\n\n\
          sip_title_prefix = \"{}\"\n\
@@ -70,12 +87,20 @@ pub fn write_geoalarm_to_toml(
         u32_set_toml(&ov.tetra_issi_blacklist),
         string_set_toml(&ov.meshcom_source_whitelist),
         string_set_toml(&ov.meshcom_source_blacklist),
+        u32_set_toml(&ov.telegram_tetra_issi_whitelist),
+        u32_set_toml(&ov.telegram_tetra_issi_blacklist),
+        string_set_toml(&ov.telegram_meshcom_source_whitelist),
+        string_set_toml(&ov.telegram_meshcom_source_blacklist),
         ov.sds_source_issi.max(1),
         ov.sds_dest_issi,
         ov.sds_dest_is_group,
         ov.tpg2200_source_issi.max(1),
         ov.tpg2200_dest_issi,
-        ov.tpg2200_incident_base.clamp(1, 256),
+        ov.tpg2200_ric,
+        ov.tpg2200_incident_base.min(255),
+        ov.tpg2200_priority.min(15),
+        u32_priority_map_toml(&ov.tpg2200_issi_priorities),
+        tpg_ric_priority_map_toml(&ov.tpg2200_ric_priorities),
         toml_escape(&ov.tpg2200_text_prefix),
         ov.tpg2200_max_text_chars.clamp(8, 160),
         toml_escape(&ov.sip_title_prefix),

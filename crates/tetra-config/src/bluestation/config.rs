@@ -3,15 +3,14 @@ use std::sync::{Arc, RwLock};
 use tetra_core::freqs::FreqInfo;
 
 use crate::bluestation::{
-    CfgAsterisk, CfgCellInfo, CfgControl, CfgDapnet, CfgEcholink, CfgEmergency, CfgHealth,
-    CfgGeoalarm, CfgMeshcom, CfgNetInfo, CfgPhyIo, CfgRecovery, CfgSecurity, CfgSnomNotify,
-    CfgTpg2200Action, CfgWxService, PhyBackend, StackState,
+    CfgAsterisk, CfgCellInfo, CfgControl, CfgDapnet, CfgEcholink, CfgEmergency, CfgGeoalarm, CfgHealth, CfgMeshcom, CfgNetInfo, CfgPhyIo,
+    CfgRecovery, CfgSecurity, CfgSnomNotify, CfgTpg2200Action, CfgWxService, PhyBackend, StackState,
 };
 
-use super::sec_dashboard::CfgDashboard;
 use super::sec_brew::CfgBrew;
-use super::sec_telemetry::CfgTelemetry;
+use super::sec_dashboard::CfgDashboard;
 use super::sec_telegram::CfgTelegram;
+use super::sec_telemetry::CfgTelemetry;
 
 /// Wrapper for a string that should be treated as a secret. Display and Debug will redact the actual value,
 /// to prevent accidental logging of secrets.
@@ -75,6 +74,9 @@ pub struct StackConfig {
 
     /// Brew protocol (TetraPack/BrandMeister) configuration
     pub brew: Option<CfgBrew>,
+
+    /// Optional secondary Brew protocol bridge.
+    pub brew2: Option<CfgBrew>,
 
     /// Asterisk SIP/RTP bridge configuration.
     pub asterisk: CfgAsterisk,
@@ -181,9 +183,10 @@ impl StackConfig {
 
         // Validate timezone if configured
         if let Some(ref tz) = self.cell.timezone
-            && tz.parse::<chrono_tz::Tz>().is_err() {
-                return Err("Invalid IANA timezone name in cell.timezone");
-            }
+            && tz.parse::<chrono_tz::Tz>().is_err()
+        {
+            return Err("Invalid IANA timezone name in cell.timezone");
+        }
 
         // Validate neighbor cells
         if self.cell.neighbor_cells_ca.len() > 7 {
@@ -218,21 +221,45 @@ impl StackConfig {
                 return Err("cell.neighbor_cells_ca: main_carrier_number must be 0-4095");
             }
             if let Some(v) = cell.main_carrier_number_extension
-                && v > 0x3FF { return Err("cell.neighbor_cells_ca: main_carrier_number_extension must be 0-1023"); }
+                && v > 0x3FF
+            {
+                return Err("cell.neighbor_cells_ca: main_carrier_number_extension must be 0-1023");
+            }
             if let Some(v) = cell.mcc
-                && v > 0x3FF { return Err("cell.neighbor_cells_ca: mcc must be 0-1023"); }
+                && v > 0x3FF
+            {
+                return Err("cell.neighbor_cells_ca: mcc must be 0-1023");
+            }
             if let Some(v) = cell.mnc
-                && v > 0x3FFF { return Err("cell.neighbor_cells_ca: mnc must be 0-16383"); }
+                && v > 0x3FFF
+            {
+                return Err("cell.neighbor_cells_ca: mnc must be 0-16383");
+            }
             if let Some(v) = cell.location_area
-                && v > 0x3FFF { return Err("cell.neighbor_cells_ca: location_area must be 0-16383"); }
+                && v > 0x3FFF
+            {
+                return Err("cell.neighbor_cells_ca: location_area must be 0-16383");
+            }
             if let Some(v) = cell.maximum_ms_transmit_power
-                && v > 0x7 { return Err("cell.neighbor_cells_ca: maximum_ms_transmit_power must be 0-7"); }
+                && v > 0x7
+            {
+                return Err("cell.neighbor_cells_ca: maximum_ms_transmit_power must be 0-7");
+            }
             if let Some(v) = cell.minimum_rx_access_level
-                && v > 0xF { return Err("cell.neighbor_cells_ca: minimum_rx_access_level must be 0-15"); }
+                && v > 0xF
+            {
+                return Err("cell.neighbor_cells_ca: minimum_rx_access_level must be 0-15");
+            }
             if let Some(v) = cell.timeshare_cell_information_or_security_parameters
-                && v > 0x1F { return Err("cell.neighbor_cells_ca: timeshare_cell_information_or_security_parameters must be 0-31"); }
+                && v > 0x1F
+            {
+                return Err("cell.neighbor_cells_ca: timeshare_cell_information_or_security_parameters must be 0-31");
+            }
             if let Some(v) = cell.tdma_frame_offset
-                && v > 0x3F { return Err("cell.neighbor_cells_ca: tdma_frame_offset must be 0-63"); }
+                && v > 0x3F
+            {
+                return Err("cell.neighbor_cells_ca: tdma_frame_offset must be 0-63");
+            }
         }
 
         // Restart recovery: an explicit allowlist must not exceed the cache cap (the numeric
@@ -242,6 +269,28 @@ impl StackConfig {
             && self.recovery.issi_allowlist.len() as u32 > self.recovery.max_cached_issis
         {
             return Err("recovery.issi_allowlist has more entries than recovery.max_cached_issis");
+        }
+
+        if self.brew.is_some() && self.brew2.is_some() {
+            let brew = self.brew.as_ref().expect("checked");
+            let brew2 = self.brew2.as_ref().expect("checked");
+            if !brew.has_local_issi_allowlist() || !brew2.has_local_issi_allowlist() {
+                return Err("brew and brew2 require non-empty local_issi_allowlist when both are configured");
+            }
+
+            let Some(brew_allowlist) = brew.effective_local_issi_allowlist() else {
+                return Err("brew local_issi_allowlist is required when brew2 is configured");
+            };
+            let Some(brew2_allowlist) = brew2.effective_local_issi_allowlist() else {
+                return Err("brew2 local_issi_allowlist is required when brew is configured");
+            };
+            if brew_allowlist.is_empty() || brew2_allowlist.is_empty() {
+                return Err("brew and brew2 effective local_issi_allowlist must not be empty");
+            }
+            let brew_set: std::collections::HashSet<u32> = brew_allowlist.into_iter().collect();
+            if brew2_allowlist.into_iter().any(|issi| brew_set.contains(&issi)) {
+                return Err("brew and brew2 local_issi_allowlist must not overlap");
+            }
         }
 
         Ok(())
@@ -326,6 +375,10 @@ impl SharedConfig {
                 // Health alerts aren't part of the dashboard live-edit override yet — take the
                 // base config value so the field is always populated.
                 alert_health: base.alert_health,
+                alert_brew_register: o.alert_brew_register,
+                brew_register_prefix: o.brew_register_prefix.clone(),
+                brew_register_issi_whitelist: o.brew_register_issi_whitelist.clone(),
+                brew_register_issi_blacklist: o.brew_register_issi_blacklist.clone(),
             }
         } else {
             base
@@ -356,7 +409,11 @@ impl SharedConfig {
                 telegram_allowed_rics: o.telegram_allowed_rics.clone(),
                 callout_source_issi: o.callout_source_issi,
                 callout_dest_issi: o.callout_dest_issi,
-                callout_incident_base: o.callout_incident_base.clamp(1, 256),
+                callout_tpg_ric: o.callout_tpg_ric,
+                callout_incident_base: o.callout_incident_base.min(255),
+                callout_priority: o.callout_priority.min(15),
+                callout_issi_priorities: o.callout_issi_priorities.clone(),
+                callout_tpg_ric_priorities: o.callout_tpg_ric_priorities.clone(),
                 callout_text_prefix: o.callout_text_prefix.clone(),
                 telegram_prefix: o.telegram_prefix.clone(),
                 rwth_core_enabled: o.rwth_core_enabled,
@@ -465,12 +522,20 @@ impl SharedConfig {
                 tetra_issi_blacklist: o.tetra_issi_blacklist.clone(),
                 meshcom_source_whitelist: o.meshcom_source_whitelist.clone(),
                 meshcom_source_blacklist: o.meshcom_source_blacklist.clone(),
+                telegram_tetra_issi_whitelist: o.telegram_tetra_issi_whitelist.clone(),
+                telegram_tetra_issi_blacklist: o.telegram_tetra_issi_blacklist.clone(),
+                telegram_meshcom_source_whitelist: o.telegram_meshcom_source_whitelist.clone(),
+                telegram_meshcom_source_blacklist: o.telegram_meshcom_source_blacklist.clone(),
                 sds_source_issi: o.sds_source_issi.max(1),
                 sds_dest_issi: o.sds_dest_issi,
                 sds_dest_is_group: o.sds_dest_is_group,
                 tpg2200_source_issi: o.tpg2200_source_issi.max(1),
                 tpg2200_dest_issi: o.tpg2200_dest_issi,
-                tpg2200_incident_base: o.tpg2200_incident_base.clamp(1, 256),
+                tpg2200_ric: o.tpg2200_ric,
+                tpg2200_incident_base: o.tpg2200_incident_base.min(255),
+                tpg2200_priority: o.tpg2200_priority.min(15),
+                tpg2200_issi_priorities: o.tpg2200_issi_priorities.clone(),
+                tpg2200_ric_priorities: o.tpg2200_ric_priorities.clone(),
                 tpg2200_text_prefix: o.tpg2200_text_prefix.clone(),
                 tpg2200_max_text_chars: o.tpg2200_max_text_chars.clamp(8, 160),
                 sip_title_prefix: o.sip_title_prefix.clone(),

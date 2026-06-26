@@ -1,5 +1,6 @@
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
 use tetra_core::TimeslotAllocator;
+use tetra_core::tetra_entities::TetraEntity;
 
 /// A one-shot or repeating SDS broadcast message injected at runtime via the dashboard.
 ///
@@ -191,6 +192,10 @@ pub struct TelegramRuntimeOverride {
     pub alert_lip: bool,
     pub alert_backhaul: bool,
     pub alert_critical_logs: bool,
+    pub alert_brew_register: bool,
+    pub brew_register_prefix: String,
+    pub brew_register_issi_whitelist: BTreeSet<u32>,
+    pub brew_register_issi_blacklist: BTreeSet<u32>,
 }
 
 /// Runtime override for DAPNET receive/send/forwarding settings, edited from the dashboard.
@@ -217,7 +222,11 @@ pub struct DapnetRuntimeOverride {
     pub telegram_allowed_rics: std::collections::BTreeSet<u32>,
     pub callout_source_issi: u32,
     pub callout_dest_issi: u32,
+    pub callout_tpg_ric: u32,
     pub callout_incident_base: u16,
+    pub callout_priority: u8,
+    pub callout_issi_priorities: std::collections::BTreeMap<u32, u8>,
+    pub callout_tpg_ric_priorities: std::collections::BTreeMap<u32, u8>,
     pub callout_text_prefix: String,
     pub telegram_prefix: String,
     pub rwth_core_enabled: bool,
@@ -311,12 +320,20 @@ pub struct GeoalarmRuntimeOverride {
     pub tetra_issi_blacklist: std::collections::BTreeSet<u32>,
     pub meshcom_source_whitelist: std::collections::BTreeSet<String>,
     pub meshcom_source_blacklist: std::collections::BTreeSet<String>,
+    pub telegram_tetra_issi_whitelist: std::collections::BTreeSet<u32>,
+    pub telegram_tetra_issi_blacklist: std::collections::BTreeSet<u32>,
+    pub telegram_meshcom_source_whitelist: std::collections::BTreeSet<String>,
+    pub telegram_meshcom_source_blacklist: std::collections::BTreeSet<String>,
     pub sds_source_issi: u32,
     pub sds_dest_issi: u32,
     pub sds_dest_is_group: bool,
     pub tpg2200_source_issi: u32,
     pub tpg2200_dest_issi: u32,
+    pub tpg2200_ric: u32,
     pub tpg2200_incident_base: u16,
+    pub tpg2200_priority: u8,
+    pub tpg2200_issi_priorities: std::collections::BTreeMap<u32, u8>,
+    pub tpg2200_ric_priorities: std::collections::BTreeMap<u32, u8>,
     pub tpg2200_text_prefix: String,
     pub tpg2200_max_text_chars: usize,
     pub sip_title_prefix: String,
@@ -463,6 +480,7 @@ impl Default for EcholinkRuntimeStatus {
 #[derive(Debug, Clone)]
 pub struct MeshcomNodeStatus {
     pub src: String,
+    pub via: Vec<String>,
     pub last_seen: String,
     pub last_type: String,
     pub lat: Option<f64>,
@@ -483,6 +501,7 @@ pub struct MeshcomMessageStatus {
     pub msg_type: String,
     pub src_type: Option<String>,
     pub src: Option<String>,
+    pub via: Vec<String>,
     pub dst: Option<String>,
     pub msg: Option<String>,
     pub msg_id: Option<String>,
@@ -539,6 +558,7 @@ pub struct GeoalarmEventStatus {
     pub ts: String,
     pub source: String,
     pub device: String,
+    pub via: Vec<String>,
     pub lat: f64,
     pub lon: f64,
     pub distance_m: f64,
@@ -596,6 +616,8 @@ pub struct StackState {
     pub timeslot_alloc: TimeslotAllocator,
     /// Backhaul/network connection to SwMI (e.g., Brew/TetraPack). False -> fallback mode.
     pub network_connected: bool,
+    /// Per Brew entity connection state. `network_connected` is the aggregate over this map.
+    pub brew_entity_connected: HashMap<TetraEntity, bool>,
     /// Centralized subscriber registry for local-first routing decisions.
     pub subscribers: SubscriberRegistry,
     /// Queue of live SDS messages injected at runtime via the dashboard.
@@ -625,6 +647,7 @@ pub struct StackState {
     /// Runtime override for Snom XML NOTIFY settings. See SnomNotifyRuntimeOverride.
     pub snom_notify_override: Option<SnomNotifyRuntimeOverride>,
     /// Next TPG2200 ActionURL incident number. Initialised lazily from `[tpg2200_action]`.
+    /// The incident is converted to the TPG selector byte immediately before sending.
     pub tpg2200_action_next_incident: Option<u16>,
     /// Runtime Asterisk SIP/RTP bridge status for `/api/asterisk/status` and the dashboard tab.
     pub asterisk_status: AsteriskRuntimeStatus,
@@ -762,6 +785,7 @@ impl Default for StackState {
         Self {
             timeslot_alloc: TimeslotAllocator::default(),
             network_connected: false,
+            brew_entity_connected: HashMap::new(),
             subscribers: SubscriberRegistry::new(),
             live_sds_queue: VecDeque::new(),
             next_live_sds_id: 1,

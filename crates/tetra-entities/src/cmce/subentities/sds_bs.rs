@@ -128,10 +128,7 @@ impl SdsBsSubentity {
     }
 
     /// Provide the control-command sender used to deliver WX/METAR replies.
-    pub fn set_wx_cmd_sender(
-        &mut self,
-        tx: crossbeam_channel::Sender<ControlCommand>,
-    ) {
+    pub fn set_wx_cmd_sender(&mut self, tx: crossbeam_channel::Sender<ControlCommand>) {
         self.wx_cmd_tx = Some(tx);
     }
 
@@ -169,7 +166,8 @@ impl SdsBsSubentity {
                 s.dest_ssi = dest_ssi;
             }
             None => {
-                self.emergency_sessions.insert(source_issi, EmergencySession { dest_ssi, last_seen: now });
+                self.emergency_sessions
+                    .insert(source_issi, EmergencySession { dest_ssi, last_seen: now });
                 tracing::warn!("EMERGENCY: ISSI {} entered emergency (status to ISSI {})", source_issi, dest_ssi);
                 self.emit(TelemetryEvent::EmergencyAlarm { source_issi, dest_ssi });
             }
@@ -250,9 +248,7 @@ impl SdsBsSubentity {
     fn ee_window_blocks(&self, dest_ssi: u32) -> bool {
         let state = self.config.state_read();
         match state.ee_monitoring_windows.get(&dest_ssi) {
-            Some(&(frame, mframe, cycle_len)) => {
-                !self.last_dltime.in_ee_monitoring_window(frame, mframe, cycle_len)
-            }
+            Some(&(frame, mframe, cycle_len)) => !self.last_dltime.in_ee_monitoring_window(frame, mframe, cycle_len),
             None => false, // not in energy economy — always reachable
         }
     }
@@ -270,8 +266,7 @@ impl SdsBsSubentity {
             return;
         }
         for p in std::mem::take(&mut self.pending_sds) {
-            let reachable =
-                !self.issi_on_local_traffic(p.dest_ssi) && !self.ee_window_blocks(p.dest_ssi);
+            let reachable = !self.issi_on_local_traffic(p.dest_ssi) && !self.ee_window_blocks(p.dest_ssi);
             if reachable {
                 // Out of any call and awake on its window (if in EE) — deliver on the MCCH.
                 tracing::info!("SDS: destination {} reachable — delivering deferred SDS on the MCCH", p.dest_ssi);
@@ -281,7 +276,9 @@ impl SdsBsSubentity {
                 // sender, instead of delivering late after its radio has already given up.
                 tracing::warn!(
                     "SDS: {} -> {} undeliverable within {}s (destination stayed in a call / asleep) — failing",
-                    p.source_issi, p.dest_ssi, SDS_DEFER_DEADLINE.as_secs()
+                    p.source_issi,
+                    p.dest_ssi,
+                    SDS_DEFER_DEADLINE.as_secs()
                 );
                 self.report_sds_failure(queue, &p);
             } else {
@@ -305,7 +302,9 @@ impl SdsBsSubentity {
         let report = SdsUserData::Type4(32, vec![0x82, 0x10, SDS_TL_STATUS_UNDELIVERABLE, mr]);
         tracing::info!(
             "SDS: reporting delivery failure to {} (MR={}) for undeliverable SDS to {}",
-            p.source_issi, mr, p.dest_ssi
+            p.source_issi,
+            mr,
+            p.dest_ssi
         );
         self.deliver_d_sds_data_now(queue, p.dest_ssi, p.source_issi, SsiType::Issi, report, false);
     }
@@ -336,7 +335,8 @@ impl SdsBsSubentity {
         tracing::trace!("SDS route_rf_deliver");
 
         let SapMsgInner::LcmcMleUnitdataInd(prim) = &mut message.msg else {
-            tracing::error!("BUG: unexpected message or state -- routing error"); return;
+            tracing::error!("BUG: unexpected message or state -- routing error");
+            return;
         };
         let calling_party = prim.received_tetra_address;
 
@@ -393,10 +393,7 @@ impl SdsBsSubentity {
             // tetraflow-sds-bot guards against this in handle_downlink_sds / parse_text_payload
             // by rejecting data[1] == 0x10; mirror that here and absorb the report.
             if Self::is_sds_tl_report(&pdu.user_defined_data) {
-                tracing::debug!(
-                    "SDS: absorbing SDS-TL delivery report to WX service from ISSI {}",
-                    source_ssi
-                );
+                tracing::debug!("SDS: absorbing SDS-TL delivery report to WX service from ISSI {}", source_ssi);
                 return;
             }
             // Delivery confirmation, identical to tetraflow-sds-bot's queue_u_status: before
@@ -409,7 +406,11 @@ impl SdsBsSubentity {
                 self.send_d_sds_data(queue, wx.service_issi, source_ssi, SsiType::Issi, report);
             }
             self.handle_wx_request(source_ssi, &pdu.user_defined_data);
-            self.emit(TelemetryEvent::SdsActivity { source_issi: source_ssi, dest_issi: dest_ssi });
+            self.emit(TelemetryEvent::SdsActivity {
+                source_issi: source_ssi,
+                dest_issi: dest_ssi,
+                source: "local".to_string(),
+            });
             return;
         }
 
@@ -426,17 +427,27 @@ impl SdsBsSubentity {
         if is_local_issi {
             tracing::info!("SDS: local delivery: {} -> {}", source_ssi, dest_ssi);
             self.send_d_sds_data(queue, source_ssi, dest_ssi, SsiType::Issi, pdu.user_defined_data);
-            self.emit(TelemetryEvent::SdsActivity { source_issi: source_ssi, dest_issi: dest_ssi });
+            self.emit(TelemetryEvent::SdsActivity {
+                source_issi: source_ssi,
+                dest_issi: dest_ssi,
+                source: "local".to_string(),
+            });
         } else if is_local_group {
             tracing::info!("SDS: group delivery: {} -> GSSI {}", source_ssi, dest_ssi);
             self.send_d_sds_data(queue, source_ssi, dest_ssi, SsiType::Gssi, pdu.user_defined_data);
-            self.emit(TelemetryEvent::SdsActivity { source_issi: source_ssi, dest_issi: dest_ssi });
-        } else if net_brew::feature_sds_enabled(&self.config) {
-            tracing::info!("SDS: forwarding to Brew: {} -> {}", source_ssi, dest_ssi);
+            self.emit(TelemetryEvent::SdsActivity {
+                source_issi: source_ssi,
+                dest_issi: dest_ssi,
+                source: "local".to_string(),
+            });
+        } else if let Some(brew_entity) = net_brew::route_entity_for_local_issi(&self.config, source_ssi)
+            && net_brew::feature_sds_enabled_for_entity(&self.config, brew_entity)
+        {
+            tracing::info!("SDS: forwarding to {:?}: {} -> {}", brew_entity, source_ssi, dest_ssi);
             queue.push_back(SapMsg {
                 sap: Sap::Control,
                 src: TetraEntity::Cmce,
-                dest: TetraEntity::Brew,
+                dest: brew_entity,
                 msg: SapMsgInner::CmceSdsData(CmceSdsData {
                     source_issi: source_ssi,
                     dest_issi: dest_ssi,
@@ -450,6 +461,7 @@ impl SdsBsSubentity {
 
     /// Handle incoming SDS data from Brew entity (network-originated SDS)
     pub fn rx_sds_from_brew(&mut self, queue: &mut MessageQueue, message: SapMsg) {
+        let source = crate::net_telemetry::telemetry_source_for_entity(message.src);
         let SapMsgInner::CmceSdsData(sds) = message.msg else {
             tracing::error!("SDS: rx_sds_from_brew expected CmceSdsData, got unexpected message type");
             return;
@@ -469,8 +481,7 @@ impl SdsBsSubentity {
         // previously a group-addressed Brew SDS was dropped because is_registered() only matches
         // individual ISSIs). Two short read borrows, each O(1), identical to sds_bs.rs:302-303.
         let is_local_issi = self.config.state_read().subscribers.is_registered(sds.dest_issi);
-        let is_local_group =
-            !is_local_issi && self.config.state_read().subscribers.has_group_members(sds.dest_issi);
+        let is_local_group = !is_local_issi && self.config.state_read().subscribers.has_group_members(sds.dest_issi);
 
         // Log the network-originated SDS in the dashboard SDS Log before it is delivered.
         self.log_sds("net", sds.source_issi, sds.dest_issi, is_local_group, &sds.user_defined_data);
@@ -478,9 +489,19 @@ impl SdsBsSubentity {
         if is_local_issi {
             // Send D-SDS-DATA downlink to the local MS on the MCCH.
             tracing::info!("SDS: local delivery from Brew: {} -> {}", sds.source_issi, sds.dest_issi);
+            self.emit(TelemetryEvent::SdsActivity {
+                source_issi: sds.source_issi,
+                dest_issi: sds.dest_issi,
+                source: source.to_string(),
+            });
             self.send_d_sds_data(queue, sds.source_issi, sds.dest_issi, SsiType::Issi, sds.user_defined_data);
         } else if is_local_group {
             tracing::info!("SDS: group delivery from Brew: {} -> GSSI {}", sds.source_issi, sds.dest_issi);
+            self.emit(TelemetryEvent::SdsActivity {
+                source_issi: sds.source_issi,
+                dest_issi: sds.dest_issi,
+                source: source.to_string(),
+            });
             self.send_d_sds_data(queue, sds.source_issi, sds.dest_issi, SsiType::Gssi, sds.user_defined_data);
         } else {
             tracing::warn!(
@@ -554,18 +575,6 @@ impl SdsBsSubentity {
             len_bits
         );
 
-        // Do NOT gate RF delivery on the SDS subscriber registry. A terminal that just sent
-        // us an uplink request (e.g. the WX/METAR requester) is reachable on our air
-        // interface even when it is not in the static local-subscriber table — dropping here
-        // is exactly what swallowed the reply. Deliver D-SDS-DATA over RF to the destination
-        // regardless, the same way tetraflow-sds-bot answers the requester directly.
-        if !dest_is_group && !self.config.state_read().subscribers.is_registered(dest_ssi) {
-            tracing::debug!(
-                "SDS: dest ISSI {} from Control not in local registry; delivering over RF anyway",
-                dest_ssi
-            );
-        }
-
         // SDS-TL Simple Text Message — format verificat din tetraflow-sds-bot:
         //   Byte 0: 0x82  — Protocol Identifier (SDS-TL text messaging)
         //   Byte 1: 0x04  — Message Type (Simple Text, cu TL-ACK request)
@@ -575,7 +584,12 @@ impl SdsBsSubentity {
         static SDS_MR: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(1);
         let mr = {
             let v = SDS_MR.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-            if v == 0 { SDS_MR.store(1, std::sync::atomic::Ordering::Relaxed); 1 } else { v }
+            if v == 0 {
+                SDS_MR.store(1, std::sync::atomic::Ordering::Relaxed);
+                1
+            } else {
+                v
+            }
         };
         let wrapped_payload: Vec<u8> = {
             let mut v = vec![0x82u8, 0x04u8, mr, 0x01u8];
@@ -585,8 +599,47 @@ impl SdsBsSubentity {
         let wrapped_len_bits = (wrapped_payload.len() * 8) as u16;
         let sds_data = SdsUserData::Type4(wrapped_len_bits, wrapped_payload);
 
-        // Log the dashboard-originated SDS before sending it downlink.
+        // Log the dashboard-originated SDS before sending it.
         self.log_sds("tx", source_ssi, dest_ssi, dest_is_group, &sds_data);
+
+        // Route the dashboard-composed SDS the same way route_rf_deliver routes a radio-originated
+        // one: local subscribers/groups are served over our own RF, anything else goes up the Brew
+        // link when the SDS feature is enabled. Without this, a dashboard SDS addressed to an ISSI
+        // that lives behind Brew (e.g. on a bridged network) was delivered over RF "anyway", never
+        // acknowledged, and lost once the LLC retransmissions exhausted.
+        //
+        // The diversion is scoped to the dashboard operator ISSI (9999) on purpose: the WX/METAR
+        // responder re-injects its replies through this very path (see queue_wx_reply) addressed to
+        // an on-air requester that may legitimately be absent from the static registry, and those
+        // must keep going out over RF — so they are intentionally excluded here.
+        const DASHBOARD_ISSI: u32 = 9999;
+        let is_local_issi = !dest_is_group && self.config.state_read().subscribers.is_registered(dest_ssi);
+        let is_local_group = dest_is_group && self.config.state_read().subscribers.has_group_members(dest_ssi);
+
+        if source_ssi == DASHBOARD_ISSI && !is_local_issi && !is_local_group && net_brew::feature_sds_enabled(&self.config) {
+            tracing::info!("SDS: forwarding dashboard SDS to Brew: {} -> {}", source_ssi, dest_ssi);
+            queue.push_back(SapMsg {
+                sap: Sap::Control,
+                src: TetraEntity::Cmce,
+                dest: TetraEntity::Brew,
+                msg: SapMsgInner::CmceSdsData(CmceSdsData {
+                    source_issi: source_ssi,
+                    dest_issi: dest_ssi,
+                    user_defined_data: sds_data,
+                }),
+            });
+            return true;
+        }
+
+        // Deliver over RF. As before, we do NOT gate on the SDS subscriber registry: a terminal
+        // that just sent us an uplink request (e.g. the WX/METAR requester) is reachable on our
+        // air interface even when it is not in the static local-subscriber table.
+        if !dest_is_group && !is_local_issi {
+            tracing::debug!(
+                "SDS: dest ISSI {} from Control not in local registry; delivering over RF anyway",
+                dest_ssi
+            );
+        }
 
         self.send_d_sds_data(
             queue,
@@ -604,7 +657,8 @@ impl SdsBsSubentity {
         tracing::trace!("SDS route_status_deliver");
 
         let SapMsgInner::LcmcMleUnitdataInd(prim) = &mut message.msg else {
-            tracing::error!("BUG: unexpected message or state -- routing error"); return;
+            tracing::error!("BUG: unexpected message or state -- routing error");
+            return;
         };
         let calling_party = prim.received_tetra_address;
 
@@ -663,7 +717,8 @@ impl SdsBsSubentity {
         // Emergency status is LOCAL-only by design — never forwarded to Brew unless the operator
         // opts in via [emergency] forward_to_brew. Non-emergency statuses keep their normal routing.
         let is_emergency = matches!(pdu.pre_coded_status, PreCodedStatus::Emergency);
-        let brew_ok = net_brew::is_active(&self.config)
+        let brew_entity = net_brew::route_entity_for_local_issi(&self.config, source_ssi);
+        let brew_ok = brew_entity.is_some_and(|entity| net_brew::feature_sds_enabled_for_entity(&self.config, entity))
             && (!is_emergency || self.config.config().emergency.forward_to_brew);
 
         // Route: local delivery, Brew forward, or drop
@@ -698,11 +753,12 @@ impl SdsBsSubentity {
                 SdsUserData::Type1(pdu.pre_coded_status.into_raw())
             };
 
-            tracing::info!("SDS-STATUS: forwarding to Brew: {} -> {}", source_ssi, dest_ssi);
+            let brew_entity = brew_entity.expect("checked by brew_ok");
+            tracing::info!("SDS-STATUS: forwarding to {:?}: {} -> {}", brew_entity, source_ssi, dest_ssi);
             queue.push_back(SapMsg {
                 sap: Sap::Control,
                 src: TetraEntity::Cmce,
-                dest: TetraEntity::Brew,
+                dest: brew_entity,
                 msg: SapMsgInner::CmceSdsData(CmceSdsData {
                     source_issi: source_ssi,
                     dest_issi: dest_ssi,
@@ -770,7 +826,8 @@ impl SdsBsSubentity {
                 timeslots[(ts - 1) as usize] = true;
                 tracing::debug!(
                     "SDS-STATUS: dest {} is on traffic ts {} — delivering D-STATUS via FACCH stealing",
-                    dest_issi, ts
+                    dest_issi,
+                    ts
                 );
                 (
                     true,
@@ -861,14 +918,8 @@ impl SdsBsSubentity {
         // bare text under PID 0x02/0x09; in that case the byte after the PID may be a coding
         // scheme, or it may already be the first text byte.
         let (scheme, payload): (Option<u8>, &[u8]) = match bytes.first() {
-            Some(0x82) | Some(0x80) | Some(0x8A) | Some(0x89) if bytes.len() > 4 => {
-                (Some(bytes[3]), &bytes[4..])
-            }
-            Some(0x02) | Some(0x09)
-                if bytes.len() > 2 && matches!(bytes[1], 0x01..=0x03 | 0x1A) =>
-            {
-                (Some(bytes[1]), &bytes[2..])
-            }
+            Some(0x82) | Some(0x80) | Some(0x8A) | Some(0x89) if bytes.len() > 4 => (Some(bytes[3]), &bytes[4..]),
+            Some(0x02) | Some(0x09) if bytes.len() > 2 && matches!(bytes[1], 0x01..=0x03 | 0x1A) => (Some(bytes[1]), &bytes[2..]),
             Some(0x02) | Some(0x09) if bytes.len() > 1 => (None, &bytes[1..]),
             Some(0x01..=0x03) | Some(0x1A) if bytes.len() > 1 => (Some(bytes[0]), &bytes[1..]),
             _ => return String::new(),
@@ -1006,7 +1057,8 @@ impl SdsBsSubentity {
         let Some(request) = wx_service::parse_wx_request(&text) else {
             tracing::debug!(
                 "WX: ignoring non-command SDS from ISSI {} (only METAR/WX): {:?}",
-                requester_issi, text
+                requester_issi,
+                text
             );
             return;
         };
@@ -1039,12 +1091,7 @@ impl SdsBsSubentity {
 
     /// Build a SendSds control command carrying `text` and push it onto the control queue.
     /// `payload` here is the bare text; rx_sds_from_control wraps it in the SDS-TL header.
-    fn queue_wx_reply(
-        tx: &crossbeam_channel::Sender<ControlCommand>,
-        source_issi: u32,
-        dest_issi: u32,
-        text: &str,
-    ) {
+    fn queue_wx_reply(tx: &crossbeam_channel::Sender<ControlCommand>, source_issi: u32, dest_issi: u32, text: &str) {
         // TETRA SDS-TL simple text is length-limited; trim to a safe size.
         let mut payload: Vec<u8> = text.bytes().take(220).collect();
         if payload.is_empty() {
@@ -1081,7 +1128,9 @@ impl SdsBsSubentity {
         }
         self.last_periodic_wx = Some(std::time::Instant::now());
 
-        let Some(tx) = self.wx_cmd_tx.clone() else { return; };
+        let Some(tx) = self.wx_cmd_tx.clone() else {
+            return;
+        };
         let icao = wx.periodic_icao.clone();
         let dest = wx.periodic_issi;
         let is_group = wx.periodic_is_group;
@@ -1091,7 +1140,7 @@ impl SdsBsSubentity {
             .name("wx-periodic".into())
             .spawn(move || {
                 use crate::net_dashboard::wx_service;
-                        let reply = match wx_service::fetch_metar_decoded(&icao) {
+                let reply = match wx_service::fetch_metar_decoded(&icao) {
                     Ok(d) if !d.is_empty() => d,
                     _ => return, // skip this cycle on failure; try again next interval
                 };
@@ -1125,9 +1174,7 @@ impl SdsBsSubentity {
         dest_ssi_type: SsiType,
         user_defined_data: SdsUserData,
     ) {
-        if dest_ssi_type == SsiType::Issi
-            && (self.issi_on_local_traffic(dest_ssi) || self.ee_window_blocks(dest_ssi))
-        {
+        if dest_ssi_type == SsiType::Issi && (self.issi_on_local_traffic(dest_ssi) || self.ee_window_blocks(dest_ssi)) {
             tracing::info!(
                 "SDS: dest {} not reachable on MCCH now (in call or EE-asleep) — deferring until reachable",
                 dest_ssi
@@ -1212,11 +1259,7 @@ impl SdsBsSubentity {
             Some((ts, usage)) if (1..=4).contains(&ts) => {
                 let mut timeslots = [false; 4];
                 timeslots[(ts - 1) as usize] = true;
-                tracing::debug!(
-                    "SDS: dest {} is on traffic ts {} — delivering via FACCH stealing",
-                    dest_ssi,
-                    ts
-                );
+                tracing::debug!("SDS: dest {} is on traffic ts {} — delivering via FACCH stealing", dest_ssi, ts);
                 (
                     true,
                     Some(CmceChanAllocReq {
@@ -1323,7 +1366,12 @@ impl SdsBsSubentity {
         static SDS_MR: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(1);
         let mr = {
             let v = SDS_MR.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-            if v == 0 { SDS_MR.store(1, std::sync::atomic::Ordering::Relaxed); 1 } else { v }
+            if v == 0 {
+                SDS_MR.store(1, std::sync::atomic::Ordering::Relaxed);
+                1
+            } else {
+                v
+            }
         };
         let mut payload = vec![0x82u8, 0x04u8, mr, 0x01u8];
         // Keep printable ASCII only (the encoding byte declares ISO-8859-1/ASCII).
@@ -1336,7 +1384,14 @@ impl SdsBsSubentity {
         // active call — even though the requester's own talkgroup is idle and it is listening
         // on the MCCH — so the radio never sees its reply and retransmits the U-STATUS until
         // timeout.
-        self.deliver_d_sds_data_now(queue, source_issi, dest_issi, SsiType::Issi, SdsUserData::Type4(len_bits, payload), true);
+        self.deliver_d_sds_data_now(
+            queue,
+            source_issi,
+            dest_issi,
+            SsiType::Issi,
+            SdsUserData::Type4(len_bits, payload),
+            true,
+        );
     }
 
     fn handle_sds_command_status(&mut self, queue: &mut MessageQueue, source_ssi: u32, status: &PreCodedStatus) {
@@ -1346,7 +1401,8 @@ impl SdsBsSubentity {
         let Some(ref ctrl) = cfg.cell.sds_command_control else {
             tracing::debug!(
                 "SDS-CMD: U-STATUS to 9999 from {} (status={}) but sds_command_control not configured, ignoring",
-                source_ssi, status_code
+                source_ssi,
+                status_code
             );
             return;
         };
@@ -1354,7 +1410,8 @@ impl SdsBsSubentity {
         if !ctrl.authorized_issis.contains(&source_ssi) {
             tracing::warn!(
                 "SDS-CMD: U-STATUS to 9999 from ISSI {} (status={}) — ISSI not in authorized_issis, ignoring",
-                source_ssi, status_code
+                source_ssi,
+                status_code
             );
             return;
         }
@@ -1362,14 +1419,17 @@ impl SdsBsSubentity {
         let Some(entry) = ctrl.commands.iter().find(|e| e.status_code == status_code) else {
             tracing::debug!(
                 "SDS-CMD: U-STATUS to 9999 from ISSI {} status={} — no matching command, ignoring",
-                source_ssi, status_code
+                source_ssi,
+                status_code
             );
             return;
         };
 
         tracing::info!(
             "SDS-CMD: ISSI {} triggered action='{}' via status={}",
-            source_ssi, entry.action, status_code
+            source_ssi,
+            entry.action,
+            status_code
         );
 
         match entry.action.as_str() {
@@ -1489,10 +1549,7 @@ mod tests {
             "OK"
         );
         assert_eq!(
-            SdsBsSubentity::extract_sds_text(&SdsUserData::Type4(
-                40,
-                vec![0x09, 0x01, b'H', b'i', b'!']
-            )),
+            SdsBsSubentity::extract_sds_text(&SdsUserData::Type4(40, vec![0x09, 0x01, b'H', b'i', b'!'])),
             "Hi!"
         );
     }
@@ -1500,10 +1557,7 @@ mod tests {
     #[test]
     fn sds_tl_text_pid_89_decodes_utf16_payload() {
         assert_eq!(
-            SdsBsSubentity::extract_sds_text(&SdsUserData::Type4(
-                48,
-                vec![0x89, 0x04, 0x22, 0x02, 0x00, b'A']
-            )),
+            SdsBsSubentity::extract_sds_text(&SdsUserData::Type4(48, vec![0x89, 0x04, 0x22, 0x02, 0x00, b'A'])),
             "A"
         );
     }
