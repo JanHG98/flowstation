@@ -583,18 +583,11 @@ pub struct DashboardServer {
     sessions: SharedSessionStore,
     /// Last time a ts_voice WS message was broadcast per TS (indexed 0..3 for TS1..TS4)
     ts_last_broadcast: std::sync::Mutex<[std::time::Instant; 4]>,
-    /// On-demand RadioID callsign resolver (ISSI → indicativ), cached locally.
-    radioid: crate::net_dashboard::radioid::RadioIdCache,
 }
 
 impl DashboardServer {
     pub fn new(config_path: String) -> Self {
         let now = std::time::Instant::now();
-        // RadioID callsign cache lives next to the active config file.
-        let radioid_path = std::path::Path::new(&config_path)
-            .parent()
-            .map(|d| d.join("radioid_cache.json"))
-            .unwrap_or_else(|| std::path::PathBuf::from("radioid_cache.json"));
         Self {
             state: Arc::new(RwLock::new(DashboardStateInner::new(config_path.clone()))),
             clients: Arc::new(Mutex::new(Vec::new())),
@@ -608,7 +601,6 @@ impl DashboardServer {
             public_overview: false,
             sessions: Arc::new(Mutex::new(SessionStore::new())),
             ts_last_broadcast: std::sync::Mutex::new([now; 4]),
-            radioid: crate::net_dashboard::radioid::RadioIdCache::new(radioid_path),
         }
     }
 
@@ -662,7 +654,6 @@ impl DashboardServer {
         let public_overview = self.public_overview;
         let shared_config = self.shared_config.clone();
         let sessions = Arc::clone(&self.sessions);
-        let radioid = self.radioid.clone();
 
         std::thread::Builder::new()
             .name("dashboard-server".into())
@@ -703,7 +694,6 @@ impl DashboardServer {
                     let auth = auth.clone();
                     let shared_config = shared_config.clone();
                     let sessions = Arc::clone(&sessions);
-                    let radioid = radioid.clone();
                     std::thread::Builder::new()
                         .name("dashboard-conn".into())
                         .spawn(move || {
@@ -719,7 +709,6 @@ impl DashboardServer {
                                 auth,
                                 shared_config,
                                 sessions,
-                                radioid,
                                 public_overview,
                             )
                         })
@@ -1843,7 +1832,6 @@ fn handle_connection(
     auth: Option<(String, String)>,
     shared_config: Option<tetra_config::bluestation::SharedConfig>,
     sessions: SharedSessionStore,
-    radioid: crate::net_dashboard::radioid::RadioIdCache,
     public_overview: bool,
 ) {
     let _ = stream.set_read_timeout(Some(std::time::Duration::from_millis(500)));
@@ -2148,15 +2136,12 @@ fn handle_connection(
             },
         }
     } else if req_line.contains("GET /api/callsigns") {
-        let mut buf = BufReader::new(stream);
-        loop {
-            let mut line = String::new();
-            let _ = buf.read_line(&mut line);
-            if line == "\r\n" || line.is_empty() || line == "\n" {
-                break;
-            }
-        }
-        serve_callsigns(buf.into_inner(), &radioid, &req_line);
+        // External callsign lookup has been removed from the base station.
+        // Keep the old endpoint as a harmless compatibility stub so older cached
+        // dashboard assets do not accidentally hit the final HTML catch-all.
+        let mut s = stream;
+        drain_http_headers(&mut s);
+        http_json_response(s, 200, "{}");
     } else if req_line.contains("GET /api/update/check") {
         let mut buf = BufReader::new(stream);
         loop {
@@ -3033,48 +3018,6 @@ fn serve_update_status(mut stream: TcpStream, update_state: &SharedUpdateState) 
 /// GET /api/update/check — query GitHub for the latest release and report whether a newer
 /// version than the running build exists. Best-effort; on any failure returns
 /// check_failed=true so the dashboard simply hides the badge.
-/// GET /api/callsigns?ids=1,2,3 — resolve ISSIs to RadioID callsigns ("indicative"). Returns a JSON
-/// object `{ "<id>": {"cs":"CALLSIGN","fl":"🇷🇴"} }` for resolved IDs (`fl` is the country flag emoji
-/// derived from the call-sign prefix, or empty if unknown) and `{ "<id>": "" }` for IDs confirmed
-/// absent from RadioID. IDs still being fetched in the background are OMITTED, so the client retries
-/// them on a later poll. Lookups are non-blocking — unknown IDs are queued for background resolution.
-fn serve_callsigns(stream: TcpStream, radioid: &crate::net_dashboard::radioid::RadioIdCache, req_line: &str) {
-    use crate::net_dashboard::radioid::Lookup;
-    // Parse the `ids=` query parameter from "GET /api/callsigns?ids=1,2,3 HTTP/1.1".
-    let ids: Vec<u32> = req_line
-        .split_whitespace()
-        .nth(1)
-        .and_then(|p| p.split('?').nth(1))
-        .into_iter()
-        .flat_map(|q| q.split('&'))
-        .find_map(|kv| kv.strip_prefix("ids="))
-        .map(|v| {
-            v.split(',')
-                .filter_map(|s| s.trim().parse::<u32>().ok())
-                .take(256) // bound work per request
-                .collect()
-        })
-        .unwrap_or_default();
-
-    let mut map = serde_json::Map::new();
-    for id in ids {
-        match radioid.get(id) {
-            Lookup::Found(cs) => {
-                let flag = crate::net_dashboard::callsign::callsign_flag(&cs).unwrap_or_default();
-                let mut entry = serde_json::Map::new();
-                entry.insert("cs".to_string(), serde_json::Value::String(cs));
-                entry.insert("fl".to_string(), serde_json::Value::String(flag));
-                map.insert(id.to_string(), serde_json::Value::Object(entry));
-            }
-            Lookup::NotFound => {
-                map.insert(id.to_string(), serde_json::Value::String(String::new()));
-            }
-            Lookup::Pending => {} // omit — client retries on a later poll
-        }
-    }
-    http_json_response(stream, 200, &serde_json::Value::Object(map).to_string());
-}
-
 fn serve_update_check(mut stream: TcpStream) {
     let result = crate::net_dashboard::update_check::check_for_update(tetra_core::STACK_VERSION);
     let body = result.to_json();
