@@ -54,6 +54,7 @@ struct SipDialog {
     local_uri: String,
     local_tag: String,
     remote_tag: Option<String>,
+    invite_branch: Option<String>,
     cseq: u32,
     auth: Option<DigestChallenge>,
     auth_retry_sent: bool,
@@ -383,6 +384,9 @@ impl AsteriskEntity {
         let (rtp_port, auth) = self.dialogs.get(&uuid).map(|dialog| (dialog.rtp.local_port, dialog.auth.clone()))?;
         let request_uri = self.request_uri(&snapshot.number);
         let branch = self.next_branch();
+        if let Some(dialog) = self.dialogs.get_mut(&uuid) {
+            dialog.invite_branch = Some(branch.clone());
+        }
         let body = self.build_sdp(rtp_port);
         let auth = auth
             .as_ref()
@@ -446,7 +450,17 @@ impl AsteriskEntity {
         };
         let method = if cancel { "CANCEL" } else { "BYE" };
         let request_uri = self.request_uri(&dialog.number);
-        let branch = self.next_branch();
+        let branch = if cancel {
+            dialog.invite_branch.clone().unwrap_or_else(|| {
+                tracing::warn!(
+                    "AsteriskEntity: CANCEL uuid={} has no stored INVITE branch; using fresh branch as fallback",
+                    uuid
+                );
+                self.next_branch()
+            })
+        } else {
+            self.next_branch()
+        };
         let to = if cancel {
             // CANCEL must match the original INVITE transaction.
             // Do not use the early-dialog To tag from 180/183 here.
@@ -479,6 +493,15 @@ impl AsteriskEntity {
             cseq,
             method,
             self.contact_uri()
+        );
+        tracing::info!(
+            "AsteriskEntity: sending {} uuid={} call_id={} cseq={} branch={} to={}",
+            method,
+            uuid,
+            dialog.call_id_header,
+            cseq,
+            branch,
+            to
         );
         self.send_sip(request, format!("{} {}", method, uuid));
     }
@@ -802,6 +825,7 @@ impl AsteriskEntity {
             local_uri: self.local_uri(),
             local_tag,
             remote_tag,
+            invite_branch: None,
             cseq: 1,
             auth: None,
             auth_retry_sent: false,
@@ -928,6 +952,7 @@ impl AsteriskEntity {
             call_id_header: format!("flow-{}@{}", brew_uuid, self.asterisk_config.contact_host),
             local_tag: format!("flow{}", &brew_uuid.to_string()[..8]),
             remote_tag: None,
+            invite_branch: None,
             cseq: 1,
             auth: None,
             auth_retry_sent: false,
@@ -1315,6 +1340,7 @@ struct SipDialogSnapshot {
     source_issi: Option<u32>,
     local_tag: String,
     remote_tag: Option<String>,
+    invite_branch: Option<String>,
     cseq: u32,
 }
 
@@ -1328,6 +1354,7 @@ impl SipDialogSnapshot {
             source_issi: Some(dialog.call.source_issi),
             local_tag: dialog.local_tag.clone(),
             remote_tag: dialog.remote_tag.clone(),
+            invite_branch: dialog.invite_branch.clone(),
             cseq: dialog.cseq,
         }
     }
