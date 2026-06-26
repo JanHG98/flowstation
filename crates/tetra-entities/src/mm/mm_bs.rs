@@ -804,6 +804,14 @@ impl MmBs {
             .as_ref()
             .and_then(|c| if c.clch_needed || c.common_scch { Some(0x01u64) } else { None });
 
+        // Hytera compatibility needs to inspect class_of_ms before we move it into client_mgr.
+        // ClassOfMs is not Copy, so doing this later would borrow a moved value.
+        let hytera_periodic_accept_compat = pdu
+            .class_of_ms
+            .as_ref()
+            .map(|class| class.common_scch && class.air_interface_version >= 2)
+            .unwrap_or(false);
+
         let _ = self.client_mgr.set_client_class_of_ms(issi, pdu.class_of_ms);
         self.config.state_write().subscribers.set_duplex_capable(issi, duplex_capable);
 
@@ -826,16 +834,8 @@ impl MmBs {
         // Hytera-like capability set. Mirroring the MS request type is also the least surprising
         // response for an initial ITSI attach: attach in, attach accepted.
         let periodic_secs = self.config.config().cell.periodic_registration_secs;
-        let hytera_periodic_accept_compat = pdu
-            .class_of_ms
-            .as_ref()
-            .map(|class| class.common_scch && class.air_interface_version >= 2)
-            .unwrap_or(false);
 
-        let accept_type = if periodic_secs > 0
-            && !hytera_periodic_accept_compat
-            && pdu.location_update_type != LocationUpdateType::ItsiAttach
-        {
+        let accept_type = if periodic_secs > 0 && !hytera_periodic_accept_compat {
             LocationUpdateType::PeriodicLocationUpdating
         } else {
             if periodic_secs > 0 && hytera_periodic_accept_compat {
