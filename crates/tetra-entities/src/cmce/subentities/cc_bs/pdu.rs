@@ -1020,7 +1020,7 @@ impl CcBsSubentity {
         queue: &mut MessageQueue,
         call_id: u16,
         disconnect_cause: DisconnectCause,
-        _disconnecting_issi: Option<u32>,
+        disconnecting_issi: Option<u32>,
     ) {
         if let Some(call) = self.individual_calls.get_mut(&call_id) {
             call.begin_release(disconnect_cause);
@@ -1112,8 +1112,24 @@ impl CcBsSubentity {
         }
         self.cached_setups.remove(&call_id);
 
-        if (call.called_over_brew || call.calling_over_brew) && disconnect_cause != DisconnectCause::SwmiRequestedDisconnection {
+        // If a local MS releases a network-routed individual call during setup/ringing,
+        // the network side must be told immediately so Asterisk can CANCEL the still-ringing
+        // SIP INVITE. Previously U-RELEASE lost the releasing ISSI and SwMIRequestedDisconnection
+        // was filtered here, so the TETRA side cleaned up but the phone kept ringing.
+        let local_party_requested_release = disconnecting_issi.is_some();
+
+        if (call.called_over_brew || call.calling_over_brew)
+            && (local_party_requested_release || disconnect_cause != DisconnectCause::SwmiRequestedDisconnection)
+        {
             if let Some(brew_uuid) = call.brew_uuid {
+                tracing::info!(
+                    "CMCE: notifying {:?} about individual release uuid={} call_id={} cause={} local_party={:?}",
+                    call.network_entity(),
+                    brew_uuid,
+                    call_id,
+                    disconnect_cause,
+                    disconnecting_issi
+                );
                 self.notify_network_circuit_release(queue, call.network_entity(), brew_uuid, disconnect_cause);
             }
         }
