@@ -5584,6 +5584,9 @@ async function loadDeviceRegistry(){
     deviceRegistryLoaded=true;
   }finally{
     deviceRegistryInflight=false;
+    renderAll();
+    renderEmergencyBanner();
+    renderSdsLog();
     renderMapsIfActive();
   }
 }
@@ -5636,34 +5639,34 @@ function mapsDeviceMeta(source,device){
   return parts.filter(Boolean).join(' · ');
 }
 
-// ── RadioID callsigns (indicativ) ──────────────────────────────────────────────
-// issi -> {cs:"CALLSIGN", fl:"🇷🇴"} (found; fl is the country flag emoji from the prefix, or "")
-//       | "" (looked up, none). A missing key means unresolved.
-let callsigns={};
-let _csInflight=false;
-// Render an ISSI with its RadioID callsign (and country flag, when known) appended.
-function idCell(issi){const c=callsigns[issi];if(!c||!c.cs)return `<code>${issi}</code>`;const fl=c.fl?c.fl+' ':'';return `<code>${issi}</code> <span class="callsign">${fl}${escHtml(c.cs)}</span>`;}
-// Resolve callsigns for every ISSI currently on screen we have not looked up yet. On-demand: the
-// server fetches unknowns from RadioID in the background and caches them locally; pending IDs are
-// omitted from the response and retried on the next tick. Found/absent results are cached here.
-function refreshCallsigns(){
-  if(_csInflight)return;
-  const ids=new Set();
-  Object.values(state.ms).forEach(m=>ids.add(m.issi));
-  Object.values(state.calls).forEach(c=>{if(c.caller_issi)ids.add(c.caller_issi);if(c.called_issi&&c.call_type!=='group')ids.add(c.called_issi);if(c.active_speaker)ids.add(c.active_speaker);});
-  state.lastHeard.forEach(e=>{if(e.issi)ids.add(e.issi);});
-  (state.sdsLog||[]).forEach(e=>{if(e.source_issi)ids.add(e.source_issi);if(e.dest_issi&&!e.is_group)ids.add(e.dest_issi);});
-  Object.values(state.emergencies||{}).forEach(e=>{if(e.issi)ids.add(e.issi);});
-  const unknown=[...ids].filter(id=>id&&callsigns[id]===undefined).slice(0,256);
-  if(!unknown.length)return;
-  _csInflight=true;
-  fetch('/api/callsigns?ids='+unknown.join(','))
-    .then(r=>r.ok?r.json():{})
-    .then(d=>{let changed=false;for(const k in d){if(callsigns[k]!==d[k]){callsigns[k]=d[k];changed=true;}}if(changed){renderStations();renderCalls();renderLastHeard();renderSdsLog();renderEmergencyBanner();}})
-    .catch(()=>{})
-    .finally(()=>{_csInflight=false;});
+// ── Local device labels (devices.json) ────────────────────────────────────────
+// External callsign lookup is disabled. ISSI labels come only from devices.json.
+// Keeping the old function names as no-op compatibility hooks avoids touching every
+// render path that used to call refreshCallsigns().
+function deviceInlineName(issi){
+  const key=String(issi??'').trim();
+  if(!key)return '';
+  const entry=deviceRegistry[key];
+  if(!entry)return '';
+  if(typeof entry==='string')return entry.trim();
+  return String(entry.name||entry.label||entry.title||'').trim();
 }
-setInterval(refreshCallsigns,4000);
+function deviceSearchText(issi){
+  const key=String(issi??'').trim();
+  const info=deviceInfoForIssi(key,'TETRA LIP');
+  return [key,info.known?info.name:'',info.type||'',info.owner||''].filter(Boolean).join(' ');
+}
+function idCell(issi){
+  const key=String(issi??'').trim();
+  const name=deviceInlineName(key);
+  return `<code>${escHtml(key)}</code>${name?` <span class="callsign">${escHtml(name)}</span>`:''}`;
+}
+function refreshCallsigns(){
+  // Legacy hook name: no external lookup. Reload devices.json once if it has not been loaded yet.
+  if(!deviceRegistryLoaded&&!deviceRegistryInflight){
+    loadDeviceRegistry().then(()=>{renderStations();renderCalls();renderLastHeard();renderSdsLog();renderEmergencyBanner();renderMapsIfActive();});
+  }
+}
 const logFilter=()=>document.getElementById('log-filter').value;
 
 function showFallbackBanner(reason){
@@ -5688,11 +5691,9 @@ function renderEmergencyBanner(){
   if(!arr.length){b.style.display='none';list.innerHTML='';return;}
   b.style.display='flex';
   list.innerHTML=arr.sort((a,b)=>a.issi-b.issi).map(e=>{
-    // callsigns[issi] is an object {cs, fl} (see idCell/tsIssiText), not a string.
-    const c=callsigns[e.issi];
-    const fl=(c&&c.fl)?c.fl+' ':'';
-    const who=(c&&c.cs)?(e.issi+' · '+fl+c.cs):(''+e.issi);
-    return `<span style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.18);border-radius:4px;padding:2px 8px"><code style="color:#fff">${who}</code><button onclick="clearEmergency(${e.issi})" style="padding:1px 7px;background:#fff;color:var(--danger);border:none;border-radius:3px;font-weight:600;cursor:pointer;font-size:11px">${t('emg_clear')}</button></span>`;
+    const name=deviceInlineName(e.issi);
+    const who=name?`${e.issi} · ${name}`:''+e.issi;
+    return `<span style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.18);border-radius:4px;padding:2px 8px"><code style="color:#fff">${escHtml(who)}</code><button onclick="clearEmergency(${e.issi})" style="padding:1px 7px;background:#fff;color:var(--danger);border:none;border-radius:3px;font-weight:600;cursor:pointer;font-size:11px">${t('emg_clear')}</button></span>`;
   }).join('');
 }
 function clearEmergency(issi){if(!confirm(t('confirm_clear_emergency',{issi})))return;wsSend({type:'emergency_clear',issi});}
@@ -6036,8 +6037,7 @@ function lastHeardRegex(id,label){
   catch(e){return {error:`${label}: ${e.message||'invalid regex'}`};}
 }
 function lastHeardIdText(id){
-  const c=callsigns[id];
-  return [id,c&&c.cs?c.cs:''].filter(v=>v!==null&&v!==undefined&&String(v).length).join(' ');
+  return deviceSearchText(id);
 }
 function lastHeardSourceAllowed(entry){
   const source=String(entry.source||'local').toLowerCase();
@@ -6138,7 +6138,7 @@ function updateTsBlocks(){
 
     const voiceRecent=st.voice_ts&&(now-st.voice_ts)<TS_VOICE_DECAY_MS;
     // Top line = GSSI (talkgroup) for group calls / called ISSI for individual;
-    // bottom line = the ISSI currently keyed up, with its RadioID callsign when known.
+    // bottom line = the ISSI currently keyed up, with its devices.json name when known.
     const lines=tsLines(st);
     label.textContent=lines.top;
 
@@ -6170,17 +6170,15 @@ function formatDur(s){
   return Math.floor(s/60)+'m'+String(s%60).padStart(2,'0')+'s';
 }
 
-// Render an ISSI + its RadioID callsign (indicativ) compactly for the TS sub-line.
+// Render an ISSI + its devices.json name compactly for the TS sub-line.
 function tsIssiText(issi){
   if(!issi)return '';
-  const c=callsigns[issi];
-  if(!c||!c.cs)return ''+issi;
-  const fl=c.fl?c.fl+' ':'';
-  return issi+' · '+fl+c.cs;
+  const name=deviceInlineName(issi);
+  return name?`${issi} · ${name}`:''+issi;
 }
 // Compute the two text lines for an active timeslot from its call state:
 //   top    → GSSI (talkgroup number) for group calls, else the called ISSI / P2P
-//   bottom → the ISSI currently transmitting, with callsign when resolved
+//   bottom → the ISSI currently transmitting, with devices.json name when known
 function tsLines(st){
   const speaker=st.speaker_issi||st.caller_issi;
   if(st.call_type==='group'){
@@ -6471,12 +6469,9 @@ function mapsCollect(){
     const issi=e.source_issi||'';
     if(!mapsIsRegisteredIssi(issi))return;
     const device=deviceInfoForIssi(issi,'TETRA LIP');
-    const cs=callsigns[issi]?.cs;
-    const callsign=cs?` · ${cs}`:'';
     const detail=[
       `SDS ${String(e.direction||'').toUpperCase()} ${e.source_issi||'—'} → ${e.dest_issi||'—'}${e.is_group?' group':''}`,
-      device.note||'',
-      callsign?`RadioID${callsign}`:''
+      device.note||''
     ].filter(Boolean).join(' · ');
     const marker=mapsMarker('sds',device.name,lip.lat,lip.lon,
       detail,
@@ -6910,8 +6905,7 @@ function sdsLogRegex(id,label){
   catch(e){return {error:`${label}: ${e.message||'invalid regex'}`};}
 }
 function sdsLogFromText(e){
-  const c=callsigns[e.source_issi];
-  return [e.source_issi,c&&c.cs?c.cs:''].filter(v=>v!==null&&v!==undefined&&String(v).length).join(' ');
+  return deviceSearchText(e.source_issi);
 }
 function sdsLogTgText(e){
   return e.is_group?String(e.dest_issi||''):'';
