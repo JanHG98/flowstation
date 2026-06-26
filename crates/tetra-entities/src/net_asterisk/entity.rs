@@ -447,7 +447,11 @@ impl AsteriskEntity {
         let method = if cancel { "CANCEL" } else { "BYE" };
         let request_uri = self.request_uri(&dialog.number);
         let branch = self.next_branch();
-        let to = if let Some(tag) = &dialog.remote_tag {
+        let to = if cancel {
+            // CANCEL must match the original INVITE transaction.
+            // Do not use the early-dialog To tag from 180/183 here.
+            format!("<{}>", request_uri)
+        } else if let Some(tag) = &dialog.remote_tag {
             format!("<{}>;tag={}", request_uri, tag)
         } else {
             format!("<{}>", request_uri)
