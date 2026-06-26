@@ -171,7 +171,7 @@ fn default_strip_outbound_prefix() -> bool {
 }
 
 fn default_tetra_source_issi() -> u32 {
-    9999
+    4010001
 }
 
 fn default_reconnect_interval_secs() -> u64 {
