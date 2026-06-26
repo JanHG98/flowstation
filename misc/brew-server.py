@@ -37,9 +37,14 @@ CONFIG = {
     "http_port": 8080,
     "ws_port": 8081,
     "realm": "BrewServer",
-    "username": "brew",
-    "password": "brew123",  # In Produktion ändern!
     "server_name": "PythonBrew/1.0",
+    # ---------- Benutzerdatenbank ----------
+    "users": {
+        "SRV-M-TBS-01": "securePass1",
+        "basisstation2": "securePass2",
+        "basisstation3": "securePass3",
+        "admin": "admin123",   # für das Web-Dashboard
+    }
 }
 
 # ============================================================
