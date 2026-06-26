@@ -481,7 +481,7 @@ service_issi = 4010001            # ISSI that radios address to request weather
 #
 [telegram_alerts]
 enabled = true
-bot_token = "8086616038:AAG6eGu0lUo1s3NWYh8dd5yirV2OfjFPfSY"
+bot_token = ""
 chat_ids = [89135013]          # one or more; negative IDs are groups/channels
 alert_connect = true            # radio attached
 alert_disconnect = true         # radio detached
