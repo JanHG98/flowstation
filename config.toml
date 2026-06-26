@@ -396,15 +396,15 @@ action = "info"
 # "PTT does nothing after a BS restart" case the cache can miss. Honours the same whitelist /
 # issi_allowlist scoping. Set reactive_enabled = false to disable.
 #
-[recovery]
-enabled = false                 # proactive boot-time cache replay on/off (default false)
+# [recovery]
+# enabled = false                 # proactive boot-time cache replay on/off (default false)
 # issi_allowlist = []             # empty = every cached/seen ISSI; non-empty = only these (both modes)
 # cache_path = ""                 # explicit path; omit/empty = <config-dir>/recovery_cache.json
 # max_replay_attempts = 150       # per-ISSI COMMAND re-sends before giving up (1..=500)
 # replay_per_frame = 1            # COMMANDs emitted per TDMA frame during the sweep (1..=18)
 # debounce_secs = 5               # coalesce registry changes into one cache write (1..=300)
 # max_cached_issis = 1024         # hard cap on cached terminals (1..=65535)
-reactive_enabled = false        # command unknown radios to re-register on sight (default true)
+# reactive_enabled = false        # command unknown radios to re-register on sight (default true)
 # reactive_cooldown_secs = 10     # min gap between reactive COMMANDs to the same ISSI (2..=120)
 
 ###############################################################################
@@ -450,9 +450,9 @@ snapshot_interval_secs = 300        # how often a snapshot is emitted (1..=300)
 # Everything here can also be toggled/edited live from the dashboard (Config page),
 # which writes the values back to this section.
 #
-# [wx_service]
-# enabled = true                 # master on/off for the on-demand responder
-# service_issi = 9998            # ISSI that radios address to request weather
+[wx_service]
+enabled = true                 # master on/off for the on-demand responder
+service_issi = 4010001            # ISSI that radios address to request weather
 # periodic_enabled = false       # auto-broadcast a fixed station periodically
 # periodic_issi = 1001           # destination (ISSI, or a GSSI if periodic_is_group)
 # periodic_is_group = false      # true = periodic_issi is a talkgroup (GSSI)
@@ -596,36 +596,36 @@ timeout_ms = 2000
 # Uncomment this section to automatically enable the Brew entity.
 # See: https://wiki.tetrapack.online/books/tetra/page/brew
 
-[brew]
+# [brew]
 
 # Server address
-host = "10.0.1.22"
-port = 8081
+# host = "10.0.1.22"
+# port = 8081
 
 # Use TLS (wss:// / https://)
-tls = false
+# tls = false
 
 # HTTP Digest authentication credentials, registered in BrandMeister.
 # Username should be your SSID (DMR ID + 2-digit suffix).
 # Password is your BrandMeister hotspot password.
-username = 4010001
-password = "012345"
+# username = 4010001
+# password = "012345"
 
 # Reconnect delay (seconds)
-reconnect_delay_secs = 5
+# reconnect_delay_secs = 5
 
 # Additional initial latency in frames for inbound Brew jitter playback.
 # Default: 0. Increase if you hear audio artifacts at the start of transmissions.
 # jitter_initial_latency_frames = 0
 
 # Enable SDS forwarding between local clients and Brew. Enabled by default.
-feature_sds_enabled = true
+# feature_sds_enabled = true
 
 # Export RSSI measurements to the Brew server as Service (0xf4) JSON messages.
 # Disabled by default. Enable if your Brew server supports RSSI data ingestion.
 # When enabled, each radio's signal level is sent at most once every 5 seconds.
 # Format: {"issi": 2260570, "rssi_dbfs": -42.3}
-feature_rssi_export = true
+# feature_rssi_export = true
 
 # OPTIONAL: restrict OUTBOUND Brew forwarding to selected SSIs.
 # This is an OUTBOUND-only filter (FH-FEAT-032 R3): only calls/SDS TO these SSIs are
