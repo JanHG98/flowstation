@@ -142,7 +142,7 @@ colour_code = 1
 # IANA timezone for time broadcasting via D-NWRK-BROADCAST. When set, the BS will
 # broadcast UTC time and local time offset once per hyperframe (~61s) so that
 # radios can synchronize their clocks. Daylight saving time is handled automatically.
-# timezone = "Europe/Bucharest"
+timezone = "Europe/Berlin"
 
 # Local SSI ranges for this cell. Traffic for these ranges will not leave the cell.
 # Overrides any settings in the brew section, if enabled.
@@ -214,7 +214,7 @@ sndcp_service             = true  # advertise TETRA packet-data (SNDCP) service
 # deployments — only touch these if you understand the ETSI MAC/MLE fields.
 # neighbor_cell_broadcast = 0       # 2-bit D-MLE-SYNC neighbor-cell broadcast mode (default 0)
 # late_entry_supported    = false   # advertise late-entry support in D-MLE-SYNC (default false)
-# system_code             = 3       # SYNC system code; 3 = ETSI EN 300 392-2 V3.1.1 (default 3)
+system_code             = 1       # SYNC system code; 3 = ETSI EN 300 392-2 V3.1.1 (default 3)
 # sharing_mode            = 0       # carrier sharing mode (0 = continuous transmission; default 0)
 # ts_reserved_frames      = 0       # timeshare reserved frames per multiframe (default 0)
 # u_plane_dtx             = false   # advertise U-plane DTX (discontinuous TX) support (default false)
@@ -395,16 +395,15 @@ action = "info"
 # only in response to a radio that is demonstrably present, so it is RF-cheap and heals the common
 # "PTT does nothing after a BS restart" case the cache can miss. Honours the same whitelist /
 # issi_allowlist scoping. Set reactive_enabled = false to disable.
-#
-# [recovery]
-# enabled = false                 # proactive boot-time cache replay on/off (default false)
+[recovery]
+enabled = false                 # proactive boot-time cache replay on/off (default false)
 # issi_allowlist = []             # empty = every cached/seen ISSI; non-empty = only these (both modes)
 # cache_path = ""                 # explicit path; omit/empty = <config-dir>/recovery_cache.json
 # max_replay_attempts = 150       # per-ISSI COMMAND re-sends before giving up (1..=500)
 # replay_per_frame = 1            # COMMANDs emitted per TDMA frame during the sweep (1..=18)
 # debounce_secs = 5               # coalesce registry changes into one cache write (1..=300)
 # max_cached_issis = 1024         # hard cap on cached terminals (1..=65535)
-# reactive_enabled = false        # command unknown radios to re-register on sight (default true)
+reactive_enabled = false        # command unknown radios to re-register on sight (default true)
 # reactive_cooldown_secs = 10     # min gap between reactive COMMANDs to the same ISSI (2..=120)
 
 ###############################################################################
