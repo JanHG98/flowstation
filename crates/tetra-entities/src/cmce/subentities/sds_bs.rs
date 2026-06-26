@@ -414,9 +414,9 @@ impl SdsBsSubentity {
             return;
         }
 
-        // ACKs/replies addressed to the dashboard ISSI (9999) are consumed locally.
-        if dest_ssi == 9999 {
-            tracing::debug!("SDS: absorbing message to dashboard ISSI 9999 from {}", source_ssi);
+        // ACKs/replies addressed to the dashboard ISSI (4010001) are consumed locally.
+        if dest_ssi == 4010001 {
+            tracing::debug!("SDS: absorbing message to dashboard ISSI 4010001 from {}", source_ssi);
             return;
         }
 
@@ -608,11 +608,11 @@ impl SdsBsSubentity {
         // that lives behind Brew (e.g. on a bridged network) was delivered over RF "anyway", never
         // acknowledged, and lost once the LLC retransmissions exhausted.
         //
-        // The diversion is scoped to the dashboard operator ISSI (9999) on purpose: the WX/METAR
+        // The diversion is scoped to the dashboard operator ISSI (4010001) on purpose: the WX/METAR
         // responder re-injects its replies through this very path (see queue_wx_reply) addressed to
         // an on-air requester that may legitimately be absent from the static registry, and those
         // must keep going out over RF — so they are intentionally excluded here.
-        const DASHBOARD_ISSI: u32 = 9999;
+        const DASHBOARD_ISSI: u32 = 4010001;
         let is_local_issi = !dest_is_group && self.config.state_read().subscribers.is_registered(dest_ssi);
         let is_local_group = dest_is_group && self.config.state_read().subscribers.has_group_members(dest_ssi);
 
@@ -697,19 +697,19 @@ impl SdsBsSubentity {
         // Emergency-state tracking. The radio re-sends pre-coded status Emergency while in
         // emergency and is silent on exit: ENTER/REFRESH on Emergency, and a non-Emergency status
         // from the same ISSI CLEARS its session (the "first normal status = user cancelled" signal).
-        // Skip the 9999 command channel (restart/kick_all/info statuses) so an unrelated command
+        // Skip the 4010001 command channel (restart/kick_all/info statuses) so an unrelated command
         // status from a radio currently in emergency does not double as an emergency cancellation.
         // Local-only — evaluated before any Brew forward and gated by the [emergency] config below.
-        if dest_ssi != 9999 {
+        if dest_ssi != 4010001 {
             match pdu.pre_coded_status {
                 PreCodedStatus::Emergency => self.emergency_enter(source_ssi, dest_ssi),
                 _ => self.emergency_clear(source_ssi, "non-emergency status"),
             }
         }
 
-        // SDS command control: U-STATUS to ISSI 9999 from an authorized ISSI triggers
+        // SDS command control: U-STATUS to ISSI 4010001 from an authorized ISSI triggers
         // a system action (restart, shutdown, kick_all) if the status code matches.
-        if dest_ssi == 9999 {
+        if dest_ssi == 4010001 {
             self.handle_sds_command_status(queue, source_ssi, &pdu.pre_coded_status);
             return;
         }
@@ -1358,7 +1358,7 @@ impl SdsBsSubentity {
         supported
     }
 
-    /// Execute a system action triggered by an SDS U-STATUS command to ISSI 9999.
+    /// Execute a system action triggered by an SDS U-STATUS command to ISSI 4010001.
     /// Send a short text reply as an SDS-TL simple-text message from `source_issi` to `dest_issi`.
     /// Used by the U-STATUS info responder (FH-FEAT-014). Mirrors the SDS-TL framing used elsewhere:
     /// [PID 0x82, message type 0x04, message reference, encoding 0x01 (ISO-8859-1), text…].
@@ -1400,7 +1400,7 @@ impl SdsBsSubentity {
         let cfg = self.config.config();
         let Some(ref ctrl) = cfg.cell.sds_command_control else {
             tracing::debug!(
-                "SDS-CMD: U-STATUS to 9999 from {} (status={}) but sds_command_control not configured, ignoring",
+                "SDS-CMD: U-STATUS to 4010001 from {} (status={}) but sds_command_control not configured, ignoring",
                 source_ssi,
                 status_code
             );
@@ -1409,7 +1409,7 @@ impl SdsBsSubentity {
 
         if !ctrl.authorized_issis.contains(&source_ssi) {
             tracing::warn!(
-                "SDS-CMD: U-STATUS to 9999 from ISSI {} (status={}) — ISSI not in authorized_issis, ignoring",
+                "SDS-CMD: U-STATUS to 4010001 from ISSI {} (status={}) — ISSI not in authorized_issis, ignoring",
                 source_ssi,
                 status_code
             );
@@ -1418,7 +1418,7 @@ impl SdsBsSubentity {
 
         let Some(entry) = ctrl.commands.iter().find(|e| e.status_code == status_code) else {
             tracing::debug!(
-                "SDS-CMD: U-STATUS to 9999 from ISSI {} status={} — no matching command, ignoring",
+                "SDS-CMD: U-STATUS to 4010001 from ISSI {} status={} — no matching command, ignoring",
                 source_ssi,
                 status_code
             );
@@ -1451,13 +1451,13 @@ impl SdsBsSubentity {
             // ── FH-FEAT-014: query the host and reply to the requester as an SDS ──
             "ip" => {
                 let ip = crate::sys_telemetry::primary_ip().unwrap_or_else(|| "n/a".to_string());
-                self.send_text_sds(queue, 9999, source_ssi, &format!("Host IP: {ip}"));
+                self.send_text_sds(queue, 4010001, source_ssi, &format!("Host IP: {ip}"));
             }
             "temp" => {
                 let temp = crate::sys_telemetry::cpu_temp_c()
                     .map(|c| format!("{c:.1} C"))
                     .unwrap_or_else(|| "n/a".to_string());
-                self.send_text_sds(queue, 9999, source_ssi, &format!("Host temp: {temp}"));
+                self.send_text_sds(queue, 4010001, source_ssi, &format!("Host temp: {temp}"));
             }
             "info" => {
                 let ip = crate::sys_telemetry::primary_ip().unwrap_or_else(|| "n/a".to_string());
@@ -1466,7 +1466,7 @@ impl SdsBsSubentity {
                     .unwrap_or_else(|| "n/a".to_string());
                 self.send_text_sds(
                     queue,
-                    9999,
+                    4010001,
                     source_ssi,
                     &format!("FlowStation v{} | IP {} | {}", tetra_core::STACK_VERSION, ip, temp),
                 );
