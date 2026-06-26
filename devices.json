@@ -7,11 +7,10 @@
   "2020001": {
     "name": "Motorola MTP",
     "type": "HRT",
-    "owner": "Ole"
+    "owner": "Jan"
   },
   "5102": {
-    "name": "Sepura SC",
-    "type": "HRT",
-    "owner": "Jan"
+    "name": "LIP Testgerät 5102",
+    "type": "Test"
   }
 }
