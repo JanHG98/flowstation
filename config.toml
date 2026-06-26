@@ -550,7 +550,7 @@ password = "DagurUranus2014#"
 # Local/LAN NetCore Directory Server for device, base-station, group and status labels.
 # Set base_url to the LXC/host running NetCore Directory.
 enabled = true
-base_url = "http://127.0.0.1:8095"
+base_url = "http://10.0.1.23:8095"
 timeout_ms = 2000
 
 ###############################################################################
@@ -599,7 +599,7 @@ timeout_ms = 2000
 [brew]
 
 # Server address
-host = "10.0.1.196"
+host = "10.0.1.22"
 port = 8081
 
 # Use TLS (wss:// / https://)
