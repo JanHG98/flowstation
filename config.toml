@@ -319,7 +319,7 @@ sndcp_service             = true  # advertise TETRA packet-data (SNDCP) service
 # OPTIONAL: Remote control via U-STATUS (FlowStation)
 #
 # Allows authorized radios to trigger BS actions remotely by sending a U-STATUS
-# message to ISSI 9999 (the BS control address) from the radio menu.
+# message to ISSI 4010001 (the BS control address) from the radio menu.
 # Only ISSIs listed in authorized_issis can trigger commands.
 # Unrecognized status codes from authorized radios are silently ignored.
 # Enabled by the presence of this sub-section; remove to disable.
@@ -340,7 +340,7 @@ sndcp_service             = true  # advertise TETRA packet-data (SNDCP) service
 authorized_issis = [2010001, 2010002, 2020001, 2020002, 5102]   # ISSIs allowed to send commands
 #
 [[cell_info.sds_command_control.commands]]
-status_code = 33001             # U-STATUS code sent from the radio to ISSI 9999
+status_code = 33001             # U-STATUS code sent from the radio to ISSI 4010001
 action = "restart"
 #
 [[cell_info.sds_command_control.commands]]
@@ -664,7 +664,7 @@ timeout_ms = 2000
 # forward_callout = false
 # forward_telegram = false
 #
-# sds_source_issi = 9999
+# sds_source_issi = 4010001
 # sds_dest_issi = 0
 # sds_dest_is_group = false
 # ric_issi_routes = { "0632585" = 2632585 }
@@ -673,7 +673,7 @@ timeout_ms = 2000
 # callout_allowed_rics = []
 # telegram_allowed_rics = []
 #
-# callout_source_issi = 9999
+# callout_source_issi = 4010001
 # callout_dest_issi = 0
 # callout_incident_base = 2
 # callout_text_prefix = "DAPNET"
@@ -709,7 +709,7 @@ timeout_ms = 2000
 # [tpg2200_action]
 # enabled = false
 # token = ""
-# source_issi = 9999
+# source_issi = 4010001
 # dest_issi = 0
 # incident_base = 1
 # default_text = "ALARM"
@@ -786,11 +786,11 @@ timeout_ms = 2000
 # meshcom_source_whitelist = []        # empty = every MeshCom source
 # meshcom_source_blacklist = []
 #
-# sds_source_issi = 9999
+# sds_source_issi = 4010001
 # sds_dest_issi = 0                    # 0 = not configured
 # sds_dest_is_group = false
 #
-# tpg2200_source_issi = 9999
+# tpg2200_source_issi = 4010001
 # tpg2200_dest_issi = 0                # TPG2200 ISSI
 # tpg2200_incident_base = 1            # cycles 1..=256
 # tpg2200_text_prefix = "GeoAlarm"
