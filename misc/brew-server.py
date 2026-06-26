@@ -1,14 +1,7 @@
 #!/usr/bin/env python3
 """
 Brew Server - TETRA Homebrew Protocol Implementation
-Nach Spezifikation: https://wiki.tetrapack.online/books/tetra/page/brew
-
-Dieser Server implementiert:
-- HTTP Digest Authentication (RFC 2831)
-- WebSocket (RFC 6455) mit binären Nachrichten
-- Subscriber Control (Klasse 0xf0)
-- Call Control (Klasse 0xf1)
-- Einfaches Web-Dashboard
+Mit Mehrfach-Benutzerunterstützung für mehrere Basisstationen
 """
 
 import asyncio
@@ -23,7 +16,6 @@ from socketserver import ThreadingMixIn
 import threading
 import urllib.parse
 
-# WebSocket-Bibliothek
 try:
     import websockets
 except ImportError:
@@ -31,7 +23,7 @@ except ImportError:
     exit(1)
 
 # ============================================================
-# KONFIGURATION
+# KONFIGURATION - HIER DEINE BENUTZER EINTRAGEN
 # ============================================================
 CONFIG = {
     "http_port": 8080,
@@ -40,31 +32,30 @@ CONFIG = {
     "server_name": "PythonBrew/1.0",
     # ---------- Benutzerdatenbank ----------
     "users": {
-        "SRV-M-TBS-01": "securePass1",
+        # Jede Basisstation bekommt einen eigenen Login
+        "basisstation1": "securePass1",
         "basisstation2": "securePass2",
         "basisstation3": "securePass3",
-        "admin": "admin123",   # für das Web-Dashboard
+        # Admin für das Web-Dashboard
+        "admin": "admin123",
     }
 }
 
 # ============================================================
 # BREW PROTOKOLL KONSTANTEN
 # ============================================================
-# Message Classes
 BREW_SUBSCRIBER_CONTROL = 0xf0
 BREW_CALL_CONTROL = 0xf1
 BREW_FRAME_DATA = 0xf2
 BREW_ERROR = 0xf3
 BREW_SERVICE = 0xf4
 
-# Subscriber Control Types (Klasse 0xf0)
 BREW_SUBSCRIBER_DEREGISTER = 0
 BREW_SUBSCRIBER_REGISTER = 1
 BREW_SUBSCRIBER_REREGISTER = 2
 BREW_SUBSCRIBER_AFFILIATE = 8
 BREW_SUBSCRIBER_DEAFFILIATE = 9
 
-# Call Control Types (Klasse 0xf1)
 CALL_STATE_GROUP_TX = 2
 CALL_STATE_GROUP_IDLE = 3
 CALL_STATE_SETUP_REQUEST = 4
@@ -79,12 +70,11 @@ CALL_STATE_CALL_RELEASE = 10
 # GLOBALER STATE
 # ============================================================
 class BrewState:
-    """Hält den gesamten Zustand des Brew-Servers."""
     def __init__(self):
-        self.subscribers = {}  # ISSI -> {info}
-        self.affiliations = {}  # ISSI -> [GSSI-Liste]
-        self.active_calls = []  # Aktive Anrufe
-        self.connections = []   # Offene WebSocket-Verbindungen
+        self.subscribers = {}
+        self.affiliations = {}
+        self.active_calls = []
+        self.connections = []
         self.stats = {
             "start_time": time.time(),
             "total_registrations": 0,
@@ -93,7 +83,6 @@ class BrewState:
         self._lock = asyncio.Lock()
 
     async def add_subscriber(self, issi: int, groups: list = None):
-        """Registriert einen Teilnehmer."""
         async with self._lock:
             if issi not in self.subscribers:
                 self.stats["total_registrations"] += 1
@@ -107,7 +96,6 @@ class BrewState:
                 self.affiliations[issi] = groups
 
     async def remove_subscriber(self, issi: int):
-        """Deregistriert einen Teilnehmer."""
         async with self._lock:
             if issi in self.subscribers:
                 del self.subscribers[issi]
@@ -115,7 +103,6 @@ class BrewState:
                 del self.affiliations[issi]
 
     async def affiliate(self, issi: int, groups: list):
-        """Affiliiert einen Teilnehmer mit einer Gruppe."""
         async with self._lock:
             self.affiliations[issi] = groups
             if issi in self.subscribers:
@@ -123,7 +110,6 @@ class BrewState:
                 self.subscribers[issi]["last_seen"] = time.time()
 
     async def deaffiliate(self, issi: int):
-        """Deaffiliiert einen Teilnehmer."""
         async with self._lock:
             if issi in self.affiliations:
                 del self.affiliations[issi]
@@ -131,11 +117,9 @@ class BrewState:
                 self.subscribers[issi]["groups"] = []
 
     def get_all_subscribers(self):
-        """Gibt alle registrierten Teilnehmer zurück."""
         return list(self.subscribers.values())
 
     def get_stats(self):
-        """Gibt Statistiken zurück."""
         return {
             "uptime": int(time.time() - self.stats["start_time"]),
             "subscribers": len(self.subscribers),
@@ -145,14 +129,12 @@ class BrewState:
             "total_calls": self.stats["total_calls"],
         }
 
-# Globaler Zustand
 brew_state = BrewState()
 
 # ============================================================
-# HTTP DIGEST AUTHENTICATION (RFC 2831)
+# DIGEST AUTHENTICATION (RFC 2831)
 # ============================================================
 def compute_digest_response(username, realm, password, method, uri, nonce, nc, cnonce, qop):
-    """Berechnet die Digest-Response nach RFC 2831."""
     ha1 = hashlib.md5(f"{username}:{realm}:{password}".encode()).hexdigest()
     ha2 = hashlib.md5(f"{method}:{uri}".encode()).hexdigest()
     response = hashlib.md5(
@@ -161,7 +143,6 @@ def compute_digest_response(username, realm, password, method, uri, nonce, nc, c
     return response
 
 def parse_auth_header(auth_header):
-    """Parst den Authorization-Header."""
     if not auth_header or not auth_header.startswith("Digest "):
         return None
     parts = auth_header[7:].split(", ")
@@ -175,7 +156,7 @@ def parse_auth_header(auth_header):
     return params
 
 def verify_digest_auth(auth_header, method, uri):
-    """Verifiziert die Digest-Authentifizierung."""
+    """Verifiziert Digest-Auth gegen die Benutzerdatenbank."""
     params = parse_auth_header(auth_header)
     if not params:
         return False
@@ -192,34 +173,40 @@ def verify_digest_auth(auth_header, method, uri):
     if not all([username, realm, nonce, response]):
         return False
 
-    if username != CONFIG["username"] or realm != CONFIG["realm"]:
+    if realm != CONFIG["realm"]:
+        return False
+
+    # Hole das Passwort für diesen Benutzer aus der Datenbank
+    password = CONFIG["users"].get(username)
+    if password is None:
         return False
 
     expected = compute_digest_response(
-        username, realm, CONFIG["password"],
+        username, realm, password,
         method, uri_param or uri,
         nonce, nc or "00000001", cnonce or "00000000", qop or "auth"
     )
 
     return response == expected
 
+def get_username_from_auth(auth_header):
+    """Extrahiert den Benutzernamen aus dem Authorization-Header."""
+    params = parse_auth_header(auth_header)
+    return params.get("username") if params else None
+
 def generate_nonce():
-    """Generiert eine zufällige Nonce."""
     return hashlib.md5(f"{time.time()}:{uuid.uuid4()}".encode()).hexdigest()
 
 # ============================================================
-# HTTP SERVER FÜR AUTHENTIFIZIERUNG UND DASHBOARD
+# HTTP SERVER
 # ============================================================
 class BrewHTTPHandler(BaseHTTPRequestHandler):
-    """HTTP-Handler für Authentifizierung und Web-Dashboard."""
-
     protocol_version = "HTTP/1.1"
 
     def log_message(self, format, *args):
-        pass  # Silent logging
+        pass
 
     def send_auth_challenge(self):
-        """Sendet eine 401 Unauthorized mit Digest-Challenge."""
         self.send_response(401)
         self.send_header("WWW-Authenticate", 
             f'Digest realm="{CONFIG["realm"]}", '
@@ -231,7 +218,6 @@ class BrewHTTPHandler(BaseHTTPRequestHandler):
         self.wfile.write(b"<html><body><h1>401 Unauthorized</h1></body></html>")
 
     def is_authenticated(self):
-        """Prüft, ob die Anfrage authentifiziert ist."""
         auth = self.headers.get("Authorization")
         if not auth:
             return False
@@ -240,11 +226,9 @@ class BrewHTTPHandler(BaseHTTPRequestHandler):
         return verify_digest_auth(auth, method, path)
 
     def do_GET(self):
-        """Verarbeitet GET-Anfragen."""
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
 
-        # Authentifizierung prüfen
         if not self.is_authenticated():
             self.send_auth_challenge()
             return
@@ -261,7 +245,6 @@ class BrewHTTPHandler(BaseHTTPRequestHandler):
             self.wfile.write(b"Not found")
 
     def serve_dashboard(self):
-        """Serviert das Web-Dashboard."""
         stats = brew_state.get_stats()
         subscribers = brew_state.get_all_subscribers()
 
@@ -282,9 +265,6 @@ class BrewHTTPHandler(BaseHTTPRequestHandler):
                 table {{ width: 100%; border-collapse: collapse; }}
                 th, td {{ padding: 10px; text-align: left; border-bottom: 1px solid #ddd; }}
                 th {{ background: #f0f0f0; }}
-                .badge {{ display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 12px; }}
-                .badge-online {{ background: #4CAF50; color: white; }}
-                .badge-offline {{ background: #f44336; color: white; }}
                 .refresh-btn {{ background: #2196F3; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; }}
                 .refresh-btn:hover {{ background: #1976D2; }}
                 .footer {{ text-align: center; color: #999; font-size: 12px; margin-top: 30px; }}
@@ -378,7 +358,6 @@ class BrewHTTPHandler(BaseHTTPRequestHandler):
         self.wfile.write(html.encode())
 
     def serve_api_status(self):
-        """Serviert den API-Status als JSON."""
         stats = brew_state.get_stats()
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
@@ -386,7 +365,6 @@ class BrewHTTPHandler(BaseHTTPRequestHandler):
         self.wfile.write(json.dumps(stats).encode())
 
     def serve_api_subscribers(self):
-        """Serviert die Teilnehmerliste als JSON."""
         subs = brew_state.get_all_subscribers()
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
@@ -394,50 +372,52 @@ class BrewHTTPHandler(BaseHTTPRequestHandler):
         self.wfile.write(json.dumps(subs, default=str).encode())
 
 class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
-    """Thread-fähiger HTTP-Server."""
     daemon_threads = True
 
 def run_http_server():
     """Startet den HTTP-Server in einem separaten Thread."""
     server = ThreadedHTTPServer(("0.0.0.0", CONFIG["http_port"]), BrewHTTPHandler)
     print(f"🌐 HTTP Server läuft auf http://0.0.0.0:{CONFIG['http_port']}")
-    print(f"   Login: {CONFIG['username']} / {CONFIG['password']}")
+    # Admin-Login für das Dashboard anzeigen
+    admin_pass = CONFIG["users"].get("admin", "Nicht gesetzt")
+    print(f"   Dashboard-Login: admin / {admin_pass}")
+    # Basisstations-Benutzer auflisten (ohne admin)
+    station_users = [u for u in CONFIG["users"].keys() if u != "admin"]
+    if station_users:
+        print(f"   Basisstationen können sich mit: {', '.join(station_users)} anmelden")
     server.serve_forever()
 
 # ============================================================
 # WEBSOCKET BREW SERVER
 # ============================================================
 async def handle_brew_connection(websocket, path):
-    """Verarbeitet eine eingehende Brew-WebSocket-Verbindung."""
-    print(f"🔗 Neue Brew-Verbindung: {websocket.remote_address}")
+    # Extrahiere den Benutzernamen aus den Headern
+    auth_header = websocket.request_headers.get("Authorization")
+    username = get_username_from_auth(auth_header) if auth_header else "unknown"
+    print(f"🔗 Neue Brew-Verbindung von {username} ({websocket.remote_address})")
     brew_state.connections.append(websocket)
 
     try:
         async for message in websocket:
-            # Brew-Nachrichten sind binär
             if not isinstance(message, bytes):
                 continue
 
             if len(message) < 2:
                 continue
 
-            # Zweibytiges Präfix: Klasse und Typ
             msg_class = message[0]
             msg_type = message[1]
             payload = message[2:]
 
-            print(f"📨 Nachricht: Klasse=0x{msg_class:02x}, Typ=0x{msg_type:02x}, Länge={len(payload)}")
+            print(f"📨 [{username}] Klasse=0x{msg_class:02x}, Typ=0x{msg_type:02x}, Länge={len(payload)}")
 
-            # Verarbeite Nachricht basierend auf der Klasse
             if msg_class == BREW_SUBSCRIBER_CONTROL:
                 await handle_subscriber_control(websocket, msg_type, payload)
             elif msg_class == BREW_CALL_CONTROL:
                 await handle_call_control(websocket, msg_type, payload)
             elif msg_class == BREW_FRAME_DATA:
-                # Frame-Daten (SDS, etc.) - nur loggen
                 print(f"   📦 Frame Data: {payload.hex()[:32]}...")
             elif msg_class == BREW_SERVICE:
-                # Service-Nachrichten (JSON)
                 try:
                     json_str = payload.decode('utf-8').rstrip('\x00')
                     data = json.loads(json_str)
@@ -448,15 +428,13 @@ async def handle_brew_connection(websocket, path):
                 print(f"   ⚠️ Unbekannte Klasse: 0x{msg_class:02x}")
 
     except websockets.exceptions.ConnectionClosed:
-        print(f"🔌 Verbindung geschlossen: {websocket.remote_address}")
+        print(f"🔌 Verbindung von {username} geschlossen")
     finally:
         if websocket in brew_state.connections:
             brew_state.connections.remove(websocket)
 
 async def handle_subscriber_control(websocket, msg_type, payload):
-    """Verarbeitet Subscriber-Control-Nachrichten (Klasse 0xf0)."""
-    # Payload-Struktur: uint32_t ISSI, uint64_t time, uint32_t fraction, [uint32_t groups...]
-    if len(payload) < 16:  # 4 + 8 + 4 = 16 Bytes
+    if len(payload) < 16:
         print("   ⚠️ Payload zu kurz für Subscriber Control")
         return
 
@@ -464,7 +442,6 @@ async def handle_subscriber_control(websocket, msg_type, payload):
     timestamp = struct.unpack("<Q", payload[4:12])[0]
     fraction = struct.unpack("<I", payload[12:16])[0]
 
-    # Extrahiere Gruppen (GSSIs) aus dem Rest
     groups = []
     if len(payload) > 16:
         num_groups = (len(payload) - 16) // 4
@@ -475,28 +452,22 @@ async def handle_subscriber_control(websocket, msg_type, payload):
     if msg_type == BREW_SUBSCRIBER_REGISTER:
         print(f"   📝 REGISTER: ISSI={issi}")
         await brew_state.add_subscriber(issi, groups)
-
     elif msg_type == BREW_SUBSCRIBER_DEREGISTER:
         print(f"   ❌ DEREGISTER: ISSI={issi}")
         await brew_state.remove_subscriber(issi)
-
     elif msg_type == BREW_SUBSCRIBER_REREGISTER:
         print(f"   🔄 REREGISTER: ISSI={issi}")
         await brew_state.add_subscriber(issi, groups)
-
     elif msg_type == BREW_SUBSCRIBER_AFFILIATE:
         print(f"   🔗 AFFILIATE: ISSI={issi} -> Gruppen={groups}")
         await brew_state.affiliate(issi, groups)
-
     elif msg_type == BREW_SUBSCRIBER_DEAFFILIATE:
         print(f"   🔗 DEAFFILIATE: ISSI={issi}")
         await brew_state.deaffiliate(issi)
-
     else:
         print(f"   ⚠️ Unbekannter Subscriber-Typ: {msg_type}")
 
 async def handle_call_control(websocket, msg_type, payload):
-    """Verarbeitet Call-Control-Nachrichten (Klasse 0xf1)."""
     call_states = {
         CALL_STATE_GROUP_TX: "GROUP_TX",
         CALL_STATE_GROUP_IDLE: "GROUP_IDLE",
@@ -511,13 +482,11 @@ async def handle_call_control(websocket, msg_type, payload):
     state_name = call_states.get(msg_type, f"UNKNOWN(0x{msg_type:02x})")
     print(f"   📞 CALL: {state_name} (Länge={len(payload)})")
 
-    if msg_type == CALL_STATE_SETUP_REQUEST and len(payload) >= 4:
-        # Extrahiere Quell- und Ziel-ISSI
+    if msg_type == CALL_STATE_SETUP_REQUEST and len(payload) >= 8:
         source = struct.unpack("<I", payload[0:4])[0]
-        dest = struct.unpack("<I", payload[4:8])[0] if len(payload) >= 8 else 0
+        dest = struct.unpack("<I", payload[4:8])[0]
         print(f"      📞 Anruf von {source} -> {dest}")
         brew_state.stats["total_calls"] += 1
-
     elif msg_type == CALL_STATE_CALL_RELEASE:
         brew_state.active_calls = []
 
@@ -526,13 +495,15 @@ async def handle_call_control(websocket, msg_type, payload):
 # ============================================================
 async def main():
     """Hauptfunktion: Startet HTTP- und WebSocket-Server."""
-    # HTTP-Server in separatem Thread starten
     http_thread = threading.Thread(target=run_http_server, daemon=True)
     http_thread.start()
 
-    # WebSocket-Server starten
     print(f"🔌 Brew WebSocket Server läuft auf ws://0.0.0.0:{CONFIG['ws_port']}")
-    print(f"   Authentifizierung: {CONFIG['username']} / {CONFIG['password']}")
+    station_users = [u for u in CONFIG["users"].keys() if u != "admin"]
+    if station_users:
+        print(f"   Basisstationen verwenden: {', '.join(station_users)}")
+    else:
+        print("   Keine Basisstations-Benutzer konfiguriert!")
     print("   Drücke Ctrl+C zum Beenden")
     print("-" * 50)
 
@@ -540,9 +511,9 @@ async def main():
         handle_brew_connection,
         "0.0.0.0",
         CONFIG["ws_port"],
-        max_size=10**7,  # 10 MB
+        max_size=10**7,
     ):
-        await asyncio.Future()  # Läuft bis zum Abbruch
+        await asyncio.Future()
 
 if __name__ == "__main__":
     try:
