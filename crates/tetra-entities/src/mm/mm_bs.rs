@@ -813,12 +813,38 @@ impl MmBs {
         // Registration / affiliation / EE state changed — persist for restart recovery (debounced).
         self.recovery_mark_dirty();
 
-        // Use PeriodicLocationUpdating accept type when periodic registration is enabled.
-        // This signals to the MS that it must re-register within the configured interval.
+        // Periodic registration compatibility:
+        //
+        // Historically we forced the D-LOCATION-UPDATE-ACCEPT type to
+        // PeriodicLocationUpdating whenever `[cell] periodic_registration_secs > 0`, even for an
+        // initial ITSI attach. Motorola/Sepura tolerate this, but Hytera terminals that advertise
+        // AI v2 + common SCCH have been observed to accept the registration and affiliation, but
+        // then refuse/abort the first PTT ("please wait" -> "PTT rejected" -> re-attach).
+        //
+        // Keep the periodic registration timer internally (`reset_registration_timer` above still
+        // runs), but do not force the *accept PDU type* to PeriodicLocationUpdating for this
+        // Hytera-like capability set. Mirroring the MS request type is also the least surprising
+        // response for an initial ITSI attach: attach in, attach accepted.
         let periodic_secs = self.config.config().cell.periodic_registration_secs;
-        let accept_type = if periodic_secs > 0 {
+        let hytera_periodic_accept_compat = pdu
+            .class_of_ms
+            .as_ref()
+            .map(|class| class.common_scch && class.air_interface_version >= 2)
+            .unwrap_or(false);
+
+        let accept_type = if periodic_secs > 0
+            && !hytera_periodic_accept_compat
+            && pdu.location_update_type != LocationUpdateType::ItsiAttach
+        {
             LocationUpdateType::PeriodicLocationUpdating
         } else {
+            if periodic_secs > 0 && hytera_periodic_accept_compat {
+                tracing::debug!(
+                    "MM: ISSI {} uses AIv2/common-SCCH; mirroring {:?} in D-LOCATION-UPDATE-ACCEPT instead of forcing PeriodicLocationUpdating (Hytera periodic-registration compatibility)",
+                    issi,
+                    pdu.location_update_type
+                );
+            }
             pdu.location_update_type
         };
 
