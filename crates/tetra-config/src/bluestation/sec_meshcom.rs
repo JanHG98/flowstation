@@ -153,7 +153,7 @@ fn default_max_nodes() -> usize {
 }
 
 fn default_source_issi() -> u32 {
-    9999
+    4010001
 }
 
 fn default_meshcom_prefix() -> String {
