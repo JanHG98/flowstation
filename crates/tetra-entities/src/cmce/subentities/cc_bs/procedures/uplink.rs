@@ -910,8 +910,13 @@ impl CcBsSubentity {
 
         tracing::info!("U-RELEASE: call_id={} cause={}", call_id, disconnect_cause);
         if self.individual_calls.contains_key(&call_id) {
-            tracing::info!("U-RELEASE (individual) call_id={} cause={}", call_id, disconnect_cause);
-            self.release_individual_call(queue, call_id, disconnect_cause);
+            tracing::info!(
+                "U-RELEASE (individual) call_id={} cause={} from ISSI {}",
+                call_id,
+                disconnect_cause,
+                sender.ssi
+            );
+            self.release_individual_call_from_u_disconnect(queue, call_id, disconnect_cause, sender.ssi);
         } else if self.active_calls.contains_key(&call_id) || self.cached_setups.contains_key(&call_id) {
             self.release_group_call(queue, call_id, disconnect_cause);
         } else {
