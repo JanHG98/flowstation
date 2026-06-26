@@ -1,0 +1,78 @@
+{
+  "devices": [
+    {
+      "issi": 2010002,
+      "name": "Hytera HRT",
+      "short": "HYT",
+      "type": "HRT",
+      "owner": "Jan",
+      "role": "Testgerät",
+      "icon": "radio",
+      "color": "blue",
+      "visible": true
+    },
+    {
+      "issi": 2020001,
+      "name": "Motorola MTP",
+      "short": "MTP",
+      "type": "HRT",
+      "owner": "Jan",
+      "role": "Primäres Testgerät",
+      "icon": "radio",
+      "color": "green",
+      "visible": true
+    },
+    {
+      "issi": 5102,
+      "name": "LIP Testgerät 5102",
+      "short": "LIP",
+      "type": "Test",
+      "owner": "Jan",
+      "role": "SDS/LIP Test",
+      "icon": "gps",
+      "color": "orange",
+      "visible": true
+    }
+  ],
+  "basestations": [
+    {
+      "issi": 4010001,
+      "name": "NetCore TBS 1",
+      "short": "TBS1",
+      "location": "Hannover",
+      "mcc": "262",
+      "mnc": "0001",
+      "color": "green",
+      "visible": true
+    }
+  ],
+  "groups": [
+    {
+      "gssi": 15201,
+      "name": "NetCore Testgruppe",
+      "short": "TEST",
+      "type": "TMO Group",
+      "owner": "Jan",
+      "color": "teal",
+      "visible": true
+    }
+  ],
+  "status_messages": [
+    {
+      "code": 100,
+      "label": "OK / Test",
+      "severity": "info",
+      "description": "Teststatus",
+      "color": "blue",
+      "visible": true
+    },
+    {
+      "code": 50005,
+      "label": "Remote Restart",
+      "severity": "warn",
+      "description": "NetCore Remote Restart SDS Status",
+      "color": "orange",
+      "visible": true
+    }
+  ]
+}
