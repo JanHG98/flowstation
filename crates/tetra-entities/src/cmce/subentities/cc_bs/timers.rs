@@ -62,7 +62,23 @@ impl CcBsSubentity {
                             continue;
                         }
 
-                        // Take the mutable borrow now that the EE gate (a `&self` method) has run.
+                        // Group-call D-SETUP resends are useful while someone is actively transmitting
+                        // (late entry / Energy-Economy listeners). During hangtime / NoActiveSpeaker,
+                        // however, a repeated D-SETUP with TransmissionGrant::NotGranted confuses
+                        // some terminals (observed Motorola MTP6650: "please wait" -> "PTT rejected"
+                        // -> reattach). Do not re-announce the group call while no speaker owns the
+                        // floor; the next PTT retake is handled by U-TX-DEMAND / fresh call setup.
+                        if let Some(active) = self.active_calls.get(&call_id) {
+                            if !active.is_tx_active() {
+                                tracing::debug!(
+                                    "CMCE: suppressing D-SETUP resend for group call_id={} during hangtime/NoActiveSpeaker",
+                                    call_id
+                                );
+                                continue;
+                            }
+                        }
+
+                        // Take the mutable borrow now that the EE gate and group hangtime gate have run.
                         let cached = self.cached_setups.get_mut(&call_id).expect("cached D-SETUP present (peeked above)");
                         if let Some(receipt) = cached.tx_receipt.as_ref()
                             && !receipt.is_in_final_state()
@@ -75,15 +91,11 @@ impl CcBsSubentity {
                             continue;
                         }
 
-                        // Update transmission_grant based on current call state:
-                        // During NoActiveSpeaker (nobody transmitting), use NotGranted;
-                        // during Transmitting, use GrantedToOtherUser.
-                        if let Some(active) = self.active_calls.get(&call_id) {
-                            cached.pdu.transmission_grant = if active.is_tx_active() {
-                                TransmissionGrant::GrantedToOtherUser
-                            } else {
-                                TransmissionGrant::NotGranted
-                            };
+                        // For active group-call late-entry resends, the group members should see
+                        // GrantedToOtherUser while the current speaker is still transmitting.
+                        if self.active_calls.contains_key(&call_id) {
+                            cached.pdu.transmission_grant = TransmissionGrant::GrantedToOtherUser;
+                            cached.pdu.transmission_request_permission = false;
                         }
                         let dest_addr = cached.dest_addr;
                         let (sdu, chan_alloc) = Self::build_d_setup_prim(&cached.pdu, usage, ts, UlDlAssignment::Both);
@@ -393,7 +405,10 @@ impl CcBsSubentity {
         let candidates: Vec<u16> = self
             .active_calls
             .iter()
-            .filter(|(_, c)| !c.ee_announce_done && c.created_at.age(now) < EE_DSETUP_FALLBACK_TS)
+            // Only re-announce while someone is actively transmitting. Once the group call is in
+            // hangtime / NoActiveSpeaker, extra D-SETUPs can be interpreted by some radios as a
+            // denied retake rather than a harmless late-entry announce.
+            .filter(|(_, c)| c.is_tx_active() && !c.ee_announce_done && c.created_at.age(now) < EE_DSETUP_FALLBACK_TS)
             .map(|(&id, _)| id)
             .collect();
         if candidates.is_empty() {
