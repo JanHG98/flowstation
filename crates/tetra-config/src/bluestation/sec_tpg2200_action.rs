@@ -30,7 +30,7 @@ impl Default for CfgTpg2200Action {
         Self {
             enabled: false,
             token: SecretField::from(String::new()),
-            source_issi: 9999,
+            source_issi: 4010001,
             dest_issi: 0,
             tpg_ric: default_tpg2200_ric(),
             incident_base: default_incident_base(),
@@ -104,7 +104,7 @@ impl Default for CfgTpg2200ActionDto {
 }
 
 fn default_source_issi() -> u32 {
-    9999
+    4010001
 }
 
 fn default_incident_base() -> u16 {
