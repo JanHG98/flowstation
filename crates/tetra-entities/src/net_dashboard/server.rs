@@ -2905,7 +2905,7 @@ fn handle_ws_command(text: &str, state: &DashboardState, cmd_tx: &Arc<Mutex<Opti
 
             send_cmd(ControlCommand::SendSds {
                 handle: 0,
-                source_ssi: 9999,
+                source_ssi: 4010001,
                 dest_ssi: dest,
                 dest_is_group: false,
                 len_bits,
@@ -2920,7 +2920,7 @@ fn handle_ws_command(text: &str, state: &DashboardState, cmd_tx: &Arc<Mutex<Opti
                 return;
             }
             let source_issi = match v.get("source_issi").and_then(|i| i.as_u64()) {
-                Some(0) | None => 9999,
+                Some(0) | None => 4010001,
                 Some(source) => source.min(u32::MAX as u64) as u32,
             };
             let callout_id = v
