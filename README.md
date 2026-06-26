@@ -295,11 +295,9 @@ sudo asterisk -rx "dialplan reload"
 ### Quick start (from source)
 
 ```bash
-git clone https://github.com/razvanzeces/flowstation.git
+git clone https://github.com/JanHG98/flowstation.git
 cd flowstation
-cp example_config/config.toml ./config.toml
-# Edit config.toml — set tx_freq, rx_freq, mcc, mnc at minimum
-cargo build --release
+cargo build --release --features asterisk
 ./target/release/bluestation-bs config.toml
 ```
 
