@@ -8,6 +8,7 @@ use tetra_core::{BitBuffer, Sap, SsiType, TdmaTime, TetraAddress, tetra_entities
 use tetra_pdus::cmce::enums::pre_coded_status::PreCodedStatus;
 use tetra_pdus::cmce::enums::short_report_type::ShortReportType;
 use tetra_saps::control::enums::sds_user_data::SdsUserData;
+use tetra_saps::control::brew::{BrewSubscriberAction, MmSubscriberUpdate};
 use tetra_saps::control::sds::CmceSdsData;
 use tetra_saps::lcmc::LcmcMleUnitdataReq;
 use tetra_saps::lcmc::enums::{alloc_type::ChanAllocType, ul_dl_assignment::UlDlAssignment};
@@ -144,6 +145,10 @@ pub struct SdsBsSubentity {
     /// Last per-radio/per-status Home Mode Display acknowledgement. Prevents periodic status/GPS
     /// beacons from turning into a reply storm.
     status_reply_last: HashMap<(u32, u16), Instant>,
+    /// Last known NetCore Directory status per local ISSI. Kept across deregistration so a
+    /// radio that drops off and registers again immediately gets its status text back on the
+    /// Motorola Home Mode Display without the operator having to re-send the status.
+    last_status_by_issi: HashMap<u32, (u16, StatusDirectoryEntry)>,
 }
 
 impl SdsBsSubentity {
@@ -161,6 +166,7 @@ impl SdsBsSubentity {
             last_periodic_wx: None,
             emergency_sessions: std::collections::HashMap::new(),
             status_reply_last: HashMap::new(),
+            last_status_by_issi: HashMap::new(),
         }
     }
 
@@ -1406,17 +1412,29 @@ impl SdsBsSubentity {
         supported
     }
 
-    fn handle_directory_status_label(&mut self, queue: &mut MessageQueue, source_issi: u32, dest_issi: u32, status: &PreCodedStatus) {
-        let status_code = status.into_raw() as u16;
-        let Some(entry) = Self::status_directory_lookup(status_code) else {
-            tracing::debug!(
-                "SDS-STATUS: no NetCore Directory label for status={} from ISSI {}",
-                status_code,
-                source_issi
-            );
+    /// Called by CmceBs when MM reports local subscriber registration/deregistration.
+    /// Re-applies the last known Directory status after a radio has dropped and re-registered.
+    pub fn handle_subscriber_update(&mut self, queue: &mut MessageQueue, update: &MmSubscriberUpdate) {
+        if update.action != BrewSubscriberAction::Register {
+            return;
+        }
+
+        let Some((status_code, entry)) = self.last_status_by_issi.get(&update.issi).cloned() else {
             return;
         };
 
+        tracing::info!(
+            "SDS-STATUS: ISSI {} registered again — re-applying last status={} ({:?})",
+            update.issi,
+            status_code,
+            entry.label
+        );
+
+        self.emit_status_dashboard(update.issi, DASHBOARD_ISSI, &entry);
+        self.send_status_hmd_reply(queue, update.issi, status_code, &entry, true, "registration replay");
+    }
+
+    fn emit_status_dashboard(&self, source_issi: u32, dest_issi: u32, entry: &StatusDirectoryEntry) {
         // Feed the dashboard using the existing SDS Log websocket path. The frontend derives the
         // registered-radio status column from the newest PID-218 row per ISSI.
         let dashboard_text = if entry.description.trim().is_empty() {
@@ -1437,8 +1455,18 @@ impl SdsBsSubentity {
             dest_issi,
             source: "local_status".to_string(),
         });
+    }
 
-        if !self.should_send_status_hmd_reply(source_issi, status_code) {
+    fn send_status_hmd_reply(
+        &mut self,
+        queue: &mut MessageQueue,
+        source_issi: u32,
+        status_code: u16,
+        entry: &StatusDirectoryEntry,
+        force: bool,
+        reason: &str,
+    ) {
+        if !force && !self.should_send_status_hmd_reply(source_issi, status_code) {
             tracing::debug!(
                 "SDS-STATUS: suppressing repeated HMD reply to ISSI {} for status={} (throttle active)",
                 source_issi,
@@ -1447,14 +1475,37 @@ impl SdsBsSubentity {
             return;
         }
 
+        // A forced re-registration replay also refreshes the throttle timestamp so a terminal that
+        // immediately repeats the same U-STATUS does not get a duplicate display line.
+        if force {
+            self.status_reply_last.insert((source_issi, status_code), Instant::now());
+        }
+
         let reply = Self::status_hmd_reply_text(&entry.label);
         tracing::info!(
-            "SDS-STATUS: replying to ISSI {} with HomeModeDisplay PID {} text {:?}",
+            "SDS-STATUS: replying to ISSI {} with HomeModeDisplay PID {} text {:?} ({})",
             source_issi,
             SDS_PROTOCOL_HOME_MODE_DISPLAY,
-            reply
+            reply,
+            reason
         );
         self.send_home_mode_display_text(queue, DASHBOARD_ISSI, source_issi, &reply);
+    }
+
+    fn handle_directory_status_label(&mut self, queue: &mut MessageQueue, source_issi: u32, dest_issi: u32, status: &PreCodedStatus) {
+        let status_code = status.into_raw() as u16;
+        let Some(entry) = Self::status_directory_lookup(status_code) else {
+            tracing::debug!(
+                "SDS-STATUS: no NetCore Directory label for status={} from ISSI {}",
+                status_code,
+                source_issi
+            );
+            return;
+        };
+
+        self.last_status_by_issi.insert(source_issi, (status_code, entry.clone()));
+        self.emit_status_dashboard(source_issi, dest_issi, &entry);
+        self.send_status_hmd_reply(queue, source_issi, status_code, &entry, false, "status received");
     }
 
     fn should_send_status_hmd_reply(&mut self, source_issi: u32, status_code: u16) -> bool {
