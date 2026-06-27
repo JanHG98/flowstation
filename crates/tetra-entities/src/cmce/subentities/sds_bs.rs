@@ -966,7 +966,7 @@ impl SdsBsSubentity {
         // scheme, or it may already be the first text byte.
         let (scheme, payload): (Option<u8>, &[u8]) = match bytes.first() {
             Some(0x82) | Some(0x80) | Some(0x8A) | Some(0x89) if bytes.len() > 4 => (Some(bytes[3]), &bytes[4..]),
-            Some(SDS_PROTOCOL_HOME_MODE_DISPLAY) if bytes.len() > 4 => (Some(bytes[3]), &bytes[4..]),
+            Some(pid) if *pid == SDS_PROTOCOL_HOME_MODE_DISPLAY && bytes.len() > 4 => (Some(bytes[3]), &bytes[4..]),
             Some(0x02) | Some(0x09) if bytes.len() > 2 && matches!(bytes[1], 0x01..=0x03 | 0x1A) => (Some(bytes[1]), &bytes[2..]),
             Some(0x02) | Some(0x09) if bytes.len() > 1 => (None, &bytes[1..]),
             Some(0x01..=0x03) | Some(0x1A) if bytes.len() > 1 => (Some(bytes[0]), &bytes[1..]),
