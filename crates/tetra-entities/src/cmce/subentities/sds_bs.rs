@@ -81,9 +81,9 @@ const STATUS_HMD_REPLY_THROTTLE: Duration = Duration::from_secs(30);
 const STATUS_DIRECTORY_REFRESH: Duration = Duration::from_secs(30);
 /// Cache lifetime for NetCore Directory status-group membership lookups. Kept short so
 /// Directory edits feel live on the BS without waiting for a new radio status.
-const STATUS_GROUP_MEMBERS_REFRESH: Duration = Duration::from_secs(2);
+const STATUS_GROUP_MEMBERS_REFRESH: Duration = Duration::from_secs(5);
 /// Poll interval for re-applying cached statuses to newly-added status-sync members.
-const STATUS_GROUP_MEMBERS_POLL: Duration = Duration::from_secs(2);
+const STATUS_GROUP_MEMBERS_POLL: Duration = Duration::from_secs(5);
 
 #[derive(Debug, Clone)]
 struct StatusDirectoryEntry {
