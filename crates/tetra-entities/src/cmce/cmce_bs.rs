@@ -253,6 +253,7 @@ impl TetraEntityTrait for CmceBs {
                     let SapMsgInner::MmSubscriberUpdate(update) = message.msg else {
                         unreachable!();
                     };
+                    self.sds.handle_subscriber_update(queue, &update);
                     self.cc.handle_subscriber_update(queue, update);
                 }
                 ControlRoute::SdsRc => {
