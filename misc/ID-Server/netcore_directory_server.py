@@ -13,6 +13,8 @@ Local RadioID-style registry for FlowStation / NetCore-Tetra.
     /api/devices
     /api/basestations
     /api/groups
+    /api/device-groups
+    /api/status-group-members?issi=<ISSI>
     /api/status
 """
 
@@ -30,7 +32,7 @@ from urllib.parse import parse_qs, urlparse
 
 
 APP_NAME = "NetCore Directory"
-APP_VERSION = "0.1.0"
+APP_VERSION = "0.2.0"
 
 
 def now_iso() -> str:
@@ -84,6 +86,31 @@ CREATE TABLE IF NOT EXISTS groups (
     updated_at TEXT NOT NULL DEFAULT ''
 );
 
+
+CREATE TABLE IF NOT EXISTS device_groups (
+    group_id INTEGER PRIMARY KEY,
+    opta TEXT NOT NULL DEFAULT '',
+    name TEXT NOT NULL DEFAULT '',
+    short TEXT NOT NULL DEFAULT '',
+    type TEXT NOT NULL DEFAULT 'vehicle',
+    owner TEXT NOT NULL DEFAULT '',
+    color TEXT NOT NULL DEFAULT 'purple',
+    status_sync INTEGER NOT NULL DEFAULT 1,
+    visible INTEGER NOT NULL DEFAULT 1,
+    notes TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT '',
+    updated_at TEXT NOT NULL DEFAULT ''
+);
+
+CREATE TABLE IF NOT EXISTS device_group_members (
+    group_id INTEGER NOT NULL,
+    issi INTEGER NOT NULL,
+    role TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT '',
+    PRIMARY KEY (group_id, issi),
+    FOREIGN KEY(group_id) REFERENCES device_groups(group_id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS status_messages (
     code INTEGER PRIMARY KEY,
     label TEXT NOT NULL DEFAULT '',
@@ -113,6 +140,11 @@ TABLES = {
         "fields": ["gssi", "name", "short", "type", "owner", "color", "visible", "notes"],
         "required_pk": "gssi",
     },
+    "device_groups": {
+        "pk": "group_id",
+        "fields": ["group_id", "opta", "name", "short", "type", "owner", "color", "status_sync", "visible", "notes"],
+        "required_pk": "group_id",
+    },
     "status_messages": {
         "pk": "code",
         "fields": ["code", "label", "severity", "description", "color", "visible"],
@@ -130,6 +162,7 @@ class Store:
     def conn(self) -> sqlite3.Connection:
         c = sqlite3.connect(self.path)
         c.row_factory = sqlite3.Row
+        c.execute("PRAGMA foreign_keys=ON")
         return c
 
     def init_db(self) -> None:
@@ -150,6 +183,132 @@ class Store:
         with self.conn() as c:
             row = c.execute(f"SELECT * FROM {table} WHERE {pk}=?", (pk_value,)).fetchone()
         return row_to_dict(row) if row else None
+
+    def next_pk(self, table: str) -> int:
+        meta = TABLES[table]
+        pk = meta["pk"]
+        with self.conn() as c:
+            row = c.execute(f"SELECT COALESCE(MAX({pk}), 0) + 1 AS next_id FROM {table}").fetchone()
+        return int(row["next_id"] if row else 1)
+
+    @staticmethod
+    def parse_member_issis(raw) -> list[int]:
+        if raw is None:
+            return []
+        values = []
+        if isinstance(raw, str):
+            parts = raw.replace("\n", ",").replace(";", ",").split(",")
+            values = [p.strip() for p in parts if p.strip()]
+        elif isinstance(raw, list):
+            values = raw
+        else:
+            values = [raw]
+
+        out: list[int] = []
+        seen: set[int] = set()
+        for v in values:
+            try:
+                if isinstance(v, dict):
+                    v = v.get("issi") or v.get("id") or v.get("device_issi")
+                issi = int(str(v).strip())
+            except Exception:
+                continue
+            if issi <= 0 or issi in seen:
+                continue
+            seen.add(issi)
+            out.append(issi)
+        return out
+
+    def list_device_groups(self) -> list[dict]:
+        groups = self.list_items("device_groups")
+        for g in groups:
+            gid = int(g["group_id"])
+            g["members"] = self.list_device_group_members(gid)
+            g["member_devices"] = [self.get_item("devices", issi) for issi in g["members"]]
+            g["member_devices"] = [d for d in g["member_devices"] if d]
+        return groups
+
+    def get_device_group(self, group_id: int) -> dict | None:
+        item = self.get_item("device_groups", group_id)
+        if not item:
+            return None
+        item["members"] = self.list_device_group_members(group_id)
+        item["member_devices"] = [self.get_item("devices", issi) for issi in item["members"]]
+        item["member_devices"] = [d for d in item["member_devices"] if d]
+        return item
+
+    def list_device_group_members(self, group_id: int) -> list[int]:
+        with self.conn() as c:
+            rows = c.execute(
+                "SELECT issi FROM device_group_members WHERE group_id=? ORDER BY issi ASC",
+                (group_id,),
+            ).fetchall()
+        return [int(r["issi"]) for r in rows]
+
+    def set_device_group_members(self, group_id: int, members: list[int]) -> None:
+        ts = now_iso()
+        with self.conn() as c:
+            c.execute("DELETE FROM device_group_members WHERE group_id=?", (group_id,))
+            for issi in members:
+                c.execute(
+                    "INSERT OR REPLACE INTO device_group_members (group_id, issi, role, created_at) VALUES (?, ?, '', ?)",
+                    (group_id, int(issi), ts),
+                )
+            c.commit()
+
+    def upsert_device_group(self, data: dict, pk_override: int | None = None) -> dict:
+        payload = dict(data)
+        has_members = any(k in payload for k in ("members", "member_issis", "members_text"))
+
+        if "members_text" in payload and "members" not in payload:
+            payload["members"] = payload["members_text"]
+        if "member_issis" in payload and "members" not in payload:
+            payload["members"] = payload["member_issis"]
+
+        if pk_override is not None:
+            payload["group_id"] = pk_override
+
+        if not payload.get("group_id"):
+            payload["group_id"] = self.next_pk("device_groups")
+
+        if "status_sync" in payload:
+            payload["status_sync"] = 1 if bool(payload.get("status_sync", True)) else 0
+
+        members = self.parse_member_issis(payload.get("members"))
+        payload.pop("members", None)
+        payload.pop("member_issis", None)
+        payload.pop("members_text", None)
+
+        item = self.upsert_item("device_groups", payload)
+        gid = int(item["group_id"])
+        if has_members:
+            self.set_device_group_members(gid, members)
+        return self.get_device_group(gid) or item
+
+    def delete_device_group(self, group_id: int) -> bool:
+        with self.conn() as c:
+            c.execute("DELETE FROM device_group_members WHERE group_id=?", (group_id,))
+            cur = c.execute("DELETE FROM device_groups WHERE group_id=?", (group_id,))
+            c.commit()
+            return cur.rowcount > 0
+
+    def groups_for_issi(self, issi: int) -> list[dict]:
+        with self.conn() as c:
+            rows = c.execute(
+                """
+                SELECT g.* FROM device_groups g
+                JOIN device_group_members m ON m.group_id = g.group_id
+                WHERE m.issi=? AND g.visible=1
+                ORDER BY g.group_id ASC
+                """,
+                (issi,),
+            ).fetchall()
+        out = []
+        for r in rows:
+            g = row_to_dict(r)
+            g["members"] = self.list_device_group_members(int(g["group_id"]))
+            out.append(g)
+        return out
 
     def delete_item(self, table: str, pk_value: int) -> bool:
         meta = TABLES[table]
@@ -172,8 +331,11 @@ class Store:
         if pk_override is not None:
             item[pk] = pk_override
 
-        if pk not in item:
-            raise ValueError(f"missing {pk}")
+        if pk not in item or item.get(pk) in ("", None):
+            if table == "device_groups":
+                item[pk] = self.next_pk(table)
+            else:
+                raise ValueError(f"missing {pk}")
 
         try:
             item[pk] = int(item[pk])
@@ -182,6 +344,8 @@ class Store:
 
         if "visible" in fields:
             item["visible"] = 1 if bool(item.get("visible", True)) else 0
+        if "status_sync" in fields:
+            item["status_sync"] = 1 if bool(item.get("status_sync", True)) else 0
 
         # Normalize all missing non-PK fields to empty/default-ish values.
         defaults = {
@@ -199,6 +363,8 @@ class Store:
             "label": "",
             "severity": "info",
             "description": "",
+            "opta": "",
+            "status_sync": 1,
             "visible": 1,
         }
 
@@ -234,11 +400,24 @@ class Store:
             "devices": self.list_items("devices"),
             "basestations": self.list_items("basestations"),
             "groups": self.list_items("groups"),
+            "device_groups": self.list_device_groups(),
             "status_messages": self.list_items("status_messages"),
         }
 
     def import_all(self, payload: dict) -> dict:
         counts = {}
+
+        for key in ("device_groups", "device-groups", "vehicles", "status_groups"):
+            items = payload.get(key)
+            if not isinstance(items, list):
+                continue
+            n = 0
+            for item in items:
+                if isinstance(item, dict):
+                    self.upsert_device_group(item)
+                    n += 1
+            counts["device_groups"] = counts.get("device_groups", 0) + n
+
         mapping = {
             "devices": "devices",
             "basestations": "basestations",
@@ -285,7 +464,7 @@ INDEX_HTML = r"""<!doctype html>
 .title h2{font-size:24px;margin:0}.title p{color:var(--muted);margin:5px 0 0}
 .actions{display:flex;gap:8px;flex-wrap:wrap}.btn{border:1px solid var(--border);background:var(--bg3);color:var(--text);padding:9px 12px;border-radius:10px;font-weight:700;font-size:12px;cursor:pointer}
 .btn:hover{border-color:var(--blue);color:var(--blue)}.btn.primary{background:rgba(25,211,173,.12);border-color:rgba(25,211,173,.45);color:var(--accent)}.btn.danger:hover{border-color:var(--danger);color:var(--danger)}
-.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:18px}.stat{background:rgba(18,29,45,.72);border:1px solid var(--border);border-radius:16px;padding:15px;box-shadow:var(--shadow)}
+.grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin-bottom:18px}.stat{background:rgba(18,29,45,.72);border:1px solid var(--border);border-radius:16px;padding:15px;box-shadow:var(--shadow)}
 .stat .k{font:700 10px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}.stat .v{font:800 26px var(--mono);margin-top:7px}
 .panel{background:rgba(18,29,45,.78);border:1px solid var(--border);border-radius:18px;box-shadow:var(--shadow);overflow:hidden}
 .panel-head{display:flex;align-items:center;justify-content:space-between;padding:16px;border-bottom:1px solid var(--border);gap:10px}
@@ -311,7 +490,8 @@ input,select,textarea{background:var(--bg);border:1px solid var(--border);color:
     <div class="nav">
       <button data-tab="devices" class="active">Geräte <span class="count" id="c-devices">0</span></button>
       <button data-tab="basestations">Basisstationen <span class="count" id="c-basestations">0</span></button>
-      <button data-tab="groups">Gruppen <span class="count" id="c-groups">0</span></button>
+      <button data-tab="groups">Talkgroups <span class="count" id="c-groups">0</span></button>
+      <button data-tab="device_groups">Gerätegruppen <span class="count" id="c-device_groups">0</span></button>
       <button data-tab="status_messages">Statusmeldungen <span class="count" id="c-status_messages">0</span></button>
       <button data-tab="api">API Test <span class="count">curl</span></button>
     </div>
@@ -329,7 +509,8 @@ input,select,textarea{background:var(--bg);border:1px solid var(--border);color:
     <div class="grid">
       <div class="stat"><div class="k">Devices</div><div class="v" id="s-devices">0</div></div>
       <div class="stat"><div class="k">Basestations</div><div class="v" id="s-basestations">0</div></div>
-      <div class="stat"><div class="k">Groups</div><div class="v" id="s-groups">0</div></div>
+      <div class="stat"><div class="k">Talkgroups</div><div class="v" id="s-groups">0</div></div>
+      <div class="stat"><div class="k">Device Groups</div><div class="v" id="s-device_groups">0</div></div>
       <div class="stat"><div class="k">Status</div><div class="v" id="s-status_messages">0</div></div>
     </div>
     <section class="panel" id="table-panel">
@@ -341,7 +522,8 @@ input,select,textarea{background:var(--bg);border:1px solid var(--border);color:
       <div style="padding:16px;line-height:1.7;color:var(--muted)">
         <p><code>/api/dmr/user/?id=2020001</code> → Gerät als RadioID-kompatible Antwort</p>
         <p><code>/api/dmr/repeater/?id=4010001</code> → Basisstation als RadioID-kompatible Antwort</p>
-        <p><code>/api/devices</code>, <code>/api/basestations</code>, <code>/api/groups</code>, <code>/api/status</code></p>
+        <p><code>/api/devices</code>, <code>/api/basestations</code>, <code>/api/groups</code>, <code>/api/device-groups</code>, <code>/api/status</code></p>
+        <p><code>/api/status-group-members?issi=2020001</code> → Gerätegruppe(n) und Status-Sync-Members zu einer ISSI</p>
         <div style="display:flex;gap:8px;margin-top:14px"><input id="apiId" value="2020001" style="flex:1"><button class="btn primary" onclick="testApi()">Test</button></div>
         <pre id="apiOut" style="margin-top:14px;background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:14px;overflow:auto"></pre>
       </div>
@@ -352,7 +534,7 @@ input,select,textarea{background:var(--bg);border:1px solid var(--border);color:
 <div class="toast" id="toast"></div>
 <script>
 const API = {
-  devices:'/api/devices', basestations:'/api/basestations', groups:'/api/groups', status_messages:'/api/status'
+  devices:'/api/devices', basestations:'/api/basestations', groups:'/api/groups', device_groups:'/api/device-groups', status_messages:'/api/status'
 };
 const meta = {
   devices:{title:'Geräte',sub:'ISSI-Verzeichnis für HRT/MRT/Gateways.',pk:'issi',cols:['issi','name','short','type','owner','role','visible'],fields:[
@@ -363,6 +545,9 @@ const meta = {
   ]},
   groups:{title:'Gruppen',sub:'GSSI/Talkgroups mit Namen und Owner.',pk:'gssi',cols:['gssi','name','short','type','owner','visible'],fields:[
     ['gssi','GSSI','number'],['name','Name','text'],['short','Kurzname','text'],['type','Typ','text'],['owner','Owner','text'],['color','Farbe','text'],['visible','Sichtbar','checkbox'],['notes','Notizen','textarea']
+  ]},
+  device_groups:{title:'Gerätegruppen',sub:'OPTA-/Fahrzeuggruppen: mehrere ISSIs teilen Status und Rückmeldung.',pk:'group_id',cols:['group_id','opta','name','short','type','members','status_sync','visible'],fields:[
+    ['group_id','Gruppen-ID','number'],['opta','OPTA / Kennung','text'],['name','Name','text'],['short','Kurzname','text'],['type','Typ','text'],['owner','Owner','text'],['color','Farbe','text'],['status_sync','Status synchronisieren','checkbox'],['visible','Sichtbar','checkbox'],['members','Mitglieder ISSI (Komma oder Zeilen)','textarea'],['notes','Notizen','textarea']
   ]},
   status_messages:{title:'Statusmeldungen',sub:'Statuscodes und Labels.',pk:'code',cols:['code','label','severity','description','visible'],fields:[
     ['code','Code','number'],['label','Label','text'],['severity','Severity','text'],['description','Beschreibung','textarea'],['color','Farbe','text'],['visible','Sichtbar','checkbox']
@@ -391,6 +576,8 @@ function render(){
 function cell(c,v,row){
   if(c==='issi'||c==='gssi'||c==='code')return `<td><code>${esc(v)}</code></td>`;
   if(c==='visible')return `<td><span class="badge ${v?'ok':'warn'}">${v?'visible':'hidden'}</span></td>`;
+  if(c==='status_sync')return `<td><span class="badge ${v?'ok':'warn'}">${v?'sync':'solo'}</span></td>`;
+  if(c==='members')return `<td>${Array.isArray(v)?v.map(x=>`<code>${esc(x)}</code>`).join(' '):esc(v)}</td>`;
   if(c==='color')return `<td><span class="color-dot" style="background:${esc(v)}"></span>${esc(v)}</td>`;
   return `<td>${esc(v)}</td>`;
 }
@@ -488,10 +675,32 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json(200, self.radioid_repeater_response(issi))
             return
 
+        if path == "/api/status-group-members":
+            q = parse_qs(parsed.query)
+            issi = self.parse_int(q.get("issi", q.get("id", ["0"]))[0])
+            groups = self.store.groups_for_issi(issi)
+            members: list[int] = []
+            seen: set[int] = set()
+            for g in groups:
+                if not g.get("status_sync", 1):
+                    continue
+                for m in g.get("members", []):
+                    if m not in seen:
+                        seen.add(m)
+                        members.append(m)
+            self.send_json(200, {"issi": issi, "count": len(groups), "groups": groups, "status_sync_members": members})
+            return
+
         route = self.resolve_collection(parts)
         if route:
             table, pk = route
-            if pk is None:
+            if table == "device_groups":
+                if pk is None:
+                    self.send_json(200, self.store.list_device_groups())
+                else:
+                    item = self.store.get_device_group(pk)
+                    self.send_json(200 if item else 404, item or {"error": "not found"})
+            elif pk is None:
                 self.send_json(200, self.store.list_items(table))
             else:
                 item = self.store.get_item(table, pk)
@@ -517,7 +726,10 @@ class Handler(BaseHTTPRequestHandler):
         if route:
             table, pk = route
             try:
-                item = self.store.upsert_item(table, self.read_json(), pk)
+                if table == "device_groups":
+                    item = self.store.upsert_device_group(self.read_json(), pk)
+                else:
+                    item = self.store.upsert_item(table, self.read_json(), pk)
                 self.send_json(200, item)
             except Exception as e:
                 self.send_json(400, {"error": str(e)})
@@ -540,7 +752,10 @@ class Handler(BaseHTTPRequestHandler):
             if pk is None:
                 self.send_json(400, {"error": "missing id"})
                 return
-            ok = self.store.delete_item(table, pk)
+            if table == "device_groups":
+                ok = self.store.delete_device_group(pk)
+            else:
+                ok = self.store.delete_item(table, pk)
             self.send_json(200 if ok else 404, {"ok": ok})
             return
         self.send_json(404, {"error": "not found"})
@@ -561,6 +776,10 @@ class Handler(BaseHTTPRequestHandler):
             "basestations": "basestations",
             "base-stations": "basestations",
             "groups": "groups",
+            "device-groups": "device_groups",
+            "device_groups": "device_groups",
+            "status-groups": "device_groups",
+            "vehicles": "device_groups",
             "status": "status_messages",
             "status_messages": "status_messages",
         }.get(name)
