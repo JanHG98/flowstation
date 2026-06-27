@@ -3042,11 +3042,11 @@ fn handle_ws_command(text: &str, state: &DashboardState, cmd_tx: &Arc<Mutex<Opti
                 return;
             }
             tracing::info!("Dashboard: operator clearing emergency for ISSI {}", issi);
-            // Route to CMCE: it clears the source SDS session (so the emergency does not re-arm on
-            // the radio's next status re-send) and emits EmergencyCancel, which clears the banner
-            // for EVERY connected client via the telemetry round-trip. We deliberately do NOT mutate
-            // dashboard state here — otherwise the round-trip would find nothing to clear and skip
-            // the broadcast to other browsers.
+            // Route to CMCE: it performs the SwMI/Call-Control emergency clear (priority-15
+            // call release) and also clears any status-based emergency session, emitting
+            // EmergencyCancel through the normal telemetry round-trip. We deliberately do NOT
+            // mutate dashboard state here — otherwise the round-trip would find nothing to clear
+            // and skip the broadcast to other browsers.
             if !send_cmd(ControlCommand::ClearEmergency { issi }) {
                 tracing::warn!("Dashboard: no control dispatcher for emergency_clear");
             }
