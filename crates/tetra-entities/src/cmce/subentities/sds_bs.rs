@@ -79,8 +79,11 @@ const DASHBOARD_ISSI: u32 = 4010001;
 /// status (for example GPS/location status). Dashboard state is still updated every time.
 const STATUS_HMD_REPLY_THROTTLE: Duration = Duration::from_secs(30);
 const STATUS_DIRECTORY_REFRESH: Duration = Duration::from_secs(30);
-/// Cache lifetime for NetCore Directory status-group membership lookups.
-const STATUS_GROUP_MEMBERS_REFRESH: Duration = Duration::from_secs(30);
+/// Cache lifetime for NetCore Directory status-group membership lookups. Kept short so
+/// Directory edits feel live on the BS without waiting for a new radio status.
+const STATUS_GROUP_MEMBERS_REFRESH: Duration = Duration::from_secs(2);
+/// Poll interval for re-applying cached statuses to newly-added status-sync members.
+const STATUS_GROUP_MEMBERS_POLL: Duration = Duration::from_secs(2);
 
 #[derive(Debug, Clone)]
 struct StatusDirectoryEntry {
@@ -159,6 +162,10 @@ pub struct SdsBsSubentity {
     /// radio that drops off and registers again immediately gets its status text back on the
     /// Motorola Home Mode Display without the operator having to re-send the status.
     last_status_by_issi: HashMap<u32, (u16, StatusDirectoryEntry)>,
+    /// Last periodic refresh of NetCore Directory status-sync group memberships. This lets the BS
+    /// notice Directory edits (e.g. adding another radio to a vehicle group) without waiting for
+    /// any radio to send a fresh status.
+    last_status_group_refresh: Option<Instant>,
 }
 
 impl SdsBsSubentity {
@@ -177,6 +184,7 @@ impl SdsBsSubentity {
             emergency_sessions: std::collections::HashMap::new(),
             status_reply_last: HashMap::new(),
             last_status_by_issi: HashMap::new(),
+            last_status_group_refresh: None,
         }
     }
 
@@ -376,6 +384,9 @@ impl SdsBsSubentity {
         self.flush_pending_sds(queue);
         // Feed the health monitor's Congestion domain: undelivered/deferred SDS backlog.
         crate::health::registry().set_sds_queue_depth(self.pending_sds.len());
+        // Pull NetCore Directory status-sync membership changes periodically so adding/removing
+        // devices in a Directory group is reflected without waiting for a new radio status.
+        self.refresh_status_groups_from_directory(queue);
         if let Some(hmd_tx) = self.home_mode_display_sender.tick_start(&self.config, dltime) {
             self.send_d_sds_data(queue, hmd_tx.source_issi, hmd_tx.dest_gssi, SsiType::Gssi, hmd_tx.payload);
         }
@@ -1420,6 +1431,89 @@ impl SdsBsSubentity {
             unimplemented_log!("SDS-STATUS: dm_ms_address not supported");
         }
         supported
+    }
+
+    /// Periodically refresh NetCore Directory status-sync groups for all cached statuses.
+    /// This is what makes Directory group edits feel live: when a radio is added to a vehicle
+    /// group, it receives the current group status and the dashboard row is updated even if no
+    /// terminal sends a new U-STATUS.
+    fn refresh_status_groups_from_directory(&mut self, queue: &mut MessageQueue) {
+        let now = Instant::now();
+        if let Some(last) = self.last_status_group_refresh {
+            if now.duration_since(last) < STATUS_GROUP_MEMBERS_POLL {
+                return;
+            }
+        }
+        self.last_status_group_refresh = Some(now);
+
+        if self.last_status_by_issi.is_empty() {
+            return;
+        }
+
+        let seeds: Vec<(u32, u16, StatusDirectoryEntry)> = self
+            .last_status_by_issi
+            .iter()
+            .map(|(&issi, (status_code, entry))| (issi, *status_code, entry.clone()))
+            .collect();
+
+        for (seed_issi, status_code, entry) in seeds {
+            let members = Self::status_directory_group_members(seed_issi);
+            if members.len() <= 1 && members.first().copied() == Some(seed_issi) {
+                continue;
+            }
+
+            let mut applied: Vec<u32> = Vec::new();
+            for member_issi in members {
+                let changed = match self.last_status_by_issi.get(&member_issi) {
+                    Some((old_code, old_entry)) => {
+                        *old_code != status_code
+                            || old_entry.label != entry.label
+                            || old_entry.description != entry.description
+                            || old_entry.severity != entry.severity
+                    }
+                    None => true,
+                };
+
+                if !changed {
+                    continue;
+                }
+
+                self.last_status_by_issi.insert(member_issi, (status_code, entry.clone()));
+                self.emit_status_dashboard(member_issi, DASHBOARD_ISSI, &entry);
+                applied.push(member_issi);
+
+                let is_registered = {
+                    let state = self.config.state_read();
+                    state.subscribers.is_registered(member_issi)
+                };
+
+                if is_registered {
+                    self.send_status_hmd_reply(
+                        queue,
+                        member_issi,
+                        status_code,
+                        &entry,
+                        true,
+                        "status-sync directory refresh",
+                    );
+                } else {
+                    tracing::debug!(
+                        "SDS-STATUS: status-sync refreshed ISSI {} is not registered; cached status only",
+                        member_issi
+                    );
+                }
+            }
+
+            if !applied.is_empty() {
+                tracing::info!(
+                    "SDS-STATUS: refreshed Directory status-sync from seed ISSI {} status={} ({:?}) to {:?}",
+                    seed_issi,
+                    status_code,
+                    entry.label,
+                    applied
+                );
+            }
+        }
     }
 
     /// Called by CmceBs when MM reports local subscriber registration/deregistration.
