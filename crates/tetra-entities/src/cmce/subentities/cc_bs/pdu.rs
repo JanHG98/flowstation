@@ -1003,6 +1003,13 @@ impl CcBsSubentity {
                     issi
                 );
 
+                // A priority-15 group emergency is special for the originating MS: some terminals
+                // (notably with Hot Mic enabled) keep their *local emergency mode* active even if
+                // they see only the group-addressed D-RELEASE. Clear the caller leg explicitly before
+                // the normal group release so the HRT gets an addressed disconnect/release on the
+                // traffic channel while it is still assigned, plus an MCCH fallback.
+                self.send_emergency_originator_clear(queue, &call, call_id, DisconnectCause::SwmiRequestedDisconnection);
+
                 if let CallOrigin::Network { network_entity, brew_uuid } = call.origin {
                     self.notify_network_call_end(queue, network_entity, brew_uuid);
                 }
@@ -1025,6 +1032,83 @@ impl CcBsSubentity {
         }
 
         total
+    }
+
+    /// Send an explicit clear sequence to the originating MS of an emergency group call.
+    ///
+    /// Normal group-call release is GSSI-addressed. That is enough to tear down the traffic call,
+    /// but field terminals with Hot Mic / emergency personality may keep the local red emergency
+    /// state latched until they receive something addressed to the originating ISSI or the user
+    /// ends the emergency locally. Therefore operator clear sends both D-DISCONNECT and D-RELEASE
+    /// directly to the caller before the ordinary group release.
+    fn send_emergency_originator_clear(
+        &mut self,
+        queue: &mut MessageQueue,
+        call: &ActiveCall,
+        call_id: u16,
+        disconnect_cause: DisconnectCause,
+    ) {
+        let caller_addr = match &call.origin {
+            CallOrigin::Local { caller_addr } => *caller_addr,
+            _ if call.source_issi != 0 => TetraAddress::new(call.source_issi, SsiType::Issi),
+            _ => {
+                tracing::warn!(
+                    "CMCE: emergency clear call_id={} has no local caller ISSI for caller-leg clear",
+                    call_id
+                );
+                return;
+            }
+        };
+
+        if caller_addr.ssi_type != SsiType::Issi {
+            tracing::warn!(
+                "CMCE: emergency clear call_id={} caller address {:?} is not ISSI, skipping caller-leg clear",
+                call_id,
+                caller_addr
+            );
+            return;
+        }
+
+        tracing::warn!(
+            "CMCE: operator emergency clear call_id={} sending caller-leg D-DISCONNECT/D-RELEASE to ISSI {} on ts={} usage={}",
+            call_id,
+            caller_addr.ssi,
+            call.ts,
+            call.usage
+        );
+
+        // First try while the traffic circuit is still up. FACCH stealing reaches terminals that
+        // are camped on the assigned traffic timeslot during Hot Mic / hangtime.
+        for _ in 0..2 {
+            let disconnect_sdu = Self::build_d_disconnect(call_id, disconnect_cause);
+            queue.push_back(Self::build_sapmsg_stealing(
+                disconnect_sdu,
+                self.dltime,
+                caller_addr,
+                call.ts,
+                Some(call.usage),
+            ));
+
+            let release_sdu = Self::build_d_release(call_id, disconnect_cause);
+            queue.push_back(Self::build_sapmsg_stealing(
+                release_sdu,
+                self.dltime,
+                caller_addr,
+                call.ts,
+                Some(call.usage),
+            ));
+        }
+
+        // Also queue an MCCH fallback. If the MS has already dropped back from the traffic channel,
+        // this is the path it should still be monitoring. Keep it unacknowledged like the existing
+        // CC builders to match the rest of the BS signalling behaviour.
+        for _ in 0..2 {
+            let disconnect_sdu = Self::build_d_disconnect(call_id, disconnect_cause);
+            queue.push_back(Self::build_sapmsg(disconnect_sdu, None, self.dltime, caller_addr, None));
+
+            let release_sdu = Self::build_d_release(call_id, disconnect_cause);
+            queue.push_back(Self::build_sapmsg(release_sdu, None, self.dltime, caller_addr, None));
+        }
     }
 
     /// Release a group call: send D-RELEASE, close circuits, clean up state
