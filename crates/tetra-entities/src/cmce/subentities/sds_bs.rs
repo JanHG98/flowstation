@@ -79,6 +79,8 @@ const DASHBOARD_ISSI: u32 = 4010001;
 /// status (for example GPS/location status). Dashboard state is still updated every time.
 const STATUS_HMD_REPLY_THROTTLE: Duration = Duration::from_secs(30);
 const STATUS_DIRECTORY_REFRESH: Duration = Duration::from_secs(30);
+/// Cache lifetime for NetCore Directory status-group membership lookups.
+const STATUS_GROUP_MEMBERS_REFRESH: Duration = Duration::from_secs(30);
 
 #[derive(Debug, Clone)]
 struct StatusDirectoryEntry {
@@ -102,6 +104,14 @@ struct StatusDirectoryCache {
 }
 
 static STATUS_DIRECTORY_CACHE: OnceLock<Mutex<StatusDirectoryCache>> = OnceLock::new();
+
+#[derive(Debug, Default)]
+struct StatusGroupMembersCache {
+    base_url: String,
+    map: HashMap<u32, (Instant, Vec<u32>)>,
+}
+
+static STATUS_GROUP_MEMBERS_CACHE: OnceLock<Mutex<StatusGroupMembersCache>> = OnceLock::new();
 
 #[derive(Debug, Clone, Copy)]
 struct LipPosition {
@@ -1503,9 +1513,33 @@ impl SdsBsSubentity {
             return;
         };
 
-        self.last_status_by_issi.insert(source_issi, (status_code, entry.clone()));
-        self.emit_status_dashboard(source_issi, dest_issi, &entry);
-        self.send_status_hmd_reply(queue, source_issi, status_code, &entry, false, "status received");
+        let members = Self::status_directory_group_members(source_issi);
+        tracing::info!(
+            "SDS-STATUS: applying Directory status={} ({:?}) from ISSI {} to status-sync member(s) {:?}",
+            status_code,
+            entry.label,
+            source_issi,
+            members
+        );
+
+        for member_issi in members {
+            self.last_status_by_issi.insert(member_issi, (status_code, entry.clone()));
+            self.emit_status_dashboard(member_issi, dest_issi, &entry);
+
+            let should_reply = member_issi == source_issi || {
+                let state = self.config.state_read();
+                state.subscribers.is_registered(member_issi)
+            };
+
+            if should_reply {
+                self.send_status_hmd_reply(queue, member_issi, status_code, &entry, false, "status received/status-sync");
+            } else {
+                tracing::debug!(
+                    "SDS-STATUS: status-sync member ISSI {} is not registered; cached status only",
+                    member_issi
+                );
+            }
+        }
     }
 
     fn should_send_status_hmd_reply(&mut self, source_issi: u32, status_code: u16) -> bool {
@@ -1562,6 +1596,150 @@ impl SdsBsSubentity {
         // The radio just used random access on the MCCH to send the U-STATUS, so send the reply
         // back on the MCCH instead of deferring/stealing due to unrelated group traffic.
         self.deliver_d_sds_data_now(queue, source_issi, dest_issi, SsiType::Issi, sds_data, true);
+    }
+
+    fn status_directory_group_members(source_issi: u32) -> Vec<u32> {
+        let Some(cfg) = Self::status_directory_runtime_config() else {
+            return vec![source_issi];
+        };
+        if !cfg.enabled || cfg.base_url.trim().is_empty() {
+            return vec![source_issi];
+        }
+
+        let base_url = cfg.base_url.trim().trim_end_matches('/').to_string();
+        let cache_lock = STATUS_GROUP_MEMBERS_CACHE.get_or_init(|| Mutex::new(StatusGroupMembersCache::default()));
+        let mut cache = match cache_lock.lock() {
+            Ok(cache) => cache,
+            Err(_) => return vec![source_issi],
+        };
+
+        if cache.base_url != base_url {
+            cache.base_url = base_url.clone();
+            cache.map.clear();
+        }
+
+        if let Some((loaded_at, members)) = cache.map.get(&source_issi) {
+            if loaded_at.elapsed() < STATUS_GROUP_MEMBERS_REFRESH {
+                return members.clone();
+            }
+        }
+
+        let members = match Self::fetch_status_group_members(&base_url, cfg.timeout_ms, source_issi) {
+            Ok(members) => members,
+            Err(err) => {
+                tracing::debug!(
+                    "NetCore Directory: status group lookup failed for ISSI {}: {}",
+                    source_issi,
+                    err
+                );
+                vec![source_issi]
+            }
+        };
+
+        cache.map.insert(source_issi, (Instant::now(), members.clone()));
+        members
+    }
+
+    fn fetch_status_group_members(base_url: &str, timeout_ms: u64, source_issi: u32) -> Result<Vec<u32>, String> {
+        let url = format!("{}/api/status-group-members?issi={}", base_url.trim_end_matches('/'), source_issi);
+        let client = reqwest::blocking::Client::builder()
+            .timeout(Duration::from_millis(timeout_ms.clamp(250, 10_000)))
+            .user_agent("netcore-tetra-status-groups")
+            .build()
+            .map_err(|e| e.to_string())?;
+        let resp = client.get(&url).send().map_err(|e| e.to_string())?;
+        let status = resp.status();
+        if !status.is_success() {
+            return Err(format!("{} returned HTTP {}", url, status));
+        }
+        let text = resp.text().map_err(|e| e.to_string())?;
+        Ok(Self::parse_status_group_members_json(&text, source_issi))
+    }
+
+    fn parse_status_group_members_json(raw: &str, source_issi: u32) -> Vec<u32> {
+        let Ok(json) = serde_json::from_str::<serde_json::Value>(raw) else {
+            return vec![source_issi];
+        };
+
+        let mut members = Vec::new();
+
+        if let Some(arr) = json.get("status_sync_members").and_then(|v| v.as_array()) {
+            for value in arr {
+                if let Some(issi) = Self::json_u32(value) {
+                    Self::push_unique_issi(&mut members, issi);
+                }
+            }
+        }
+
+        // Backward/alternate forms: either a top-level "members" array or nested "groups".
+        if members.is_empty() {
+            if let Some(arr) = json.get("members").and_then(|v| v.as_array()) {
+                for value in arr {
+                    if let Some(issi) = Self::json_u32(value) {
+                        Self::push_unique_issi(&mut members, issi);
+                    }
+                }
+            }
+        }
+
+        if members.is_empty() {
+            if let Some(groups) = json.get("groups").and_then(|v| v.as_array()) {
+                for group in groups {
+                    let status_sync = group
+                        .get("status_sync")
+                        .map(Self::json_boolish)
+                        .unwrap_or(true);
+                    if !status_sync {
+                        continue;
+                    }
+                    if let Some(arr) = group.get("members").and_then(|v| v.as_array()) {
+                        for value in arr {
+                            if let Some(issi) = Self::json_u32(value) {
+                                Self::push_unique_issi(&mut members, issi);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if members.is_empty() {
+            members.push(source_issi);
+        } else {
+            Self::push_unique_issi(&mut members, source_issi);
+        }
+
+        members
+    }
+
+    fn json_u32(value: &serde_json::Value) -> Option<u32> {
+        if let Some(n) = value.as_u64() {
+            return (n <= 0x00FF_FFFF).then_some(n as u32);
+        }
+        let s = value.as_str()?.trim();
+        if s.is_empty() {
+            return None;
+        }
+        s.parse::<u32>().ok().filter(|n| *n <= 0x00FF_FFFF)
+    }
+
+    fn json_boolish(value: &serde_json::Value) -> bool {
+        if let Some(v) = value.as_bool() {
+            return v;
+        }
+        if let Some(n) = value.as_i64() {
+            return n != 0;
+        }
+        if let Some(s) = value.as_str() {
+            return matches!(s.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on");
+        }
+        false
+    }
+
+    fn push_unique_issi(members: &mut Vec<u32>, issi: u32) {
+        if issi != 0 && !members.contains(&issi) {
+            members.push(issi);
+        }
     }
 
     fn status_directory_lookup(status_code: u16) -> Option<StatusDirectoryEntry> {
