@@ -948,6 +948,85 @@ impl CcBsSubentity {
         queue.push_back(msg);
     }
 
+    /// Operator / SwMI clear for active emergency calls involving `issi`.
+    ///
+    /// This is deliberately call-control level, not only dashboard/SDS state cleanup: emergency
+    /// calls are represented as ordinary CC calls with ETSI priority 15. When the operator clears
+    /// one from the Web UI, the BS releases every matching active emergency group or individual
+    /// call with `SwmiRequestedDisconnection`, which sends the normal D-RELEASE path and tears down
+    /// the traffic circuit.
+    ///
+    /// `issi == 0` is treated as "clear all active emergency calls" for future control clients,
+    /// though the dashboard currently sends a concrete ISSI. Returns the number of calls released.
+    pub fn clear_emergency_calls_for_issi(&mut self, queue: &mut MessageQueue, issi: u32) -> usize {
+        let group_call_ids: Vec<u16> = self
+            .active_calls
+            .iter()
+            .filter(|(_, call)| {
+                is_emergency_priority(call.priority)
+                    && (issi == 0
+                        || call.source_issi == issi
+                        || matches!(&call.origin, CallOrigin::Local { caller_addr } if caller_addr.ssi == issi))
+            })
+            .map(|(&call_id, _)| call_id)
+            .collect();
+
+        let individual_call_ids: Vec<u16> = self
+            .individual_calls
+            .iter()
+            .filter(|(_, call)| {
+                is_emergency_priority(call.priority)
+                    && (issi == 0 || call.calling_addr.ssi == issi || call.called_addr.ssi == issi)
+            })
+            .map(|(&call_id, _)| call_id)
+            .collect();
+
+        let total = group_call_ids.len() + individual_call_ids.len();
+
+        if total == 0 {
+            tracing::info!(
+                "CMCE: operator emergency clear for ISSI {} found no active emergency-priority call",
+                issi
+            );
+            return 0;
+        }
+
+        for call_id in group_call_ids {
+            let snapshot = self.active_calls.get(&call_id).cloned();
+            if let Some(call) = snapshot {
+                tracing::warn!(
+                    "CMCE: operator releasing EMERGENCY group call_id={} source_issi={} dest_gssi={} priority={} for ISSI {}",
+                    call_id,
+                    call.source_issi,
+                    call.dest_gssi,
+                    call.priority,
+                    issi
+                );
+
+                if let CallOrigin::Network { network_entity, brew_uuid } = call.origin {
+                    self.notify_network_call_end(queue, network_entity, brew_uuid);
+                }
+            }
+            self.release_group_call(queue, call_id, DisconnectCause::SwmiRequestedDisconnection);
+        }
+
+        for call_id in individual_call_ids {
+            if let Some(call) = self.individual_calls.get(&call_id) {
+                tracing::warn!(
+                    "CMCE: operator releasing EMERGENCY individual call_id={} calling_issi={} called_issi={} priority={} for ISSI {}",
+                    call_id,
+                    call.calling_addr.ssi,
+                    call.called_addr.ssi,
+                    call.priority,
+                    issi
+                );
+            }
+            self.release_individual_call(queue, call_id, DisconnectCause::SwmiRequestedDisconnection);
+        }
+
+        total
+    }
+
     /// Release a group call: send D-RELEASE, close circuits, clean up state
     pub(super) fn release_group_call(&mut self, queue: &mut MessageQueue, call_id: u16, disconnect_cause: DisconnectCause) {
         if let Some(call) = self.active_calls.get_mut(&call_id) {
