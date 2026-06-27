@@ -167,7 +167,7 @@ impl CmceBs {
                 // Then clear any status-based emergency session/banner for the same ISSI. If the
                 // emergency came purely from a priority-15 call this is harmless/no-op, while a
                 // U-STATUS emergency still gets the existing EmergencyCancel telemetry.
-                sds.clear_emergency_command(issi);
+                sds.clear_emergency_command(queue, issi);
             }
             _ => {
                 tracing::warn!("CMCE: ignoring unsupported control command {:?}", cmd);
