@@ -122,13 +122,29 @@ struct LipPosition {
     longitude: f64,
 }
 
-/// One active status-based emergency session (keyed by source ISSI in `emergency_sessions`).
-/// The radio re-sends the emergency status periodically while active and goes silent on exit, so
-/// `last_seen` drives the clear-timeout sweep. Call-raised emergencies are NOT tracked here — the
-/// dashboard derives those from the call lifecycle.
+/// Where an active emergency state came from. Different vendors expose the same user-facing
+/// "Notruf" through slightly different signalling: Motorola tends to send the standard
+/// pre-coded Emergency status (0), Hytera often sends a mapped NetCore Directory status (32780),
+/// and Sepura HotMic units send a proprietary Type4 SDS before raising the priority-15 group call.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum EmergencySourceKind {
+    StandardStatus,
+    DirectoryStatus(u16),
+    SepuraType4,
+}
+
+/// One active emergency session (keyed by source ISSI in `emergency_sessions`).
+///
+/// Status-based terminals re-send their emergency status periodically while active and go silent
+/// or send a normal status on exit, so `last_seen` drives the timeout sweep. Sepura HotMic is more
+/// vendor-specific: it sends a proprietary Type4 SDS to the dashboard ISSI before raising the
+/// priority-15 group call, and later sends a related Type4 SDS when the terminal leaves emergency.
 struct EmergencySession {
     dest_ssi: u32,
     last_seen: std::time::Instant,
+    kind: EmergencySourceKind,
+    sepura_payload: Option<Vec<u8>>,
+    clear_requested_at: Option<std::time::Instant>,
 }
 
 pub struct SdsBsSubentity {
@@ -211,35 +227,78 @@ impl SdsBsSubentity {
         bytes.iter().map(|b| format!("{:02X}", b)).collect::<Vec<_>>().join(", ")
     }
 
-    // ── Emergency state (status-based) ──────────────────────────────────────────
+    // ── Emergency state (multi-vendor) ────────────────────────────────────────
     //
-    // A radio signals emergency with a U-STATUS (pre-coded status Emergency, status 0), re-sent
-    // periodically while active; it sends nothing on exit. We raise a session on the first
-    // Emergency status from an ISSI and clear it when: (a) the ISSI sends a non-Emergency status,
-    // (b) no Emergency status arrives for `clear_timeout_secs` (the radio went silent — swept in
-    // tick), or (c) an operator clears it from the dashboard. Telemetry (EmergencyAlarm /
-    // EmergencyCancel) fires only on the enter/clear transitions, never on re-sends.
+    // Motorola generally signals emergency with a standard U-STATUS Emergency (status 0).
+    // Hytera often sends NetCore/Directory status 32780 ("Notruf") around a priority-15 group
+    // call. Sepura HotMic sends a proprietary Type4 SDS with a stable C8 06 prefix before the
+    // priority-15 group call and later another related Type4 SDS when the terminal leaves
+    // emergency locally. The dashboard banner is driven by this unified state.
 
-    /// Raise (or refresh) a status-based emergency for `source_issi`. Emits `EmergencyAlarm` only
-    /// on the idle→emergency transition so periodic re-sends don't re-fire the alarm / Telegram.
-    fn emergency_enter(&mut self, source_issi: u32, dest_ssi: u32) {
+    fn emergency_kind_label(kind: &EmergencySourceKind) -> &'static str {
+        match kind {
+            EmergencySourceKind::StandardStatus => "standard status 0",
+            EmergencySourceKind::DirectoryStatus(_) => "mapped Directory status",
+            EmergencySourceKind::SepuraType4 => "Sepura Type4 SDS",
+        }
+    }
+
+    /// Directory/NetCore status values that should be treated as real emergency, not only as a
+    /// normal text status. 32780 is the observed "Notruf" status from Motorola/Hytera codeplugs.
+    fn is_mapped_emergency_status(status_code: u16) -> bool {
+        matches!(status_code, 32780)
+    }
+
+    /// Raise (or refresh) an emergency for `source_issi`. Emits `EmergencyAlarm` only on the
+    /// idle→emergency transition so periodic re-sends don't re-fire the alarm / Telegram.
+    fn emergency_enter_with_kind(
+        &mut self,
+        source_issi: u32,
+        dest_ssi: u32,
+        kind: EmergencySourceKind,
+        sepura_payload: Option<Vec<u8>>,
+    ) {
         let now = std::time::Instant::now();
         match self.emergency_sessions.get_mut(&source_issi) {
             Some(s) => {
-                // REFRESH — radio is still in emergency; keep the session alive.
+                // REFRESH — radio is still in emergency; keep the session alive and update the
+                // vendor metadata. If an operator clear was pending and the terminal speaks again
+                // with an emergency packet, keep clear_requested_at so the UI/logs stay honest:
+                // the device is still in emergency until a clear/cancel signal is observed.
                 s.last_seen = now;
                 s.dest_ssi = dest_ssi;
+                s.kind = kind;
+                if sepura_payload.is_some() {
+                    s.sepura_payload = sepura_payload;
+                }
             }
             None => {
-                self.emergency_sessions
-                    .insert(source_issi, EmergencySession { dest_ssi, last_seen: now });
-                tracing::warn!("EMERGENCY: ISSI {} entered emergency (status to ISSI {})", source_issi, dest_ssi);
+                self.emergency_sessions.insert(
+                    source_issi,
+                    EmergencySession {
+                        dest_ssi,
+                        last_seen: now,
+                        kind: kind.clone(),
+                        sepura_payload,
+                        clear_requested_at: None,
+                    },
+                );
+                tracing::warn!(
+                    "EMERGENCY: ISSI {} entered emergency via {} (dest {})",
+                    source_issi,
+                    Self::emergency_kind_label(&kind),
+                    dest_ssi
+                );
                 self.emit(TelemetryEvent::EmergencyAlarm { source_issi, dest_ssi });
             }
         }
     }
 
-    /// Clear a status-based emergency for `source_issi` if present, emitting `EmergencyCancel`.
+    fn emergency_enter(&mut self, source_issi: u32, dest_ssi: u32) {
+        self.emergency_enter_with_kind(source_issi, dest_ssi, EmergencySourceKind::StandardStatus, None);
+    }
+
+    /// Clear an emergency for `source_issi` if present, emitting `EmergencyCancel`.
     fn emergency_clear(&mut self, source_issi: u32, reason: &str) {
         if self.emergency_sessions.remove(&source_issi).is_some() {
             tracing::info!("EMERGENCY: ISSI {} cleared ({})", source_issi, reason);
@@ -247,20 +306,142 @@ impl SdsBsSubentity {
         }
     }
 
-    /// Operator/manual clear dispatched from the dashboard (`issi == 0` clears every session).
-    pub fn clear_emergency_command(&mut self, issi: u32) {
-        if issi == 0 {
-            let all: Vec<u32> = self.emergency_sessions.keys().copied().collect();
-            for i in all {
-                self.emergency_clear(i, "operator clear (all)");
-            }
+    fn same_sepura_signature(a: &[u8], b: &[u8]) -> bool {
+        a.len() == b.len() && a.len() >= 4 && a[0] == b[0] && a[1] == b[1] && a[3..] == b[3..]
+    }
+
+    fn sepura_emergency_payload(data: &SdsUserData) -> Option<Vec<u8>> {
+        let payload = data.to_arr();
+        // Observed Sepura HotMic emergency SDS, addressed to the local dashboard ISSI, starts with
+        // C8 06 and is 15 bytes / 120 bits in the field logs. Keep the detector slightly tolerant
+        // so firmware variants with appended bytes are still recognized.
+        if payload.len() >= 8 && payload.get(0) == Some(&0xC8) && payload.get(1) == Some(&0x06) {
+            Some(payload)
         } else {
-            self.emergency_clear(issi, "operator clear");
+            None
         }
     }
 
-    /// Sweep emergency sessions whose last emergency status is older than `clear_timeout_secs`.
-    /// The radio sends nothing on exit, so silence past the timeout is treated as "cleared".
+    /// Handle Sepura HotMic proprietary Type4 SDS packets. Returns true when the packet was
+    /// consumed locally as Sepura emergency signalling.
+    fn handle_sepura_emergency_sds(
+        &mut self,
+        _queue: &mut MessageQueue,
+        source_issi: u32,
+        dest_ssi: u32,
+        data: &SdsUserData,
+    ) -> bool {
+        if dest_ssi != DASHBOARD_ISSI {
+            return false;
+        }
+
+        let Some(payload) = Self::sepura_emergency_payload(data) else {
+            return false;
+        };
+
+        let seq = payload.get(2).copied().unwrap_or(0);
+        let clear_after_operator = self
+            .emergency_sessions
+            .get(&source_issi)
+            .and_then(|s| {
+                if s.kind != EmergencySourceKind::SepuraType4 || s.clear_requested_at.is_none() {
+                    return None;
+                }
+                let old = s.sepura_payload.as_ref()?;
+                let old_seq = old.get(2).copied().unwrap_or(0);
+                Some(Self::same_sepura_signature(old, &payload) && old_seq != seq)
+            })
+            .unwrap_or(false);
+
+        tracing::warn!(
+            "SEPURA-EMG-SDS: ISSI {} -> {} seq=0x{:02X} raw=[{}]{}",
+            source_issi,
+            dest_ssi,
+            seq,
+            Self::format_hex_bytes(&payload),
+            if clear_after_operator { " (terminal clear after operator request)" } else { "" }
+        );
+
+        if clear_after_operator {
+            self.emergency_clear(source_issi, "Sepura Type4 terminal clear after operator request");
+            return true;
+        }
+
+        self.emergency_enter_with_kind(
+            source_issi,
+            dest_ssi,
+            EmergencySourceKind::SepuraType4,
+            Some(payload),
+        );
+        true
+    }
+
+    fn send_sepura_emergency_cancel_sds(&mut self, queue: &mut MessageQueue, dest_issi: u32, last_payload: &[u8]) {
+        let mut payload = last_payload.to_vec();
+        if payload.len() >= 3 {
+            // Best-effort Sepura HotMic clear candidate: field logs show the terminal's later
+            // self-clear packet as the same C8 06 payload with byte[2] incremented (e.g. 1B→1C).
+            // Send that candidate back to the terminal. If the firmware ignores it, the state
+            // remains "clear requested" and will only clear when the terminal emits its own packet
+            // or times out.
+            payload[2] = payload[2].wrapping_add(1);
+        }
+
+        tracing::warn!(
+            "SEPURA-EMG-SDS: sending best-effort emergency cancel candidate to ISSI {} raw=[{}]",
+            dest_issi,
+            Self::format_hex_bytes(&payload)
+        );
+
+        let len_bits = (payload.len() * 8) as u16;
+        let sds_data = SdsUserData::Type4(len_bits, payload);
+        self.log_sds("tx", DASHBOARD_ISSI, dest_issi, false, &sds_data);
+
+        // Force MCCH for the vendor SDS candidate. The existing field-note in send_d_sds_data says
+        // most terminals ignore SDS in-band on the traffic slot; by the time operator clear runs,
+        // Call Control is also tearing the slot down. MCCH gives the radio the best chance to see it.
+        self.deliver_d_sds_data_now(queue, DASHBOARD_ISSI, dest_issi, SsiType::Issi, sds_data, true);
+    }
+
+    /// Operator/manual clear dispatched from the dashboard (`issi == 0` clears every session).
+    /// For Sepura HotMic we do not immediately emit EmergencyCancel: the call is released by CC,
+    /// but the terminal may keep its local red emergency mode until it sends its later Type4 packet.
+    pub fn clear_emergency_command(&mut self, queue: &mut MessageQueue, issi: u32) {
+        if issi == 0 {
+            let all: Vec<u32> = self.emergency_sessions.keys().copied().collect();
+            for i in all {
+                self.clear_one_emergency_from_operator(queue, i, "operator clear (all)");
+            }
+        } else {
+            self.clear_one_emergency_from_operator(queue, issi, "operator clear");
+        }
+    }
+
+    fn clear_one_emergency_from_operator(&mut self, queue: &mut MessageQueue, issi: u32, reason: &str) {
+        let now = std::time::Instant::now();
+        let sepura_payload = match self.emergency_sessions.get_mut(&issi) {
+            Some(s) if s.kind == EmergencySourceKind::SepuraType4 => {
+                s.clear_requested_at = Some(now);
+                s.sepura_payload.clone()
+            }
+            _ => None,
+        };
+
+        if let Some(payload) = sepura_payload {
+            self.send_sepura_emergency_cancel_sds(queue, issi, &payload);
+            tracing::warn!(
+                "EMERGENCY: ISSI {} Sepura clear requested — call released, waiting for terminal Type4 clear/timeout",
+                issi
+            );
+            return;
+        }
+
+        self.emergency_clear(issi, reason);
+    }
+
+    /// Sweep emergency sessions whose last emergency signal is older than `clear_timeout_secs`.
+    /// Standard/Directory radios often go silent on exit; Sepura may also stay latched if its
+    /// proprietary clear was not understood, so timeout is the final safety net.
     fn expire_emergency_sessions(&mut self) {
         if self.emergency_sessions.is_empty() {
             return;
@@ -447,6 +628,13 @@ impl SdsBsSubentity {
         // the BS's view of the destination; the read borrow is O(1) and dropped immediately.
         let rx_is_group = self.config.state_read().subscribers.has_group_members(dest_ssi);
         self.log_sds("rx", source_ssi, dest_ssi, rx_is_group, &pdu.user_defined_data);
+
+        // Sepura HotMic emergency signalling: proprietary Type4 SDS with C8 06 prefix addressed
+        // to the dashboard/control ISSI. Consume it before the WX responder so it is not logged as
+        // a bogus weather request.
+        if self.handle_sepura_emergency_sds(queue, source_ssi, dest_ssi, &pdu.user_defined_data) {
+            return;
+        }
 
         // Built-in WX/METAR service: if this SDS is addressed to the configured service
         // ISSI and the responder is enabled, treat the text as a weather command, fetch
@@ -775,8 +963,15 @@ impl SdsBsSubentity {
         // status from a radio currently in emergency does not double as an emergency cancellation.
         // Local-only — evaluated before any Brew forward and gated by the [emergency] config below.
         if dest_ssi != DASHBOARD_ISSI {
+            let status_code = pdu.pre_coded_status.into_raw() as u16;
             match pdu.pre_coded_status {
                 PreCodedStatus::Emergency => self.emergency_enter(source_ssi, dest_ssi),
+                _ if Self::is_mapped_emergency_status(status_code) => self.emergency_enter_with_kind(
+                    source_ssi,
+                    dest_ssi,
+                    EmergencySourceKind::DirectoryStatus(status_code),
+                    None,
+                ),
                 _ => self.emergency_clear(source_ssi, "non-emergency status"),
             }
         }
@@ -790,7 +985,8 @@ impl SdsBsSubentity {
 
         // Emergency status is LOCAL-only by design — never forwarded to Brew unless the operator
         // opts in via [emergency] forward_to_brew. Non-emergency statuses keep their normal routing.
-        let is_emergency = matches!(pdu.pre_coded_status, PreCodedStatus::Emergency);
+        let is_emergency = matches!(pdu.pre_coded_status, PreCodedStatus::Emergency)
+            || Self::is_mapped_emergency_status(pdu.pre_coded_status.into_raw() as u16);
         let brew_entity = net_brew::route_entity_for_local_issi(&self.config, source_ssi);
         let brew_ok = brew_entity.is_some_and(|entity| net_brew::feature_sds_enabled_for_entity(&self.config, entity))
             && (!is_emergency || self.config.config().emergency.forward_to_brew);
