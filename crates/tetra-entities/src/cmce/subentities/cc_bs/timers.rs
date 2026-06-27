@@ -266,7 +266,18 @@ impl CcBsSubentity {
         let expired_group_calls: Vec<u16> = self
             .active_calls
             .iter()
-            .filter_map(|(&call_id, call)| call.call_timeout_expired(self.dltime).then_some(call_id))
+            .filter_map(|(&call_id, call)| {
+                // Emergency group calls must remain under SwMI/operator control.
+                // Some terminals raise emergency as a priority-15 U-SETUP but do not send
+                // speech immediately; if the BS tears that call down by normal timeout/hangtime,
+                // the dashboard clear button later finds no active call and cannot send the
+                // authoritative D-RELEASE from the operator action. Keep emergency calls alive
+                // until the radio clears them or an operator issues ClearEmergency.
+                if is_emergency_priority(call.priority) {
+                    return None;
+                }
+                call.call_timeout_expired(self.dltime).then_some(call_id)
+            })
             .collect();
 
         for call_id in expired_group_calls {
@@ -504,7 +515,11 @@ impl CcBsSubentity {
             .active_calls
             .iter()
             .filter_map(|(&call_id, call)| match call.state() {
-                GroupCallState::NoActiveSpeaker { since } if since.age(self.dltime) > hangtime_frames => Some(call_id),
+                GroupCallState::NoActiveSpeaker { since }
+                    if since.age(self.dltime) > hangtime_frames && !is_emergency_priority(call.priority) =>
+                {
+                    Some(call_id)
+                }
                 _ => None,
             })
             .collect();
