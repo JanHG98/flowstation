@@ -151,6 +151,22 @@ impl CmceBs {
             }
             ControlCommand::ClearEmergency { issi } => {
                 tracing::info!("CMCE: ClearEmergency issi={} (operator)", issi);
+
+                // First perform the SwMI/Call-Control part: emergency button calls arrive as
+                // priority-15 CC calls, so clearing them from the dashboard must release the
+                // traffic call, not only remove a local banner.
+                let released = cc.clear_emergency_calls_for_issi(queue, issi);
+                if released > 0 {
+                    tracing::warn!(
+                        "CMCE: ClearEmergency issi={} released {} active emergency-priority call(s)",
+                        issi,
+                        released
+                    );
+                }
+
+                // Then clear any status-based emergency session/banner for the same ISSI. If the
+                // emergency came purely from a priority-15 call this is harmless/no-op, while a
+                // U-STATUS emergency still gets the existing EmergencyCancel telemetry.
                 sds.clear_emergency_command(issi);
             }
             _ => {
