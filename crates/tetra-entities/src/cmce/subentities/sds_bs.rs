@@ -1,3 +1,7 @@
+use std::collections::HashMap;
+use std::sync::{Mutex, OnceLock};
+use std::time::{Duration, Instant};
+
 use tetra_config::bluestation::SharedConfig;
 use tetra_core::Layer2Service;
 use tetra_core::{BitBuffer, Sap, SsiType, TdmaTime, TetraAddress, tetra_entities::TetraEntity, unimplemented_log};
@@ -64,6 +68,39 @@ const SDS_DEFER_DEADLINE: std::time::Duration = std::time::Duration::from_secs(1
 /// timeout (also "failed"), and we never deliver the message late, so the two cannot contradict.
 const SDS_TL_STATUS_UNDELIVERABLE: u8 = 0x02;
 const SDS_PROTOCOL_LIP: u8 = 0x0A;
+/// ETSI SDS-TL protocol ID used by Motorola Home Mode Display.
+const SDS_PROTOCOL_HOME_MODE_DISPLAY: u8 = 220;
+/// Synthetic protocol ID used only for dashboard SDS log rows representing U-STATUS.
+const SDS_PROTOCOL_STATUS_LABEL: u8 = 218;
+/// Source ISSI used by this BS/dashboard for local control/status replies.
+const DASHBOARD_ISSI: u32 = 4010001;
+/// Avoid spamming Motorola/Sepura/Hytera displays when a radio periodically re-sends the same
+/// status (for example GPS/location status). Dashboard state is still updated every time.
+const STATUS_HMD_REPLY_THROTTLE: Duration = Duration::from_secs(30);
+const STATUS_DIRECTORY_REFRESH: Duration = Duration::from_secs(30);
+
+#[derive(Debug, Clone)]
+struct StatusDirectoryEntry {
+    label: String,
+    severity: String,
+    description: String,
+}
+
+#[derive(Debug, Clone)]
+struct StatusDirectoryRuntimeConfig {
+    enabled: bool,
+    base_url: String,
+    timeout_ms: u64,
+}
+
+#[derive(Debug, Default)]
+struct StatusDirectoryCache {
+    base_url: String,
+    loaded_at: Option<Instant>,
+    map: HashMap<u16, StatusDirectoryEntry>,
+}
+
+static STATUS_DIRECTORY_CACHE: OnceLock<Mutex<StatusDirectoryCache>> = OnceLock::new();
 
 #[derive(Debug, Clone, Copy)]
 struct LipPosition {
@@ -104,6 +141,9 @@ pub struct SdsBsSubentity {
     /// a non-Emergency status, clear-timeout (tick), or operator clear. Non-empty means at least one
     /// radio is in emergency. See [`EmergencySession`].
     emergency_sessions: std::collections::HashMap<u32, EmergencySession>,
+    /// Last per-radio/per-status Home Mode Display acknowledgement. Prevents periodic status/GPS
+    /// beacons from turning into a reply storm.
+    status_reply_last: HashMap<(u32, u16), Instant>,
 }
 
 impl SdsBsSubentity {
@@ -120,6 +160,7 @@ impl SdsBsSubentity {
             wx_cmd_tx: None,
             last_periodic_wx: None,
             emergency_sessions: std::collections::HashMap::new(),
+            status_reply_last: HashMap::new(),
         }
     }
 
@@ -415,8 +456,8 @@ impl SdsBsSubentity {
         }
 
         // ACKs/replies addressed to the dashboard ISSI (4010001) are consumed locally.
-        if dest_ssi == 4010001 {
-            tracing::debug!("SDS: absorbing message to dashboard ISSI 4010001 from {}", source_ssi);
+        if dest_ssi == DASHBOARD_ISSI {
+            tracing::debug!("SDS: absorbing message to dashboard ISSI {} from {}", DASHBOARD_ISSI, source_ssi);
             return;
         }
 
@@ -612,7 +653,6 @@ impl SdsBsSubentity {
         // responder re-injects its replies through this very path (see queue_wx_reply) addressed to
         // an on-air requester that may legitimately be absent from the static registry, and those
         // must keep going out over RF — so they are intentionally excluded here.
-        const DASHBOARD_ISSI: u32 = 4010001;
         let is_local_issi = !dest_is_group && self.config.state_read().subscribers.is_registered(dest_ssi);
         let is_local_group = dest_is_group && self.config.state_read().subscribers.has_group_members(dest_ssi);
 
@@ -694,13 +734,20 @@ impl SdsBsSubentity {
             pdu.pre_coded_status
         );
 
+        // NetCore Directory status labels: show the status text in the dashboard row and, for
+        // Motorola-style terminals, acknowledge it back as Home Mode Display PID 220 text. SDS-TL
+        // short reports are delivery reports, not operator/device statuses, so skip those.
+        if !matches!(pdu.pre_coded_status, PreCodedStatus::SdsTl(_)) {
+            self.handle_directory_status_label(queue, source_ssi, dest_ssi, &pdu.pre_coded_status);
+        }
+
         // Emergency-state tracking. The radio re-sends pre-coded status Emergency while in
         // emergency and is silent on exit: ENTER/REFRESH on Emergency, and a non-Emergency status
         // from the same ISSI CLEARS its session (the "first normal status = user cancelled" signal).
         // Skip the 4010001 command channel (restart/kick_all/info statuses) so an unrelated command
         // status from a radio currently in emergency does not double as an emergency cancellation.
         // Local-only — evaluated before any Brew forward and gated by the [emergency] config below.
-        if dest_ssi != 4010001 {
+        if dest_ssi != DASHBOARD_ISSI {
             match pdu.pre_coded_status {
                 PreCodedStatus::Emergency => self.emergency_enter(source_ssi, dest_ssi),
                 _ => self.emergency_clear(source_ssi, "non-emergency status"),
@@ -709,7 +756,7 @@ impl SdsBsSubentity {
 
         // SDS command control: U-STATUS to ISSI 4010001 from an authorized ISSI triggers
         // a system action (restart, shutdown, kick_all) if the status code matches.
-        if dest_ssi == 4010001 {
+        if dest_ssi == DASHBOARD_ISSI {
             self.handle_sds_command_status(queue, source_ssi, &pdu.pre_coded_status);
             return;
         }
@@ -919,6 +966,7 @@ impl SdsBsSubentity {
         // scheme, or it may already be the first text byte.
         let (scheme, payload): (Option<u8>, &[u8]) = match bytes.first() {
             Some(0x82) | Some(0x80) | Some(0x8A) | Some(0x89) if bytes.len() > 4 => (Some(bytes[3]), &bytes[4..]),
+            Some(SDS_PROTOCOL_HOME_MODE_DISPLAY) if bytes.len() > 4 => (Some(bytes[3]), &bytes[4..]),
             Some(0x02) | Some(0x09) if bytes.len() > 2 && matches!(bytes[1], 0x01..=0x03 | 0x1A) => (Some(bytes[1]), &bytes[2..]),
             Some(0x02) | Some(0x09) if bytes.len() > 1 => (None, &bytes[1..]),
             Some(0x01..=0x03) | Some(0x1A) if bytes.len() > 1 => (Some(bytes[0]), &bytes[1..]),
@@ -1358,6 +1406,379 @@ impl SdsBsSubentity {
         supported
     }
 
+    fn handle_directory_status_label(&mut self, queue: &mut MessageQueue, source_issi: u32, dest_issi: u32, status: &PreCodedStatus) {
+        let status_code = status.into_raw() as u16;
+        let Some(entry) = Self::status_directory_lookup(status_code) else {
+            tracing::debug!(
+                "SDS-STATUS: no NetCore Directory label for status={} from ISSI {}",
+                status_code,
+                source_issi
+            );
+            return;
+        };
+
+        // Feed the dashboard using the existing SDS Log websocket path. The frontend derives the
+        // registered-radio status column from the newest PID-218 row per ISSI.
+        let dashboard_text = if entry.description.trim().is_empty() {
+            format!("Status: {}", entry.label)
+        } else {
+            format!("Status: {} — {}", entry.label, entry.description)
+        };
+        self.emit(TelemetryEvent::SdsLog {
+            direction: "rx".to_string(),
+            source_issi,
+            dest_issi,
+            is_group: false,
+            protocol_id: SDS_PROTOCOL_STATUS_LABEL,
+            text: dashboard_text,
+        });
+        self.emit(TelemetryEvent::SdsActivity {
+            source_issi,
+            dest_issi,
+            source: "local_status".to_string(),
+        });
+
+        if !self.should_send_status_hmd_reply(source_issi, status_code) {
+            tracing::debug!(
+                "SDS-STATUS: suppressing repeated HMD reply to ISSI {} for status={} (throttle active)",
+                source_issi,
+                status_code
+            );
+            return;
+        }
+
+        let reply = Self::status_hmd_reply_text(&entry.label);
+        tracing::info!(
+            "SDS-STATUS: replying to ISSI {} with HomeModeDisplay PID {} text {:?}",
+            source_issi,
+            SDS_PROTOCOL_HOME_MODE_DISPLAY,
+            reply
+        );
+        self.send_home_mode_display_text(queue, DASHBOARD_ISSI, source_issi, &reply);
+    }
+
+    fn should_send_status_hmd_reply(&mut self, source_issi: u32, status_code: u16) -> bool {
+        let now = Instant::now();
+        let key = (source_issi, status_code);
+        match self.status_reply_last.get(&key) {
+            Some(last) if now.duration_since(*last) < STATUS_HMD_REPLY_THROTTLE => false,
+            _ => {
+                self.status_reply_last.insert(key, now);
+                true
+            }
+        }
+    }
+
+    fn status_hmd_reply_text(label: &str) -> String {
+        let mut text = format!("Status: {}", label.trim());
+        // Keep the reply short enough for old Motorola display lines and avoid non-Latin-1 chars.
+        text = text
+            .chars()
+            .map(|ch| if (ch as u32) <= 0xFF { ch } else { '?' })
+            .collect::<String>();
+        const MAX_CHARS: usize = 64;
+        if text.chars().count() > MAX_CHARS {
+            text = text.chars().take(MAX_CHARS - 1).collect::<String>();
+            text.push('…');
+        }
+        text
+    }
+
+    fn send_home_mode_display_text(&mut self, queue: &mut MessageQueue, source_issi: u32, dest_issi: u32, text: &str) {
+        static HMD_MR: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(1);
+        let mr = {
+            let v = HMD_MR.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            if v == 0 {
+                HMD_MR.store(1, std::sync::atomic::Ordering::Relaxed);
+                1
+            } else {
+                v
+            }
+        };
+
+        let mut payload = Vec::with_capacity(text.len().min(220) + 4);
+        payload.push(SDS_PROTOCOL_HOME_MODE_DISPLAY); // PID 220 = Home Mode Display
+        payload.push(0x00); // SDS-TL TRANSFER, no delivery report request, no store/forward
+        payload.push(mr);
+        payload.push(0x01); // ISO-8859-1 / Latin text coding scheme
+        payload.extend(text.chars().take(220).map(|ch| if (ch as u32) <= 0xFF { ch as u8 } else { b'?' }));
+        let len_bits = (payload.len() * 8) as u16;
+        let sds_data = SdsUserData::Type4(len_bits, payload);
+
+        // Also make the outgoing HMD reply visible in the SDS log.
+        self.log_sds("tx", source_issi, dest_issi, false, &sds_data);
+
+        // The radio just used random access on the MCCH to send the U-STATUS, so send the reply
+        // back on the MCCH instead of deferring/stealing due to unrelated group traffic.
+        self.deliver_d_sds_data_now(queue, source_issi, dest_issi, SsiType::Issi, sds_data, true);
+    }
+
+    fn status_directory_lookup(status_code: u16) -> Option<StatusDirectoryEntry> {
+        let cfg = Self::status_directory_runtime_config()?;
+        if !cfg.enabled || cfg.base_url.trim().is_empty() {
+            return None;
+        }
+        let base_url = cfg.base_url.trim().trim_end_matches('/').to_string();
+        let cache_lock = STATUS_DIRECTORY_CACHE.get_or_init(|| Mutex::new(StatusDirectoryCache::default()));
+        let mut cache = cache_lock.lock().ok()?;
+        let fresh = cache.base_url == base_url
+            && cache
+                .loaded_at
+                .is_some_and(|loaded| loaded.elapsed() < STATUS_DIRECTORY_REFRESH);
+        if !fresh {
+            match Self::fetch_status_directory(&base_url, cfg.timeout_ms) {
+                Ok(map) => {
+                    tracing::debug!("NetCore Directory: loaded {} status label(s) from {}", map.len(), base_url);
+                    cache.base_url = base_url.clone();
+                    cache.loaded_at = Some(Instant::now());
+                    cache.map = map;
+                }
+                Err(err) => {
+                    tracing::debug!("NetCore Directory: status lookup refresh failed: {}", err);
+                    cache.loaded_at = Some(Instant::now()); // short negative cache to avoid tight retry loops
+                }
+            }
+        }
+        cache.map.get(&status_code).cloned()
+    }
+
+    fn fetch_status_directory(base_url: &str, timeout_ms: u64) -> Result<HashMap<u16, StatusDirectoryEntry>, String> {
+        let url = format!("{}/api/status", base_url.trim_end_matches('/'));
+        let client = reqwest::blocking::Client::builder()
+            .timeout(Duration::from_millis(timeout_ms.clamp(250, 10_000)))
+            .user_agent("flowstation-status-directory")
+            .build()
+            .map_err(|e| e.to_string())?;
+        let resp = client.get(&url).send().map_err(|e| e.to_string())?;
+        let status = resp.status();
+        if !status.is_success() {
+            return Err(format!("{} returned HTTP {}", url, status));
+        }
+        let text = resp.text().map_err(|e| e.to_string())?;
+        Self::parse_status_directory_json(&text)
+    }
+
+    fn parse_status_directory_json(raw: &str) -> Result<HashMap<u16, StatusDirectoryEntry>, String> {
+        let json: serde_json::Value = serde_json::from_str(raw).map_err(|e| e.to_string())?;
+        let mut out = HashMap::new();
+        match json {
+            serde_json::Value::Array(arr) => Self::collect_status_entries(&mut out, arr),
+            serde_json::Value::Object(map) => {
+                if let Some(serde_json::Value::Array(arr)) = map.get("status_messages").or_else(|| map.get("status")) {
+                    Self::collect_status_entries(&mut out, arr.clone());
+                } else {
+                    for (key, value) in map {
+                        if let Ok(code) = key.trim().parse::<u16>() {
+                            if let Some(entry) = Self::status_entry_from_value(Some(code), &value) {
+                                out.insert(code, entry);
+                            }
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+        Ok(out)
+    }
+
+    fn collect_status_entries(out: &mut HashMap<u16, StatusDirectoryEntry>, arr: Vec<serde_json::Value>) {
+        for value in arr {
+            let code = value
+                .get("code")
+                .and_then(|v| v.as_u64())
+                .and_then(|n| (n <= u16::MAX as u64).then_some(n as u16));
+            if let Some(code) = code {
+                if let Some(entry) = Self::status_entry_from_value(Some(code), &value) {
+                    out.insert(code, entry);
+                }
+            }
+        }
+    }
+
+    fn status_entry_from_value(code_hint: Option<u16>, value: &serde_json::Value) -> Option<StatusDirectoryEntry> {
+        let obj = value.as_object()?;
+        let visible = obj.get("visible").and_then(|v| v.as_bool()).unwrap_or(true);
+        if !visible {
+            return None;
+        }
+        let label = obj
+            .get("label")
+            .or_else(|| obj.get("name"))
+            .or_else(|| obj.get("text"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .trim()
+            .to_string();
+        let description = obj
+            .get("description")
+            .or_else(|| obj.get("note"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .trim()
+            .to_string();
+        let label = if !label.is_empty() {
+            label
+        } else if !description.is_empty() {
+            description.clone()
+        } else {
+            format!("Status {}", code_hint.unwrap_or(0))
+        };
+        let severity = obj
+            .get("severity")
+            .or_else(|| obj.get("level"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("info")
+            .trim()
+            .to_ascii_lowercase();
+        Some(StatusDirectoryEntry {
+            label,
+            severity,
+            description,
+        })
+    }
+
+    fn status_directory_runtime_config() -> Option<StatusDirectoryRuntimeConfig> {
+        let mut cfg = StatusDirectoryRuntimeConfig {
+            enabled: false,
+            base_url: "http://127.0.0.1:8095".to_string(),
+            timeout_ms: 1_000,
+        };
+
+        for path in Self::status_directory_config_candidates() {
+            if let Ok(text) = std::fs::read_to_string(&path) {
+                if Self::apply_netcore_directory_toml(&text, &mut cfg) {
+                    break;
+                }
+            }
+        }
+
+        if let Ok(url) = std::env::var("NETCORE_DIRECTORY_URL") {
+            let url = url.trim();
+            if !url.is_empty() {
+                cfg.base_url = url.to_string();
+                cfg.enabled = true;
+            }
+        }
+        if let Ok(enabled) = std::env::var("NETCORE_DIRECTORY_ENABLED") {
+            match enabled.trim().to_ascii_lowercase().as_str() {
+                "1" | "true" | "yes" | "on" => cfg.enabled = true,
+                "0" | "false" | "no" | "off" => cfg.enabled = false,
+                _ => {}
+            }
+        }
+        if let Ok(timeout) = std::env::var("NETCORE_DIRECTORY_TIMEOUT_MS") {
+            if let Ok(ms) = timeout.trim().parse::<u64>() {
+                cfg.timeout_ms = ms.clamp(250, 10_000);
+            }
+        }
+
+        cfg.base_url = cfg.base_url.trim().trim_end_matches('/').to_string();
+        cfg.enabled.then_some(cfg)
+    }
+
+    fn status_directory_config_candidates() -> Vec<std::path::PathBuf> {
+        let mut out = Vec::new();
+        for key in ["FLOWSTATION_CONFIG", "TETRA_CONFIG", "BLUESTATION_CONFIG"] {
+            if let Ok(v) = std::env::var(key) {
+                let v = v.trim();
+                if !v.is_empty() {
+                    out.push(std::path::PathBuf::from(v));
+                }
+            }
+        }
+        let args: Vec<String> = std::env::args().collect();
+        for (idx, arg) in args.iter().enumerate() {
+            if let Some(v) = arg.strip_prefix("--config=") {
+                out.push(std::path::PathBuf::from(v));
+            } else if (arg == "--config" || arg == "-c") && idx + 1 < args.len() {
+                out.push(std::path::PathBuf::from(&args[idx + 1]));
+            } else if arg.ends_with(".toml") {
+                out.push(std::path::PathBuf::from(arg));
+            }
+        }
+        for p in [
+            "config.toml",
+            "./config.toml",
+            "/opt/tetra/config.toml",
+            "/opt/flowstation/config.toml",
+            "/opt/tetra-bluestation/config.toml",
+            "/etc/flowstation/config.toml",
+        ] {
+            out.push(std::path::PathBuf::from(p));
+        }
+        out
+    }
+
+    fn apply_netcore_directory_toml(text: &str, cfg: &mut StatusDirectoryRuntimeConfig) -> bool {
+        let mut in_section = false;
+        let mut seen = false;
+        for raw in text.lines() {
+            let line = Self::strip_toml_comment(raw).trim();
+            if line.is_empty() {
+                continue;
+            }
+            if line.starts_with('[') && line.ends_with(']') {
+                in_section = line.trim_matches(|c| c == '[' || c == ']').trim() == "netcore_directory";
+                continue;
+            }
+            if !in_section {
+                continue;
+            }
+            let Some((key, value)) = line.split_once('=') else {
+                continue;
+            };
+            seen = true;
+            let key = key.trim();
+            let value = Self::unquote_toml_value(value.trim());
+            match key {
+                "enabled" => match value.trim().to_ascii_lowercase().as_str() {
+                    "1" | "true" | "yes" | "on" => cfg.enabled = true,
+                    "0" | "false" | "no" | "off" => cfg.enabled = false,
+                    _ => {}
+                },
+                "base_url" => {
+                    if !value.trim().is_empty() {
+                        cfg.base_url = value.trim().to_string();
+                    }
+                }
+                "timeout_ms" => {
+                    if let Ok(ms) = value.trim().parse::<u64>() {
+                        cfg.timeout_ms = ms.clamp(250, 10_000);
+                    }
+                }
+                _ => {}
+            }
+        }
+        seen
+    }
+
+    fn strip_toml_comment(line: &str) -> &str {
+        let mut in_string = false;
+        let mut escaped = false;
+        for (idx, ch) in line.char_indices() {
+            if escaped {
+                escaped = false;
+                continue;
+            }
+            match ch {
+                '\\' if in_string => escaped = true,
+                '"' => in_string = !in_string,
+                '#' if !in_string => return &line[..idx],
+                _ => {}
+            }
+        }
+        line
+    }
+
+    fn unquote_toml_value(value: &str) -> String {
+        let v = value.trim();
+        if v.len() >= 2 && v.starts_with('"') && v.ends_with('"') {
+            v[1..v.len() - 1].replace("\\\"", "\"")
+        } else {
+            v.to_string()
+        }
+    }
+
     /// Execute a system action triggered by an SDS U-STATUS command to ISSI 4010001.
     /// Send a short text reply as an SDS-TL simple-text message from `source_issi` to `dest_issi`.
     /// Used by the U-STATUS info responder (FH-FEAT-014). Mirrors the SDS-TL framing used elsewhere:
@@ -1400,7 +1821,8 @@ impl SdsBsSubentity {
         let cfg = self.config.config();
         let Some(ref ctrl) = cfg.cell.sds_command_control else {
             tracing::debug!(
-                "SDS-CMD: U-STATUS to 4010001 from {} (status={}) but sds_command_control not configured, ignoring",
+                "SDS-CMD: U-STATUS to {} from {} (status={}) but sds_command_control not configured, ignoring",
+                DASHBOARD_ISSI,
                 source_ssi,
                 status_code
             );
@@ -1409,7 +1831,8 @@ impl SdsBsSubentity {
 
         if !ctrl.authorized_issis.contains(&source_ssi) {
             tracing::warn!(
-                "SDS-CMD: U-STATUS to 4010001 from ISSI {} (status={}) — ISSI not in authorized_issis, ignoring",
+                "SDS-CMD: U-STATUS to {} from ISSI {} (status={}) — ISSI not in authorized_issis, ignoring",
+                DASHBOARD_ISSI,
                 source_ssi,
                 status_code
             );
@@ -1418,7 +1841,8 @@ impl SdsBsSubentity {
 
         let Some(entry) = ctrl.commands.iter().find(|e| e.status_code == status_code) else {
             tracing::debug!(
-                "SDS-CMD: U-STATUS to 4010001 from ISSI {} status={} — no matching command, ignoring",
+                "SDS-CMD: U-STATUS to {} from ISSI {} status={} — no matching command, ignoring",
+                DASHBOARD_ISSI,
                 source_ssi,
                 status_code
             );
@@ -1451,13 +1875,13 @@ impl SdsBsSubentity {
             // ── FH-FEAT-014: query the host and reply to the requester as an SDS ──
             "ip" => {
                 let ip = crate::sys_telemetry::primary_ip().unwrap_or_else(|| "n/a".to_string());
-                self.send_text_sds(queue, 4010001, source_ssi, &format!("Host IP: {ip}"));
+                self.send_text_sds(queue, DASHBOARD_ISSI, source_ssi, &format!("Host IP: {ip}"));
             }
             "temp" => {
                 let temp = crate::sys_telemetry::cpu_temp_c()
                     .map(|c| format!("{c:.1} C"))
                     .unwrap_or_else(|| "n/a".to_string());
-                self.send_text_sds(queue, 4010001, source_ssi, &format!("Host temp: {temp}"));
+                self.send_text_sds(queue, DASHBOARD_ISSI, source_ssi, &format!("Host temp: {temp}"));
             }
             "info" => {
                 let ip = crate::sys_telemetry::primary_ip().unwrap_or_else(|| "n/a".to_string());
@@ -1466,7 +1890,7 @@ impl SdsBsSubentity {
                     .unwrap_or_else(|| "n/a".to_string());
                 self.send_text_sds(
                     queue,
-                    4010001,
+                    DASHBOARD_ISSI,
                     source_ssi,
                     &format!("FlowStation v{} | IP {} | {}", tetra_core::STACK_VERSION, ip, temp),
                 );
