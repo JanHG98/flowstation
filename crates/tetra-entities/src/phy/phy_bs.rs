@@ -310,10 +310,16 @@ impl<D: RxTxDev> PhyBs<D> {
         // lock onto the same uplink burst that was already decoded on the primary
         // carrier. Forwarding both copies makes UMAC/LLC see duplicate MAC-ACCESS,
         // duplicate ACKs and duplicated fragment starts, which can put radios into a
-        // setup/retry loop. Collect all burst candidates for this TDMA slot and drop
-        // exact duplicate bitstreams seen in the same full/subslot, keeping the
-        // strongest RSSI copy. Real independent traffic on two carriers has different
-        // bits and is still forwarded normally.
+        // setup/retry loop.
+        //
+        // The two demodulators do not necessarily produce bit-exact bursts: the
+        // off-channel copy can differ by a handful of bits and still decode to the
+        // same valid MAC PDU after error correction. Therefore exact Vec equality is
+        // not sufficient here. Treat same-timeslot/same-subslot/same-training bursts
+        // from different carriers as duplicates when their raw demodulated bitstreams
+        // are very close by Hamming distance, and keep only the stronger RSSI copy.
+        // Unrelated simultaneous bursts are still forwarded because their bitstreams
+        // differ by roughly half the burst length.
         #[derive(Debug)]
         struct RxBurstCandidate {
             carrier_num: u16,
@@ -321,6 +327,33 @@ impl<D: RxTxDev> PhyBs<D> {
             train_type: TrainingSequence,
             rssi_dbfs: f32,
             bits: Vec<u8>,
+        }
+
+        fn hamming_distance(a: &[u8], b: &[u8]) -> usize {
+            a.iter().zip(b).filter(|(x, y)| x != y).count()
+        }
+
+        fn duplicate_threshold(train_type: TrainingSequence, bit_len: usize) -> usize {
+            // Keep this intentionally conservative. For unrelated TETRA bursts the
+            // expected distance is about bit_len / 2. Adjacent-channel ghost copies
+            // observed on SXceiver are much closer, but not always bit-identical.
+            match train_type {
+                TrainingSequence::ExtendedTrainSeq => (bit_len / 8).max(24),
+                TrainingSequence::NormalTrainSeq1 | TrainingSequence::NormalTrainSeq2 => (bit_len / 8).max(40),
+                _ => (bit_len / 10).max(16),
+            }
+        }
+
+        fn looks_like_adjacent_duplicate(existing: &RxBurstCandidate, subslot_id: u8, train_type: TrainingSequence, bits: &[u8]) -> Option<usize> {
+            if existing.subslot_id != subslot_id || existing.train_type != train_type || existing.bits.len() != bits.len() {
+                return None;
+            }
+            let dist = hamming_distance(&existing.bits, bits);
+            if dist <= duplicate_threshold(train_type, bits.len()) {
+                Some(dist)
+            } else {
+                None
+            }
         }
 
         let mut candidates: Vec<RxBurstCandidate> = Vec::new();
@@ -342,28 +375,35 @@ impl<D: RxTxDev> PhyBs<D> {
                     label
                 );
 
-                if let Some(existing) = candidates.iter_mut().find(|c| {
-                    c.subslot_id == subslot_id && c.train_type == burst.train_type && c.bits.as_slice() == burst.bits
-                }) {
+                if let Some((existing, dist)) = candidates
+                    .iter_mut()
+                    .filter_map(|c| looks_like_adjacent_duplicate(c, subslot_id, burst.train_type, burst.bits).map(|dist| (c, dist)))
+                    .next()
+                {
                     if burst.rssi_dbfs > existing.rssi_dbfs {
                         tracing::debug!(
                             ts=%self.dltime,
                             from_carrier=existing.carrier_num,
                             to_carrier=rx_slot.carrier_num,
+                            hamming_distance=dist,
+                            threshold=duplicate_threshold(burst.train_type, burst.bits.len()),
                             old_rssi=existing.rssi_dbfs,
                             new_rssi=burst.rssi_dbfs,
                             "PHY: duplicate RX burst on adjacent carrier; keeping stronger copy"
                         );
                         existing.carrier_num = rx_slot.carrier_num;
                         existing.rssi_dbfs = burst.rssi_dbfs;
+                        existing.bits = burst.bits.to_vec();
                     } else {
                         tracing::debug!(
                             ts=%self.dltime,
                             kept_carrier=existing.carrier_num,
                             dropped_carrier=rx_slot.carrier_num,
+                            hamming_distance=dist,
+                            threshold=duplicate_threshold(burst.train_type, burst.bits.len()),
                             kept_rssi=existing.rssi_dbfs,
                             dropped_rssi=burst.rssi_dbfs,
-                            "PHY: dropping duplicate RX burst from adjacent carrier"
+                            "PHY: dropping adjacent-channel duplicate RX burst"
                         );
                     }
                     return;
