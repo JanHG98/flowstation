@@ -5,11 +5,23 @@
 /// Short git commit hash, set at compile time (e.g. "2aad62c8"). No `g` prefix: the empty `--match=`
 /// makes `git describe --always` emit the bare abbreviated commit hash, not a tag-relative name.
 pub const GIT_HASH: &str = git_version::git_version!(
-    args = ["--always", "--dirty=-modified", "--match=", "--abbrev=8"],
+    // NetCore services are usually built from local, patched trees. Keep the visible
+    // runtime version stable and commit-based instead of showing "-modified" in the
+    // dashboard for every local operator patch. OTA still compares this abbreviated
+    // hash with the repository HEAD.
+    args = ["--always", "--match=", "--abbrev=8"],
     fallback = "unknown"
 );
-/// Full stack version string, e.g. "v0.0.6-2aad62c8"
+
+/// Product/branding used by the NetCore dashboard and OTA output.
+pub const STACK_NAME: &str = "NetCore-Tetra";
+pub const STACK_CODENAME: &str = "Dual Carrier";
+
+/// Full stack version string, e.g. "v1.3.0-2aad62c8".
 pub const STACK_VERSION: &str = const_format::formatcp!("v{}-{}", env!("CARGO_PKG_VERSION"), GIT_HASH);
+
+/// Human-friendly product + version string.
+pub const STACK_DISPLAY: &str = const_format::formatcp!("{} {}", STACK_NAME, STACK_VERSION);
 
 pub mod address;
 pub mod bitbuffer;
