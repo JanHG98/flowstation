@@ -1239,6 +1239,7 @@ impl BrewEntity {
                 src: self.entity,
                 dest: TetraEntity::Umac,
                 msg: SapMsgInner::TmdCircuitDataReq(TmdCircuitDataReq {
+                    carrier_num: self.config.config().cell.main_carrier,
                     ts,
                     data: frame.acelp_data,
                 }),
