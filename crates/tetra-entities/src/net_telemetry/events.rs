@@ -49,6 +49,9 @@ pub enum TelemetryEvent {
         gssi: u32,
         caller_issi: u32,
         ts: u8,
+        /// Carrier number on which the traffic channel was allocated.
+        /// Defaults to the main carrier for current CMCE allocation logic.
+        carrier_num: u16,
         priority: u8,
         source: String,
     },
@@ -69,6 +72,8 @@ pub enum TelemetryEvent {
         called_issi: u32,
         simplex: bool,
         ts: u8,
+        /// Carrier number on which the traffic channel was allocated.
+        carrier_num: u16,
         priority: u8,
         source: String,
     },
@@ -94,7 +99,7 @@ pub enum TelemetryEvent {
         text: String,
     },
     /// Voice frame activity on a traffic timeslot (UL or DL)
-    TsVoiceActivity { ts: u8 },
+    TsVoiceActivity { carrier_num: u16, ts: u8 },
     /// Fast visual feed for the RF dashboard: spectrum + constellation + RMS/peak.
     /// Emitted ~5 times per second so spectrum/constellation/waterfall feel fluid.
     /// Cheap to compute (FFT + magnitude). Constellation symbol recovery is the
