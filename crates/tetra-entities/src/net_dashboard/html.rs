@@ -6133,15 +6133,15 @@ function tsResolveCarrier(carrier){
 function tsAllCarriers(){
   const out=[];
   if(state.btsMainCarrier!=null)out.push({carrier:Number(state.btsMainCarrier),label:'MAIN',secondary:false});
-  if(state.dualCarrierRunning&&state.btsSecondaryCarrier!=null)out.push({carrier:Number(state.btsSecondaryCarrier),label:'SECONDARY',secondary:true});
+  if(state.dualCarrierRunning&&state.btsSecondaryCarrier!=null)out.push({carrier:Number(state.btsSecondaryCarrier),label:'TRAFFIC ONLY',secondary:true});
   if(!out.length)out.push({carrier:null,label:'MAIN',secondary:false});
   return out;
 }
 function tsBlockMarkup(carrier,ts,kind){
   const id=tsDomId(carrier,ts);
-  const cls=kind==='main-control'?'ts-block mcch':(kind==='secondary-control'?'ts-block mcch':'ts-block');
-  const label=kind==='main-control'?'MCCH':(kind==='secondary-control'?'BCCH':'—');
-  const sub=kind==='main-control'||kind==='secondary-control'?'ACTIVE':'Idle';
+  const cls=kind==='main-control'?'ts-block mcch':'ts-block';
+  const label=kind==='main-control'?'MCCH':'—';
+  const sub=kind==='main-control'?'ACTIVE':'Idle';
   return `<div class="${cls}" id="${id}" data-carrier="${carrier??''}" data-ts="${ts}">
     <div class="ts-num">TS ${ts}</div>
     ${ts>1?'<div class="ts-timer"></div>':''}
@@ -6155,7 +6155,7 @@ function tsBlockMarkup(carrier,ts,kind){
 }
 function renderTsCarrier(carrier,label,secondary){
   const head=state.dualCarrierRunning?`<div class="ts-carrier-head ${secondary?'secondary':'main'}">Carrier ${carrier??'—'} <span class="ts-carrier-tag">${label}</span></div>`:'';
-  const kind1=secondary?'secondary-control':'main-control';
+  const kind1=secondary?'idle':'main-control';
   return head+[1,2,3,4].map(ts=>tsBlockMarkup(carrier,ts,ts===1?kind1:'idle')).join('');
 }
 function renderTsGrid(){
@@ -6201,9 +6201,9 @@ function updateTsBlocks(){
       const sub=block.querySelector('.ts-sub');
       const dur=block.querySelector('.ts-duration-bar');
 
-      if(ts===1){
+      if(ts===1&&!carrierInfo.secondary){
         block.className='ts-block mcch';
-        label.textContent=carrierInfo.secondary?'BCCH':'MCCH';
+        label.textContent='MCCH';
         sub.textContent='ACTIVE';
         tsApplyWave(carrier,1,true);
         if(dur)dur.style.width='0%';
