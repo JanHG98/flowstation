@@ -37,8 +37,8 @@ pub fn read_dual_carrier(config_path: &str) -> DualCarrierState {
 
     for line in txt.lines() {
         let trimmed = line.trim_start();
-        if trimmed.starts_with('[') && trimmed.contains(']') {
-            in_cell = trimmed.starts_with("[cell_info]");
+        if let Some(name) = table_name(trimmed) {
+            in_cell = is_cell_info_table(name);
             continue;
         }
         if !in_cell || trimmed.starts_with('#') {
@@ -64,6 +64,43 @@ fn active_value<'a>(trimmed: &'a str, key: &str) -> Option<&'a str> {
 /// Strip a trailing `# inline comment` and surrounding whitespace from a TOML scalar value.
 fn value_token(v: &str) -> &str {
     v.split('#').next().unwrap_or(v).trim()
+}
+
+/// Return the TOML table name for real table headers (`[cell_info]`,
+/// `[cell_info.sds_command_control]`, `[[cell_info.neighbor_cells_ca]]`).
+///
+/// Important: ordinary array values such as `local_ssi_ranges = [` followed by
+/// `    [0, 90],` also start with `[` after trimming. Treating those as section
+/// headers corrupts the array by inserting keys inside it. We therefore accept
+/// only bare dotted TOML table names made from identifier characters used in this
+/// config, not comma-separated array literals.
+fn table_name(trimmed: &str) -> Option<&str> {
+    let head = value_token(trimmed);
+    let inner = if let Some(rest) = head.strip_prefix("[[") {
+        rest.strip_suffix("]]" )?
+    } else if let Some(rest) = head.strip_prefix('[') {
+        rest.strip_suffix(']')?
+    } else {
+        return None;
+    };
+
+    let name = inner.trim();
+    if name.is_empty() {
+        return None;
+    }
+
+    if name
+        .bytes()
+        .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'_' | b'-' | b'.'))
+    {
+        Some(name)
+    } else {
+        None
+    }
+}
+
+fn is_cell_info_table(name: &str) -> bool {
+    name == "cell_info"
 }
 
 /// Produce a new TOML body with `dual_carrier_enabled` (and, when `secondary_carrier` is `Some`,
@@ -104,12 +141,14 @@ pub fn compute_toml(original: &str, enabled: bool, secondary_carrier: Option<u16
     for line in original.lines() {
         let trimmed = line.trim_start();
 
-        if trimmed.starts_with('[') && trimmed.contains(']') {
-            // Leaving [cell_info] without having written every key: append them at section end.
+        if let Some(name) = table_name(trimmed) {
+            // Leaving the top-level [cell_info] table without having written every key:
+            // append them at section end. Do not treat array rows such as `[0, 90],`
+            // as table headers.
             if in_cell {
                 flush_missing(&mut out, &mut wrote_enabled, &mut wrote_secondary);
             }
-            in_cell = trimmed.starts_with("[cell_info]");
+            in_cell = is_cell_info_table(name);
             if in_cell {
                 cell_seen = true;
             }
@@ -200,6 +239,31 @@ issi_whitelist = []
         let sec_idx = out.find("[security]").unwrap();
         let enabled_idx = out.find("dual_carrier_enabled = true").unwrap();
         assert!(cell_idx < enabled_idx && enabled_idx < sec_idx);
+    }
+
+    #[test]
+    fn local_ssi_ranges_array_is_not_treated_as_section_header() {
+        let sample = "\
+[cell_info]
+main_carrier = 720
+local_ssi_ranges = [
+    [0, 90],
+]
+system_wide_services = true
+
+[cell_info.sds_command_control]
+authorized_issis = [2010001]
+";
+
+        let out = compute_toml(sample, true, Some(721));
+        let local_idx = out.find("local_ssi_ranges = [").unwrap();
+        let local_end = out[local_idx..].find("\n]").unwrap() + local_idx;
+        let enabled_idx = out.find("dual_carrier_enabled = true").unwrap();
+        let sds_section_idx = out.find("[cell_info.sds_command_control]").unwrap();
+
+        assert!(enabled_idx > local_end, "dual_carrier_enabled must not be inserted inside local_ssi_ranges");
+        assert!(enabled_idx < sds_section_idx, "dual carrier keys should stay in top-level [cell_info]");
+        assert!(out.contains("local_ssi_ranges = [\n    [0, 90],\n]"));
     }
 
     #[test]
