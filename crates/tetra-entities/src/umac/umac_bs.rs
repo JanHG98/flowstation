@@ -25,13 +25,13 @@ use tetra_saps::lcmc::enums::alloc_type::ChanAllocType;
 use tetra_saps::lcmc::enums::ul_dl_assignment::UlDlAssignment;
 use tetra_saps::lcmc::fields::chan_alloc_req::CmceChanAllocReq;
 use tetra_saps::tma::{TmaReport, TmaReportInd, TmaUnitdataInd};
-use tetra_saps::tmv::TmvConfigureReq;
+use tetra_saps::tmv::{TmvConfigureReq, TmvUnitdataReqSlots};
 use tetra_saps::tmv::enums::logical_chans::LogicalChannel;
 use tetra_saps::{SapMsg, SapMsgInner};
 
 use crate::lmac::components::scrambler;
 use crate::umac::subcomp::bs_frag::BsFragger;
-use crate::umac::subcomp::bs_sched::{BsChannelScheduler, PrecomputedUmacPdus, TCH_S_CAP};
+use crate::umac::subcomp::bs_sched::{BsChannelScheduler, CarrierDownlinkMode, PrecomputedUmacPdus, TCH_S_CAP};
 use crate::umac::subcomp::fillbits;
 use crate::{MessagePrio, MessageQueue, TetraEntityTrait};
 
@@ -55,6 +55,7 @@ pub struct UmacBs {
     /// Contains UL/DL scheduling logic
     /// Access to this field is used only by testing code
     pub channel_scheduler: BsChannelScheduler,
+    secondary_channel_schedulers: Vec<BsChannelScheduler>,
     // ulrx_scheduler: UlScheduler,
     /// Timestamp of last received UL voice frame per timeslot (0-indexed: ts1..ts4).
     /// Used to detect UL inactivity when a radio disappears mid-transmission.
@@ -86,6 +87,13 @@ impl UmacBs {
         let scrambling_code = scrambler::tetra_scramb_get_init(c.net.mcc, c.net.mnc, c.cell.colour_code);
         let system_wide_services = Self::get_system_wide_services_state(&config);
         let precomps = Self::generate_precomps(&config);
+        let mut secondary_channel_schedulers = Vec::new();
+        if let Some(secondary_carrier) = c.cell.secondary_carrier {
+            let mut sched = BsChannelScheduler::new(scrambling_code, precomps.clone());
+            sched.set_carrier_num(secondary_carrier);
+            sched.set_downlink_mode(CarrierDownlinkMode::SecondaryBcchNoMcch);
+            secondary_channel_schedulers.push(sched);
+        }
         Self {
             self_component: TetraEntity::Umac,
             config,
@@ -96,9 +104,46 @@ impl UmacBs {
             pending_stch: None,
             // event_label_store: EventLabelStore::new(),
             channel_scheduler: BsChannelScheduler::new(scrambling_code, precomps),
+            secondary_channel_schedulers,
             last_ul_voice: [None; 4],
             ul_signal_owner: [None; 4],
             pending_circuit_closes: [PendingCircuitClose::default(); 4],
+        }
+    }
+
+    fn main_carrier(&self) -> u16 {
+        self.config.config().cell.main_carrier
+    }
+
+    fn scheduler_for_mut(&mut self, carrier_num: u16) -> &mut BsChannelScheduler {
+        if carrier_num == self.main_carrier() {
+            return &mut self.channel_scheduler;
+        }
+        if let Some(index) = self
+            .secondary_channel_schedulers
+            .iter()
+            .position(|sched| sched.carrier_num() == carrier_num)
+        {
+            return &mut self.secondary_channel_schedulers[index];
+        }
+        tracing::error!("UMAC: unknown carrier {}, no scheduler configured -- falling back to primary", carrier_num);
+        &mut self.channel_scheduler
+    }
+
+    fn scheduler_for(&self, carrier_num: u16) -> &BsChannelScheduler {
+        if carrier_num == self.main_carrier() {
+            return &self.channel_scheduler;
+        }
+        match self
+            .secondary_channel_schedulers
+            .iter()
+            .find(|sched| sched.carrier_num() == carrier_num)
+        {
+            Some(sched) => sched,
+            None => {
+                tracing::error!("UMAC: unknown carrier {}, no scheduler configured -- falling back to primary", carrier_num);
+                &self.channel_scheduler
+            }
         }
     }
 
@@ -256,6 +301,9 @@ impl UmacBs {
         if is_effective != self.system_wide_services {
             self.system_wide_services = is_effective;
             self.channel_scheduler.set_system_wide_services_state(is_effective);
+            for scheduler in &mut self.secondary_channel_schedulers {
+                scheduler.set_system_wide_services_state(is_effective);
+            }
 
             // Should already be signalled at SwMI interface level
             tracing::debug!("UmacBs: system_wide_services {}", if is_effective { "ENABLED" } else { "DISABLED" });
@@ -1384,8 +1432,8 @@ impl UmacBs {
                 // UL stuck-transmitter timer: the speaker is remote and no local radio is
                 // transmitting. The timer only tracks locally-owned uplink, which is armed by
                 // CallControl::FloorGranted and refreshed by TmdCircuitDataInd (real UL frames).
-                if self.channel_scheduler.circuit_is_active(Direction::Dl, ts) {
-                    self.channel_scheduler.dl_schedule_tmd(ts, prim.data);
+                if self.scheduler_for(prim.carrier_num).circuit_is_active(Direction::Dl, ts) {
+                    self.scheduler_for_mut(prim.carrier_num).dl_schedule_tmd(ts, prim.data);
                 } else {
                     tracing::warn!(
                         "rx_tmd_prim: dropping DL voice on inactive circuit ts={} src={:?} dltime={}",
@@ -1397,6 +1445,7 @@ impl UmacBs {
             }
             // UL voice from LMAC → forward to Brew + cross-route (duplex) or loopback (simplex) to DL
             SapMsgInner::TmdCircuitDataInd(prim) => {
+                let carrier_num = prim.carrier_num;
                 let ts = prim.ts;
                 let data = prim.data;
 
@@ -1408,14 +1457,14 @@ impl UmacBs {
                 // Forward UL voice to Brew (User plane) if loaded. Each Brew entity only accepts
                 // frames for timeslots it explicitly claimed from CMCE.
                 if self.config.config().brew.is_some() || self.config.config().brew2.is_some() {
-                    if self.channel_scheduler.circuit_is_active(Direction::Ul, ts) {
+                    if self.scheduler_for(carrier_num).circuit_is_active(Direction::Ul, ts) {
                         for dest in crate::net_brew::BREW_ENTITIES {
                             if crate::net_brew::is_active_for_entity(&self.config, dest) {
                                 queue.push_back(SapMsg {
                                     sap: Sap::TmdSap,
                                     src: TetraEntity::Umac,
                                     dest,
-                                    msg: SapMsgInner::TmdCircuitDataInd(tetra_saps::tmd::TmdCircuitDataInd { ts, data: data.clone() }),
+                                    msg: SapMsgInner::TmdCircuitDataInd(tetra_saps::tmd::TmdCircuitDataInd { carrier_num, ts, data: data.clone() }),
                                 });
                             }
                         }
@@ -1427,12 +1476,12 @@ impl UmacBs {
                 // Forward UL voice to Asterisk if the SIP bridge is enabled. The Asterisk entity
                 // keeps its own ts -> dialog map and ignores unrelated circuits.
                 if self.config.config().asterisk.enabled {
-                    if self.channel_scheduler.circuit_is_active(Direction::Ul, ts) {
+                    if self.scheduler_for(carrier_num).circuit_is_active(Direction::Ul, ts) {
                         let msg = SapMsg {
                             sap: Sap::TmdSap,
                             src: TetraEntity::Umac,
                             dest: TetraEntity::Asterisk,
-                            msg: SapMsgInner::TmdCircuitDataInd(tetra_saps::tmd::TmdCircuitDataInd { ts, data: data.clone() }),
+                            msg: SapMsgInner::TmdCircuitDataInd(tetra_saps::tmd::TmdCircuitDataInd { carrier_num, ts, data: data.clone() }),
                         };
                         queue.push_back(msg);
                     } else {
@@ -1443,12 +1492,12 @@ impl UmacBs {
                 // Forward UL voice to EchoLink if the bridge is enabled. The EchoLink entity keeps
                 // its own ts -> QSO map and ignores unrelated circuits.
                 if self.config.effective_echolink().enabled {
-                    if self.channel_scheduler.circuit_is_active(Direction::Ul, ts) {
+                    if self.scheduler_for(carrier_num).circuit_is_active(Direction::Ul, ts) {
                         let msg = SapMsg {
                             sap: Sap::TmdSap,
                             src: TetraEntity::Umac,
                             dest: TetraEntity::Echolink,
-                            msg: SapMsgInner::TmdCircuitDataInd(tetra_saps::tmd::TmdCircuitDataInd { ts, data: data.clone() }),
+                            msg: SapMsgInner::TmdCircuitDataInd(tetra_saps::tmd::TmdCircuitDataInd { carrier_num, ts, data: data.clone() }),
                         };
                         queue.push_back(msg);
                     } else {
@@ -1464,9 +1513,9 @@ impl UmacBs {
                 //     calling MS to hear their own voice instead of the remote party.
                 // Refresh the peer's UL inactivity timer so the remote MS isn't timed out while
                 // only the other party is talking.
-                let dl_target_ts = match self.channel_scheduler.ul_circuit_peer_ts(ts) {
+                let dl_target_ts = match self.scheduler_for(carrier_num).ul_circuit_peer_ts(ts) {
                     Some(peer_ts) => {
-                        if (1..=4).contains(&peer_ts) && self.channel_scheduler.circuit_is_active(Direction::Ul, peer_ts) {
+                        if (1..=4).contains(&peer_ts) && self.scheduler_for(carrier_num).circuit_is_active(Direction::Ul, peer_ts) {
                             self.last_ul_voice[peer_ts as usize - 1] = Some(self.dltime);
                         }
                         tracing::trace!("rx_tmd_prim: duplex P2P cross-route UL ts={} -> DL ts={}", ts, peer_ts);
@@ -1474,7 +1523,7 @@ impl UmacBs {
                     }
                     None => {
                         use tetra_saps::control::call_control::CircuitDlMediaSource;
-                        if self.channel_scheduler.ul_circuit_dl_media_source(ts) == CircuitDlMediaSource::SwMI {
+                        if self.scheduler_for(carrier_num).ul_circuit_dl_media_source(ts) == CircuitDlMediaSource::SwMI {
                             // Circuit call via Brew: DL comes from TetraPack, not local loopback.
                             // Suppress UL->DL reflection so the caller doesn't hear their own voice.
                             tracing::trace!("rx_tmd_prim: circuit call ts={}, suppressing local UL loopback (SwMI)", ts);
@@ -1484,9 +1533,9 @@ impl UmacBs {
                     }
                 };
 
-                if self.channel_scheduler.circuit_is_active(Direction::Dl, dl_target_ts) {
+                if self.scheduler_for(carrier_num).circuit_is_active(Direction::Dl, dl_target_ts) {
                     if let Some(packed) = pack_ul_acelp_bits(&data) {
-                        self.channel_scheduler.dl_schedule_tmd(dl_target_ts, packed);
+                        self.scheduler_for_mut(carrier_num).dl_schedule_tmd(dl_target_ts, packed);
                     } else {
                         tracing::warn!(
                             "rx_tmd_prim: unsupported UL voice length {} on ts={} (target ts={}), skipping",
@@ -1517,6 +1566,8 @@ impl UmacBs {
             src: self.self_component,
             dest: TetraEntity::Lmac,
             msg: SapMsgInner::TmvConfigureReq(TmvConfigureReq {
+                carrier_num: Some(self.main_carrier()),
+                time: Some(self.dltime.add_timeslots(-2)),
                 blk2_stolen: Some(true),
                 ..Default::default()
             }),
@@ -1861,9 +1912,15 @@ impl TetraEntityTrait for UmacBs {
         if self.channel_scheduler.cur_dltime != ts && self.channel_scheduler.cur_dltime == (TdmaTime { t: 0, f: 0, m: 0, h: 0 }) {
             // Upon start of the system, we need to set the dl time for the channel scheduler
             self.channel_scheduler.set_dl_time(ts);
+            for scheduler in &mut self.secondary_channel_schedulers {
+                scheduler.set_dl_time(ts);
+            }
         } else {
             // When running, we adopt the new time and check for desync
             self.channel_scheduler.tick_start(ts);
+            for scheduler in &mut self.secondary_channel_schedulers {
+                scheduler.tick_start(ts);
+            }
         }
 
         // Check for UL inactivity (stuck transmitter detection)
@@ -1872,16 +1929,30 @@ impl TetraEntityTrait for UmacBs {
         // Feed the health monitor's Congestion domain: current downlink scheduling backlog.
         crate::health::registry().set_dl_queue_depth(self.channel_scheduler.dl_queue_depth());
 
-        // Collect/construct traffic that should be sent down to the LMAC
-        // This is basically the _previous_ timeslot
-        let elem = self.channel_scheduler.finalize_ts_for_tick();
-        let s = SapMsg {
-            sap: Sap::TmvSap,
-            src: self.self_component,
-            dest: TetraEntity::Lmac,
-            msg: SapMsgInner::TmvUnitdataReq(elem),
+        // Collect/construct traffic that should be sent down to the LMAC.
+        // With DualCarrier enabled we finalize one slot per configured carrier and send them as a batch
+        // so PHY can synthesize all carriers in the same SDR timeslot.
+        let mut slots = Vec::with_capacity(1 + self.secondary_channel_schedulers.len());
+        slots.push(self.channel_scheduler.finalize_ts_for_tick());
+        for scheduler in &mut self.secondary_channel_schedulers {
+            slots.push(scheduler.finalize_ts_for_tick());
+        }
+        let s = if slots.len() == 1 {
+            SapMsg {
+                sap: Sap::TmvSap,
+                src: self.self_component,
+                dest: TetraEntity::Lmac,
+                msg: SapMsgInner::TmvUnitdataReq(slots.remove(0)),
+            }
+        } else {
+            SapMsg {
+                sap: Sap::TmvSap,
+                src: self.self_component,
+                dest: TetraEntity::Lmac,
+                msg: SapMsgInner::TmvUnitdataReqSlots(TmvUnitdataReqSlots { slots }),
+            }
         };
-        tracing::trace!("UmacBs tick: Pushing finalized timeslot to LMAC: {:?}", s);
+        tracing::trace!("UmacBs tick: Pushing finalized timeslot(s) to LMAC: {:?}", s);
         queue.push_back(s);
 
         self.process_pending_circuit_closes();
