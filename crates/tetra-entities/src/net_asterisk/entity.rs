@@ -1138,7 +1138,7 @@ impl AsteriskEntity {
                 sap: Sap::TmdSap,
                 src: TetraEntity::Asterisk,
                 dest: TetraEntity::Umac,
-                msg: SapMsgInner::TmdCircuitDataReq(TmdCircuitDataReq { ts, data }),
+                msg: SapMsgInner::TmdCircuitDataReq(TmdCircuitDataReq { carrier_num: self.config.config().cell.main_carrier, ts, data }),
             });
         }
     }
