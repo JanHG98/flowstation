@@ -132,8 +132,13 @@ pub struct StackConfig {
 impl StackConfig {
     /// Return BS phase-modulated carrier numbers and their DL/UL frequencies.
     pub fn bs_phase_mod_carriers(&self) -> Result<Vec<(u16, u32, u32)>, String> {
-        let mut carriers = Vec::with_capacity(if self.cell.secondary_carrier.is_some() { 2 } else { 1 });
-        for carrier in [Some(self.cell.main_carrier), self.cell.secondary_carrier].into_iter().flatten() {
+        let configured_carriers = [
+            Some(self.cell.main_carrier),
+            self.cell.secondary_carrier,
+            self.cell.third_carrier,
+        ];
+        let mut carriers = Vec::with_capacity(configured_carriers.iter().filter(|c| c.is_some()).count());
+        for carrier in configured_carriers.into_iter().flatten() {
             let freq_info = FreqInfo::from_components(
                 self.cell.freq_band,
                 carrier,
@@ -168,10 +173,23 @@ impl StackConfig {
             }
         };
 
-        if let Some(secondary_carrier) = self.cell.secondary_carrier
-            && secondary_carrier == self.cell.main_carrier
         {
-            return Err("cell.secondary_carrier must differ from cell.main_carrier");
+            let mut seen_carriers = std::collections::HashSet::new();
+            for (name, carrier) in [
+                ("cell.main_carrier", Some(self.cell.main_carrier)),
+                ("cell.secondary_carrier", self.cell.secondary_carrier),
+                ("cell.third_carrier", self.cell.third_carrier),
+            ] {
+                if let Some(carrier) = carrier
+                    && !seen_carriers.insert(carrier)
+                {
+                    return Err(match name {
+                        "cell.secondary_carrier" => "cell.secondary_carrier must differ from the other configured carrier(s)",
+                        "cell.third_carrier" => "cell.third_carrier must differ from the other configured carrier(s)",
+                        _ => "configured BS carriers must be unique",
+                    });
+                }
+            }
         }
 
         // Sanity check on main carrier property fields in SYSINFO
@@ -201,7 +219,7 @@ impl StackConfig {
             if carriers.len() > 1 {
                 let Some(sample_rate_hz) = soapy_cfg.fs else {
                     return Err(
-                        "dual carrier requires phy_io.soapysdr.sample_rate to be set so the secondary carrier can be proven to fit the SDR passband",
+                        "multi-carrier operation requires phy_io.soapysdr.sample_rate to be set so all carriers can be proven to fit the SDR passband",
                     );
                 };
                 let dl_freqs: Vec<u32> = carriers.iter().map(|(_, dl, _)| *dl).collect();
