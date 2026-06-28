@@ -292,9 +292,30 @@ impl LmacBs {
             return;
         };
 
-        let msg_dltime = self.dltime.add_timeslots(-2); // Msg on uplink was sent two timeslots ago. 
+        let msg_dltime = self.dltime.add_timeslots(-2); // Msg on uplink was sent two timeslots ago.
         let key = (prim.carrier_num, msg_dltime.t);
         let pchan = self.uplink_phy_chan.get(&key).copied().unwrap_or(PhysicalChannel::Unallocated);
+
+        // Dual-carrier guard: secondary carriers are traffic-only in this build.
+        // Random access / SCH/HU / SCH/F on TS1 must stay on the main carrier. With
+        // adjacent carriers, the secondary demodulator can see ghost copies of the
+        // main-carrier common-control uplink. Dropping those here prevents duplicate
+        // MAC-ACCESS, duplicate ACKs and LLC setup loops while still allowing genuine
+        // assigned traffic (pchan == Tp) on a secondary carrier.
+        let main_carrier = self.config.config().cell.main_carrier;
+        if prim.carrier_num != main_carrier && pchan != PhysicalChannel::Tp {
+            tracing::debug!(
+                carrier=prim.carrier_num,
+                main_carrier,
+                ts=msg_dltime.t,
+                pchan=?pchan,
+                train_type=?prim.train_type,
+                burst_type=?prim.burst_type,
+                "LMAC: dropping secondary-carrier non-traffic/control uplink burst"
+            );
+            return;
+        }
+
         let blk2_stolen = self.blk2_stolen.get(&key).copied().unwrap_or(false);
         let lchan = Self::determine_logical_channel_ul(&prim, pchan == PhysicalChannel::Tp, blk2_stolen);
 
