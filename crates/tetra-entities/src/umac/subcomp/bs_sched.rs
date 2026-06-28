@@ -1225,6 +1225,29 @@ impl BsChannelScheduler {
         let dl_is_traffic = dl_circuit_active && !hang_effective;
         let ul_is_traffic = ul_circuit_active && !hang_effective;
 
+        // NetCore dual-carrier hardening:
+        // Secondary carriers are operated as traffic-only carriers for now. They must
+        // not emit MCCH/BCCH/SYSINFO/AACH idle control bursts while no traffic circuit
+        // is assigned, otherwise nearby MSs and the adjacent-carrier demodulator may
+        // see a second common-control path and duplicate random-access/setup traffic.
+        // Returning an empty TP slot makes PHY skip transmission for this carrier/slot.
+        if self.downlink_mode == CarrierDownlinkMode::TrafficOnly && !dl_is_traffic && !ul_is_traffic {
+            let clear_ts = ts.add_timeslots(-4);
+            let index = self.ul_ts_to_sched_index(&clear_ts);
+            self.ulsched[ts.t as usize - 1][index].ul1 = None;
+            self.ulsched[ts.t as usize - 1][index].ul2 = None;
+            self.ulsched[ts.t as usize - 1][index].usage_marker = None;
+            tracing::trace!(carrier=self.carrier_num, ts=%ts, "BsChannelScheduler: traffic-only secondary idle slot, no DL burst");
+            return TmvUnitdataReqSlot {
+                carrier_num: self.carrier_num,
+                ts,
+                blk1: None,
+                blk2: None,
+                bbk: None,
+                ul_phy_chan: PhysicalChannel::Unallocated,
+            };
+        }
+
         // Build the block for this timeslot with anything scheduled (traffic or signalling)
         // For traffic timeslots, also check for FACCH/stealing (STCH half-slot)
         let ul_phy = if ul_is_traffic { PhysicalChannel::Tp } else { PhysicalChannel::Cp };
