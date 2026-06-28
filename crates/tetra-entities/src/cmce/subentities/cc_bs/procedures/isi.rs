@@ -960,6 +960,7 @@ impl CcBsSubentity {
             gssi: dest_gssi,
             caller_issi: source_issi,
             ts,
+            carrier_num: self.config.config().cell.main_carrier,
             priority,
             source: crate::net_telemetry::telemetry_source_for_entity(network_entity).to_string(),
         });
