@@ -1366,13 +1366,18 @@ impl UmacBs {
         }
 
         // ── Normal signaling path (MCCH / SCH/F) ────────────────────────
-        let (usage_marker, mac_chan_alloc) = if let Some(chan_alloc) = prim.chan_alloc {
+        let (usage_marker, mac_chan_alloc, target_carrier) = if let Some(chan_alloc) = prim.chan_alloc {
+            let target_carrier = chan_alloc
+                .carrier
+                .and_then(|c| if c >= 0 { Some(c as u16) } else { None })
+                .unwrap_or_else(|| self.config.config().cell.main_carrier);
             (
                 chan_alloc.usage,
-                Some(Self::cmce_to_mac_chanalloc(&chan_alloc, self.config.config().cell.main_carrier)),
+                Some(Self::cmce_to_mac_chanalloc(&chan_alloc, target_carrier)),
+                target_carrier,
             )
         } else {
-            (None, None)
+            (None, None, self.config.config().cell.main_carrier)
         };
 
         // Build MAC-RESOURCE optimistically (as if it would always fit in one slot)
@@ -1398,7 +1403,7 @@ impl UmacBs {
         // Let the scheduler choose MCCH versus linked signalling timeslot from
         // the LLC link context. FACCH/traffic-slot signalling uses the explicit
         // stealing path above.
-        self.channel_scheduler
+        self.scheduler_for_mut(target_carrier)
             .dl_enqueue_tma_for_link(prim.link_id, pdu, sdu, prim.tx_reporter);
     }
 
