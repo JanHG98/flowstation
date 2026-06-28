@@ -2325,6 +2325,13 @@ fn handle_connection(
             }
         }
         serve_bts_info(buf.into_inner(), &shared_config);
+    } else if req_line.contains("GET /api/dualcarrier") {
+        let mut s = stream;
+        drain_http_headers(&mut s);
+        serve_dual_carrier_get(s, &shared_config, &config_path);
+    } else if req_line.contains("POST /api/dualcarrier") {
+        let (inner, body_str) = read_post_body(stream);
+        serve_dual_carrier_post(inner, &shared_config, &config_path, &body_str);
     } else if req_line.contains("GET /api/asterisk/status") {
         let mut s = stream;
         drain_http_headers(&mut s);
@@ -3144,6 +3151,118 @@ fn serve_bts_info(mut stream: TcpStream, shared_config: &Option<tetra_config::bl
     let _ = stream.write_all(header.as_bytes());
     let _ = stream.write_all(body.as_bytes());
 }
+
+/// GET /api/dualcarrier — current Dual-Carrier ON/OFF state for the first-page toggle.
+/// Reads the switch + configured secondary carrier from the TOML, plus the running effective state.
+fn serve_dual_carrier_get(
+    stream: TcpStream,
+    shared_config: &Option<tetra_config::bluestation::SharedConfig>,
+    config_path: &str,
+) {
+    let st = crate::net_dashboard::dual_carrier::read_dual_carrier(config_path);
+    let main_carrier = shared_config.as_ref().map(|c| c.config().cell.main_carrier);
+    let running_active = shared_config
+        .as_ref()
+        .map(|c| c.config().cell.secondary_carrier.is_some())
+        .unwrap_or(false);
+
+    let body = serde_json::json!({
+        "enabled": st.enabled,
+        "secondary_carrier": st.secondary_carrier,
+        "active": st.active(),
+        "running_active": running_active,
+        "main_carrier": main_carrier,
+    })
+    .to_string();
+
+    http_json_response(stream, 200, &body);
+}
+
+/// POST /api/dualcarrier — toggle dual carrier. Body: {"enabled": bool, "secondary_carrier"?: u16}.
+///
+/// The secondary carrier is fixed at startup (PHY/SDR tuning and UMAC schedulers read it once), so
+/// this validates the resulting config, writes TOML, and schedules a controlled service restart.
+fn serve_dual_carrier_post(
+    stream: TcpStream,
+    _shared_config: &Option<tetra_config::bluestation::SharedConfig>,
+    config_path: &str,
+    body: &str,
+) {
+    use crate::net_dashboard::dual_carrier;
+
+    let req: serde_json::Value = match serde_json::from_str(body) {
+        Ok(v) => v,
+        Err(e) => return http_response(stream, 400, &format!("invalid JSON: {e}")),
+    };
+    let Some(enabled) = req.get("enabled").and_then(|v| v.as_bool()) else {
+        return http_response(stream, 400, "missing boolean field 'enabled'");
+    };
+
+    let current = dual_carrier::read_dual_carrier(config_path);
+
+    // Enabling uses an explicit carrier from the request, otherwise the one already present in TOML.
+    // Disabling does not rewrite the carrier number, so OFF remembers what ON should use next time.
+    let secondary = if enabled {
+        let requested = match req.get("secondary_carrier").and_then(|v| v.as_u64()) {
+            Some(n) if n > 4095 => {
+                return http_response(stream, 400, "secondary_carrier must be in 0..4095");
+            }
+            Some(n) => Some(n as u16),
+            None => None,
+        };
+        match requested.or(current.secondary_carrier) {
+            Some(n) => Some(n),
+            None => {
+                return http_response(
+                    stream,
+                    400,
+                    "enabling dual carrier needs a secondary_carrier number (none configured yet)",
+                );
+            }
+        }
+    } else {
+        None
+    };
+
+    let original = match std::fs::read_to_string(config_path) {
+        Ok(s) => s,
+        Err(e) => return http_response(stream, 500, &format!("cannot read config: {e}")),
+    };
+    let prospective = dual_carrier::compute_toml(&original, enabled, secondary);
+    match tetra_config::bluestation::parsing::from_toml_str(&prospective) {
+        Ok(cfg) => {
+            if let Err(e) = cfg.validate() {
+                return http_response(stream, 400, &format!("resulting config is invalid: {e}"));
+            }
+        }
+        Err(e) => return http_response(stream, 400, &format!("resulting config does not parse: {e}")),
+    }
+
+    if let Err(e) = dual_carrier::write_dual_carrier(config_path, enabled, secondary) {
+        return http_response(stream, 500, &format!("failed to write config: {e}"));
+    }
+
+    tracing::info!(
+        "Dashboard: Dual-Carrier set {} (secondary_carrier={:?}); scheduling restart",
+        if enabled { "ON" } else { "OFF" },
+        secondary
+    );
+    crate::service_control::schedule_service_action(
+        crate::service_control::ServiceAction::Restart,
+        std::time::Duration::from_secs(2),
+    );
+
+    http_response(
+        stream,
+        200,
+        if enabled {
+            "Dual carrier enabled; the base station is restarting to apply it."
+        } else {
+            "Dual carrier disabled; the base station is restarting to apply it."
+        },
+    );
+}
+
 
 /// GET /api/asterisk/status — config + runtime status for the Asterisk SIP bridge.
 fn serve_asterisk_status(stream: TcpStream, shared_config: &Option<tetra_config::bluestation::SharedConfig>) {
