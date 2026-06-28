@@ -60,7 +60,7 @@ rx_freq = 408000000
 
 # Optional sample rate (samples/sec) applied to both RX and TX.
 # If unset, the device-specific default is used.
-# sample_rate = 1800000
+sample_rate = 1800000
 
 # Optional SDR center frequencies in Hz for dual-carrier / phase-modulated operation.
 # For a single carrier, leave these commented and the radio tunes directly to tx_freq/rx_freq.
