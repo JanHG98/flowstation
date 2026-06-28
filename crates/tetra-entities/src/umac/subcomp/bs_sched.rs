@@ -42,10 +42,18 @@ pub const SCH_HD_CAP: usize = 124;
 pub const SCH_F_CAP: usize = 268;
 pub const TCH_S_CAP: usize = 274;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CarrierDownlinkMode {
+    PrimaryMcch,
+    SecondaryBcchNoMcch,
+    TrafficOnly,
+}
+
+
 /// Number of timeslots the scheduler operates on. May become larger when secondary carriers are supported.
 pub const NUM_TIMESLOTS: usize = 4;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct PrecomputedUmacPdus {
     pub mac_sysinfo1: MacSysinfo,
     pub mac_sysinfo2: MacSysinfo,
@@ -73,6 +81,8 @@ pub struct TimeslotSchedule {
 // #[derive(Debug)]
 pub struct BsChannelScheduler {
     pub cur_dltime: TdmaTime,
+    carrier_num: u16,
+    downlink_mode: CarrierDownlinkMode,
     scrambling_code: u32,
     precomps: PrecomputedUmacPdus,
     /// Collect dltx traffic here that can't be sent this slot.
@@ -149,8 +159,11 @@ const EMPTY_SCHED: [[TimeslotSchedule; MACSCHED_NUM_FRAMES]; 4] = [EMPTY_SCHED_C
 
 impl BsChannelScheduler {
     pub fn new(scrambling_code: u32, precomps: PrecomputedUmacPdus) -> Self {
+        let carrier_num = precomps.mac_sysinfo1.main_carrier;
         BsChannelScheduler {
             cur_dltime: TdmaTime { t: 0, f: 0, m: 0, h: 0 }, // Intentionally invalid, updated in tick function
+            carrier_num,
+            downlink_mode: CarrierDownlinkMode::PrimaryMcch,
             scrambling_code,
             precomps,
             dltx_next_slot_queue: Vec::new(),
@@ -247,6 +260,18 @@ impl BsChannelScheduler {
     // }
 
     /// Update the System Wide Services flag in the broadcast SYSINFO.
+    pub fn set_carrier_num(&mut self, carrier_num: u16) {
+        self.carrier_num = carrier_num;
+    }
+
+    pub fn set_downlink_mode(&mut self, downlink_mode: CarrierDownlinkMode) {
+        self.downlink_mode = downlink_mode;
+    }
+
+    pub fn carrier_num(&self) -> u16 {
+        self.carrier_num
+    }
+
     pub fn set_system_wide_services_state(&mut self, enabled: bool) {
         if self.precomps.mle_sysinfo.bs_service_details.system_wide_services != enabled {
             self.precomps.mle_sysinfo.bs_service_details.system_wide_services = enabled;
@@ -1217,6 +1242,7 @@ impl BsChannelScheduler {
                     tch_buf.get_len()
                 );
                 TmvUnitdataReqSlot {
+                    carrier_num: self.carrier_num,
                     ts,
                     blk1: Some(TmvUnitdataReq {
                         logical_channel: LogicalChannel::Stch,
@@ -1234,6 +1260,7 @@ impl BsChannelScheduler {
             } else {
                 // Normal traffic: full-slot TCH
                 TmvUnitdataReqSlot {
+                    carrier_num: self.carrier_num,
                     ts,
                     blk1: Some(TmvUnitdataReq {
                         logical_channel: LogicalChannel::TchS,
@@ -1254,6 +1281,7 @@ impl BsChannelScheduler {
             let buf = self.dl_build_block_from_signalling_schedule(ts);
             if let Some(buf) = buf {
                 TmvUnitdataReqSlot {
+                    carrier_num: self.carrier_num,
                     ts,
                     blk1: Some(TmvUnitdataReq {
                         logical_channel: LogicalChannel::SchF,
@@ -1269,6 +1297,7 @@ impl BsChannelScheduler {
                 // Otherwise, fall back to default SYNC/SYSINFO.
                 if hang_effective && dl_circuit_active {
                     TmvUnitdataReqSlot {
+                    carrier_num: self.carrier_num,
                         ts,
                         blk1: Some(TmvUnitdataReq {
                             logical_channel: LogicalChannel::SchF,
@@ -1282,6 +1311,7 @@ impl BsChannelScheduler {
                 } else {
                     // Put default SYNC/SYSINFO frame
                     TmvUnitdataReqSlot {
+                    carrier_num: self.carrier_num,
                         ts,
                         blk1: None,
                         blk2: None,
