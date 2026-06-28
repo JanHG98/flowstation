@@ -582,6 +582,5 @@ impl TetraEntityTrait for LmacBs {
 
     fn tick_start(&mut self, _queue: &mut MessageQueue, ts: TdmaTime) {
         self.dltime = ts;
-        self.blk2_stolen = false; // reset in case it was set during this tick
     }
 }
