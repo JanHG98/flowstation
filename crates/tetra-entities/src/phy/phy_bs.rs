@@ -367,10 +367,10 @@ impl<D: RxTxDev> PhyBs<D> {
                     return;
                 }
 
-                tracing::info!(
+                tracing::trace!(
                     ts=%self.dltime,
                     carrier=rx_slot.carrier_num,
-                    "rx_tpsap_prim got {:?} in {}",
+                    "rx_tpsap_prim candidate {:?} in {}",
                     burst.train_type,
                     label
                 );
@@ -424,6 +424,21 @@ impl<D: RxTxDev> PhyBs<D> {
         }
 
         for candidate in candidates {
+            let label = match candidate.subslot_id {
+                1 => "subslot1",
+                2 => "subslot2",
+                3 => "fullslot",
+                _ => "slot",
+            };
+            tracing::info!(
+                ts=%self.dltime,
+                carrier=candidate.carrier_num,
+                rssi_dbfs=candidate.rssi_dbfs,
+                "rx_tpsap_prim forwarding {:?} in {}",
+                candidate.train_type,
+                label
+            );
+
             if let Some(ul_rx_sender) = &self.ul_rx_sender {
                 let _ = ul_rx_sender.try_send(FileWriteMsg::WriteHeaderAndBlock(
                     candidate.subslot_id,
