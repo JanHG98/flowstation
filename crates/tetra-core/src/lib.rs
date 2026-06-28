@@ -15,7 +15,7 @@ pub const GIT_HASH: &str = git_version::git_version!(
 
 /// Product/branding used by the NetCore dashboard and OTA output.
 pub const STACK_NAME: &str = "NetCore-Tetra";
-pub const STACK_CODENAME: &str = "Dual Carrier";
+pub const STACK_CODENAME: &str = "Triple Carrier Lab";
 
 /// Full stack version string, e.g. "v1.3.0-2aad62c8".
 pub const STACK_VERSION: &str = const_format::formatcp!("v{}-{}", env!("CARGO_PKG_VERSION"), GIT_HASH);
