@@ -629,7 +629,7 @@ impl EcholinkEntity {
                 sap: Sap::TmdSap,
                 src: TetraEntity::Echolink,
                 dest: TetraEntity::Umac,
-                msg: SapMsgInner::TmdCircuitDataReq(TmdCircuitDataReq { ts, data: frame }),
+                msg: SapMsgInner::TmdCircuitDataReq(TmdCircuitDataReq { carrier_num: self.config.config().cell.main_carrier, ts, data: frame }),
             });
         }
         self.last_rx = Some(format!("audio {} bytes from {}", packet.len(), addr));
