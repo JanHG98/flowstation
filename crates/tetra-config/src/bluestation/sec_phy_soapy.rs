@@ -11,6 +11,17 @@ pub struct CfgSoapySdr {
     pub dl_freq: f64,
     /// PPM frequency error correction
     pub ppm_err: f64,
+    /// Optional explicit SDR RX center frequency in Hz.
+    ///
+    /// When unset, legacy behaviour is used (RX tuned from `rx_freq`, including
+    /// the PHY-specific offset applied by the Soapy backend). For dual-carrier
+    /// operation, set this to the midpoint of the uplink carriers.
+    pub rx_center_freq: Option<f64>,
+    /// Optional explicit SDR TX center frequency in Hz.
+    ///
+    /// When unset, legacy behaviour is used (TX tuned to `tx_freq`). For
+    /// dual-carrier operation, set this to the midpoint of the downlink carriers.
+    pub tx_center_freq: Option<f64>,
     /// Argument string to select a specific SDR device.
     /// If None, devices will be enumerated until the first supported device is found.
     pub device: Option<String>,
@@ -46,6 +57,24 @@ impl CfgSoapySdr {
         let err = (self.dl_freq / 1_000_000.0) * ppm;
         (self.dl_freq + err, err)
     }
+
+    /// Get corrected explicit RX center frequency with PPM error applied.
+    pub fn rx_center_freq_corrected(&self) -> Option<(f64, f64)> {
+        self.rx_center_freq.map(|center_freq| {
+            let ppm = self.ppm_err;
+            let err = (center_freq / 1_000_000.0) * ppm;
+            (center_freq + err, err)
+        })
+    }
+
+    /// Get corrected explicit TX center frequency with PPM error applied.
+    pub fn tx_center_freq_corrected(&self) -> Option<(f64, f64)> {
+        self.tx_center_freq.map(|center_freq| {
+            let ppm = self.ppm_err;
+            let err = (center_freq / 1_000_000.0) * ppm;
+            (center_freq + err, err)
+        })
+    }
 }
 
 #[derive(Deserialize)]
@@ -53,6 +82,8 @@ pub struct SoapySdrDto {
     pub rx_freq: f64,
     pub tx_freq: f64,
     pub ppm_err: Option<f64>,
+    pub rx_center_freq: Option<f64>,
+    pub tx_center_freq: Option<f64>,
 
     pub device: Option<String>,
 
