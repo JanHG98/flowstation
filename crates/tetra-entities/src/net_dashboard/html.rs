@@ -1208,6 +1208,20 @@ tr.row-emergency td:first-child{box-shadow:inset 3px 0 0 var(--danger);}
 
 /* ── TS Visualizer ───────────────────────────────────────────────── */
 .ts-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:16px 18px;}
+.ts-carrier-head{
+  grid-column:1/-1;display:flex;align-items:center;gap:8px;margin:2px 0 0;
+  font-family:var(--mono);font-size:10px;font-weight:800;letter-spacing:0.11em;text-transform:uppercase;
+  color:var(--text2);
+}
+.ts-carrier-head::before{
+  content:'';width:7px;height:7px;border-radius:50%;background:var(--accent2);
+  box-shadow:0 0 8px color-mix(in srgb,var(--accent2) 50%, transparent);
+}
+.ts-carrier-head.secondary::before{background:var(--accent);box-shadow:0 0 8px color-mix(in srgb,var(--accent) 50%, transparent);}
+.ts-carrier-head .ts-carrier-tag{
+  padding:2px 7px;border:1px solid var(--border);border-radius:999px;background:var(--bg3);
+  color:var(--text3);font-size:9px;letter-spacing:0.08em;
+}
 .ts-block{
   border:1px solid var(--border);border-radius:8px;
   padding:12px 10px 8px;text-align:center;
@@ -2675,77 +2689,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
           <div class="card-title">RF Channel — Timeslots</div>
         </div>
         <div class="ts-grid" id="ts-grid">
-          <div class="ts-block mcch" id="ts-block-1">
-            <div class="ts-num">TS 1</div>
-            <div class="ts-led"></div>
-            <div class="ts-wave">
-              <div class="ts-wave-bar" style="height:8px"></div>
-              <div class="ts-wave-bar" style="height:14px"></div>
-              <div class="ts-wave-bar" style="height:10px"></div>
-              <div class="ts-wave-bar" style="height:16px"></div>
-              <div class="ts-wave-bar" style="height:8px"></div>
-              <div class="ts-wave-bar" style="height:12px"></div>
-              <div class="ts-wave-bar" style="height:6px"></div>
-            </div>
-            <div class="ts-label">MCCH</div>
-            <div class="ts-sub">ACTIVE</div>
-            <div class="ts-flash"></div>
-            <div class="ts-duration-bar"></div>
-          </div>
-          <div class="ts-block" id="ts-block-2">
-            <div class="ts-num">TS 2</div>
-            <div class="ts-timer"></div>
-            <div class="ts-led"></div>
-            <div class="ts-wave">
-              <div class="ts-wave-bar" style="height:3px"></div>
-              <div class="ts-wave-bar" style="height:3px"></div>
-              <div class="ts-wave-bar" style="height:3px"></div>
-              <div class="ts-wave-bar" style="height:3px"></div>
-              <div class="ts-wave-bar" style="height:3px"></div>
-              <div class="ts-wave-bar" style="height:3px"></div>
-              <div class="ts-wave-bar" style="height:3px"></div>
-            </div>
-            <div class="ts-label">—</div>
-            <div class="ts-sub">Idle</div>
-            <div class="ts-flash"></div>
-            <div class="ts-duration-bar"></div>
-          </div>
-          <div class="ts-block" id="ts-block-3">
-            <div class="ts-num">TS 3</div>
-            <div class="ts-timer"></div>
-            <div class="ts-led"></div>
-            <div class="ts-wave">
-              <div class="ts-wave-bar" style="height:3px"></div>
-              <div class="ts-wave-bar" style="height:3px"></div>
-              <div class="ts-wave-bar" style="height:3px"></div>
-              <div class="ts-wave-bar" style="height:3px"></div>
-              <div class="ts-wave-bar" style="height:3px"></div>
-              <div class="ts-wave-bar" style="height:3px"></div>
-              <div class="ts-wave-bar" style="height:3px"></div>
-            </div>
-            <div class="ts-label">—</div>
-            <div class="ts-sub">Idle</div>
-            <div class="ts-flash"></div>
-            <div class="ts-duration-bar"></div>
-          </div>
-          <div class="ts-block" id="ts-block-4">
-            <div class="ts-num">TS 4</div>
-            <div class="ts-timer"></div>
-            <div class="ts-led"></div>
-            <div class="ts-wave">
-              <div class="ts-wave-bar" style="height:3px"></div>
-              <div class="ts-wave-bar" style="height:3px"></div>
-              <div class="ts-wave-bar" style="height:3px"></div>
-              <div class="ts-wave-bar" style="height:3px"></div>
-              <div class="ts-wave-bar" style="height:3px"></div>
-              <div class="ts-wave-bar" style="height:3px"></div>
-              <div class="ts-wave-bar" style="height:3px"></div>
-            </div>
-            <div class="ts-label">—</div>
-            <div class="ts-sub">Idle</div>
-            <div class="ts-flash"></div>
-            <div class="ts-duration-bar"></div>
-          </div>
+          <!-- Rendered by renderTsGrid(): main carrier plus secondary carrier when DualCarrier is running. -->
         </div>
       </div>
 
@@ -5583,7 +5527,7 @@ async function wifiCall(url, body){
 function escAttr(s){ return String(s).replace(/&/g,'&amp;').replace(/'/g,"&#39;").replace(/"/g,'&quot;'); }
 
 // ── State + WS ────────────────────────────────────────────────────────────
-let ws=null,state={ms:{},calls:{},emergencies:{},lastHeard:[],sdsLog:[],dapnetLog:[],echolinkDirectory:[],echolinkDirectoryStatus:'',meshcomNodes:[],meshcomMessages:[],geoalarmEvents:[],geoalarmConfig:null,brewOnline:false,brewVer:0,brewStatus:null,brewStatusLoadedAt:0},sdsDest=0;
+let ws=null,state={ms:{},calls:{},emergencies:{},lastHeard:[],sdsLog:[],dapnetLog:[],echolinkDirectory:[],echolinkDirectoryStatus:'',meshcomNodes:[],meshcomMessages:[],geoalarmEvents:[],geoalarmConfig:null,brewOnline:false,brewVer:0,brewStatus:null,brewStatusLoadedAt:0,btsMainCarrier:null,btsSecondaryCarrier:null,dualCarrierActive:false,dualCarrierRunning:false},sdsDest=0;
 
 // ── Local device registry (root /devices.json) ────────────────────────────────
 // Supports both compact mappings ("2010002":"Hytera HRT") and structured entries:
@@ -6172,6 +6116,42 @@ function toggleLastHeardSource(source){
 function renderAll(){renderStations();renderCalls();renderLastHeard();updateTsBlocks();}
 
 // ── TS Visualizer ─────────────────────────────────────────────────────────
+function tsIdleBars(active){
+  const heights=active?[8,14,10,16,8,12,6]:[3,3,3,3,3,3,3];
+  return heights.map(h=>`<div class="ts-wave-bar" style="height:${h}px"></div>`).join('');
+}
+function tsBlockMarkup(carrier,ts,kind){
+  const isMain=carrier==null || carrier===state.btsMainCarrier;
+  const id=isMain?`ts-block-${ts}`:`ts-block-${carrier}-${ts}`;
+  const cls=kind==='main-control'?'ts-block mcch':(kind==='secondary-control'?'ts-block mcch':'ts-block');
+  const label=kind==='main-control'?'MCCH':(kind==='secondary-control'?'BCCH':'—');
+  const sub=kind==='main-control'||kind==='secondary-control'?'ACTIVE':'Idle';
+  return `<div class="${cls}" id="${id}" data-carrier="${carrier??''}" data-ts="${ts}">
+    <div class="ts-num">TS ${ts}</div>
+    ${ts>1?'<div class="ts-timer"></div>':''}
+    <div class="ts-led"></div>
+    <div class="ts-wave">${tsIdleBars(kind==='main-control'||kind==='secondary-control')}</div>
+    <div class="ts-label">${label}</div>
+    <div class="ts-sub">${sub}</div>
+    <div class="ts-flash"></div>
+    <div class="ts-duration-bar"></div>
+  </div>`;
+}
+function renderTsCarrier(carrier,label,secondary){
+  const head=state.dualCarrierRunning?`<div class="ts-carrier-head ${secondary?'secondary':'main'}">Carrier ${carrier??'—'} <span class="ts-carrier-tag">${label}</span></div>`:'';
+  const kind1=secondary?'secondary-control':'main-control';
+  return head+[1,2,3,4].map(ts=>tsBlockMarkup(carrier,ts,ts===1?kind1:'idle')).join('');
+}
+function renderTsGrid(){
+  const grid=document.getElementById('ts-grid');
+  if(!grid)return;
+  const main=state.btsMainCarrier;
+  const sec=state.btsSecondaryCarrier;
+  const dual=!!(state.dualCarrierRunning&&sec!=null);
+  grid.classList.toggle('dual',dual);
+  grid.innerHTML=renderTsCarrier(main,'MAIN',false)+(dual?renderTsCarrier(sec,'SECONDARY',true):'');
+  updateTsBlocks();
+}
 // tsState[ts-1]: {call_id, call_type, label, sub, voice_ts, started_at}
 const tsState=[null,null,null,null];
 const TS_VOICE_DECAY_MS=800;
@@ -8514,6 +8494,8 @@ async function loadBtsInfo(){
     set('bts-mcc', d.mcc);
     set('bts-mnc', d.mnc);
     set('bts-carrier', d.main_carrier);
+    if(d.main_carrier!=null){state.btsMainCarrier=d.main_carrier;}
+    renderTsGrid();
     // Neighbor-cell + hangtime chips in the card header
     const nb=document.getElementById('bts-neighbor');
     if(nb){
@@ -8546,8 +8528,13 @@ async function loadDualCarrierInfo(){
     const r=await fetch('/api/dualcarrier',{credentials:'same-origin'});
     if(!r.ok)return;
     const d=await r.json();
+    if(d.main_carrier!=null)state.btsMainCarrier=d.main_carrier;
+    state.btsSecondaryCarrier=(d.secondary_carrier!=null)?d.secondary_carrier:null;
+    state.dualCarrierActive=!!d.active;
+    state.dualCarrierRunning=!!d.running_active;
     const sec=document.getElementById('bts-secondary-carrier');
     if(sec)sec.textContent=(d.secondary_carrier!=null)?d.secondary_carrier:'—';
+    renderTsGrid();
     const inp=document.getElementById('dual-carrier-num');
     if(inp&&d.secondary_carrier!=null)inp.value=d.secondary_carrier;
     const sub=document.getElementById('bts-dual-sub');
