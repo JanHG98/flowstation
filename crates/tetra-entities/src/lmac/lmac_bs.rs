@@ -465,12 +465,27 @@ impl LmacBs {
         for prim in batch.slots {
             self.uplink_phy_chan.insert((prim.carrier_num, prim.ts.t), prim.ul_phy_chan);
 
+            // NetCore dual-carrier traffic-only hardening:
+            // Secondary schedulers may intentionally return a completely empty slot
+            // (no BBK/AACH and no payload blocks) while idle. This means: do not
+            // transmit anything on that carrier/slot. Treat that as a normal skip,
+            // not as a scheduler error.
+            if prim.bbk.is_none() && prim.blk1.is_none() && prim.blk2.is_none() {
+                tracing::trace!(
+                    carrier = prim.carrier_num,
+                    ts = prim.ts.t,
+                    time = %prim.ts,
+                    "LMAC: skipping empty batched slot"
+                );
+                continue;
+            }
+
             let Some(bbk) = prim.bbk else {
-                tracing::error!("LMAC: batched slot missing bbk on carrier={} ts={}", prim.carrier_num, prim.ts.t);
+                tracing::warn!("LMAC: batched slot missing bbk on carrier={} ts={}, dropping non-empty slot", prim.carrier_num, prim.ts.t);
                 continue;
             };
             let Some(blk1) = prim.blk1 else {
-                tracing::error!("LMAC: batched slot missing blk1 on carrier={} ts={}", prim.carrier_num, prim.ts.t);
+                tracing::warn!("LMAC: batched slot missing blk1 on carrier={} ts={}, dropping non-empty slot", prim.carrier_num, prim.ts.t);
                 continue;
             };
             let blk2 = prim.blk2;
