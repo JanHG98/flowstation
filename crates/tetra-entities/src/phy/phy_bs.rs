@@ -201,7 +201,7 @@ impl<D: RxTxDev> PhyBs<D> {
             return Some(dl_burst);
         }
 
-        let Some(bbk_bits) = prim.bbk else {
+        let Some(mut bbk_bits) = prim.bbk else {
             tracing::warn!("PHY: TP slot missing BBK, dropping");
             return None;
         };
