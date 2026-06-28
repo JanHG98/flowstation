@@ -2660,14 +2660,26 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
               <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M4 17h16"/><path d="M8 4v6"/><path d="M16 14v6"/></svg>
             </span>
             <div>
-              <div class="bts-dual-title">Multi Carrier</div>
+              <div class="bts-dual-title">Traffic Carrier</div>
               <div class="bts-dual-sub" id="bts-dual-sub">—</div>
             </div>
           </div>
           <div class="bts-dual-actions">
-            <input class="bts-dual-input" id="dual-carrier-num" type="number" min="0" max="4095" step="1" placeholder="2nd" title="Secondary carrier">
-            <input class="bts-dual-input" id="third-carrier-num" type="number" min="0" max="4095" step="1" placeholder="3rd" title="Third carrier, optional">
-            <button class="btn-sm" id="dual-carrier-toggle" onclick="toggleDualCarrier()">—</button>
+            <button class="btn-sm" id="secondary-carrier-toggle" onclick="toggleSecondaryCarrier()">—</button>
+          </div>
+        </div>
+        <div class="bts-dual-bar">
+          <div class="bts-dual-info">
+            <span class="bts-dual-icon">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h18"/><path d="M12 3v18"/><circle cx="12" cy="12" r="4"/></svg>
+            </span>
+            <div>
+              <div class="bts-dual-title">Third Carrier</div>
+              <div class="bts-dual-sub" id="bts-third-sub">—</div>
+            </div>
+          </div>
+          <div class="bts-dual-actions">
+            <button class="btn-sm" id="third-carrier-toggle" onclick="toggleThirdCarrier()">—</button>
           </div>
         </div>
         <div class="bts-access-bar">
@@ -8546,70 +8558,49 @@ async function loadDualCarrierInfo(){
     state.thirdCarrierActive=!!d.third_active;
     state.dualCarrierRunning=!!d.running_secondary_active;
     state.thirdCarrierRunning=!!d.running_third_active;
+
     const sec=document.getElementById('bts-secondary-carrier');
     if(sec)sec.textContent=(d.secondary_carrier!=null)?d.secondary_carrier:'—';
     const third=document.getElementById('bts-third-carrier');
     if(third)third.textContent=(d.third_carrier!=null)?d.third_carrier:'—';
     renderTsGrid();
-    const inp=document.getElementById('dual-carrier-num');
-    if(inp&&d.secondary_carrier!=null)inp.value=d.secondary_carrier;
-    const inp3=document.getElementById('third-carrier-num');
-    if(inp3&&d.third_carrier!=null)inp3.value=d.third_carrier;
+
     const sub=document.getElementById('bts-dual-sub');
     if(sub){
-      const configured=[];
-      configured.push(d.secondary_active?'2nd ON':'2nd OFF');
-      configured.push(d.third_active?'3rd ON':'3rd OFF');
-      const running=[];
-      running.push(d.running_secondary_active?'2nd running':'2nd stopped');
-      running.push(d.running_third_active?'3rd running':'3rd stopped');
-      sub.textContent=configured.join(' · ')+' · '+running.join(' · ')+(d.main_carrier!=null?' · main '+d.main_carrier:'');
+      const secCarrier=(d.secondary_carrier!=null)?('carrier '+d.secondary_carrier):'not configured';
+      const secCfg=d.secondary_active?'configured ON':'configured OFF';
+      const secRun=d.running_secondary_active?'running ON':'running OFF';
+      const thirdAuto=(d.third_carrier!=null)?(' · enables 3rd '+d.third_carrier+' automatically'):' · no 3rd configured';
+      sub.textContent=secCarrier+' · '+secCfg+' · '+secRun+thirdAuto;
     }
-    const btn=document.getElementById('dual-carrier-toggle');
-    if(btn){
-      btn.textContent=d.active?'Disable':'Enable';
-      btn.classList.toggle('btn-primary',!d.active);
-      btn.dataset.enabled=d.active?'1':'0';
+    const thirdSub=document.getElementById('bts-third-sub');
+    if(thirdSub){
+      const thirdCarrier=(d.third_carrier!=null)?('carrier '+d.third_carrier):'not configured';
+      const thirdCfg=d.third_active?'configured ON':'configured OFF';
+      const thirdRun=d.running_third_active?'running ON':'running OFF';
+      thirdSub.textContent=thirdCarrier+' · '+thirdCfg+' · '+thirdRun+(d.secondary_active?'':' · requires traffic carrier');
+    }
+
+    const secBtn=document.getElementById('secondary-carrier-toggle');
+    if(secBtn){
+      secBtn.textContent=d.secondary_active?'Disable 2nd+3rd':'Enable 2nd+3rd';
+      secBtn.classList.toggle('btn-primary',!d.secondary_active);
+      secBtn.dataset.enabled=d.secondary_active?'1':'0';
+      secBtn.title=d.secondary_active?'Disable traffic carrier; third carrier follows OFF':'Enable traffic carrier; third carrier follows ON when configured';
+    }
+    const thirdBtn=document.getElementById('third-carrier-toggle');
+    if(thirdBtn){
+      thirdBtn.textContent=d.third_active?'Disable 3rd':'Enable 3rd';
+      thirdBtn.classList.toggle('btn-primary',!!d.secondary_active&&!d.third_active);
+      thirdBtn.dataset.enabled=d.third_active?'1':'0';
+      thirdBtn.disabled=!d.secondary_active;
+      thirdBtn.title=d.secondary_active?'Toggle only the third carrier':'Enable the traffic carrier first';
     }
   }catch(e){/* endpoint unavailable — leave placeholders */}
 }
 
-async function toggleDualCarrier(){
-  const btn=document.getElementById('dual-carrier-toggle');
-  const inp=document.getElementById('dual-carrier-num');
-  const inp3=document.getElementById('third-carrier-num');
-  const currentlyOn=btn&&btn.dataset.enabled==='1';
-  const enabled=!currentlyOn;
-  const body={enabled};
-  if(enabled){
-    const n=parseInt(inp&&inp.value?inp.value:'',10);
-    if(!Number.isFinite(n)||n<0||n>4095){
-      alert('Secondary carrier must be 0..4095');
-      return;
-    }
-    body.secondary_carrier=n;
-    const raw3=inp3&&inp3.value?inp3.value.trim():'';
-    if(raw3!==''){
-      const n3=parseInt(raw3,10);
-      if(!Number.isFinite(n3)||n3<0||n3>4095){
-        alert('Third carrier must be empty or 0..4095');
-        return;
-      }
-      if(n3===n){
-        alert('Third carrier must differ from secondary carrier');
-        return;
-      }
-      if(state.btsMainCarrier!=null&&n3===Number(state.btsMainCarrier)){
-        alert('Third carrier must differ from main carrier');
-        return;
-      }
-      body.third_carrier=n3;
-      body.third_enabled=true;
-    }else{
-      body.third_enabled=false;
-    }
-  }
-  if(btn){btn.disabled=true;btn.textContent=enabled?'Enabling…':'Disabling…';}
+async function postCarrierToggle(body,button,workingText){
+  if(button){button.disabled=true;button.textContent=workingText||'Applying…';}
   try{
     const r=await fetch('/api/dualcarrier',{
       method:'POST',
@@ -8619,18 +8610,56 @@ async function toggleDualCarrier(){
     });
     const txt=await r.text();
     if(!r.ok){
-      alert(txt||'Multi carrier update failed');
+      alert(txt||'Carrier update failed');
       return;
     }
-    const sub=document.getElementById('bts-dual-sub');
+    const sub=document.getElementById(body.target==='third'?'bts-third-sub':'bts-dual-sub');
     if(sub)sub.textContent=txt||'Restart scheduled';
     setTimeout(loadDualCarrierInfo,2500);
   }catch(e){
-    alert('Multi carrier update failed: '+e);
+    alert('Carrier update failed: '+e);
   }finally{
-    if(btn)btn.disabled=false;
+    if(button)button.disabled=false;
   }
 }
+
+async function toggleSecondaryCarrier(){
+  const btn=document.getElementById('secondary-carrier-toggle');
+  const currentlyOn=btn&&btn.dataset.enabled==='1';
+  const enabled=!currentlyOn;
+  const body={target:'secondary',enabled};
+  if(enabled){
+    if(state.btsSecondaryCarrier==null){
+      alert('No secondary_carrier configured in config.toml');
+      return;
+    }
+    body.secondary_carrier=Number(state.btsSecondaryCarrier);
+    if(state.btsThirdCarrier!=null){
+      body.third_carrier=Number(state.btsThirdCarrier);
+    }
+  }
+  await postCarrierToggle(body,btn,enabled?'Enabling…':'Disabling…');
+}
+
+async function toggleThirdCarrier(){
+  const btn=document.getElementById('third-carrier-toggle');
+  const currentlyOn=btn&&btn.dataset.enabled==='1';
+  const enabled=!currentlyOn;
+  if(enabled&&!state.dualCarrierActive){
+    alert('Enable the traffic carrier first.');
+    return;
+  }
+  if(enabled&&state.btsThirdCarrier==null){
+    alert('No third_carrier configured in config.toml');
+    return;
+  }
+  const body={target:'third',enabled};
+  if(enabled){body.third_carrier=Number(state.btsThirdCarrier);}
+  await postCarrierToggle(body,btn,enabled?'Enabling…':'Disabling…');
+}
+
+// Backward-compatible wrapper for older onclick/cache states.
+async function toggleDualCarrier(){return toggleSecondaryCarrier();}
 
 async function loadSystemInfo(){
   try{
