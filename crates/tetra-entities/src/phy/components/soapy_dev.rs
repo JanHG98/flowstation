@@ -244,18 +244,34 @@ impl RxDsp {
             monitors: phy_config
                 .monitor_frequencies
                 .iter()
-                .map(|(dl_freq, ul_freq)| MonitorDlUlPair {
-                    dl: DemodulatorChannel::new(fft_planner, rx_fcfb_params, *dl_freq, demodulator::Mode::DlUnsynchronized),
-                    ul: ul_freq
-                        .as_ref()
-                        .map(|ul_freq| DemodulatorChannel::new(fft_planner, rx_fcfb_params, *ul_freq, demodulator::Mode::Idle)),
+                .enumerate()
+                .map(|(i, (dl_freq, ul_freq))| MonitorDlUlPair {
+                    dl: DemodulatorChannel::new(
+                        fft_planner,
+                        rx_fcfb_params,
+                        *dl_freq,
+                        demodulator::Mode::DlUnsynchronized,
+                        phy_config.monitor_carrier_numbers.get(i).copied().unwrap_or(0),
+                    ),
+                    ul: ul_freq.as_ref().map(|ul_freq| {
+                        DemodulatorChannel::new(
+                            fft_planner,
+                            rx_fcfb_params,
+                            *ul_freq,
+                            demodulator::Mode::Idle,
+                            phy_config.monitor_carrier_numbers.get(i).copied().unwrap_or(0),
+                        )
+                    }),
                 })
                 .collect(),
 
             ul_demodulators: phy_config
                 .bs_ul_frequencies
                 .iter()
-                .map(|ul_freq| DemodulatorChannel::new(fft_planner, rx_fcfb_params, *ul_freq, demodulator::Mode::Ul))
+                .zip(phy_config.bs_carrier_numbers.iter().copied())
+                .map(|(ul_freq, carrier_num)| {
+                    DemodulatorChannel::new(fft_planner, rx_fcfb_params, *ul_freq, demodulator::Mode::Ul, carrier_num)
+                })
                 .collect(),
         }
     }
@@ -513,6 +529,7 @@ impl DemodulatorChannel {
         analysis_in_params: fcfb::AnalysisInputParameters,
         frequency: f64,
         mode: demodulator::Mode,
+        carrier_num: u16,
     ) -> Self {
         Self {
             downconverter: fcfb::AnalysisOutputProcessor::new_with_frequency(
@@ -522,7 +539,7 @@ impl DemodulatorChannel {
                 frequency,
                 Some(25000.0),
             ),
-            demodulator: demodulator::Demodulator::new(mode),
+            demodulator: demodulator::Demodulator::new(mode, carrier_num),
         }
     }
 
