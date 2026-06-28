@@ -2652,6 +2652,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
           <div class="bts-tile"><div class="bts-tile-label">MNC</div><div class="bts-tile-value" id="bts-mnc">—</div></div>
           <div class="bts-tile"><div class="bts-tile-label" data-i18n="bts_carrier">Main Carrier</div><div class="bts-tile-value" id="bts-carrier">—</div></div>
           <div class="bts-tile"><div class="bts-tile-label">Secondary Carrier</div><div class="bts-tile-value" id="bts-secondary-carrier">—</div></div>
+          <div class="bts-tile"><div class="bts-tile-label">Third Carrier</div><div class="bts-tile-value" id="bts-third-carrier">—</div></div>
         </div>
         <div class="bts-dual-bar">
           <div class="bts-dual-info">
@@ -2659,12 +2660,13 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
               <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M4 17h16"/><path d="M8 4v6"/><path d="M16 14v6"/></svg>
             </span>
             <div>
-              <div class="bts-dual-title">Dual Carrier</div>
+              <div class="bts-dual-title">Multi Carrier</div>
               <div class="bts-dual-sub" id="bts-dual-sub">—</div>
             </div>
           </div>
           <div class="bts-dual-actions">
-            <input class="bts-dual-input" id="dual-carrier-num" type="number" min="0" max="4095" step="1" placeholder="1522">
+            <input class="bts-dual-input" id="dual-carrier-num" type="number" min="0" max="4095" step="1" placeholder="2nd" title="Secondary carrier">
+            <input class="bts-dual-input" id="third-carrier-num" type="number" min="0" max="4095" step="1" placeholder="3rd" title="Third carrier, optional">
             <button class="btn-sm" id="dual-carrier-toggle" onclick="toggleDualCarrier()">—</button>
           </div>
         </div>
@@ -5526,7 +5528,7 @@ async function wifiCall(url, body){
 function escAttr(s){ return String(s).replace(/&/g,'&amp;').replace(/'/g,"&#39;").replace(/"/g,'&quot;'); }
 
 // ── State + WS ────────────────────────────────────────────────────────────
-let ws=null,state={ms:{},calls:{},emergencies:{},lastHeard:[],sdsLog:[],dapnetLog:[],echolinkDirectory:[],echolinkDirectoryStatus:'',meshcomNodes:[],meshcomMessages:[],geoalarmEvents:[],geoalarmConfig:null,brewOnline:false,brewVer:0,brewStatus:null,brewStatusLoadedAt:0,btsMainCarrier:null,btsSecondaryCarrier:null,dualCarrierActive:false,dualCarrierRunning:false},sdsDest=0;
+let ws=null,state={ms:{},calls:{},emergencies:{},lastHeard:[],sdsLog:[],dapnetLog:[],echolinkDirectory:[],echolinkDirectoryStatus:'',meshcomNodes:[],meshcomMessages:[],geoalarmEvents:[],geoalarmConfig:null,brewOnline:false,brewVer:0,brewStatus:null,brewStatusLoadedAt:0,btsMainCarrier:null,btsSecondaryCarrier:null,btsThirdCarrier:null,dualCarrierActive:false,dualCarrierRunning:false,thirdCarrierActive:false,thirdCarrierRunning:false},sdsDest=0;
 
 // ── Local device registry (root /devices.json) ────────────────────────────────
 // Supports both compact mappings ("2010002":"Hytera HRT") and structured entries:
@@ -6132,7 +6134,8 @@ function tsResolveCarrier(carrier){
 function tsAllCarriers(){
   const out=[];
   if(state.btsMainCarrier!=null)out.push({carrier:Number(state.btsMainCarrier),label:'MAIN',secondary:false});
-  if(state.dualCarrierRunning&&state.btsSecondaryCarrier!=null)out.push({carrier:Number(state.btsSecondaryCarrier),label:'TRAFFIC ONLY',secondary:true});
+  if(state.dualCarrierRunning&&state.btsSecondaryCarrier!=null)out.push({carrier:Number(state.btsSecondaryCarrier),label:'TRAFFIC 2',secondary:true});
+  if(state.thirdCarrierRunning&&state.btsThirdCarrier!=null)out.push({carrier:Number(state.btsThirdCarrier),label:'TRAFFIC 3',secondary:true});
   if(!out.length)out.push({carrier:null,label:'MAIN',secondary:false});
   return out;
 }
@@ -6153,7 +6156,7 @@ function tsBlockMarkup(carrier,ts,kind){
   </div>`;
 }
 function renderTsCarrier(carrier,label,secondary){
-  const head=state.dualCarrierRunning?`<div class="ts-carrier-head ${secondary?'secondary':'main'}">Carrier ${carrier??'—'} <span class="ts-carrier-tag">${label}</span></div>`:'';
+  const head=(state.dualCarrierRunning||state.thirdCarrierRunning)?`<div class="ts-carrier-head ${secondary?'secondary':'main'}">Carrier ${carrier??'—'} <span class="ts-carrier-tag">${label}</span></div>`:'';
   const kind1=secondary?'idle':'main-control';
   return head+[1,2,3,4].map(ts=>tsBlockMarkup(carrier,ts,ts===1?kind1:'idle')).join('');
 }
@@ -8501,6 +8504,8 @@ async function loadBtsInfo(){
     set('bts-mnc', d.mnc);
     set('bts-carrier', d.main_carrier);
     if(d.main_carrier!=null){state.btsMainCarrier=d.main_carrier;}
+    if(d.secondary_carrier!=null){state.btsSecondaryCarrier=d.secondary_carrier;}
+    if(d.third_carrier!=null){state.btsThirdCarrier=d.third_carrier;}
     renderTsGrid();
     // Neighbor-cell + hangtime chips in the card header
     const nb=document.getElementById('bts-neighbor');
@@ -8536,18 +8541,29 @@ async function loadDualCarrierInfo(){
     const d=await r.json();
     if(d.main_carrier!=null)state.btsMainCarrier=d.main_carrier;
     state.btsSecondaryCarrier=(d.secondary_carrier!=null)?d.secondary_carrier:null;
-    state.dualCarrierActive=!!d.active;
-    state.dualCarrierRunning=!!d.running_active;
+    state.btsThirdCarrier=(d.third_carrier!=null)?d.third_carrier:null;
+    state.dualCarrierActive=!!d.secondary_active;
+    state.thirdCarrierActive=!!d.third_active;
+    state.dualCarrierRunning=!!d.running_secondary_active;
+    state.thirdCarrierRunning=!!d.running_third_active;
     const sec=document.getElementById('bts-secondary-carrier');
     if(sec)sec.textContent=(d.secondary_carrier!=null)?d.secondary_carrier:'—';
+    const third=document.getElementById('bts-third-carrier');
+    if(third)third.textContent=(d.third_carrier!=null)?d.third_carrier:'—';
     renderTsGrid();
     const inp=document.getElementById('dual-carrier-num');
     if(inp&&d.secondary_carrier!=null)inp.value=d.secondary_carrier;
+    const inp3=document.getElementById('third-carrier-num');
+    if(inp3&&d.third_carrier!=null)inp3.value=d.third_carrier;
     const sub=document.getElementById('bts-dual-sub');
     if(sub){
-      const cfg=d.active?'configured ON':'configured OFF';
-      const run=d.running_active?'running ON':'running OFF';
-      sub.textContent=cfg+' · '+run+(d.main_carrier!=null?' · main '+d.main_carrier:'');
+      const configured=[];
+      configured.push(d.secondary_active?'2nd ON':'2nd OFF');
+      configured.push(d.third_active?'3rd ON':'3rd OFF');
+      const running=[];
+      running.push(d.running_secondary_active?'2nd running':'2nd stopped');
+      running.push(d.running_third_active?'3rd running':'3rd stopped');
+      sub.textContent=configured.join(' · ')+' · '+running.join(' · ')+(d.main_carrier!=null?' · main '+d.main_carrier:'');
     }
     const btn=document.getElementById('dual-carrier-toggle');
     if(btn){
@@ -8561,6 +8577,7 @@ async function loadDualCarrierInfo(){
 async function toggleDualCarrier(){
   const btn=document.getElementById('dual-carrier-toggle');
   const inp=document.getElementById('dual-carrier-num');
+  const inp3=document.getElementById('third-carrier-num');
   const currentlyOn=btn&&btn.dataset.enabled==='1';
   const enabled=!currentlyOn;
   const body={enabled};
@@ -8571,6 +8588,26 @@ async function toggleDualCarrier(){
       return;
     }
     body.secondary_carrier=n;
+    const raw3=inp3&&inp3.value?inp3.value.trim():'';
+    if(raw3!==''){
+      const n3=parseInt(raw3,10);
+      if(!Number.isFinite(n3)||n3<0||n3>4095){
+        alert('Third carrier must be empty or 0..4095');
+        return;
+      }
+      if(n3===n){
+        alert('Third carrier must differ from secondary carrier');
+        return;
+      }
+      if(state.btsMainCarrier!=null&&n3===Number(state.btsMainCarrier)){
+        alert('Third carrier must differ from main carrier');
+        return;
+      }
+      body.third_carrier=n3;
+      body.third_enabled=true;
+    }else{
+      body.third_enabled=false;
+    }
   }
   if(btn){btn.disabled=true;btn.textContent=enabled?'Enabling…':'Disabling…';}
   try{
@@ -8582,14 +8619,14 @@ async function toggleDualCarrier(){
     });
     const txt=await r.text();
     if(!r.ok){
-      alert(txt||'Dual carrier update failed');
+      alert(txt||'Multi carrier update failed');
       return;
     }
     const sub=document.getElementById('bts-dual-sub');
     if(sub)sub.textContent=txt||'Restart scheduled';
     setTimeout(loadDualCarrierInfo,2500);
   }catch(e){
-    alert('Dual carrier update failed: '+e);
+    alert('Multi carrier update failed: '+e);
   }finally{
     if(btn)btn.disabled=false;
   }
