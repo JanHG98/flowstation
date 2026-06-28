@@ -1856,6 +1856,35 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
 }
 .bts-access-title{font-size:12.5px;font-weight:700;color:var(--text);letter-spacing:0.01em;}
 .bts-access-sub{font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+
+.bts-dual-bar{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  margin:0 18px 10px;padding:13px 16px;
+  background:linear-gradient(180deg, var(--bg), color-mix(in srgb,var(--bg) 80%, #000));
+  border:1px solid var(--border);border-radius:10px;box-shadow:var(--hair);
+}
+.bts-dual-info{display:flex;align-items:center;gap:13px;min-width:0;}
+.bts-dual-icon{
+  width:38px;height:38px;flex-shrink:0;border-radius:10px;
+  display:flex;align-items:center;justify-content:center;
+  background:color-mix(in srgb,var(--accent) 12%, transparent);
+  border:1px solid color-mix(in srgb,var(--accent) 30%, transparent);
+  color:var(--accent);
+}
+.bts-dual-title{font-size:12.5px;font-weight:700;color:var(--text);letter-spacing:0.01em;}
+.bts-dual-sub{font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:2px;white-space:nowrap;}
+.bts-dual-actions{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+.bts-dual-input{
+  width:92px;min-height:32px;padding:6px 8px;
+  background:var(--bg);border:1px solid var(--border);border-radius:7px;
+  color:var(--text);font-family:var(--mono);font-size:12px;font-weight:700;
+}
+.bts-dual-input:focus{outline:none;border-color:var(--accent);}
+@media(max-width:700px){
+  .bts-dual-bar{align-items:stretch;flex-direction:column;}
+  .bts-dual-actions{width:100%;}
+  .bts-dual-input{flex:1;width:auto;}
+}
 .bts-access{
   font-family:var(--mono);font-size:11px;font-weight:800;letter-spacing:0.1em;
   padding:7px 16px;border-radius:999px;border:1px solid;white-space:nowrap;flex-shrink:0;
@@ -2609,6 +2638,22 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
           <div class="bts-tile"><div class="bts-tile-label">MCC</div><div class="bts-tile-value" id="bts-mcc">—</div></div>
           <div class="bts-tile"><div class="bts-tile-label">MNC</div><div class="bts-tile-value" id="bts-mnc">—</div></div>
           <div class="bts-tile"><div class="bts-tile-label" data-i18n="bts_carrier">Main Carrier</div><div class="bts-tile-value" id="bts-carrier">—</div></div>
+          <div class="bts-tile"><div class="bts-tile-label">Secondary Carrier</div><div class="bts-tile-value" id="bts-secondary-carrier">—</div></div>
+        </div>
+        <div class="bts-dual-bar">
+          <div class="bts-dual-info">
+            <span class="bts-dual-icon">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M4 17h16"/><path d="M8 4v6"/><path d="M16 14v6"/></svg>
+            </span>
+            <div>
+              <div class="bts-dual-title">Dual Carrier</div>
+              <div class="bts-dual-sub" id="bts-dual-sub">—</div>
+            </div>
+          </div>
+          <div class="bts-dual-actions">
+            <input class="bts-dual-input" id="dual-carrier-num" type="number" min="0" max="4095" step="1" placeholder="1522">
+            <button class="btn-sm" id="dual-carrier-toggle" onclick="toggleDualCarrier()">—</button>
+          </div>
         </div>
         <div class="bts-access-bar">
           <div class="bts-access-info">
@@ -8496,6 +8541,67 @@ async function loadBtsInfo(){
   }catch(e){/* config endpoint unavailable — leave placeholders */}
 }
 
+async function loadDualCarrierInfo(){
+  try{
+    const r=await fetch('/api/dualcarrier',{credentials:'same-origin'});
+    if(!r.ok)return;
+    const d=await r.json();
+    const sec=document.getElementById('bts-secondary-carrier');
+    if(sec)sec.textContent=(d.secondary_carrier!=null)?d.secondary_carrier:'—';
+    const inp=document.getElementById('dual-carrier-num');
+    if(inp&&d.secondary_carrier!=null)inp.value=d.secondary_carrier;
+    const sub=document.getElementById('bts-dual-sub');
+    if(sub){
+      const cfg=d.active?'configured ON':'configured OFF';
+      const run=d.running_active?'running ON':'running OFF';
+      sub.textContent=cfg+' · '+run+(d.main_carrier!=null?' · main '+d.main_carrier:'');
+    }
+    const btn=document.getElementById('dual-carrier-toggle');
+    if(btn){
+      btn.textContent=d.active?'Disable':'Enable';
+      btn.classList.toggle('btn-primary',!d.active);
+      btn.dataset.enabled=d.active?'1':'0';
+    }
+  }catch(e){/* endpoint unavailable — leave placeholders */}
+}
+
+async function toggleDualCarrier(){
+  const btn=document.getElementById('dual-carrier-toggle');
+  const inp=document.getElementById('dual-carrier-num');
+  const currentlyOn=btn&&btn.dataset.enabled==='1';
+  const enabled=!currentlyOn;
+  const body={enabled};
+  if(enabled){
+    const n=parseInt(inp&&inp.value?inp.value:'',10);
+    if(!Number.isFinite(n)||n<0||n>4095){
+      alert('Secondary carrier must be 0..4095');
+      return;
+    }
+    body.secondary_carrier=n;
+  }
+  if(btn){btn.disabled=true;btn.textContent=enabled?'Enabling…':'Disabling…';}
+  try{
+    const r=await fetch('/api/dualcarrier',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      credentials:'same-origin',
+      body:JSON.stringify(body)
+    });
+    const txt=await r.text();
+    if(!r.ok){
+      alert(txt||'Dual carrier update failed');
+      return;
+    }
+    const sub=document.getElementById('bts-dual-sub');
+    if(sub)sub.textContent=txt||'Restart scheduled';
+    setTimeout(loadDualCarrierInfo,2500);
+  }catch(e){
+    alert('Dual carrier update failed: '+e);
+  }finally{
+    if(btn)btn.disabled=false;
+  }
+}
+
 async function loadSystemInfo(){
   try{
     const r=await fetch('/api/system');if(!r.ok)return;
@@ -9816,6 +9922,7 @@ async function boot(){
   // instead of waiting for the user to open the System tab.
   loadSystemInfo();
   loadBtsInfo();        // TETRA BTS Details card on the default (Radios) page
+  loadDualCarrierInfo();
   refreshBrewServerStatus(true);
   setInterval(()=>refreshBrewServerStatus(true),10000);
   wifiProbeAvailable(); // toggles the WiFi nav item
