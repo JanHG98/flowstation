@@ -32,9 +32,11 @@ pub enum SapMsgInner {
     /// TP-SAP (Contents not defined in standard)
     TpUnitdataInd(TpUnitdataInd),
     TpUnitdataReq(TpUnitdataReqSlot),
+    TpUnitdataReqSlots(TpUnitdataReqSlots),
 
     // TMV-SAP
     TmvUnitdataReq(TmvUnitdataReqSlot),
+    TmvUnitdataReqSlots(TmvUnitdataReqSlots),
     TmvUnitdataInd(TmvUnitdataInd),
     TmvConfigureReq(TmvConfigureReq),
     TmvConfigureConf(TmvConfigureConf),
@@ -117,10 +119,13 @@ impl Display for SapMsgInner {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             // TP-SAP
-            // SapMsgInner::TpUnitdataInd(_) => write!(f, "TpUnitdataInd"),
+            SapMsgInner::TpUnitdataInd(_) => write!(f, "TpUnitdataInd"),
+            SapMsgInner::TpUnitdataReq(_) => write!(f, "TpUnitdataReq"),
+            SapMsgInner::TpUnitdataReqSlots(_) => write!(f, "TpUnitdataReqSlots"),
 
             // TMV-SAP
             SapMsgInner::TmvUnitdataReq(_) => write!(f, "TmvUnitdataReq"),
+            SapMsgInner::TmvUnitdataReqSlots(_) => write!(f, "TmvUnitdataReqSlots"),
             SapMsgInner::TmvUnitdataInd(_) => write!(f, "TmvUnitdataInd"),
             SapMsgInner::TmvConfigureReq(_) => write!(f, "TmvConfigureReq"),
             SapMsgInner::TmvConfigureConf(_) => write!(f, "TmvConfigureConf"),
