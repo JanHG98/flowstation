@@ -306,43 +306,98 @@ impl<D: RxTxDev> PhyBs<D> {
 
         let rx = self.rxtxdev.rxtx_timeslot(&tx_slots).expect("Got error from rxtx_timeslot");
 
+        // With adjacent dual carriers, the secondary-channel demodulator can sometimes
+        // lock onto the same uplink burst that was already decoded on the primary
+        // carrier. Forwarding both copies makes UMAC/LLC see duplicate MAC-ACCESS,
+        // duplicate ACKs and duplicated fragment starts, which can put radios into a
+        // setup/retry loop. Collect all burst candidates for this TDMA slot and drop
+        // exact duplicate bitstreams seen in the same full/subslot, keeping the
+        // strongest RSSI copy. Real independent traffic on two carriers has different
+        // bits and is still forwarded normally.
+        #[derive(Debug)]
+        struct RxBurstCandidate {
+            carrier_num: u16,
+            subslot_id: u8, // 3 = fullslot/file header id, 1/2 = subslot
+            train_type: TrainingSequence,
+            rssi_dbfs: f32,
+            bits: Vec<u8>,
+        }
+
+        let mut candidates: Vec<RxBurstCandidate> = Vec::new();
         for rx_slot in rx {
-            if let Some(rx_slot) = rx_slot {
-                let mut slot_sent = false;
-                if rx_slot.slot.train_type != TrainingSequence::NotFound {
-                    tracing::info!(ts=%self.dltime, carrier=rx_slot.carrier_num, "rx_tpsap_prim got {:?} in fullslot", rx_slot.slot.train_type);
+            let Some(rx_slot) = rx_slot else {
+                continue;
+            };
 
-                    if let Some(ul_rx_sender) = &self.ul_rx_sender {
-                        let _ = ul_rx_sender.try_send(FileWriteMsg::WriteHeaderAndBlock(3, self.tick, rx_slot.slot.bits.to_vec()));
-                    }
-
-                    Self::split_rxslot_and_send_to_lmac(queue, rx_slot.carrier_num, &rx_slot.slot);
-                    slot_sent = true;
+            let mut push_candidate = |subslot_id: u8, label: &'static str, burst: &RxBurstBits<'_>| {
+                if burst.train_type == TrainingSequence::NotFound {
+                    return;
                 }
-                if rx_slot.subslot1.train_type != TrainingSequence::NotFound {
-                    tracing::info!(ts=%self.dltime, carrier=rx_slot.carrier_num, "rx_tpsap_prim got {:?} in subslot1", rx_slot.subslot1.train_type);
-                    if slot_sent {
-                        tracing::debug!("Multiple candidate bursts detected in one slot; forwarding all (LMAC CRC drops false positives)");
-                    }
-                    if let Some(ul_rx_sender) = &self.ul_rx_sender {
-                        let _ = ul_rx_sender.try_send(FileWriteMsg::WriteHeaderAndBlock(1, self.tick, rx_slot.subslot1.bits.to_vec()));
-                    }
 
-                    Self::split_rxslot_and_send_to_lmac(queue, rx_slot.carrier_num, &rx_slot.subslot1);
-                    slot_sent = true;
-                }
-                if rx_slot.subslot2.train_type != TrainingSequence::NotFound {
-                    tracing::info!(ts=%self.dltime, carrier=rx_slot.carrier_num, "rx_tpsap_prim got {:?} in subslot2", rx_slot.subslot2.train_type);
-                    if slot_sent {
-                        tracing::debug!("Multiple candidate bursts detected in one slot; forwarding all (LMAC CRC drops false positives)");
-                    }
-                    if let Some(ul_rx_sender) = &self.ul_rx_sender {
-                        let _ = ul_rx_sender.try_send(FileWriteMsg::WriteHeaderAndBlock(2, self.tick, rx_slot.subslot2.bits.to_vec()));
-                    }
+                tracing::info!(
+                    ts=%self.dltime,
+                    carrier=rx_slot.carrier_num,
+                    "rx_tpsap_prim got {:?} in {}",
+                    burst.train_type,
+                    label
+                );
 
-                    Self::split_rxslot_and_send_to_lmac(queue, rx_slot.carrier_num, &rx_slot.subslot2);
+                if let Some(existing) = candidates.iter_mut().find(|c| {
+                    c.subslot_id == subslot_id && c.train_type == burst.train_type && c.bits.as_slice() == burst.bits
+                }) {
+                    if burst.rssi_dbfs > existing.rssi_dbfs {
+                        tracing::debug!(
+                            ts=%self.dltime,
+                            from_carrier=existing.carrier_num,
+                            to_carrier=rx_slot.carrier_num,
+                            old_rssi=existing.rssi_dbfs,
+                            new_rssi=burst.rssi_dbfs,
+                            "PHY: duplicate RX burst on adjacent carrier; keeping stronger copy"
+                        );
+                        existing.carrier_num = rx_slot.carrier_num;
+                        existing.rssi_dbfs = burst.rssi_dbfs;
+                    } else {
+                        tracing::debug!(
+                            ts=%self.dltime,
+                            kept_carrier=existing.carrier_num,
+                            dropped_carrier=rx_slot.carrier_num,
+                            kept_rssi=existing.rssi_dbfs,
+                            dropped_rssi=burst.rssi_dbfs,
+                            "PHY: dropping duplicate RX burst from adjacent carrier"
+                        );
+                    }
+                    return;
                 }
+
+                candidates.push(RxBurstCandidate {
+                    carrier_num: rx_slot.carrier_num,
+                    subslot_id,
+                    train_type: burst.train_type,
+                    rssi_dbfs: burst.rssi_dbfs,
+                    bits: burst.bits.to_vec(),
+                });
+            };
+
+            push_candidate(3, "fullslot", &rx_slot.slot);
+            push_candidate(1, "subslot1", &rx_slot.subslot1);
+            push_candidate(2, "subslot2", &rx_slot.subslot2);
+        }
+
+        for candidate in candidates {
+            if let Some(ul_rx_sender) = &self.ul_rx_sender {
+                let _ = ul_rx_sender.try_send(FileWriteMsg::WriteHeaderAndBlock(
+                    candidate.subslot_id,
+                    self.tick,
+                    candidate.bits.clone(),
+                ));
             }
+
+            let burst = RxBurstBits {
+                train_type: candidate.train_type,
+                bits: &candidate.bits,
+                rssi_dbfs: candidate.rssi_dbfs,
+            };
+            Self::split_rxslot_and_send_to_lmac(queue, candidate.carrier_num, &burst);
         }
     }
 
