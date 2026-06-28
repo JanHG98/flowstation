@@ -2281,9 +2281,9 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
 <nav id="sidebar">
   <div class="sidebar-logo">
     <div class="logo-row">
-      <div class="logo-icon">FS</div>
+      <div class="logo-icon">NC</div>
       <div class="logo-text">
-        <div class="logo-name">FlowStation</div>
+        <div class="logo-name">NetCore-Tetra</div>
         <div class="logo-sub">{{STACK_VERSION}}</div>
       </div>
     </div>
@@ -2331,9 +2331,8 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
       </div>
     </div>
   </div>
-  <div id="update-badge" class="update-badge"
-       onclick="showPage('config',document.getElementById('nav-config'))"
-       title="Click to update"></div>
+  <!-- NetCore: the old "update available" sidebar badge is intentionally disabled.
+       OTA remains available as a manual admin action in Configuration → Update. -->
 
   <div class="sidebar-nav">
     <!-- MONITOR — live, read-mostly surfaces (ordered by glance-frequency). -->
@@ -4652,8 +4651,8 @@ const LANGS={
     confirm_shutdown:'Shutdown FlowStation?\nThe service will stop and must be restarted manually.',
     confirm_logout:'Log out?',
     saved:'✓ Saved — restart to apply.',save_fail:'✗ Save failed',conn_error:'Connection error.',
-    update:'Update',update_available:'Update available',update_title:'OTA Update — github.com/razvanzeces/flowstation',
-    update_confirm:'Pull latest from main and rebuild?\nThe service will restart automatically.',
+    update:'Update',update_available:'Update available',update_title:'NetCore-Tetra Update — github.com/JanHG98/flowstation',
+    update_confirm:'Pull latest NetCore-Tetra main and rebuild?\nThe service will restart automatically.',
     update_running:'Updating… do not close this window.',
     update_done_ok:'✓ Update complete. Restarting…',
     update_done_err:'✗ Update failed. See log below.',
@@ -4755,7 +4754,7 @@ const LANGS={
     confirm_shutdown:'Oprire FlowStation?\nServiciul se va opri și trebuie repornit manual.',
     confirm_logout:'Deconectare?',
     saved:'✓ Salvat — repornire pentru aplicare.',save_fail:'✗ Salvare eșuată',conn_error:'Eroare de conexiune.',
-    update:'Update',update_available:'Actualizare disponibilă',update_title:'Update OTA — github.com/razvanzeces/flowstation',
+    update:'Update',update_available:'Actualizare disponibilă',update_title:'Update OTA — github.com/JanHG98/flowstation',
     update_confirm:'Descarcă ultima versiune din main și recompilează?\nServiciul va reporni automat.',
     update_running:'Se actualizează… nu închide fereastra.',
     update_done_ok:'✓ Update finalizat. Se repornește…',
@@ -4863,8 +4862,8 @@ const LANGS={
     confirm_shutdown:'FlowStation herunterfahren?\nDer Dienst wird gestoppt und muss manuell neu gestartet werden.',
     confirm_logout:'Abmelden?',
     saved:'✓ Gespeichert — Neustart zum Anwenden.',save_fail:'✗ Fehler beim Speichern',conn_error:'Verbindungsfehler.',
-    update:'Update',update_available:'Update verfügbar',update_title:'OTA-Update — github.com/razvanzeces/flowstation',
-    update_confirm:'Neueste Version von main holen und neu bauen?\nDer Dienst startet automatisch neu.',
+    update:'Update',update_available:'Update verfügbar',update_title:'NetCore-Tetra Update — github.com/JanHG98/flowstation',
+    update_confirm:'Neueste NetCore-Tetra Version von main holen und neu bauen?\nDer Dienst startet automatisch neu.',
     update_running:'Aktualisierung läuft… Fenster nicht schließen.',
     update_done_ok:'✓ Update abgeschlossen. Neustart…',
     update_done_err:'✗ Update fehlgeschlagen. Siehe Log unten.',
@@ -4939,7 +4938,7 @@ const LANGS={
     confirm_shutdown:'¿Apagar FlowStation?\nEl servicio se detendrá y deberá reiniciarse manualmente.',
     confirm_logout:'¿Cerrar sesión?',
     saved:'✓ Guardado — reinicia para aplicar.',save_fail:'✗ Error al guardar',conn_error:'Error de conexión.',
-    update:'Update',update_available:'Actualización disponible',update_title:'Actualización OTA — github.com/razvanzeces/flowstation',
+    update:'Update',update_available:'Actualización disponible',update_title:'Actualización OTA — github.com/JanHG98/flowstation',
     update_confirm:'¿Obtener la última versión de main y recompilar?\nEl servicio se reiniciará automáticamente.',
     update_running:'Actualizando… no cierres esta ventana.',
     update_done_ok:'✓ Actualización completa. Reiniciando…',
@@ -5006,7 +5005,7 @@ const LANGS={
     confirm_shutdown:'Leállítja a FlowStation-t?\nA szolgáltatást kézzel kell újraindítani.',
     confirm_logout:'Kijelentkezik?',
     saved:'✓ Mentve — újraindítás szükséges az alkalmazáshoz.',save_fail:'✗ Mentési hiba',conn_error:'Kapcsolódási hiba.',
-    update:'Frissítés',update_available:'Elérhető frissítés',update_title:'OTA frissítés — github.com/razvanzeces/flowstation',
+    update:'Frissítés',update_available:'Elérhető frissítés',update_title:'OTA frissítés — github.com/JanHG98/flowstation',
     update_confirm:'Letölti a legújabb verziót a main ágból és újraépíti?\nA szolgáltatás automatikusan újraindul.',
     update_running:'Frissítés folyamatban… ne zárja be az ablakot.',
     update_done_ok:'✓ Frissítés kész. Újraindul…',
@@ -5075,7 +5074,7 @@ const LANGS={
     confirm_shutdown:'确定关闭 FlowStation？\n服务将停止，需要手动重启。',
     confirm_logout:'确定注销吗？',
     saved:'✓ 已保存 — 重启后生效',save_fail:'✗ 保存失败',conn_error:'连接错误',
-    update:'更新',update_available:'有可用更新',update_title:'OTA 在线更新 — github.com/razvanzeces/flowstation',
+    update:'更新',update_available:'有可用更新',update_title:'OTA 在线更新 — github.com/JanHG98/flowstation',
     update_confirm:'是否从 main 分支拉取最新代码并重新构建？\n服务将自动重启。',
     update_running:'正在更新… 请不要关闭此窗口',
     update_done_ok:'✓ 更新完成，正在重启…',
@@ -9875,25 +9874,19 @@ window.addEventListener('resize', () => {
   drawRfWaterfall();
 });
 
-// ── GitHub update-check ─────────────────────────────────────────────────────
-// Best-effort: query GitHub for the latest release once at boot (and when the
-// config page is opened). If a newer version exists, reveal the header badge and
-// highlight the Update button. Failures are silent.
+// ── NetCore OTA indicator ───────────────────────────────────────────────────
+// NetCore runs as a system service from the operator-owned JanHG98 repository.
+// Automatic "update available" badges are disabled to avoid confusing upstream
+// release checks. OTA remains available as an explicit admin action in Config.
 async function checkUpdate(){
-  try{
-    const r=await fetch('/api/update/check');
-    if(!r.ok)return;
-    const d=await r.json();
-    const badge=document.getElementById('update-badge');
-    const btn=document.getElementById('update-btn');
-    if(d&&d.update_available&&d.latest){
-      if(badge){badge.style.display='block';badge.textContent='⬆ '+t('update_available')+' '+d.latest;}
-      if(btn){btn.classList.add('btn-primary');btn.textContent='⬆ '+t('update')+' → '+d.latest;}
-    }else{
-      if(badge)badge.style.display='none';
-      if(btn){btn.classList.remove('btn-primary');btn.textContent='⬆ '+t('update');}
-    }
-  }catch{/* silent */}
+  const badge=document.getElementById('update-badge');
+  const btn=document.getElementById('update-btn');
+  if(badge)badge.style.display='none';
+  if(btn){
+    btn.classList.remove('btn-primary');
+    btn.innerHTML='<span class="btn-icon" data-icon="update"></span><span data-i18n="update">'+t('update')+'</span>';
+    if(typeof paintIcons==='function')paintIcons(btn);
+  }
 }
 
 // ── Boot gating (FH-FEAT-033) ───────────────────────────────────────────────
@@ -10141,7 +10134,7 @@ input:focus{border-color:var(--accent2);background:var(--bg4);}
   </form>
 
   <div class="footer">
-    github.com/razvanzeces/<a href="https://github.com/razvanzeces/flowstation" target="_blank">flowstation</a>
+    github.com/JanHG98/<a href="https://github.com/JanHG98/flowstation" target="_blank">flowstation</a>
   </div>
 </div>
 
