@@ -83,6 +83,7 @@ impl LmacMs {
             src: TetraEntity::Lmac,
             dest: TetraEntity::Umac,
             msg: SapMsgInner::TmvUnitdataInd(TmvUnitdataInd {
+                    carrier_num: 0,
                 pdu: type1,
                 block_num: PhyBlockNum::Undefined,
                 logical_channel: LogicalChannel::Aach,
@@ -183,6 +184,7 @@ impl LmacMs {
                 src: TetraEntity::Lmac,
                 dest: TetraEntity::Umac,
                 msg: SapMsgInner::TmvUnitdataInd(TmvUnitdataInd {
+                    carrier_num: 0,
                     pdu: type1bits,
                     block_num,
                     logical_channel: lchan,
