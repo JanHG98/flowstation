@@ -3144,6 +3144,8 @@ fn serve_bts_info(mut stream: TcpStream, shared_config: &Option<tetra_config::bl
                 "mcc": c.net.mcc,
                 "mnc": c.net.mnc,
                 "main_carrier": c.cell.main_carrier,
+                "secondary_carrier": c.cell.secondary_carrier,
+                "third_carrier": c.cell.third_carrier,
                 "neighbor_count": c.cell.neighbor_cells_ca.len(),
                 "hangtime_secs": c.cell.hangtime_secs,
                 "whitelist_restricted": restricted,
@@ -3161,8 +3163,8 @@ fn serve_bts_info(mut stream: TcpStream, shared_config: &Option<tetra_config::bl
     let _ = stream.write_all(body.as_bytes());
 }
 
-/// GET /api/dualcarrier — current Dual-Carrier ON/OFF state for the first-page toggle.
-/// Reads the switch + configured secondary carrier from the TOML, plus the running effective state.
+/// GET /api/dualcarrier — current multi-carrier ON/OFF state for the first-page toggle.
+/// The route name stays `/api/dualcarrier` for compatibility with the v1.3.0 dashboard.
 fn serve_dual_carrier_get(
     stream: TcpStream,
     shared_config: &Option<tetra_config::bluestation::SharedConfig>,
@@ -3170,16 +3172,26 @@ fn serve_dual_carrier_get(
 ) {
     let st = crate::net_dashboard::dual_carrier::read_dual_carrier(config_path);
     let main_carrier = shared_config.as_ref().map(|c| c.config().cell.main_carrier);
-    let running_active = shared_config
+    let running_secondary_active = shared_config
         .as_ref()
         .map(|c| c.config().cell.secondary_carrier.is_some())
+        .unwrap_or(false);
+    let running_third_active = shared_config
+        .as_ref()
+        .map(|c| c.config().cell.third_carrier.is_some())
         .unwrap_or(false);
 
     let body = serde_json::json!({
         "enabled": st.enabled,
         "secondary_carrier": st.secondary_carrier,
+        "third_enabled": st.third_enabled,
+        "third_carrier": st.third_carrier,
         "active": st.active(),
-        "running_active": running_active,
+        "secondary_active": st.secondary_active(),
+        "third_active": st.third_active(),
+        "running_active": running_secondary_active || running_third_active,
+        "running_secondary_active": running_secondary_active,
+        "running_third_active": running_third_active,
         "main_carrier": main_carrier,
     })
     .to_string();
@@ -3187,9 +3199,10 @@ fn serve_dual_carrier_get(
     http_json_response(stream, 200, &body);
 }
 
-/// POST /api/dualcarrier — toggle dual carrier. Body: {"enabled": bool, "secondary_carrier"?: u16}.
+/// POST /api/dualcarrier — configure additional carriers.
+/// Body: {"enabled": bool, "secondary_carrier"?: u16, "third_enabled"?: bool, "third_carrier"?: u16}.
 ///
-/// The secondary carrier is fixed at startup (PHY/SDR tuning and UMAC schedulers read it once), so
+/// Additional carriers are fixed at startup (PHY/SDR tuning and UMAC schedulers read them once), so
 /// this validates the resulting config, writes TOML, and schedules a controlled service restart.
 fn serve_dual_carrier_post(
     stream: TcpStream,
@@ -3209,35 +3222,56 @@ fn serve_dual_carrier_post(
 
     let current = dual_carrier::read_dual_carrier(config_path);
 
-    // Enabling uses an explicit carrier from the request, otherwise the one already present in TOML.
-    // Disabling does not rewrite the carrier number, so OFF remembers what ON should use next time.
+    let parse_carrier = |field: &str| -> Result<Option<u16>, String> {
+        match req.get(field) {
+            Some(v) if v.is_null() => Ok(None),
+            Some(v) => match v.as_u64() {
+                Some(n) if n <= 4095 => Ok(Some(n as u16)),
+                _ => Err(format!("{field} must be in 0..4095")),
+            },
+            None => Ok(None),
+        }
+    };
+
+    // Enabling uses explicit carrier numbers from the request, otherwise the ones already present
+    // in TOML. Disabling keeps the carrier numbers in TOML but switches them off so the UI remembers
+    // what ON should use next time.
     let secondary = if enabled {
-        let requested = match req.get("secondary_carrier").and_then(|v| v.as_u64()) {
-            Some(n) if n > 4095 => {
-                return http_response(stream, 400, "secondary_carrier must be in 0..4095");
-            }
-            Some(n) => Some(n as u16),
-            None => None,
-        };
-        match requested.or(current.secondary_carrier) {
-            Some(n) => Some(n),
-            None => {
-                return http_response(
-                    stream,
-                    400,
-                    "enabling dual carrier needs a secondary_carrier number (none configured yet)",
-                );
-            }
+        match parse_carrier("secondary_carrier") {
+            Ok(requested) => match requested.or(current.secondary_carrier) {
+                Some(n) => Some(n),
+                None => {
+                    return http_response(
+                        stream,
+                        400,
+                        "enabling multi-carrier needs a secondary_carrier number (none configured yet)",
+                    );
+                }
+            },
+            Err(e) => return http_response(stream, 400, &e),
         }
     } else {
-        None
+        current.secondary_carrier
+    };
+
+    let requested_third = match parse_carrier("third_carrier") {
+        Ok(v) => v,
+        Err(e) => return http_response(stream, 400, &e),
+    };
+    let third = requested_third.or(current.third_carrier);
+    let third_enabled = if enabled {
+        req.get("third_enabled")
+            .and_then(|v| v.as_bool())
+            .unwrap_or_else(|| requested_third.is_some() || current.third_active())
+    } else {
+        false
     };
 
     let original = match std::fs::read_to_string(config_path) {
         Ok(s) => s,
         Err(e) => return http_response(stream, 500, &format!("cannot read config: {e}")),
     };
-    let prospective = dual_carrier::compute_toml(&original, enabled, secondary);
+    let prospective = dual_carrier::compute_toml(&original, enabled, secondary, third_enabled, third);
     match tetra_config::bluestation::parsing::from_toml_str(&prospective) {
         Ok(cfg) => {
             if let Err(e) = cfg.validate() {
@@ -3247,14 +3281,16 @@ fn serve_dual_carrier_post(
         Err(e) => return http_response(stream, 400, &format!("resulting config does not parse: {e}")),
     }
 
-    if let Err(e) = dual_carrier::write_dual_carrier(config_path, enabled, secondary) {
+    if let Err(e) = dual_carrier::write_dual_carrier(config_path, enabled, secondary, third_enabled, third) {
         return http_response(stream, 500, &format!("failed to write config: {e}"));
     }
 
     tracing::info!(
-        "Dashboard: Dual-Carrier set {} (secondary_carrier={:?}); scheduling restart",
+        "Dashboard: Multi-Carrier set secondary={} ({:?}), third={} ({:?}); scheduling restart",
         if enabled { "ON" } else { "OFF" },
-        secondary
+        secondary,
+        if third_enabled { "ON" } else { "OFF" },
+        third
     );
     crate::service_control::schedule_service_action(
         crate::service_control::ServiceAction::Restart,
@@ -3265,9 +3301,9 @@ fn serve_dual_carrier_post(
         stream,
         200,
         if enabled {
-            "Dual carrier enabled; the base station is restarting to apply it."
+            "Multi-carrier enabled; the base station is restarting to apply it."
         } else {
-            "Dual carrier disabled; the base station is restarting to apply it."
+            "Multi-carrier disabled; the base station is restarting to apply it."
         },
     );
 }
