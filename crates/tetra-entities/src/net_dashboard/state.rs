@@ -30,6 +30,8 @@ pub struct CallState {
     pub started_secs_ago: u64,
     pub simplex: bool,
     pub ts: u8,
+    /// Carrier number on which the traffic channel is allocated.
+    pub carrier_num: u16,
     /// ETSI call priority (0..=15). 15 = emergency call; 12..=15 = pre-emptive priority.
     pub priority: u8,
 }
@@ -256,6 +258,8 @@ pub struct CallEntry {
     pub started_at: Instant,
     pub simplex: bool,
     pub ts: u8,
+    /// Carrier number on which the traffic channel is allocated.
+    pub carrier_num: u16,
     /// ETSI call priority (0..=15); 15 = emergency. Mirrored from the call-started telemetry.
     pub priority: u8,
 }
@@ -571,6 +575,7 @@ impl DashboardStateInner {
                 started_secs_ago: c.started_at.elapsed().as_secs(),
                 simplex: c.simplex,
                 ts: c.ts,
+                carrier_num: c.carrier_num,
                 priority: c.priority,
             })
             .collect()
