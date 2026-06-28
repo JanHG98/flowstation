@@ -61,6 +61,8 @@ pub fn default_cell_info(freq_info: FreqInfo) -> CfgCellInfo {
         colour_code: 1,
         location_area: 2,
         main_carrier: freq_info.carrier,
+        secondary_carrier: None,
+        third_carrier: None,
         freq_band: freq_info.band,
         freq_offset_hz: freq_info.freq_offset_hz,
         duplex_spacing_id: freq_info.duplex_spacing_id,
