@@ -192,6 +192,10 @@ impl StackConfig {
             }
         }
 
+        if self.cell.third_carrier.is_some() && self.cell.secondary_carrier.is_none() {
+            return Err("cell.third_carrier requires cell.secondary_carrier to be enabled");
+        }
+
         // Sanity check on main carrier property fields in SYSINFO
         if self.phy_io.backend == PhyBackend::SoapySdr {
             let soapy_cfg = self
