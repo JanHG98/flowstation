@@ -99,7 +99,7 @@ fn test_network_downlink_voice_does_not_start_ul_inactivity_timer() {
         sap: Sap::TmdSap,
         src: TetraEntity::Brew,
         dest: TetraEntity::Umac,
-        msg: SapMsgInner::TmdCircuitDataReq(TmdCircuitDataReq { ts: 2, data: vec![0; 36] }),
+        msg: SapMsgInner::TmdCircuitDataReq(TmdCircuitDataReq { carrier_num: 1521, ts: 2, data: vec![0; 36] }),
     });
     test.run_stack(Some(3 * 18 * 4 + 10));
     let sink_msgs = test.dump_sinks();
@@ -175,6 +175,7 @@ fn test_ul_mac_u_signal_uses_floor_owner_and_timeslot_link() {
         src: TetraEntity::Lmac,
         dest: TetraEntity::Umac,
         msg: SapMsgInner::TmvUnitdataInd(TmvUnitdataInd {
+            carrier_num: 1521,
             pdu,
             block_num: PhyBlockNum::Block1,
             logical_channel: LogicalChannel::Stch,
@@ -212,6 +213,7 @@ fn test_in_fragmented_sch_hu_and_sch_f() {
     let dltime_vec1 = TdmaTime::default().add_timeslots(2); // Downlink time: 0/1/1/3
     // let ultime_vec1 = dltime_vec1.add_timeslots(-2); // Uplink time: 0/1/1/1
     let test_prim1 = TmvUnitdataInd {
+            carrier_num: 1521,
         pdu: BitBuffer::from_bitstr(test_vec1),
         block_num: PhyBlockNum::Block1,
         logical_channel: LogicalChannel::SchHu,
@@ -226,6 +228,7 @@ fn test_in_fragmented_sch_hu_and_sch_f() {
         msg: SapMsgInner::TmvUnitdataInd(test_prim1),
     };
     let test_prim2 = TmvUnitdataInd {
+            carrier_num: 1521,
         pdu: BitBuffer::from_bitstr(test_vec2),
         block_num: PhyBlockNum::Both,
         logical_channel: LogicalChannel::SchF,
@@ -272,6 +275,7 @@ fn test_in_fragmented_sch_hu_and_sch_hu() {
     let dltime_vec1 = TdmaTime::default().add_timeslots(2); // Downlink time: 0/1/1/3
     // let ultime_vec1 = dltime_vec1.add_timeslots(-2); // Uplink time: 0/1/1/1
     let test_prim1 = TmvUnitdataInd {
+            carrier_num: 1521,
         pdu: BitBuffer::from_bitstr(test_vec1),
         block_num: PhyBlockNum::Block1,
         logical_channel: LogicalChannel::SchHu,
@@ -286,6 +290,7 @@ fn test_in_fragmented_sch_hu_and_sch_hu() {
         msg: SapMsgInner::TmvUnitdataInd(test_prim1),
     };
     let test_prim2 = TmvUnitdataInd {
+            carrier_num: 1521,
         pdu: BitBuffer::from_bitstr(test_vec2),
         block_num: PhyBlockNum::Block1,
         logical_channel: LogicalChannel::SchHu,
@@ -485,6 +490,7 @@ fn test_traffic_mac_access_does_not_mark_next_facch_as_random_access() {
         src: TetraEntity::Lmac,
         dest: TetraEntity::Umac,
         msg: SapMsgInner::TmvUnitdataInd(TmvUnitdataInd {
+            carrier_num: 1521,
             pdu: uplink,
             block_num: PhyBlockNum::Block1,
             logical_channel: LogicalChannel::SchHu,
