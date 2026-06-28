@@ -112,8 +112,11 @@ pub struct CfgCellInfo {
 
     /// 12 bits, from MAC SYSINFO
     pub main_carrier: u16,
-    /// Optional secondary carrier for dual-carrier BS operation. `None` means single-carrier.
+    /// Optional secondary carrier for multi-carrier BS operation. `None` means no second carrier.
     pub secondary_carrier: Option<u16>,
+    /// Optional third carrier for lab/experimental multi-carrier BS operation.
+    /// `None` means no third carrier.
+    pub third_carrier: Option<u16>,
     /// 4 bits, from MAC SYSINFO
     pub freq_band: u8,
     /// Offset in Hz from 25kHz aligned carrier. Options: 0, 6250, -6250, 12500 Hz
@@ -219,6 +222,12 @@ pub struct CellInfoDto {
     /// `secondary_carrier` value stays in the TOML but is not used by the running stack.
     /// Absent = true for backward compatibility.
     pub dual_carrier_enabled: Option<bool>,
+    /// Optional third carrier for experimental three-carrier BS operation.
+    /// Kept separate from `secondary_carrier` to remain backward-compatible with v1.3.0 configs.
+    pub third_carrier: Option<u16>,
+    /// Operational switch for `third_carrier`. When false, the configured value stays in
+    /// TOML but is not used by the running stack. Absent = true for backward compatibility.
+    pub third_carrier_enabled: Option<bool>,
     pub freq_band: u8,
     pub freq_offset: i16,
     pub duplex_spacing: u8,
@@ -294,6 +303,11 @@ pub fn cell_dto_to_cfg(ci: CellInfoDto) -> CfgCellInfo {
         main_carrier: ci.main_carrier,
         secondary_carrier: if ci.dual_carrier_enabled.unwrap_or(true) {
             ci.secondary_carrier
+        } else {
+            None
+        },
+        third_carrier: if ci.third_carrier_enabled.unwrap_or(true) {
+            ci.third_carrier
         } else {
             None
         },
