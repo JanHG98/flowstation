@@ -5885,7 +5885,7 @@ function handleMsg(msg){
         state.calls[c.call_id]={...c,started_at:Date.now()-(c.started_secs_ago||0)*1000};
         if(c.ts&&c.ts>=2){
           const sub=c.call_type==='group'?t('call_group'):(c.simplex?t('call_p2p_s'):t('call_p2p_d'));
-          tsSetCall(c.ts,{...c,sub});
+          tsSetCall(c.carrier_num,c.ts,{...c,sub});
         }
       });
       if(msg.log&&msg.log.length){document.getElementById('log-container').innerHTML='';msg.log.forEach(e=>appendLog(e));}
@@ -5942,7 +5942,7 @@ function handleMsg(msg){
       if(msg.last_heard)pushLastHeard(msg.last_heard);
       if(msg.ts&&msg.ts>=2){
         const sub=msg.call_type==='group'?t('call_group'):(msg.simplex?t('call_p2p_s'):t('call_p2p_d'));
-        tsSetCall(msg.ts,{...msg,sub});
+        tsSetCall(msg.carrier_num,msg.ts,{...msg,sub});
         updateTsBlocks();
       }
       renderCalls();renderLastHeard();break;
@@ -5952,7 +5952,7 @@ function handleMsg(msg){
       tsClearCall(msg.call_id);updateTsBlocks();
       delete state.calls[msg.call_id];renderCalls();renderLastHeard();break;
     case 'ts_voice':
-      tsVoice(msg.ts);break;
+      tsVoice(msg.carrier_num,msg.ts);break;
     case 'speaker_changed':
       if(state.calls[msg.call_id])state.calls[msg.call_id].active_speaker=msg.speaker_issi;
       // Reflect the new speaker on the timeslot visualizer immediately.
@@ -6120,9 +6120,25 @@ function tsIdleBars(active){
   const heights=active?[8,14,10,16,8,12,6]:[3,3,3,3,3,3,3];
   return heights.map(h=>`<div class="ts-wave-bar" style="height:${h}px"></div>`).join('');
 }
+function tsCarrierKey(carrier){
+  const c=(carrier!=null)?Number(carrier):Number(state.btsMainCarrier||0);
+  return Number.isFinite(c)&&c>0?String(c):'main';
+}
+function tsKey(carrier,ts){return `${tsCarrierKey(carrier)}:${ts}`;}
+function tsDomId(carrier,ts){return `ts-block-${tsCarrierKey(carrier)}-${ts}`;}
+function tsResolveCarrier(carrier){
+  if(carrier!=null)return Number(carrier);
+  return state.btsMainCarrier!=null?Number(state.btsMainCarrier):null;
+}
+function tsAllCarriers(){
+  const out=[];
+  if(state.btsMainCarrier!=null)out.push({carrier:Number(state.btsMainCarrier),label:'MAIN',secondary:false});
+  if(state.dualCarrierRunning&&state.btsSecondaryCarrier!=null)out.push({carrier:Number(state.btsSecondaryCarrier),label:'SECONDARY',secondary:true});
+  if(!out.length)out.push({carrier:null,label:'MAIN',secondary:false});
+  return out;
+}
 function tsBlockMarkup(carrier,ts,kind){
-  const isMain=carrier==null || carrier===state.btsMainCarrier;
-  const id=isMain?`ts-block-${ts}`:`ts-block-${carrier}-${ts}`;
+  const id=tsDomId(carrier,ts);
   const cls=kind==='main-control'?'ts-block mcch':(kind==='secondary-control'?'ts-block mcch':'ts-block');
   const label=kind==='main-control'?'MCCH':(kind==='secondary-control'?'BCCH':'—');
   const sub=kind==='main-control'||kind==='secondary-control'?'ACTIVE':'Idle';
@@ -6145,29 +6161,29 @@ function renderTsCarrier(carrier,label,secondary){
 function renderTsGrid(){
   const grid=document.getElementById('ts-grid');
   if(!grid)return;
-  const main=state.btsMainCarrier;
-  const sec=state.btsSecondaryCarrier;
-  const dual=!!(state.dualCarrierRunning&&sec!=null);
-  grid.classList.toggle('dual',dual);
-  grid.innerHTML=renderTsCarrier(main,'MAIN',false)+(dual?renderTsCarrier(sec,'SECONDARY',true):'');
+  const carriers=tsAllCarriers();
+  grid.classList.toggle('dual',carriers.length>1);
+  grid.innerHTML=carriers.map(c=>renderTsCarrier(c.carrier,c.label,c.secondary)).join('');
   updateTsBlocks();
 }
-// tsState[ts-1]: {call_id, call_type, label, sub, voice_ts, started_at}
-const tsState=[null,null,null,null];
+// tsState["carrier:ts"]: {call_id, call_type, label, sub, voice_ts, started_at, carrier_num}
+const tsState={};
 const TS_VOICE_DECAY_MS=800;
-// Random wave heights per bar per TS — regenerated on each voice frame
-const tsWaveHeights=[[],[],[],[]];
+// Random wave heights per bar per carrier/TS — regenerated on each voice frame
+const tsWaveHeights={};
 
-function tsRandWave(ts){
+function tsRandWave(carrier,ts){
   const bars=7;
-  tsWaveHeights[ts-1]=Array.from({length:bars},()=>Math.floor(Math.random()*14)+4);
+  tsWaveHeights[tsKey(carrier,ts)]=Array.from({length:bars},()=>Math.floor(Math.random()*14)+4);
 }
-function tsApplyWave(ts,active){
-  const block=document.getElementById('ts-block-'+ts);
+function tsApplyWave(carrier,ts,active){
+  const block=document.getElementById(tsDomId(carrier,ts));
   if(!block)return;
   const bars=block.querySelectorAll('.ts-wave-bar');
+  const key=tsKey(carrier,ts);
   if(active){
-    tsWaveHeights[ts-1].forEach((h,i)=>{if(bars[i])bars[i].style.height=h+'px';});
+    if(!tsWaveHeights[key]||!tsWaveHeights[key].length)tsRandWave(carrier,ts);
+    tsWaveHeights[key].forEach((h,i)=>{if(bars[i])bars[i].style.height=h+'px';});
   } else {
     bars.forEach(b=>b.style.height='3px');
   }
@@ -6175,62 +6191,59 @@ function tsApplyWave(ts,active){
 
 function updateTsBlocks(){
   const now=Date.now();
-  for(let i=0;i<4;i++){
-    const ts=i+1;
-    const block=document.getElementById('ts-block-'+ts);
-    if(!block)continue;
-    const label=block.querySelector('.ts-label');
-    const sub=block.querySelector('.ts-sub');
-    const dur=block.querySelector('.ts-duration-bar');
+  for(const carrierInfo of tsAllCarriers()){
+    const carrier=carrierInfo.carrier;
+    for(let i=0;i<4;i++){
+      const ts=i+1;
+      const block=document.getElementById(tsDomId(carrier,ts));
+      if(!block)continue;
+      const label=block.querySelector('.ts-label');
+      const sub=block.querySelector('.ts-sub');
+      const dur=block.querySelector('.ts-duration-bar');
 
-    if(ts===1){
-      block.className='ts-block mcch';
-      label.textContent='MCCH';
-      sub.textContent='ACTIVE';
-      // subtle MCCH wave animation
-      if(!tsWaveHeights[0].length)tsRandWave(1);
-      tsApplyWave(1,true);
-      if(dur)dur.style.width='0%';
-      continue;
-    }
+      if(ts===1){
+        block.className='ts-block mcch';
+        label.textContent=carrierInfo.secondary?'BCCH':'MCCH';
+        sub.textContent='ACTIVE';
+        tsApplyWave(carrier,1,true);
+        if(dur)dur.style.width='0%';
+        continue;
+      }
 
-    const st=tsState[i];
-    const timer=block.querySelector('.ts-timer');
-    if(!st){
-      block.className='ts-block';
-      label.textContent='—';
-      sub.textContent='Idle';
-      tsApplyWave(ts,false);
-      if(timer)timer.textContent='';
-      if(dur)dur.style.width='0%';
-      continue;
-    }
+      const st=tsState[tsKey(carrier,ts)];
+      const timer=block.querySelector('.ts-timer');
+      if(!st){
+        block.className='ts-block';
+        label.textContent='—';
+        sub.textContent='Idle';
+        tsApplyWave(carrier,ts,false);
+        if(timer)timer.textContent='';
+        if(dur)dur.style.width='0%';
+        continue;
+      }
 
-    const voiceRecent=st.voice_ts&&(now-st.voice_ts)<TS_VOICE_DECAY_MS;
-    // Top line = GSSI (talkgroup) for group calls / called ISSI for individual;
-    // bottom line = the ISSI currently keyed up, with its devices.json name when known.
-    const lines=tsLines(st);
-    label.textContent=lines.top;
+      const voiceRecent=st.voice_ts&&(now-st.voice_ts)<TS_VOICE_DECAY_MS;
+      const lines=tsLines(st);
+      label.textContent=lines.top;
 
-    if(voiceRecent){
-      block.className='ts-block voice';
-      sub.textContent=lines.bottom?('▶ '+lines.bottom):'▶ TX';
-    } else {
-      block.className='ts-block call';
-      sub.textContent=lines.bottom||(st.sub||'Alloc');
-    }
-    // Emergency call (ETSI priority 15): overlay the danger ring on the call/voice state.
-    if((st.priority||0)>=15)block.classList.add('emergency');
-    if(timer){
-      const elapsed=Math.floor((now-(st.started_at||now))/1000);
-      timer.textContent=elapsed>0?formatDur(elapsed):'';
-    }
-    tsApplyWave(ts, voiceRecent);
+      if(voiceRecent){
+        block.className='ts-block voice';
+        sub.textContent=lines.bottom?('▶ '+lines.bottom):'▶ TX';
+      } else {
+        block.className='ts-block call';
+        sub.textContent=lines.bottom||(st.sub||'Alloc');
+      }
+      if((st.priority||0)>=15)block.classList.add('emergency');
+      if(timer){
+        const elapsed=Math.floor((now-(st.started_at||now))/1000);
+        timer.textContent=elapsed>0?formatDur(elapsed):'';
+      }
+      tsApplyWave(carrier,ts, voiceRecent);
 
-    // Duration bar — fills over 120s then stays full
-    if(dur&&st.started_at){
-      const pct=Math.min(100,((now-st.started_at)/120000)*100);
-      dur.style.width=pct+'%';
+      if(dur&&st.started_at){
+        const pct=Math.min(100,((now-st.started_at)/120000)*100);
+        dur.style.width=pct+'%';
+      }
     }
   }
 }
@@ -6240,50 +6253,43 @@ function formatDur(s){
   return Math.floor(s/60)+'m'+String(s%60).padStart(2,'0')+'s';
 }
 
-// Render an ISSI + its devices.json name compactly for the TS sub-line.
 function tsIssiText(issi){
   if(!issi)return '';
   const name=deviceInlineName(issi);
   return name?`${issi} · ${name}`:''+issi;
 }
-// Compute the two text lines for an active timeslot from its call state:
-//   top    → GSSI (talkgroup number) for group calls, else the called ISSI / P2P
-//   bottom → the ISSI currently transmitting, with devices.json name when known
 function tsLines(st){
   const speaker=st.speaker_issi||st.caller_issi;
   if(st.call_type==='group'){
-    // Group calls (the normal traffic-channel case): GSSI on top, speaking ISSI below.
     return {top: st.gssi!=null?('GSSI '+st.gssi):'GROUP', bottom: tsIssiText(speaker)};
   }
-  // Individual / point-to-point calls have no talkgroup — label the top line clearly
-  // so it never shows a bare "ISSI" that reads like a misplaced GSSI.
   return {top:'PRIVATE', bottom: tsIssiText(speaker)};
 }
-function tsSetCall(ts, call){
+function tsSetCall(carrier,ts,call){
   if(ts<2||ts>4)return;
-  tsState[ts-1]={
+  const c=tsResolveCarrier(carrier);
+  tsState[tsKey(c,ts)]={
     call_id:call.call_id, call_type:call.call_type,
     gssi:call.gssi, called_issi:call.called_issi, caller_issi:call.caller_issi,
     speaker_issi:call.active_speaker||call.speaker_issi||call.caller_issi,
     simplex:call.simplex, sub:call.sub, priority:call.priority||0,
-    voice_ts:null, started_at:Date.now()
+    carrier_num:c, voice_ts:null, started_at:Date.now()
   };
 }
-// Point a timeslot at the ISSI now transmitting (group-call speaker hand-offs).
 function tsSetSpeaker(call_id, speaker_issi){
-  for(let i=1;i<4;i++){if(tsState[i]&&tsState[i].call_id===call_id)tsState[i].speaker_issi=speaker_issi;}
+  Object.keys(tsState).forEach(k=>{if(tsState[k]&&tsState[k].call_id===call_id)tsState[k].speaker_issi=speaker_issi;});
 }
 function tsClearCall(call_id){
-  for(let i=1;i<4;i++){if(tsState[i]&&tsState[i].call_id===call_id)tsState[i]=null;}
+  Object.keys(tsState).forEach(k=>{if(tsState[k]&&tsState[k].call_id===call_id)delete tsState[k];});
 }
-function tsVoice(ts){
+function tsVoice(carrier,ts){
   if(ts<2||ts>4)return;
-  if(!tsState[ts-1])tsState[ts-1]={call_id:0,call_type:'',gssi:null,voice_ts:null,started_at:Date.now()};
-  tsState[ts-1].voice_ts=Date.now();
-  // Randomize waveform bars on each voice frame for live feel
-  tsRandWave(ts);
-  // Flash effect
-  const block=document.getElementById('ts-block-'+ts);
+  const c=tsResolveCarrier(carrier);
+  const key=tsKey(c,ts);
+  if(!tsState[key])tsState[key]={call_id:0,call_type:'',gssi:null,carrier_num:c,voice_ts:null,started_at:Date.now()};
+  tsState[key].voice_ts=Date.now();
+  tsRandWave(c,ts);
+  const block=document.getElementById(tsDomId(c,ts));
   if(block){
     const flash=block.querySelector('.ts-flash');
     if(flash){flash.style.animation='none';void flash.offsetWidth;flash.style.animation='ts-flash-in 0.08s ease-out forwards';}
@@ -6364,11 +6370,12 @@ function renderCalls(){
     const label=c.call_type==='group'?t('call_group'):(c.simplex?t('call_p2p_s'):t('call_p2p_d'));
     const to=c.call_type==='group'?`GSSI ${c.gssi}`:idCell(c.called_issi);
     const spk=c.active_speaker?idCell(c.active_speaker):'<span class="muted">—</span>';
+    const rfSlot=(c.carrier_num?` <span class="pill pill-idle">C${c.carrier_num}/TS${c.ts||'?'}</span>`:(c.ts?` <span class="pill pill-idle">TS${c.ts}</span>`:''));
     // Emergency call = ETSI call priority 15 (terminal emergency button). Flag it prominently.
     const emg=(c.priority||0)>=15;
     const emgBadge=emg?`<span class="pill pill-danger"><span class="pill-icon">${svgIcon('emergency')}</span>${t('call_emergency')}</span> `:'';
     const emgClear=emg&&c.caller_issi?` <button class="btn btn-sm btn-danger" onclick="clearEmergency(${c.caller_issi})">${t('emg_clear')}</button>`:'';
-    return`<tr${emg?' class="row-emergency"':''}><td class="col-mobile-hide"><code>${c.call_id}</code></td><td>${emgBadge}<span class="pill ${pillv}">${label}</span></td><td>${c.caller_issi?idCell(c.caller_issi):'<span class="muted">—</span>'}</td><td>${to}</td><td>${spk}</td><td><span class="num accent">${mm}:${ss}</span>${emgClear}</td></tr>`;
+    return`<tr${emg?' class="row-emergency"':''}><td class="col-mobile-hide"><code>${c.call_id}</code></td><td>${emgBadge}<span class="pill ${pillv}">${label}</span>${rfSlot}</td><td>${c.caller_issi?idCell(c.caller_issi):'<span class="muted">—</span>'}</td><td>${to}</td><td>${spk}</td><td><span class="num accent">${mm}:${ss}</span>${emgClear}</td></tr>`;
   }).join('');
 }
 
