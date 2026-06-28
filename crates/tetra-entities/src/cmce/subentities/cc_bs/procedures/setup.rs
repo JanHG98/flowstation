@@ -502,6 +502,7 @@ impl CcBsSubentity {
             gssi: dest_gssi,
             caller_issi: calling_party.ssi,
             ts: circuit.ts,
+            carrier_num: self.config.config().cell.main_carrier,
             priority: pdu.call_priority,
             source: "local".to_string(),
         });
