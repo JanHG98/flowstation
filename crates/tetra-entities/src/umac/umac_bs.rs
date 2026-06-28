@@ -88,10 +88,10 @@ impl UmacBs {
         let system_wide_services = Self::get_system_wide_services_state(&config);
         let precomps = Self::generate_precomps(&config);
         let mut secondary_channel_schedulers = Vec::new();
-        if let Some(secondary_carrier) = c.cell.secondary_carrier {
+        for carrier in [c.cell.secondary_carrier, c.cell.third_carrier].into_iter().flatten() {
             let mut sched = BsChannelScheduler::new(scrambling_code, precomps.clone());
-            sched.set_carrier_num(secondary_carrier);
-            // NetCore hardening: secondary carriers are traffic-only for now.
+            sched.set_carrier_num(carrier);
+            // NetCore hardening: additional carriers are traffic-only for now.
             // Keep common-control / random-access / SYSINFO on the main carrier
             // until the SwMI has a fully carrier-specific control-channel model
             // and the registered MS explicitly supports concurrent multicarrier.
@@ -1940,7 +1940,7 @@ impl TetraEntityTrait for UmacBs {
         crate::health::registry().set_dl_queue_depth(self.channel_scheduler.dl_queue_depth());
 
         // Collect/construct traffic that should be sent down to the LMAC.
-        // With DualCarrier enabled we finalize one slot per configured carrier and send them as a batch
+        // With multi-carrier enabled we finalize one slot per configured carrier and send them as a batch
         // so PHY can synthesize all carriers in the same SDR timeslot.
         let mut slots = Vec::with_capacity(1 + self.secondary_channel_schedulers.len());
         slots.push(self.channel_scheduler.finalize_ts_for_tick());
