@@ -207,10 +207,13 @@ impl StackConfig {
                 let dl_freqs: Vec<u32> = carriers.iter().map(|(_, dl, _)| *dl).collect();
                 let ul_freqs: Vec<u32> = carriers.iter().map(|(_, _, ul)| *ul).collect();
 
-                if !Self::frequencies_fit_center(soapy_cfg.dl_freq, sample_rate_hz, &dl_freqs) {
+                let tx_center_hz = soapy_cfg.tx_center_freq.unwrap_or(soapy_cfg.dl_freq);
+                let rx_center_hz = soapy_cfg.rx_center_freq.unwrap_or(soapy_cfg.ul_freq);
+
+                if !Self::frequencies_fit_center(tx_center_hz, sample_rate_hz, &dl_freqs) {
                     return Err("configured TX center/sample-rate do not cover all BS downlink carriers");
                 }
-                if !Self::frequencies_fit_center(soapy_cfg.ul_freq, sample_rate_hz, &ul_freqs) {
+                if !Self::frequencies_fit_center(rx_center_hz, sample_rate_hz, &ul_freqs) {
                     return Err("configured RX center/sample-rate do not cover all BS uplink carriers");
                 }
             };
