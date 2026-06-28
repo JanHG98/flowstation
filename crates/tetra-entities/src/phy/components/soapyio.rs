@@ -76,23 +76,38 @@ impl SoapyIo {
         let rx_ch = sdr_settings.rx_ch;
         let tx_ch = sdr_settings.tx_ch;
 
-        // Get PPM corrected freqs
+        // Get PPM-corrected carrier frequencies and optional explicit SDR center frequencies.
+        // The center-frequency overrides are intentionally tied to the physical SDR
+        // directions (`rx_center_freq` / `tx_center_freq`), not to TETRA DL/UL naming.
         let (dl_corrected, _) = soapy_cfg.dl_freq_corrected();
         let (ul_corrected, _) = soapy_cfg.ul_freq_corrected();
+        let rx_center_corrected = soapy_cfg.rx_center_freq_corrected().map(|(freq, _)| freq);
+        let tx_center_corrected = soapy_cfg.tx_center_freq_corrected().map(|(freq, _)| freq);
 
         let (rx_freq, tx_freq) = match mode {
             StackMode::Bs => (
-                Some(ul_corrected - SOAPY_FREQ_OFFSET), // Offset RX center frequency from carrier frequency
-                Some(dl_corrected),
+                Some(rx_center_corrected.unwrap_or(ul_corrected - SOAPY_FREQ_OFFSET)),
+                Some(tx_center_corrected.unwrap_or(dl_corrected)),
             ),
             StackMode::Ms => (
-                Some(dl_corrected - SOAPY_FREQ_OFFSET), // Offset RX center frequency from carrier frequency
-                Some(ul_corrected),
+                Some(rx_center_corrected.unwrap_or(dl_corrected - SOAPY_FREQ_OFFSET)),
+                Some(tx_center_corrected.unwrap_or(ul_corrected)),
             ),
             StackMode::Mon => {
                 unimplemented!("Monitor mode not implemented yet");
             }
         };
+
+        tracing::info!(
+            "SDR centers: RX {:.6} MHz / TX {:.6} MHz{}",
+            rx_freq.unwrap_or(0.0) / 1e6,
+            tx_freq.unwrap_or(0.0) / 1e6,
+            if soapy_cfg.rx_center_freq.is_some() || soapy_cfg.tx_center_freq.is_some() {
+                " (explicit center override)"
+            } else {
+                ""
+            }
+        );
 
         let rx_enabled = rx_freq.is_some();
         let tx_enabled = tx_freq.is_some();
