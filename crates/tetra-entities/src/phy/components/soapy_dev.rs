@@ -33,10 +33,14 @@ pub struct PhyConfig<'a> {
     /// Downlink/uplink carrier frequency pairs to monitor.
     /// Uplink frequency can be set to None to monitor downlink only.
     pub monitor_frequencies: &'a [(f64, Option<f64>)],
+    /// Carrier numbers corresponding to `monitor_frequencies`, if any.
+    pub monitor_carrier_numbers: &'a [u16],
     /// Downlink carrier frequencies for a BS.
     pub bs_dl_frequencies: &'a [f64],
     /// Uplink carrier frequencies for a BS.
     pub bs_ul_frequencies: &'a [f64],
+    /// Carrier numbers corresponding to BS uplink/downlink frequencies.
+    pub bs_carrier_numbers: &'a [u16],
 }
 
 pub struct RxTxDevSoapySdr {
@@ -81,10 +85,25 @@ impl RxTxDevSoapySdr {
             ul_corrected / 1e6
         );
 
+        let bs_carriers = config_guard
+            .as_ref()
+            .bs_phase_mod_carriers()
+            .expect("validated carrier configuration should compute");
+        let bs_carrier_numbers = bs_carriers.iter().map(|(carrier_num, _, _)| *carrier_num).collect::<Vec<_>>();
+        let ppm = soapy_cfg.ppm_err;
+        let apply_ppm = |freq_hz: u32| {
+            let f = freq_hz as f64;
+            f + (f / 1_000_000.0) * ppm
+        };
+        let bs_dl_frequencies = bs_carriers.iter().map(|(_, dl_hz, _)| apply_ppm(*dl_hz)).collect::<Vec<_>>();
+        let bs_ul_frequencies = bs_carriers.iter().map(|(_, _, ul_hz)| apply_ppm(*ul_hz)).collect::<Vec<_>>();
+
         let phy_config = soapy_dev::PhyConfig {
-            bs_dl_frequencies: &[dl_corrected],
-            bs_ul_frequencies: &[ul_corrected],
-            ..Default::default()
+            monitor_frequencies: &[],
+            monitor_carrier_numbers: &[],
+            bs_dl_frequencies: &bs_dl_frequencies,
+            bs_ul_frequencies: &bs_ul_frequencies,
+            bs_carrier_numbers: &bs_carrier_numbers,
         };
 
         let mut sdr = match soapyio::SoapyIo::new(cfg) {
