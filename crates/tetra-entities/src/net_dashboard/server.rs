@@ -384,7 +384,7 @@ fn run_update(update: SharedUpdateState, config_path: String, source_dir_overrid
         }};
     }
 
-    log!(update, "=== FlowStation OTA Update ===");
+    log!(update, "=== NetCore-Tetra OTA Update ===");
 
     // Step 1: resolve source directory. Bail out cleanly if we can't find a git repo.
     let src_dir = match resolve_source_dir(source_dir_override.as_deref()) {
@@ -509,7 +509,7 @@ fn run_update(update: SharedUpdateState, config_path: String, source_dir_overrid
         match binary_current {
             Some(true) => log!(
                 update,
-                "Already up to date — running {} matches the repository.",
+                "Already up to date — running {} matches JanHG98/flowstation main.",
                 tetra_core::STACK_VERSION
             ),
             _ => log!(
