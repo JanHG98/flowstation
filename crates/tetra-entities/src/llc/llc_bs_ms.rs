@@ -91,13 +91,24 @@ impl Llc {
         }
     }
 
-    /// Schedule an ACK to be sent at a later time
-    pub fn schedule_outgoing_ack(&mut self, dltime: TdmaTime, addr: TetraAddress, ns: u8) {
+    /// Schedule an ACK to be sent at a later time.
+    ///
+    /// `link_id` is the logical signalling/traffic link reported by UMAC. With
+    /// dual-carrier operation this may be 5..7, which maps to carrier 2 / air
+    /// TS2..4. Do not derive the ACK target from `dltime.t`: that is only the
+    /// physical air timeslot and loses the carrier context, causing ACKs for
+    /// carrier-2 calls to be emitted on carrier 1 TS2..4.
+    pub fn schedule_outgoing_ack(&mut self, dltime: TdmaTime, addr: TetraAddress, ns: u8, link_id: u32) {
+        let logical_ts = match link_id {
+            2..=7 => link_id as u8,
+            _ => dltime.t,
+        };
+
         self.scheduled_out_acks.push_back(ScheduledOutAck {
             t_start: dltime,
             nr: ns,
             addr,
-            ts: dltime.t,
+            ts: logical_ts,
         });
     }
 
@@ -573,7 +584,7 @@ impl Llc {
         let msg_dltime = self.dltime.add_timeslots(-2); // Msg on uplink was sent two timeslots ago. 
         if let Some(ns) = ns {
             // Send ACK
-            self.schedule_outgoing_ack(msg_dltime, prim.main_address, ns);
+            self.schedule_outgoing_ack(msg_dltime, prim.main_address, ns, prim.link_id);
         }
 
         // if nr is present, we have received an ACK on a previous message
@@ -804,8 +815,18 @@ impl Llc {
             tracing::debug!("auto-ack for ssi: {}, n: {}, ts: {}", ack.addr.ssi, ack.nr, ack.ts);
 
             // Send BL-ACK via FACCH (stealing) on the traffic timeslot if the original
-            // message arrived on a traffic channel (TS2-4), otherwise via MCCH (TS1).
-            let steal = matches!(ack.ts, 2..=4);
+            // message arrived on a traffic channel. With dual-carrier operation UMAC
+            // reports logical TS5..TS7 for carrier 2 / air TS2..TS4, so keep the
+            // logical ID here and include the secondary-carrier hint below.
+            let steal = matches!(ack.ts, 2..=7);
+            let ack_air_ts = match ack.ts {
+                5..=7 => ack.ts - 3,
+                _ => ack.ts,
+            };
+            let carrier_hint = match ack.ts {
+                5..=7 => Some(-2),
+                _ => None,
+            };
             let mut pdu_buf = BitBuffer::new_autoexpand(5);
             let pdu = BlAck {
                 has_fcs: false,
@@ -821,13 +842,13 @@ impl Llc {
             let chan_alloc = match steal {
                 true => {
                     let mut timeslots = [false; 4];
-                    timeslots[(ack.ts - 1) as usize] = true;
+                    timeslots[(ack_air_ts - 1) as usize] = true;
                     Some(CmceChanAllocReq {
                         usage: None,
                         timeslots,
                         alloc_type: ChanAllocType::Replace,
                         ul_dl_assigned: UlDlAssignment::Both,
-                        carrier: None,
+                        carrier: carrier_hint,
                     })
                 }
                 false => None,
