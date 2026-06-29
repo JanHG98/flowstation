@@ -6119,29 +6119,99 @@ function tsIdleBars(active){
   const heights=active?[8,14,10,16,8,12,6]:[3,3,3,3,3,3,3];
   return heights.map(h=>`<div class="ts-wave-bar" style="height:${h}px"></div>`).join('');
 }
+function tsNum(v){
+  const n=Number(v);
+  return Number.isFinite(n)?n:null;
+}
+function tsMainCarrier(){
+  const n=tsNum(state.btsMainCarrier);
+  return n!=null&&n>0?n:null;
+}
+function tsSecondaryCarrierFromActivity(){
+  const cfg=tsNum(state.btsSecondaryCarrier);
+  if(cfg!=null&&cfg>0)return cfg;
+  for(const c of Object.values(state.calls||{})){
+    const ts=tsNum(c.ts),carrier=tsNum(c.carrier_num);
+    if(ts!=null&&ts>=5&&carrier!=null&&carrier>0)return carrier;
+  }
+  for(const st of Object.values(tsState||{})){
+    const ts=tsNum(st&&st.logical_ts),carrier=tsNum(st&&st.carrier_num);
+    if(ts!=null&&ts>=5&&carrier!=null&&carrier>0)return carrier;
+  }
+  return null;
+}
+function tsHasSecondaryActivity(){
+  if(state.dualCarrierRunning&&tsSecondaryCarrierFromActivity()!=null)return true;
+  for(const c of Object.values(state.calls||{})){
+    const ts=tsNum(c.ts);
+    if(ts!=null&&ts>=5)return true;
+  }
+  for(const st of Object.values(tsState||{})){
+    const ts=tsNum(st&&st.logical_ts);
+    if(ts!=null&&ts>=5)return true;
+  }
+  return false;
+}
+function tsIsSecondaryCarrier(carrier){
+  const c=tsNum(carrier),sec=tsSecondaryCarrierFromActivity(),main=tsMainCarrier();
+  if(c==null||c<=0)return false;
+  if(sec!=null&&c===sec)return true;
+  return main!=null&&c!==main;
+}
+function tsAirTs(logicalTs){
+  const ts=tsNum(logicalTs);
+  if(ts==null)return null;
+  // FlowStation dual-carrier model: logical TS5..TS7 are secondary carrier air TS2..TS4.
+  // TS8 is displayed as the secondary carrier spare/unused block so the operator sees 1..8.
+  if(ts>=5&&ts<=7)return ts-3;
+  if(ts===8)return 1;
+  return ts;
+}
+function tsNormalizeLogicalTs(carrier,ts){
+  let logical=tsNum(ts);
+  if(logical==null)return null;
+  const c=tsNum(carrier);
+  // Some lower-layer/voice events are physical carrier/air-TS based. If they arrive as
+  // carrier=secondary with TS2..TS4, lift them into the dashboard's logical TS5..TS7 space.
+  if(tsIsSecondaryCarrier(c)&&logical>=2&&logical<=4)return logical+3;
+  return logical;
+}
 function tsCarrierKey(carrier){
   const c=(carrier!=null)?Number(carrier):Number(state.btsMainCarrier||0);
   return Number.isFinite(c)&&c>0?String(c):'main';
 }
 function tsKey(carrier,ts){return `${tsCarrierKey(carrier)}:${ts}`;}
 function tsDomId(carrier,ts){return `ts-block-${tsCarrierKey(carrier)}-${ts}`;}
-function tsResolveCarrier(carrier){
-  if(carrier!=null)return Number(carrier);
-  return state.btsMainCarrier!=null?Number(state.btsMainCarrier):null;
+function tsResolveCarrier(carrier,logicalTs){
+  const c=tsNum(carrier);
+  if(c!=null&&c>0)return c;
+  const ts=tsNum(logicalTs);
+  if(ts!=null&&ts>=5){
+    const sec=tsSecondaryCarrierFromActivity();
+    if(sec!=null)return sec;
+  }
+  return tsMainCarrier();
 }
 function tsAllCarriers(){
   const out=[];
-  if(state.btsMainCarrier!=null)out.push({carrier:Number(state.btsMainCarrier),label:'MAIN',secondary:false});
-  if(state.dualCarrierRunning&&state.btsSecondaryCarrier!=null)out.push({carrier:Number(state.btsSecondaryCarrier),label:'TRAFFIC ONLY',secondary:true});
-  if(!out.length)out.push({carrier:null,label:'MAIN',secondary:false});
+  const main=tsMainCarrier();
+  const sec=tsSecondaryCarrierFromActivity();
+  const showSec=tsHasSecondaryActivity()&&sec!=null;
+  out.push({carrier:main,label:'MAIN',secondary:false,slots:[1,2,3,4]});
+  if(showSec)out.push({carrier:sec,label:'TRAFFIC ONLY',secondary:true,slots:[5,6,7,8]});
   return out;
 }
-function tsBlockMarkup(carrier,ts,kind){
+function tsBlockMarkup(carrier,ts,kind,secondary){
   const id=tsDomId(carrier,ts);
   const cls=kind==='main-control'?'ts-block mcch':'ts-block';
+  const air=tsAirTs(ts);
   const label=kind==='main-control'?'MCCH':'—';
-  const sub=kind==='main-control'?'ACTIVE':'Idle';
-  return `<div class="${cls}" id="${id}" data-carrier="${carrier??''}" data-ts="${ts}">
+  let sub=kind==='main-control'?'ACTIVE':'Idle';
+  if(secondary&&ts===8)sub='Spare';
+  const title=secondary
+    ?`Logical TS ${ts} · carrier ${carrier??'—'} · air TS ${air??'—'}`
+    :`TS ${ts} · carrier ${carrier??'—'}`;
+  return `<div class="${cls}" id="${id}" data-carrier="${carrier??''}" data-ts="${ts}" data-air-ts="${air??''}" title="${title}">
     <div class="ts-num">TS ${ts}</div>
     ${ts>1?'<div class="ts-timer"></div>':''}
     <div class="ts-led"></div>
@@ -6152,20 +6222,19 @@ function tsBlockMarkup(carrier,ts,kind){
     <div class="ts-duration-bar"></div>
   </div>`;
 }
-function renderTsCarrier(carrier,label,secondary){
-  const head=state.dualCarrierRunning?`<div class="ts-carrier-head ${secondary?'secondary':'main'}">Carrier ${carrier??'—'} <span class="ts-carrier-tag">${label}</span></div>`:'';
-  const kind1=secondary?'idle':'main-control';
-  return head+[1,2,3,4].map(ts=>tsBlockMarkup(carrier,ts,ts===1?kind1:'idle')).join('');
+function renderTsCarrier(carrier,label,secondary,slots){
+  const head=(state.dualCarrierRunning||secondary)?`<div class="ts-carrier-head ${secondary?'secondary':'main'}">Carrier ${carrier??'—'} <span class="ts-carrier-tag">${label}</span></div>`:'';
+  return head+(slots||[1,2,3,4]).map(ts=>tsBlockMarkup(carrier,ts,(!secondary&&ts===1)?'main-control':'idle',secondary)).join('');
 }
 function renderTsGrid(){
   const grid=document.getElementById('ts-grid');
   if(!grid)return;
   const carriers=tsAllCarriers();
   grid.classList.toggle('dual',carriers.length>1);
-  grid.innerHTML=carriers.map(c=>renderTsCarrier(c.carrier,c.label,c.secondary)).join('');
+  grid.innerHTML=carriers.map(c=>renderTsCarrier(c.carrier,c.label,c.secondary,c.slots)).join('');
   updateTsBlocks();
 }
-// tsState["carrier:ts"]: {call_id, call_type, label, sub, voice_ts, started_at, carrier_num}
+// tsState["carrier:logical_ts"]: {call_id, call_type, label, sub, voice_ts, started_at, carrier_num, logical_ts}
 const tsState={};
 const TS_VOICE_DECAY_MS=800;
 // Random wave heights per bar per carrier/TS — regenerated on each voice frame
@@ -6192,8 +6261,7 @@ function updateTsBlocks(){
   const now=Date.now();
   for(const carrierInfo of tsAllCarriers()){
     const carrier=carrierInfo.carrier;
-    for(let i=0;i<4;i++){
-      const ts=i+1;
+    for(const ts of carrierInfo.slots||[1,2,3,4]){
       const block=document.getElementById(tsDomId(carrier,ts));
       if(!block)continue;
       const label=block.querySelector('.ts-label');
@@ -6214,7 +6282,7 @@ function updateTsBlocks(){
       if(!st){
         block.className='ts-block';
         label.textContent='—';
-        sub.textContent='Idle';
+        sub.textContent=(carrierInfo.secondary&&ts===8)?'Spare':'Idle';
         tsApplyWave(carrier,ts,false);
         if(timer)timer.textContent='';
         if(dur)dur.style.width='0%';
@@ -6265,30 +6333,44 @@ function tsLines(st){
   return {top:'PRIVATE', bottom: tsIssiText(speaker)};
 }
 function tsSetCall(carrier,ts,call){
-  if(ts<2||ts>4)return;
-  const c=tsResolveCarrier(carrier);
-  tsState[tsKey(c,ts)]={
+  const logicalTs=tsNormalizeLogicalTs(carrier,ts);
+  if(logicalTs==null||logicalTs<2||logicalTs>8)return;
+  const c=tsResolveCarrier(carrier,logicalTs);
+  if(c!=null&&logicalTs>=5&&!state.btsSecondaryCarrier)state.btsSecondaryCarrier=c;
+  if(c!=null&&logicalTs<=4&&!state.btsMainCarrier)state.btsMainCarrier=c;
+  tsState[tsKey(c,logicalTs)]={
     call_id:call.call_id, call_type:call.call_type,
     gssi:call.gssi, called_issi:call.called_issi, caller_issi:call.caller_issi,
     speaker_issi:call.active_speaker||call.speaker_issi||call.caller_issi,
     simplex:call.simplex, sub:call.sub, priority:call.priority||0,
-    carrier_num:c, voice_ts:null, started_at:Date.now()
+    carrier_num:c, logical_ts:logicalTs, air_ts:tsAirTs(logicalTs), voice_ts:null, started_at:Date.now()
   };
+  if(!document.getElementById(tsDomId(c,logicalTs)))renderTsGrid();
 }
 function tsSetSpeaker(call_id, speaker_issi){
   Object.keys(tsState).forEach(k=>{if(tsState[k]&&tsState[k].call_id===call_id)tsState[k].speaker_issi=speaker_issi;});
 }
 function tsClearCall(call_id){
-  Object.keys(tsState).forEach(k=>{if(tsState[k]&&tsState[k].call_id===call_id)delete tsState[k];});
+  let changedSecondary=false;
+  Object.keys(tsState).forEach(k=>{
+    if(tsState[k]&&tsState[k].call_id===call_id){
+      if((tsState[k].logical_ts||0)>=5)changedSecondary=true;
+      delete tsState[k];
+    }
+  });
+  if(changedSecondary)renderTsGrid();
 }
 function tsVoice(carrier,ts){
-  if(ts<2||ts>4)return;
-  const c=tsResolveCarrier(carrier);
-  const key=tsKey(c,ts);
-  if(!tsState[key])tsState[key]={call_id:0,call_type:'',gssi:null,carrier_num:c,voice_ts:null,started_at:Date.now()};
+  const logicalTs=tsNormalizeLogicalTs(carrier,ts);
+  if(logicalTs==null||logicalTs<2||logicalTs>8)return;
+  const c=tsResolveCarrier(carrier,logicalTs);
+  if(c!=null&&logicalTs>=5&&!state.btsSecondaryCarrier)state.btsSecondaryCarrier=c;
+  const key=tsKey(c,logicalTs);
+  if(!tsState[key])tsState[key]={call_id:0,call_type:'',gssi:null,carrier_num:c,logical_ts:logicalTs,air_ts:tsAirTs(logicalTs),voice_ts:null,started_at:Date.now()};
   tsState[key].voice_ts=Date.now();
-  tsRandWave(c,ts);
-  const block=document.getElementById(tsDomId(c,ts));
+  tsRandWave(c,logicalTs);
+  if(!document.getElementById(tsDomId(c,logicalTs)))renderTsGrid();
+  const block=document.getElementById(tsDomId(c,logicalTs));
   if(block){
     const flash=block.querySelector('.ts-flash');
     if(flash){flash.style.animation='none';void flash.offsetWidth;flash.style.animation='ts-flash-in 0.08s ease-out forwards';}
