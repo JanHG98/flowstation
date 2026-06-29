@@ -1171,7 +1171,30 @@ impl CcBsSubentity {
         };
         let dest_addr = cached.dest_addr;
 
-        // Send D-RELEASE to group
+        // Send D-RELEASE to the group while the traffic circuit is still up.
+        //
+        // Dual-carrier gotcha: if the call lives on Carrier 2, members can be camped on the
+        // secondary traffic bearer during hangtime and may not immediately hear an MCCH-only
+        // release on Carrier 1. Deliver the release via FACCH/STCH on the assigned traffic
+        // bearer first, then also queue an MCCH fallback for radios that have already returned
+        // to the control channel. UMAC defers the actual circuit close until pending STCH has
+        // drained, so these PDUs have a chance to leave before the bearer is torn down.
+        if let Some(call) = self.active_calls.get(&call_id) {
+            for _ in 0..2 {
+                let sdu = Self::build_d_release_from_d_setup(&cached.pdu, disconnect_cause);
+                let prim = Self::build_sapmsg_stealing(
+                    sdu,
+                    self.dltime,
+                    dest_addr,
+                    call.ts,
+                    Some(call.usage),
+                );
+                queue.push_back(prim);
+            }
+        }
+
+        // MCCH fallback. This is still useful for late monitors or terminals that already
+        // dropped back to the main carrier control channel before the FACCH/STCH release arrived.
         let sdu = Self::build_d_release_from_d_setup(&cached.pdu, disconnect_cause);
         let prim = Self::build_sapmsg(sdu, None, self.dltime, dest_addr, None);
         queue.push_back(prim);
