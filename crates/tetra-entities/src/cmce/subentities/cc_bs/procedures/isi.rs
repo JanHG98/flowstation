@@ -125,15 +125,17 @@ impl CcBsSubentity {
         let communication = CommunicationType::try_from(call.communication as u64).unwrap_or(CommunicationType::P2p);
         let simplex_duplex = call.duplex != 0;
         let hook_method_selection = call.method != 0;
+        let traffic_slot_capacity = self.traffic_slot_capacity();
 
         let circuit_called = {
             let mut state = self.config.state_write();
-            match self.circuits.allocate_circuit_with_allocator(
+            match self.circuits.allocate_circuit_with_capacity(
                 Direction::Both,
                 communication,
                 simplex_duplex,
                 &mut state.timeslot_alloc,
                 TimeslotOwner::Cmce,
+                traffic_slot_capacity,
             ) {
                 Ok(circuit) => circuit.clone(),
                 Err(e) => {
@@ -379,15 +381,12 @@ impl CcBsSubentity {
             }
         }
 
-        let mut calling_timeslots = [false; 4];
-        calling_timeslots[call.calling_ts as usize - 1] = true;
-        let chan_alloc_calling = CmceChanAllocReq {
-            usage: Some(call.calling_usage),
-            alloc_type: ChanAllocType::Replace,
-            carrier: None,
-            timeslots: calling_timeslots,
-            ul_dl_assigned: UlDlAssignment::Both,
-        };
+        let chan_alloc_calling = Self::chan_alloc_for_ts(
+            Some(call.calling_usage),
+            call.calling_ts,
+            ChanAllocType::Replace,
+            UlDlAssignment::Both,
+        );
 
         let d_connect = DConnect {
             call_identifier: call_id,
@@ -592,15 +591,12 @@ impl CcBsSubentity {
         );
         let ul_dl_assigned = UlDlAssignment::Both;
 
-        let mut called_timeslots = [false; 4];
-        called_timeslots[call.called_ts as usize - 1] = true;
-        let chan_alloc_called = CmceChanAllocReq {
-            usage: Some(call.called_usage),
-            alloc_type: ChanAllocType::Replace,
-            carrier: None,
-            timeslots: called_timeslots,
+        let chan_alloc_called = Self::chan_alloc_for_ts(
+            Some(call.called_usage),
+            call.called_ts,
+            ChanAllocType::Replace,
             ul_dl_assigned,
-        };
+        );
 
         let d_connect_ack = DConnectAcknowledge {
             call_identifier: call_id,
@@ -816,14 +812,16 @@ impl CcBsSubentity {
         }
 
         // New network call - allocate circuit
+        let traffic_slot_capacity = self.traffic_slot_capacity();
         let circuit = match {
             let mut state = self.config.state_write();
-            self.circuits.allocate_circuit_with_allocator(
+            self.circuits.allocate_circuit_with_capacity(
                 Direction::Both,
                 CommunicationType::P2Mp,
                 false,
                 &mut state.timeslot_alloc,
                 TimeslotOwner::Cmce,
+                traffic_slot_capacity,
             )
         } {
             Ok(c) => c.clone(),
@@ -960,7 +958,7 @@ impl CcBsSubentity {
             gssi: dest_gssi,
             caller_issi: source_issi,
             ts,
-            carrier_num: self.config.config().cell.main_carrier,
+            carrier_num: self.carrier_num_for_logical_ts(circuit.ts),
             priority,
             source: crate::net_telemetry::telemetry_source_for_entity(network_entity).to_string(),
         });
