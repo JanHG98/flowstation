@@ -1,5 +1,5 @@
-use super::*;
 use tetra_core::Todo;
+use super::*;
 
 impl CcBsSubentity {
     pub fn new(config: SharedConfig) -> Self {
@@ -60,7 +60,7 @@ impl CcBsSubentity {
     }
 
     /// Internal carrier hint used inside CMCE->UMAC `CmceChanAllocReq`.
-    /// `Todo` is signed, while a real TETRA carrier number is never negative.
+    /// `Todo` is the signed carrier-hint type used by `CmceChanAllocReq`, while a real TETRA carrier number is never negative.
     /// UMAC resolves this sentinel to `[cell_info].secondary_carrier` at runtime.
     pub(super) const SECONDARY_CARRIER_HINT: Todo = -2;
 
