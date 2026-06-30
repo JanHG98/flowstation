@@ -6161,10 +6161,10 @@ function tsIsSecondaryCarrier(carrier){
 function tsAirTs(logicalTs){
   const ts=tsNum(logicalTs);
   if(ts==null)return null;
-  // FlowStation dual-carrier model: logical TS5..TS7 are secondary carrier air TS2..TS4.
-  // TS8 is displayed as the secondary carrier spare/unused block so the operator sees 1..8.
-  if(ts>=5&&ts<=7)return ts-3;
-  if(ts===8)return 1;
+  // FlowStation dual-carrier model: logical TS5..TS8 are secondary carrier air TS1..TS4.
+  // Carrier 1 keeps TS1 as MCCH/control; carrier 2 is traffic-only, so all four
+  // physical timeslots are traffic-capable there.
+  if(ts>=5&&ts<=8)return ts-4;
   return ts;
 }
 function tsNormalizeLogicalTs(carrier,ts){
@@ -6172,8 +6172,8 @@ function tsNormalizeLogicalTs(carrier,ts){
   if(logical==null)return null;
   const c=tsNum(carrier);
   // Some lower-layer/voice events are physical carrier/air-TS based. If they arrive as
-  // carrier=secondary with TS2..TS4, lift them into the dashboard's logical TS5..TS7 space.
-  if(tsIsSecondaryCarrier(c)&&logical>=2&&logical<=4)return logical+3;
+  // carrier=secondary with TS2..TS4, lift them into the dashboard's logical TS5..TS8 space.
+  if(tsIsSecondaryCarrier(c)&&logical>=1&&logical<=4)return logical+4;
   return logical;
 }
 function tsCarrierKey(carrier){
@@ -6207,7 +6207,6 @@ function tsBlockMarkup(carrier,ts,kind,secondary){
   const air=tsAirTs(ts);
   const label=kind==='main-control'?'MCCH':'—';
   let sub=kind==='main-control'?'ACTIVE':'Idle';
-  if(secondary&&ts===8)sub='Spare';
   const title=secondary
     ?`Logical TS ${ts} · carrier ${carrier??'—'} · air TS ${air??'—'}`
     :`TS ${ts} · carrier ${carrier??'—'}`;
@@ -6282,7 +6281,7 @@ function updateTsBlocks(){
       if(!st){
         block.className='ts-block';
         label.textContent='—';
-        sub.textContent=(carrierInfo.secondary&&ts===8)?'Spare':'Idle';
+        sub.textContent='Idle';
         tsApplyWave(carrier,ts,false);
         if(timer)timer.textContent='';
         if(dur)dur.style.width='0%';
