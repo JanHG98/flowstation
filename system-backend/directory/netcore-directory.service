@@ -6,7 +6,7 @@ Wants=network-online.target
 [Service]
 Type=simple
 WorkingDirectory=/opt/netcore-directory
-ExecStart=/usr/bin/python3 /opt/netcore-directory/netcore_directory_server.py --host 0.0.0.0 --port 8095 --db /opt/netcore-directory/netcore_directory.db
+ExecStart=/usr/bin/python3 /opt/netcore-directory/netcore_directory-server.py --host 0.0.0.0 --port 8095 --db /opt/netcore-directory/netcore-directory.db
 Restart=on-failure
 RestartSec=3
 
