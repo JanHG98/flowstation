@@ -57,8 +57,8 @@ pub struct UmacBs {
     pub channel_scheduler: BsChannelScheduler,
     secondary_channel_schedulers: Vec<BsChannelScheduler>,
     // ulrx_scheduler: UlScheduler,
-    /// Timestamp of last received UL voice frame per logical timeslot (0-indexed: ts1..ts7).
-    /// Logical TS5..TS7 represent secondary-carrier physical TS2..TS4.
+    /// Timestamp of last received UL voice frame per logical timeslot (0-indexed: ts1..ts8).
+    /// Logical TS5..TS8 represent secondary-carrier physical TS1..TS4.
     /// Used to detect UL inactivity when a radio disappears mid-transmission.
     last_ul_voice: [Option<TdmaTime>; 8],
     /// Local floor owner per traffic timeslot, used to attribute MAC-U-SIGNAL
@@ -159,13 +159,13 @@ impl UmacBs {
 
     fn air_ts_for_logical(logical_ts: u8) -> u8 {
         match logical_ts {
-            5..=7 => logical_ts - 3,
+            5..=8 => logical_ts - 4,
             _ => logical_ts,
         }
     }
 
     fn is_secondary_logical_ts(logical_ts: u8) -> bool {
-        (5..=7).contains(&logical_ts)
+        (5..=8).contains(&logical_ts)
     }
 
     fn carrier_for_logical_ts(&self, logical_ts: u8) -> u16 {
@@ -177,8 +177,8 @@ impl UmacBs {
     }
 
     fn logical_ts_for_carrier_air_ts(&self, carrier_num: u16, air_ts: u8) -> u8 {
-        if self.secondary_carrier() == Some(carrier_num) && (2..=4).contains(&air_ts) {
-            air_ts + 3
+        if self.secondary_carrier() == Some(carrier_num) && (1..=4).contains(&air_ts) {
+            air_ts + 4
         } else {
             air_ts
         }
@@ -1374,14 +1374,14 @@ impl UmacBs {
         // CRITICAL: DL STCH uses MAC-RESOURCE (124-bit half-slot), NOT MAC-U-SIGNAL (UL-only).
         if prim.stealing_permission {
             // Determine the target traffic bearer for FACCH stealing. CMCE uses
-            // logical traffic slots (2..4 main carrier, 5..7 secondary carrier); UMAC
+            // logical traffic slots (2..4 main carrier, 5..8 secondary carrier); UMAC
             // maps those back to the physical air slot on the correct carrier.
             let traffic_logical_ts = prim
                 .chan_alloc
                 .as_ref()
                 .and_then(|ca| self.first_logical_ts_in_chan_alloc(ca))
                 .or_else(|| {
-                    (2..=7u8).find(|&logical_ts| {
+                    (2..=8u8).find(|&logical_ts| {
                         if Self::is_secondary_logical_ts(logical_ts) && self.secondary_carrier().is_none() {
                             return false;
                         }
@@ -1519,7 +1519,7 @@ impl UmacBs {
 
         // Let the main scheduler choose MCCH versus linked signalling timeslot from
         // the LLC link context. FACCH/traffic-slot signalling uses the explicit
-        // stealing path above. Logical secondary link ids (5..7) have no matching
+        // stealing path above. Logical secondary link ids (5..8) have no matching
         // physical slot on the main scheduler, so use link_id=0 to force MCCH/TS1.
         let scheduler_link_id = if prim.link_id <= 4 { prim.link_id } else { 0 };
         self.channel_scheduler
@@ -1551,8 +1551,8 @@ impl UmacBs {
         match message.msg {
             // DL voice from Brew/upper layer → schedule for DL transmission.
             // Upper layers keep using the CMCE logical timeslot. This lets Asterisk/Brew/
-            // EchoLink continue to key only by `ts`; UMAC resolves logical ts 5..7 to
-            // the secondary carrier's physical air slots 2..4.
+            // EchoLink continue to key only by `ts`; UMAC resolves logical ts 5..8 to
+            // the secondary carrier's physical air slots 1..4.
             SapMsgInner::TmdCircuitDataReq(prim) => {
                 let logical_ts = prim.ts;
                 let carrier_num = self.carrier_for_logical_ts(logical_ts);
@@ -1879,9 +1879,9 @@ impl UmacBs {
             return;
         };
 
-        // Traffic bearers use logical TS 2..7. Defer close until pending FACCH/STCH
+        // Traffic bearers use logical TS 2..8. Defer close until pending FACCH/STCH
         // release signalling on the matching physical carrier/slot has drained.
-        if (2..=7).contains(&ts) {
+        if (2..=8).contains(&ts) {
             match dir {
                 Direction::Both => {
                     self.pending_circuit_closes[ts as usize - 1].dl = true;
@@ -1943,7 +1943,7 @@ impl UmacBs {
     }
 
     fn process_pending_circuit_closes(&mut self) {
-        for logical_ts in 2..=7u8 {
+        for logical_ts in 2..=8u8 {
             if Self::is_secondary_logical_ts(logical_ts) && self.secondary_carrier().is_none() {
                 continue;
             }
@@ -1981,7 +1981,7 @@ impl UmacBs {
         // Must be above T.213 (1s) to tolerate DTX and brief RF fading.
         let ul_inactivity_timeslots: i32 = self.config.config().cell.ul_inactivity_secs as i32 * 18 * 4;
 
-        for logical_ts in 2..=7u8 {
+        for logical_ts in 2..=8u8 {
             if Self::is_secondary_logical_ts(logical_ts) && self.secondary_carrier().is_none() {
                 continue;
             }
