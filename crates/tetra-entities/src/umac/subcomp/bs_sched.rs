@@ -1228,18 +1228,19 @@ impl BsChannelScheduler {
         let ul_is_traffic = ul_circuit_active && !hang_effective;
 
         // NetCore dual-carrier hardening:
-        // Secondary carriers are operated as traffic-only carriers for now. They must
-        // not emit MCCH/BCCH/SYSINFO/AACH idle control bursts while no traffic circuit
-        // is assigned, otherwise nearby MSs and the adjacent-carrier demodulator may
-        // see a second common-control path and duplicate random-access/setup traffic.
+        // TrafficOnly carriers suppress all idle bursts. SecondaryBcchNoMcch keeps
+        // TS1 alive as a secondary control/guard slot, but suppresses idle bursts on
+        // TS2..TS4 so those air slots are only active when a traffic circuit exists.
         // Returning an empty TP slot makes PHY skip transmission for this carrier/slot.
-        if self.downlink_mode == CarrierDownlinkMode::TrafficOnly && !dl_is_traffic && !ul_is_traffic {
+        if ((self.downlink_mode == CarrierDownlinkMode::TrafficOnly)
+            || (self.downlink_mode == CarrierDownlinkMode::SecondaryBcchNoMcch && ts.t != 1))
+            && !dl_is_traffic && !ul_is_traffic {
             let clear_ts = ts.add_timeslots(-4);
             let index = self.ul_ts_to_sched_index(&clear_ts);
             self.ulsched[ts.t as usize - 1][index].ul1 = None;
             self.ulsched[ts.t as usize - 1][index].ul2 = None;
             self.ulsched[ts.t as usize - 1][index].usage_marker = None;
-            tracing::trace!(carrier=self.carrier_num, ts=%ts, "BsChannelScheduler: traffic-only secondary idle slot, no DL burst");
+            tracing::trace!(carrier=self.carrier_num, ts=%ts, "BsChannelScheduler: secondary idle traffic slot, no DL burst");
             return TmvUnitdataReqSlot {
                 carrier_num: self.carrier_num,
                 ts,
@@ -1450,31 +1451,6 @@ impl BsChannelScheduler {
             let mut aach = AccessAssign::default();
 
             match ts.t {
-                1 if self.downlink_mode == CarrierDownlinkMode::TrafficOnly => {
-                    // On a secondary traffic-only carrier, air TS1 is available as a
-                    // normal traffic bearer. The primary carrier still owns MCCH/Control
-                    // on TS1; this branch is only used by the secondary scheduler.
-                    let in_hangtime = self.hangtime[ts.t as usize - 1];
-                    if in_hangtime && (dl_traffic_usage.is_some() || ul_traffic_usage.is_some()) {
-                        aach.dl_usage = AccessAssignDlUsage::AssignedControl;
-                        aach.ul_usage = AccessAssignUlUsage::AssignedOnly;
-                        aach.f2_af = Some(AccessField {
-                            access_code: 0,
-                            base_frame_len: 4,
-                        });
-                    } else {
-                        aach.dl_usage = if let Some(usage) = dl_traffic_usage {
-                            AccessAssignDlUsage::Traffic(usage)
-                        } else {
-                            AccessAssignDlUsage::Unallocated
-                        };
-                        aach.ul_usage = if let Some(usage) = ul_traffic_usage {
-                            AccessAssignUlUsage::Traffic(usage)
-                        } else {
-                            AccessAssignUlUsage::Unallocated
-                        };
-                    }
-                }
                 1 => {
                     assert!(dl_traffic_usage.is_none(), "DL ts 1 can't be traffic on the primary carrier");
                     assert!(ul_traffic_usage.is_none(), "UL ts 1 can't be traffic on the primary carrier");
