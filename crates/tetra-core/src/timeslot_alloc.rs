@@ -28,27 +28,30 @@ pub enum TimeslotAllocErr {
 /// as a compact logical bearer id:
 ///
 /// - 2, 3, 4  => main carrier TS2, TS3, TS4
-/// - 5, 6, 7, 8 => secondary carrier TS1, TS2, TS3, TS4
+/// - 5, 6, 7  => secondary carrier TS2, TS3, TS4
+///
+/// Secondary-carrier TS1 is deliberately reserved for control/guard operation and
+/// is not allocated as a traffic bearer.
 ///
 /// That lets existing higher layers (Brew, Asterisk, EchoLink, CMCE call maps)
 /// keep using `ts` as their bearer key without collisions when both carriers use
 /// the same physical TETRA timeslot at the same time.
 #[derive(Debug, Clone, Default)]
 pub struct TimeslotAllocator {
-    // Index 0 = logical TS2, 1 = TS3, 2 = TS4, 3 = TS5, 4 = TS6, 5 = TS7, 6 = TS8
-    owners: [Option<TimeslotOwner>; 7],
+    // Index 0 = logical TS2, 1 = TS3, 2 = TS4, 3 = TS5, 4 = TS6, 5 = TS7
+    owners: [Option<TimeslotOwner>; 6],
 }
 
 impl TimeslotAllocator {
     pub const SINGLE_CARRIER_TRAFFIC_SLOTS: usize = 3;
-    pub const DUAL_CARRIER_TRAFFIC_SLOTS: usize = 7;
+    pub const DUAL_CARRIER_TRAFFIC_SLOTS: usize = 6;
 
     fn clamp_capacity(capacity: usize) -> usize {
         capacity.clamp(Self::SINGLE_CARRIER_TRAFFIC_SLOTS, Self::DUAL_CARRIER_TRAFFIC_SLOTS)
     }
 
     fn idx(ts: u8) -> Result<usize, TimeslotAllocErr> {
-        if (2..=8).contains(&ts) {
+        if (2..=7).contains(&ts) {
             Ok((ts - 2) as usize)
         } else {
             Err(TimeslotAllocErr::InvalidTimeslot(ts))
