@@ -18,7 +18,7 @@ asterisk = []
 
 [dependencies]
 tetra-core = { workspace = true }
-tetra-entities = { workspace = true, default-features = false }
+tetra-entities = { path = "../../crates/tetra-entities", default-features = false }
 
 clap = { workspace = true }
 chrono = { workspace = true }
