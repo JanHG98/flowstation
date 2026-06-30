@@ -62,6 +62,48 @@ impl SharedControlRoom {
         self.inner.lock().expect("control room state poisoned").health_snapshot()
     }
 
+    pub fn subscribers_snapshot(&self, node_id: Option<&str>, online_only: bool) -> Option<ControlRoomSubscribersSnapshot> {
+        self.inner
+            .lock()
+            .expect("control room state poisoned")
+            .subscribers_snapshot(node_id, online_only)
+    }
+
+    pub fn groups_snapshot(&self, node_id: Option<&str>) -> Option<ControlRoomGroupsSnapshot> {
+        self.inner
+            .lock()
+            .expect("control room state poisoned")
+            .groups_snapshot(node_id)
+    }
+
+    pub fn calls_snapshot(&self, node_id: Option<&str>) -> Option<ControlRoomCallsSnapshot> {
+        self.inner
+            .lock()
+            .expect("control room state poisoned")
+            .calls_snapshot(node_id)
+    }
+
+    pub fn sds_snapshot(&self, node_id: Option<&str>, limit: usize) -> Option<ControlRoomSdsSnapshot> {
+        self.inner
+            .lock()
+            .expect("control room state poisoned")
+            .sds_snapshot(node_id, limit)
+    }
+
+    pub fn emergencies_snapshot(&self, node_id: Option<&str>, active_only: bool) -> Option<ControlRoomEmergenciesSnapshot> {
+        self.inner
+            .lock()
+            .expect("control room state poisoned")
+            .emergencies_snapshot(node_id, active_only)
+    }
+
+    pub fn node_detail(&self, node_id: &str) -> Option<ControlRoomNodeDetail> {
+        self.inner
+            .lock()
+            .expect("control room state poisoned")
+            .node_detail(node_id)
+    }
+
     pub fn node_summary(&self, node_id: &str) -> Option<NodeOverview> {
         self.inner.lock().expect("control room state poisoned").node_summary(node_id)
     }
@@ -322,6 +364,135 @@ pub struct NodeHealthSnapshot {
     pub health: Option<Value>,
     pub sdr_health: Option<Value>,
     pub sys_health: Option<Value>,
+    pub errors: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ControlRoomSubscribersSnapshot {
+    pub now: String,
+    pub node_filter: Option<String>,
+    pub count: usize,
+    pub online_count: usize,
+    pub subscribers: Vec<SubscriberDetail>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SubscriberDetail {
+    pub node_id: String,
+    pub station_name: Option<String>,
+    pub issi: u32,
+    pub online: bool,
+    pub groups: Vec<u32>,
+    pub rssi_dbfs: Option<f32>,
+    pub energy_saving_mode: Option<u8>,
+    pub emergency: bool,
+    pub remote_source: Option<String>,
+    pub last_seen: Option<String>,
+    pub last_event: Option<String>,
+    pub timeout_drop_count: u64,
+    pub active_call_keys: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ControlRoomGroupsSnapshot {
+    pub now: String,
+    pub node_filter: Option<String>,
+    pub count: usize,
+    pub groups: Vec<GroupDetail>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GroupDetail {
+    pub node_id: String,
+    pub station_name: Option<String>,
+    pub gssi: u32,
+    pub members: Vec<u32>,
+    pub members_online: usize,
+    pub active_call_id: Option<u16>,
+    pub active_call_key: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ControlRoomCallsSnapshot {
+    pub now: String,
+    pub node_filter: Option<String>,
+    pub count: usize,
+    pub calls: Vec<CallDetail>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CallDetail {
+    pub node_id: String,
+    pub station_name: Option<String>,
+    pub key: String,
+    pub call_kind: String,
+    pub call_id: u16,
+    pub gssi: Option<u32>,
+    pub caller_issi: Option<u32>,
+    pub speaker_issi: Option<u32>,
+    pub calling_issi: Option<u32>,
+    pub called_issi: Option<u32>,
+    pub simplex: Option<bool>,
+    pub carrier_num: u16,
+    pub ts: u8,
+    pub priority: u8,
+    pub source: String,
+    pub started_at: String,
+    pub last_activity: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ControlRoomSdsSnapshot {
+    pub now: String,
+    pub node_filter: Option<String>,
+    pub count: usize,
+    pub sds: Vec<SdsDetail>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SdsDetail {
+    pub node_id: String,
+    pub station_name: Option<String>,
+    pub timestamp: String,
+    pub direction: String,
+    pub source_issi: u32,
+    pub dest_issi: u32,
+    pub is_group: bool,
+    pub protocol_id: u8,
+    pub text: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ControlRoomEmergenciesSnapshot {
+    pub now: String,
+    pub node_filter: Option<String>,
+    pub count: usize,
+    pub active_count: usize,
+    pub emergencies: Vec<EmergencyDetail>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EmergencyDetail {
+    pub node_id: String,
+    pub station_name: Option<String>,
+    pub source_issi: u32,
+    pub dest_ssi: u32,
+    pub active: bool,
+    pub raised_at: String,
+    pub cleared_at: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ControlRoomNodeDetail {
+    pub now: String,
+    pub node: NodeOverview,
+    pub subscribers: Vec<SubscriberDetail>,
+    pub groups: Vec<GroupDetail>,
+    pub active_calls: Vec<CallDetail>,
+    pub emergencies: Vec<EmergencyDetail>,
+    pub sds_log: Vec<SdsDetail>,
+    pub brew: HashMap<String, BrewState>,
+    pub timeslot_activity: HashMap<String, String>,
     pub errors: Vec<String>,
 }
 
@@ -1019,6 +1190,148 @@ impl ControlRoomState {
         }
     }
 
+    fn subscribers_snapshot(&self, node_filter: Option<&str>, online_only: bool) -> Option<ControlRoomSubscribersSnapshot> {
+        let nodes = self.selected_nodes(node_filter)?;
+        let mut subscribers = Vec::new();
+        for node in nodes {
+            for subscriber in node.subscribers.values() {
+                if online_only && !subscriber.online {
+                    continue;
+                }
+                subscribers.push(subscriber_detail(node, subscriber));
+            }
+        }
+        subscribers.sort_by(|a, b| a.node_id.cmp(&b.node_id).then(a.issi.cmp(&b.issi)));
+        let online_count = subscribers.iter().filter(|s| s.online).count();
+        Some(ControlRoomSubscribersSnapshot {
+            now: now_iso(),
+            node_filter: node_filter.map(ToString::to_string),
+            count: subscribers.len(),
+            online_count,
+            subscribers,
+        })
+    }
+
+    fn groups_snapshot(&self, node_filter: Option<&str>) -> Option<ControlRoomGroupsSnapshot> {
+        let nodes = self.selected_nodes(node_filter)?;
+        let mut groups = Vec::new();
+        for node in nodes {
+            for group in node.groups.values() {
+                groups.push(group_detail(node, group));
+            }
+        }
+        groups.sort_by(|a, b| a.node_id.cmp(&b.node_id).then(a.gssi.cmp(&b.gssi)));
+        Some(ControlRoomGroupsSnapshot {
+            now: now_iso(),
+            node_filter: node_filter.map(ToString::to_string),
+            count: groups.len(),
+            groups,
+        })
+    }
+
+    fn calls_snapshot(&self, node_filter: Option<&str>) -> Option<ControlRoomCallsSnapshot> {
+        let nodes = self.selected_nodes(node_filter)?;
+        let mut calls = Vec::new();
+        for node in nodes {
+            for (key, call) in &node.active_calls {
+                calls.push(call_detail(node, key, call));
+            }
+        }
+        calls.sort_by(|a, b| a.node_id.cmp(&b.node_id).then(a.started_at.cmp(&b.started_at)).then(a.key.cmp(&b.key)));
+        Some(ControlRoomCallsSnapshot {
+            now: now_iso(),
+            node_filter: node_filter.map(ToString::to_string),
+            count: calls.len(),
+            calls,
+        })
+    }
+
+    fn sds_snapshot(&self, node_filter: Option<&str>, limit: usize) -> Option<ControlRoomSdsSnapshot> {
+        let nodes = self.selected_nodes(node_filter)?;
+        let mut sds = Vec::new();
+        for node in nodes {
+            for entry in node.sds_log.iter().rev().take(limit) {
+                sds.push(sds_detail(node, entry));
+            }
+        }
+        sds.sort_by(|a, b| b.timestamp.cmp(&a.timestamp).then(a.node_id.cmp(&b.node_id)));
+        sds.truncate(limit);
+        Some(ControlRoomSdsSnapshot {
+            now: now_iso(),
+            node_filter: node_filter.map(ToString::to_string),
+            count: sds.len(),
+            sds,
+        })
+    }
+
+    fn emergencies_snapshot(&self, node_filter: Option<&str>, active_only: bool) -> Option<ControlRoomEmergenciesSnapshot> {
+        let nodes = self.selected_nodes(node_filter)?;
+        let mut emergencies = Vec::new();
+        for node in nodes {
+            for emergency in node.emergencies.values() {
+                if active_only && !emergency.active {
+                    continue;
+                }
+                emergencies.push(emergency_detail(node, emergency));
+            }
+        }
+        emergencies.sort_by(|a, b| {
+            b.active
+                .cmp(&a.active)
+                .then(b.raised_at.cmp(&a.raised_at))
+                .then(a.node_id.cmp(&b.node_id))
+                .then(a.source_issi.cmp(&b.source_issi))
+        });
+        let active_count = emergencies.iter().filter(|e| e.active).count();
+        Some(ControlRoomEmergenciesSnapshot {
+            now: now_iso(),
+            node_filter: node_filter.map(ToString::to_string),
+            count: emergencies.len(),
+            active_count,
+            emergencies,
+        })
+    }
+
+    fn node_detail(&self, node_id: &str) -> Option<ControlRoomNodeDetail> {
+        let node = self.nodes.get(node_id)?;
+        let mut subscribers: Vec<_> = node.subscribers.values().map(|s| subscriber_detail(node, s)).collect();
+        subscribers.sort_by_key(|s| s.issi);
+
+        let mut groups: Vec<_> = node.groups.values().map(|g| group_detail(node, g)).collect();
+        groups.sort_by_key(|g| g.gssi);
+
+        let mut active_calls: Vec<_> = node.active_calls.iter().map(|(key, call)| call_detail(node, key, call)).collect();
+        active_calls.sort_by(|a, b| a.started_at.cmp(&b.started_at).then(a.key.cmp(&b.key)));
+
+        let mut emergencies: Vec<_> = node.emergencies.values().map(|e| emergency_detail(node, e)).collect();
+        emergencies.sort_by(|a, b| b.active.cmp(&a.active).then(b.raised_at.cmp(&a.raised_at)));
+
+        let mut sds_log: Vec<_> = node.sds_log.iter().rev().take(100).map(|entry| sds_detail(node, entry)).collect();
+        sds_log.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+
+        Some(ControlRoomNodeDetail {
+            now: now_iso(),
+            node: node.overview(),
+            subscribers,
+            groups,
+            active_calls,
+            emergencies,
+            sds_log,
+            brew: node.brew.clone(),
+            timeslot_activity: node.timeslot_activity.clone(),
+            errors: node.errors.iter().cloned().collect(),
+        })
+    }
+
+    fn selected_nodes<'a>(&'a self, node_filter: Option<&str>) -> Option<Vec<&'a NodeState>> {
+        if let Some(node_id) = node_filter {
+            return self.nodes.get(node_id).map(|node| vec![node]);
+        }
+        let mut nodes: Vec<&NodeState> = self.nodes.values().collect();
+        nodes.sort_by(|a, b| a.node_id.cmp(&b.node_id));
+        Some(nodes)
+    }
+
     fn node_summary(&self, node_id: &str) -> Option<NodeOverview> {
         self.nodes.get(node_id).map(NodeState::overview)
     }
@@ -1187,6 +1500,163 @@ impl ControlRoomState {
         while self.recent_commands.len() > self.history_limit {
             self.recent_commands.pop_front();
         }
+    }
+}
+
+fn subscriber_detail(node: &NodeState, subscriber: &SubscriberState) -> SubscriberDetail {
+    let mut groups: Vec<u32> = subscriber.groups.iter().copied().collect();
+    groups.sort_unstable();
+
+    SubscriberDetail {
+        node_id: node.node_id.clone(),
+        station_name: node.station_name.clone(),
+        issi: subscriber.issi,
+        online: subscriber.online,
+        groups,
+        rssi_dbfs: subscriber.rssi_dbfs,
+        energy_saving_mode: subscriber.energy_saving_mode,
+        emergency: subscriber.emergency,
+        remote_source: subscriber.remote_source.clone(),
+        last_seen: subscriber.last_seen.clone(),
+        last_event: subscriber.last_event.clone(),
+        timeout_drop_count: subscriber.timeout_drop_count,
+        active_call_keys: subscriber_active_call_keys(node, subscriber.issi),
+    }
+}
+
+fn group_detail(node: &NodeState, group: &GroupState) -> GroupDetail {
+    let mut members: Vec<u32> = group.members.iter().copied().collect();
+    members.sort_unstable();
+
+    let members_online = members
+        .iter()
+        .filter(|issi| node.subscribers.get(issi).map(|subscriber| subscriber.online).unwrap_or(false))
+        .count();
+
+    let active_call_key = group.active_call_id.and_then(|call_id| {
+        node.active_calls.iter().find_map(|(key, call)| match call {
+            CallState::Group { call_id: current_call_id, gssi, .. } if *current_call_id == call_id && *gssi == group.gssi => Some(key.clone()),
+            _ => None,
+        })
+    });
+
+    GroupDetail {
+        node_id: node.node_id.clone(),
+        station_name: node.station_name.clone(),
+        gssi: group.gssi,
+        members,
+        members_online,
+        active_call_id: group.active_call_id,
+        active_call_key,
+    }
+}
+
+fn call_detail(node: &NodeState, key: &str, call: &CallState) -> CallDetail {
+    match call {
+        CallState::Group {
+            call_id,
+            gssi,
+            caller_issi,
+            speaker_issi,
+            carrier_num,
+            ts,
+            priority,
+            source,
+            started_at,
+            last_activity,
+        } => CallDetail {
+            node_id: node.node_id.clone(),
+            station_name: node.station_name.clone(),
+            key: key.to_string(),
+            call_kind: "group".to_string(),
+            call_id: *call_id,
+            gssi: Some(*gssi),
+            caller_issi: Some(*caller_issi),
+            speaker_issi: *speaker_issi,
+            calling_issi: None,
+            called_issi: None,
+            simplex: None,
+            carrier_num: *carrier_num,
+            ts: *ts,
+            priority: *priority,
+            source: source.clone(),
+            started_at: started_at.clone(),
+            last_activity: last_activity.clone(),
+        },
+        CallState::Individual {
+            call_id,
+            calling_issi,
+            called_issi,
+            simplex,
+            carrier_num,
+            ts,
+            priority,
+            source,
+            started_at,
+            last_activity,
+        } => CallDetail {
+            node_id: node.node_id.clone(),
+            station_name: node.station_name.clone(),
+            key: key.to_string(),
+            call_kind: "individual".to_string(),
+            call_id: *call_id,
+            gssi: None,
+            caller_issi: None,
+            speaker_issi: None,
+            calling_issi: Some(*calling_issi),
+            called_issi: Some(*called_issi),
+            simplex: Some(*simplex),
+            carrier_num: *carrier_num,
+            ts: *ts,
+            priority: *priority,
+            source: source.clone(),
+            started_at: started_at.clone(),
+            last_activity: last_activity.clone(),
+        },
+    }
+}
+
+fn sds_detail(node: &NodeState, entry: &SdsLogEntry) -> SdsDetail {
+    SdsDetail {
+        node_id: node.node_id.clone(),
+        station_name: node.station_name.clone(),
+        timestamp: entry.timestamp.clone(),
+        direction: entry.direction.clone(),
+        source_issi: entry.source_issi,
+        dest_issi: entry.dest_issi,
+        is_group: entry.is_group,
+        protocol_id: entry.protocol_id,
+        text: entry.text.clone(),
+    }
+}
+
+fn emergency_detail(node: &NodeState, emergency: &EmergencyState) -> EmergencyDetail {
+    EmergencyDetail {
+        node_id: node.node_id.clone(),
+        station_name: node.station_name.clone(),
+        source_issi: emergency.source_issi,
+        dest_ssi: emergency.dest_ssi,
+        active: emergency.active,
+        raised_at: emergency.raised_at.clone(),
+        cleared_at: emergency.cleared_at.clone(),
+    }
+}
+
+fn subscriber_active_call_keys(node: &NodeState, issi: u32) -> Vec<String> {
+    let mut keys: Vec<String> = node
+        .active_calls
+        .iter()
+        .filter(|(_, call)| call_involves_subscriber(call, issi))
+        .map(|(key, _)| key.clone())
+        .collect();
+    keys.sort();
+    keys
+}
+
+fn call_involves_subscriber(call: &CallState, issi: u32) -> bool {
+    match call {
+        CallState::Group { caller_issi, speaker_issi, .. } => *caller_issi == issi || speaker_issi.map(|speaker| speaker == issi).unwrap_or(false),
+        CallState::Individual { calling_issi, called_issi, .. } => *calling_issi == issi || *called_issi == issi,
     }
 }
 

@@ -93,6 +93,20 @@ fn route_http(request: HttpRequest, state: SharedControlRoom, node_path: &str, u
         ("GET", "/api/state") => HttpResponse::json(200, &state.snapshot()),
         ("GET", "/api/rf") => HttpResponse::json(200, &state.rf_snapshot()),
         ("GET", "/api/health/full") => HttpResponse::json(200, &state.health_snapshot()),
+        ("GET", "/api/subscribers") => {
+            let online_only = query_bool(&request, "online", false) || query_bool(&request, "online_only", false);
+            HttpResponse::json(200, &state.subscribers_snapshot(None, online_only).expect("global subscribers snapshot exists"))
+        }
+        ("GET", "/api/groups") => HttpResponse::json(200, &state.groups_snapshot(None).expect("global groups snapshot exists")),
+        ("GET", "/api/calls") => HttpResponse::json(200, &state.calls_snapshot(None).expect("global calls snapshot exists")),
+        ("GET", "/api/sds") => {
+            let limit = query_usize(&request, "limit", 100, 500);
+            HttpResponse::json(200, &state.sds_snapshot(None, limit).expect("global sds snapshot exists"))
+        }
+        ("GET", "/api/emergencies") => {
+            let active_only = query_bool(&request, "active", false) || query_bool(&request, "active_only", false);
+            HttpResponse::json(200, &state.emergencies_snapshot(None, active_only).expect("global emergencies snapshot exists"))
+        }
         ("GET", "/api/nodes") => {
             let snapshot = state.snapshot();
             HttpResponse::json(200, &snapshot.nodes)
@@ -109,6 +123,33 @@ fn route_http(request: HttpRequest, state: SharedControlRoom, node_path: &str, u
             HttpResponse::json(200, &state.recent_events_filtered(limit, event_type, quiet))
         }
         ("POST", "/api/commands") => submit_command_from_body(&request.body, state, None),
+        _ if request.method == "GET" => {
+            if let Some(route) = parse_node_detail_route(&request.path) {
+                match route.collection.as_deref() {
+                    None => node_or_404(state.node_detail(&route.node_id)),
+                    Some("subscribers") => {
+                        let online_only = query_bool(&request, "online", false) || query_bool(&request, "online_only", false);
+                        node_or_404(state.subscribers_snapshot(Some(&route.node_id), online_only))
+                    }
+                    Some("groups") => node_or_404(state.groups_snapshot(Some(&route.node_id))),
+                    Some("calls") => node_or_404(state.calls_snapshot(Some(&route.node_id))),
+                    Some("sds") => {
+                        let limit = query_usize(&request, "limit", 100, 500);
+                        node_or_404(state.sds_snapshot(Some(&route.node_id), limit))
+                    }
+                    Some("emergencies") => {
+                        let active_only = query_bool(&request, "active", false) || query_bool(&request, "active_only", false);
+                        node_or_404(state.emergencies_snapshot(Some(&route.node_id), active_only))
+                    }
+                    Some(other) => HttpResponse::json(404, &json!({
+                        "error": format!("unknown node detail collection '{}'", other),
+                        "available_collections": ["subscribers", "groups", "calls", "sds", "emergencies"]
+                    })),
+                }
+            } else {
+                not_found(node_path, ui_path)
+            }
+        }
         _ if request.method == "POST" => {
             if let Some(route) = parse_node_command_route(&request.path) {
                 match route.shortcut.as_deref() {
@@ -135,6 +176,30 @@ fn route_http(request: HttpRequest, state: SharedControlRoom, node_path: &str, u
 struct NodeCommandRoute {
     node_id: String,
     shortcut: Option<String>,
+}
+
+#[derive(Debug)]
+struct NodeDetailRoute {
+    node_id: String,
+    collection: Option<String>,
+}
+
+fn parse_node_detail_route(path: &str) -> Option<NodeDetailRoute> {
+    let rest = path.strip_prefix("/api/nodes/")?;
+    let mut parts = rest.split('/').filter(|part| !part.is_empty());
+    let node_id = parts.next()?.to_string();
+    let collection = parts.next().map(ToString::to_string);
+    if parts.next().is_some() {
+        return None;
+    }
+    Some(NodeDetailRoute { node_id, collection })
+}
+
+fn node_or_404<T: serde::Serialize>(value: Option<T>) -> HttpResponse {
+    match value {
+        Some(value) => HttpResponse::json(200, &value),
+        None => HttpResponse::json(404, &json!({ "error": "node not found" })),
+    }
 }
 
 fn parse_node_command_route(path: &str) -> Option<NodeCommandRoute> {
@@ -418,10 +483,21 @@ fn not_found(node_path: &str, ui_path: &str) -> HttpResponse {
                 "GET /",
                 "GET /health",
                 "GET /api/overview",
+                "GET /api/subscribers?online=true",
+                "GET /api/groups",
+                "GET /api/calls",
+                "GET /api/sds?limit=100",
+                "GET /api/emergencies?active=true",
+                "GET /api/nodes",
+                "GET /api/nodes/{node_id}",
+                "GET /api/nodes/{node_id}/subscribers",
+                "GET /api/nodes/{node_id}/groups",
+                "GET /api/nodes/{node_id}/calls",
+                "GET /api/nodes/{node_id}/sds",
+                "GET /api/nodes/{node_id}/emergencies",
                 "GET /api/state",
                 "GET /api/rf",
                 "GET /api/health/full",
-                "GET /api/nodes",
                 "GET /api/events?limit=50&quiet=true",
                 "GET /api/commands?limit=50",
                 "POST /api/commands",
@@ -472,10 +548,21 @@ fn index_html(node_path: &str, ui_path: &str) -> String {
   <ul>
     <li><code>GET /health</code></li>
     <li><code>GET /api/overview</code> — schlanker Leitstellenstatus</li>
+    <li><code>GET /api/subscribers?online=true</code> — Teilnehmerliste</li>
+    <li><code>GET /api/groups</code> — Gruppen und Mitglieder</li>
+    <li><code>GET /api/calls</code> — aktive Rufe</li>
+    <li><code>GET /api/sds?limit=100</code> — SDS-Log</li>
+    <li><code>GET /api/emergencies?active=true</code> — Notrufe</li>
+    <li><code>GET /api/nodes</code></li>
+    <li><code>GET /api/nodes/&lt;node_id&gt;</code> — Node-Detailansicht</li>
+    <li><code>GET /api/nodes/&lt;node_id&gt;/subscribers</code></li>
+    <li><code>GET /api/nodes/&lt;node_id&gt;/groups</code></li>
+    <li><code>GET /api/nodes/&lt;node_id&gt;/calls</code></li>
+    <li><code>GET /api/nodes/&lt;node_id&gt;/sds</code></li>
+    <li><code>GET /api/nodes/&lt;node_id&gt;/emergencies</code></li>
     <li><code>GET /api/state</code> — kompletter Debug-State</li>
     <li><code>GET /api/rf</code> — RF/SDR-Snapshot</li>
     <li><code>GET /api/health/full</code> — technische Health-Daten</li>
-    <li><code>GET /api/nodes</code></li>
     <li><code>GET /api/events?limit=50&amp;quiet=true</code></li>
     <li><code>GET /api/commands?limit=50</code></li>
     <li><code>POST /api/nodes/&lt;node_id&gt;/commands</code></li>
