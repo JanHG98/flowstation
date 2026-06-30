@@ -1,3 +1,4 @@
+use tetra_core::Todo;
 use super::*;
 
 impl CcBsSubentity {
@@ -58,6 +59,69 @@ impl CcBsSubentity {
         if simplex_duplex { CallTimeout::Infinite } else { CallTimeout::T5m }
     }
 
+    /// Internal carrier hint used inside CMCE->UMAC `CmceChanAllocReq`.
+    /// `Todo` is the signed carrier-hint type used by `CmceChanAllocReq`, while a real TETRA carrier number is never negative.
+    /// UMAC resolves this sentinel to `[cell_info].secondary_carrier` at runtime.
+    pub(super) const SECONDARY_CARRIER_HINT: Todo = -2;
+
+    /// Logical bearer id to physical TETRA air-interface timeslot.
+    /// Logical TS5..TS7 represent secondary-carrier physical TS2..TS4.
+    pub(super) fn air_ts(logical_ts: u8) -> u8 {
+        match logical_ts {
+            5..=7 => logical_ts - 3,
+            _ => logical_ts,
+        }
+    }
+
+    pub(super) fn is_secondary_logical_ts(logical_ts: u8) -> bool {
+        (5..=7).contains(&logical_ts)
+    }
+
+    pub(super) fn carrier_hint_for_logical_ts(logical_ts: u8) -> Option<Todo> {
+        if Self::is_secondary_logical_ts(logical_ts) {
+            Some(Self::SECONDARY_CARRIER_HINT)
+        } else {
+            None
+        }
+    }
+
+    pub(super) fn chan_alloc_for_ts(usage: Option<u8>, logical_ts: u8, alloc_type: ChanAllocType, ul_dl: UlDlAssignment) -> CmceChanAllocReq {
+        let air_ts = Self::air_ts(logical_ts);
+        let mut timeslots = [false; 4];
+        if (1..=4).contains(&air_ts) {
+            timeslots[air_ts as usize - 1] = true;
+        } else {
+            tracing::warn!("CMCE: invalid logical traffic ts {} while building channel allocation", logical_ts);
+        }
+        CmceChanAllocReq {
+            usage,
+            alloc_type,
+            carrier: Self::carrier_hint_for_logical_ts(logical_ts),
+            timeslots,
+            ul_dl_assigned: ul_dl,
+        }
+    }
+
+    pub(super) fn traffic_slot_capacity(&self) -> usize {
+        if self.config.config().cell.secondary_carrier.is_some() {
+            tetra_core::TimeslotAllocator::DUAL_CARRIER_TRAFFIC_SLOTS
+        } else {
+            tetra_core::TimeslotAllocator::SINGLE_CARRIER_TRAFFIC_SLOTS
+        }
+    }
+
+    pub(super) fn carrier_num_for_logical_ts(&self, logical_ts: u8) -> u16 {
+        if Self::is_secondary_logical_ts(logical_ts) {
+            self.config
+                .config()
+                .cell
+                .secondary_carrier
+                .unwrap_or(self.config.config().cell.main_carrier)
+        } else {
+            self.config.config().cell.main_carrier
+        }
+    }
+
     pub(super) fn build_d_setup_prim(pdu: &DSetup, usage: u8, ts: u8, ul_dl: UlDlAssignment) -> (BitBuffer, CmceChanAllocReq) {
         tracing::debug!("-> {:?}", pdu);
 
@@ -65,16 +129,7 @@ impl CcBsSubentity {
         pdu.to_bitbuf(&mut sdu).expect("Failed to serialize DSetup");
         sdu.seek(0);
 
-        // Construct ChanAlloc descriptor for the allocated timeslot
-        let mut timeslots = [false; 4];
-        timeslots[ts as usize - 1] = true;
-        let chan_alloc = CmceChanAllocReq {
-            usage: Some(usage),
-            alloc_type: ChanAllocType::Replace,
-            carrier: None,
-            timeslots,
-            ul_dl_assigned: ul_dl,
-        };
+        let chan_alloc = Self::chan_alloc_for_ts(Some(usage), ts, ChanAllocType::Replace, ul_dl);
         (sdu, chan_alloc)
     }
 
@@ -155,16 +210,9 @@ impl CcBsSubentity {
         usage: Option<u8>,
         ul_dl_assigned: UlDlAssignment,
     ) -> SapMsg {
-        // For FACCH stealing on traffic channel, must specify target timeslot.
-        let mut timeslots = [false; 4];
-        timeslots[(ts - 1) as usize] = true;
-        let chan_alloc = CmceChanAllocReq {
-            usage,
-            carrier: None,
-            timeslots,
-            alloc_type: ChanAllocType::Replace,
-            ul_dl_assigned,
-        };
+        // For FACCH stealing on a traffic channel, specify the physical air
+        // timeslot plus a carrier hint when the logical bearer lives on Carrier 2.
+        let chan_alloc = Self::chan_alloc_for_ts(usage, ts, ChanAllocType::Replace, ul_dl_assigned);
 
         SapMsg {
             sap: Sap::LcmcSap,
@@ -1123,10 +1171,34 @@ impl CcBsSubentity {
         };
         let dest_addr = cached.dest_addr;
 
-        // Send D-RELEASE to group
-        let sdu = Self::build_d_release_from_d_setup(&cached.pdu, disconnect_cause);
-        let prim = Self::build_sapmsg(sdu, None, self.dltime, dest_addr, None);
-        queue.push_back(prim);
+        // Send D-RELEASE conservatively.
+        //
+        // Dual-carrier gotcha: Carrier-2 group calls need the release on the active traffic
+        // bearer, otherwise some terminals can remain camped on C2 during hangtime. Earlier
+        // versions sent this twice over FACCH/STCH and also as an MCCH fallback; when the cell
+        // was nearly full that produced a burst of duplicate CC signalling and could disturb
+        // other radios. Keep it deterministic:
+        //   * C2 logical TS5..TS7: one FACCH/STCH release on that bearer while it is still up.
+        //   * C1 logical TS2..TS4: legacy MCCH release only.
+        if let Some(call) = self.active_calls.get(&call_id) {
+            let sdu = Self::build_d_release_from_d_setup(&cached.pdu, disconnect_cause);
+            let prim = if Self::is_secondary_logical_ts(call.ts) {
+                Self::build_sapmsg_stealing(
+                    sdu,
+                    self.dltime,
+                    dest_addr,
+                    call.ts,
+                    Some(call.usage),
+                )
+            } else {
+                Self::build_sapmsg(sdu, None, self.dltime, dest_addr, None)
+            };
+            queue.push_back(prim);
+        } else {
+            let sdu = Self::build_d_release_from_d_setup(&cached.pdu, disconnect_cause);
+            let prim = Self::build_sapmsg(sdu, None, self.dltime, dest_addr, None);
+            queue.push_back(prim);
+        }
 
         // Close the circuit in CircuitMgr and notify Brew
         if let Some(call) = self.active_calls.get(&call_id) {
@@ -1337,7 +1409,7 @@ impl CcBsSubentity {
 
     /// Number of currently free traffic timeslots (TS2..=TS4) on this cell.
     fn free_timeslot_count(&self) -> usize {
-        self.config.state_read().timeslot_alloc.free_count()
+        self.config.state_read().timeslot_alloc.free_count_with_capacity(self.traffic_slot_capacity())
     }
 
     /// Pick the best active call to pre-empt for a higher-priority call, or `None` if none is
