@@ -4,7 +4,7 @@ use std::time::{Duration, Instant};
 
 use tetra_config::bluestation::SharedConfig;
 use tetra_core::Layer2Service;
-use tetra_core::{BitBuffer, Sap, SsiType, TdmaTime, TetraAddress, tetra_entities::TetraEntity, unimplemented_log};
+use tetra_core::{BitBuffer, Sap, SsiType, TdmaTime, TetraAddress, Todo, tetra_entities::TetraEntity, unimplemented_log};
 use tetra_pdus::cmce::enums::pre_coded_status::PreCodedStatus;
 use tetra_pdus::cmce::enums::short_report_type::ShortReportType;
 use tetra_saps::control::enums::sds_user_data::SdsUserData;
@@ -60,6 +60,41 @@ pub struct PendingSds {
 /// deadline we deliver as soon as the destination is reachable; past it we fail cleanly. A normal
 /// short call or EE window resolves well within this; a long (back-to-back) call makes the SDS fail
 /// rather than arrive long after the sender's radio already declared it undelivered.
+
+const SECONDARY_CARRIER_HINT: Todo = -2;
+
+fn sds_air_ts(logical_ts: u8) -> u8 {
+    match logical_ts {
+        5..=7 => logical_ts - 3,
+        _ => logical_ts,
+    }
+}
+
+fn sds_carrier_hint(logical_ts: u8) -> Option<Todo> {
+    if (5..=7).contains(&logical_ts) {
+        Some(SECONDARY_CARRIER_HINT)
+    } else {
+        None
+    }
+}
+
+fn sds_chan_alloc_for_ts(usage: u8, logical_ts: u8) -> CmceChanAllocReq {
+    let air_ts = sds_air_ts(logical_ts);
+    let mut timeslots = [false; 4];
+    if (1..=4).contains(&air_ts) {
+        timeslots[air_ts as usize - 1] = true;
+    } else {
+        tracing::warn!("SDS: invalid logical traffic ts {} while building FACCH chan_alloc", logical_ts);
+    }
+    CmceChanAllocReq {
+        usage: Some(usage),
+        carrier: sds_carrier_hint(logical_ts),
+        timeslots,
+        alloc_type: ChanAllocType::Replace,
+        ul_dl_assigned: UlDlAssignment::Dl,
+    }
+}
+
 const SDS_DEFER_DEADLINE: std::time::Duration = std::time::Duration::from_secs(10);
 
 /// SDS-TL delivery-report "delivery status" octet signalling a negative outcome (could not be
@@ -1091,23 +1126,15 @@ impl SdsBsSubentity {
         };
 
         let (stealing_permission, chan_alloc, layer2service) = match traffic {
-            Some((ts, usage)) if (1..=4).contains(&ts) => {
-                let mut timeslots = [false; 4];
-                timeslots[(ts - 1) as usize] = true;
+            Some((ts, usage)) if (2..=7).contains(&ts) => {
                 tracing::debug!(
-                    "SDS-STATUS: dest {} is on traffic ts {} — delivering D-STATUS via FACCH stealing",
+                    "SDS-STATUS: dest {} is on logical traffic ts {} — delivering D-STATUS via FACCH stealing",
                     dest_issi,
                     ts
                 );
                 (
                     true,
-                    Some(CmceChanAllocReq {
-                        usage: Some(usage),
-                        carrier: None,
-                        timeslots,
-                        alloc_type: ChanAllocType::Replace,
-                        ul_dl_assigned: UlDlAssignment::Dl,
-                    }),
+                    Some(sds_chan_alloc_for_ts(usage, ts)),
                     Layer2Service::Unacknowledged,
                 )
             }
@@ -1527,20 +1554,9 @@ impl SdsBsSubentity {
         };
 
         let (stealing_permission, chan_alloc) = match traffic {
-            Some((ts, usage)) if (1..=4).contains(&ts) => {
-                let mut timeslots = [false; 4];
-                timeslots[(ts - 1) as usize] = true;
-                tracing::debug!("SDS: dest {} is on traffic ts {} — delivering via FACCH stealing", dest_ssi, ts);
-                (
-                    true,
-                    Some(CmceChanAllocReq {
-                        usage: Some(usage),
-                        carrier: None,
-                        timeslots,
-                        alloc_type: ChanAllocType::Replace,
-                        ul_dl_assigned: UlDlAssignment::Dl,
-                    }),
-                )
+            Some((ts, usage)) if (2..=7).contains(&ts) => {
+                tracing::debug!("SDS: dest {} is on logical traffic ts {} — delivering via FACCH stealing", dest_ssi, ts);
+                (true, Some(sds_chan_alloc_for_ts(usage, ts)))
             }
             // Idle destination (or no active call): MCCH, exactly as before.
             _ => (false, None),

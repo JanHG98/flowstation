@@ -89,7 +89,7 @@ impl CcBsSubentity {
             called_issi: call.called_addr.ssi,
             simplex: call.is_simplex(),
             ts: call.calling_ts,
-            carrier_num: self.config.config().cell.main_carrier,
+            carrier_num: self.carrier_num_for_logical_ts(call.calling_ts),
             priority: call.priority,
             source: if call.calling_over_brew {
                 crate::net_telemetry::telemetry_source_for_entity(call.network_entity()).to_string()
@@ -437,33 +437,19 @@ impl CcBsSubentity {
         let calling_has_initial_floor = is_simplex && cached.pdu.transmission_grant == TransmissionGrant::GrantedToOtherUser;
         let (calling_ul_dl, called_ul_dl) = (UlDlAssignment::Both, UlDlAssignment::Both);
 
-        let mut calling_timeslots = [false; 4];
-        calling_timeslots[calling_ts as usize - 1] = true;
-        let mut called_timeslots = [false; 4];
-        called_timeslots[called_ts as usize - 1] = true;
-        let chan_alloc_calling = CmceChanAllocReq {
-            usage: Some(calling_usage),
-            alloc_type: ChanAllocType::Replace,
-            carrier: None,
-            timeslots: calling_timeslots,
-            ul_dl_assigned: calling_ul_dl,
-        };
-        let chan_alloc_called = CmceChanAllocReq {
-            usage: Some(called_usage),
-            alloc_type: ChanAllocType::Replace,
-            carrier: None,
-            timeslots: called_timeslots,
-            ul_dl_assigned: called_ul_dl,
-        };
+        let chan_alloc_calling = Self::chan_alloc_for_ts(Some(calling_usage), calling_ts, ChanAllocType::Replace, calling_ul_dl);
+        let chan_alloc_called = Self::chan_alloc_for_ts(Some(called_usage), called_ts, ChanAllocType::Replace, called_ul_dl);
         tracing::debug!(
-            "P2P chan_alloc: calling ts={} usage={} slots={:?} ul_dl={}, called ts={} usage={} slots={:?} ul_dl={}",
+            "P2P chan_alloc: calling logical_ts={} usage={} carrier_hint={:?} slots={:?} ul_dl={}, called logical_ts={} usage={} carrier_hint={:?} slots={:?} ul_dl={}",
             calling_ts,
             calling_usage,
-            calling_timeslots,
+            chan_alloc_calling.carrier,
+            chan_alloc_calling.timeslots,
             chan_alloc_calling.ul_dl_assigned,
             called_ts,
             called_usage,
-            called_timeslots,
+            chan_alloc_called.carrier,
+            chan_alloc_called.timeslots,
             chan_alloc_called.ul_dl_assigned
         );
 

@@ -26,12 +26,12 @@ pub struct CircuitMgr {
     pub dltime: TdmaTime,
 
     /// Holds any Dl and Dl+Ul circuits
-    pub dl: [Option<CmceCircuit>; 4],
+    pub dl: [Option<CmceCircuit>; 8],
     /// Holds any Ul-only circuits, with no recipients on this cell
-    pub ul_only: [Option<CmceCircuit>; 4],
+    pub ul_only: [Option<CmceCircuit>; 8],
 
     /// Data blocks queued to be transmitted, per timeslot
-    pub tx_data: [VecDeque<Vec<u8>>; 4],
+    pub tx_data: [VecDeque<Vec<u8>>; 8],
 
     /// 14-bit call identifier. Zero value is reserved.
     pub next_call_identifier: u16,
@@ -43,9 +43,18 @@ impl CircuitMgr {
     pub fn new() -> Self {
         Self {
             dltime: TdmaTime::default(),
-            dl: [None, None, None, None],
-            ul_only: [None, None, None, None],
-            tx_data: [VecDeque::new(), VecDeque::new(), VecDeque::new(), VecDeque::new()],
+            dl: [None, None, None, None, None, None, None, None],
+            ul_only: [None, None, None, None, None, None, None, None],
+            tx_data: [
+                VecDeque::new(),
+                VecDeque::new(),
+                VecDeque::new(),
+                VecDeque::new(),
+                VecDeque::new(),
+                VecDeque::new(),
+                VecDeque::new(),
+                VecDeque::new(),
+            ],
             next_call_identifier: 4,
             next_usage_number: 4,
         }
@@ -186,7 +195,10 @@ impl CircuitMgr {
         Ok(self.open_circuit(dir, circuit)?)
     }
 
-    /// Allocate circuit using centralized timeslot allocator
+    /// Allocate circuit using centralized timeslot allocator.
+    ///
+    /// Uses single-carrier capacity for backward compatibility. Runtime CMCE code that knows
+    /// whether a secondary carrier is enabled should call `allocate_circuit_with_capacity`.
     pub fn allocate_circuit_with_allocator(
         &mut self,
         dir: Direction,
@@ -195,8 +207,30 @@ impl CircuitMgr {
         timeslot_alloc: &mut TimeslotAllocator,
         owner: TimeslotOwner,
     ) -> Result<&CmceCircuit, CircuitErr> {
-        // Get timeslot from centralized allocator
-        let ts = timeslot_alloc.allocate_any(owner).ok_or(CircuitErr::NoCircuitFree)?;
+        self.allocate_circuit_with_capacity(
+            dir,
+            comm_type,
+            simplex_duplex,
+            timeslot_alloc,
+            owner,
+            TimeslotAllocator::SINGLE_CARRIER_TRAFFIC_SLOTS,
+        )
+    }
+
+    pub fn allocate_circuit_with_capacity(
+        &mut self,
+        dir: Direction,
+        comm_type: CommunicationType,
+        simplex_duplex: bool,
+        timeslot_alloc: &mut TimeslotAllocator,
+        owner: TimeslotOwner,
+        traffic_slot_capacity: usize,
+    ) -> Result<&CmceCircuit, CircuitErr> {
+        // Get logical bearer from centralized allocator. Logical TS5..TS7 map to
+        // secondary-carrier physical TS2..TS4 in UMAC/chan_alloc helpers.
+        let ts = timeslot_alloc
+            .allocate_any_with_capacity(owner, traffic_slot_capacity)
+            .ok_or(CircuitErr::NoCircuitFree)?;
 
         let call_id = self.get_next_call_id();
         let usage = self.get_next_usage_number();
@@ -229,7 +263,30 @@ impl CircuitMgr {
         timeslot_alloc: &mut TimeslotAllocator,
         owner: TimeslotOwner,
     ) -> Result<&CmceCircuit, CircuitErr> {
-        let ts = timeslot_alloc.allocate_any(owner).ok_or(CircuitErr::NoCircuitFree)?;
+        self.allocate_circuit_for_call_with_capacity(
+            call_id,
+            dir,
+            comm_type,
+            simplex_duplex,
+            timeslot_alloc,
+            owner,
+            TimeslotAllocator::SINGLE_CARRIER_TRAFFIC_SLOTS,
+        )
+    }
+
+    pub fn allocate_circuit_for_call_with_capacity(
+        &mut self,
+        call_id: CallId,
+        dir: Direction,
+        comm_type: CommunicationType,
+        simplex_duplex: bool,
+        timeslot_alloc: &mut TimeslotAllocator,
+        owner: TimeslotOwner,
+        traffic_slot_capacity: usize,
+    ) -> Result<&CmceCircuit, CircuitErr> {
+        let ts = timeslot_alloc
+            .allocate_any_with_capacity(owner, traffic_slot_capacity)
+            .ok_or(CircuitErr::NoCircuitFree)?;
         let usage = self.get_next_usage_number();
 
         let circuit = CmceCircuit {

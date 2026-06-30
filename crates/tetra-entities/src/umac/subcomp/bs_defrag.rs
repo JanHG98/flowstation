@@ -11,13 +11,24 @@ const DEFRAG_TS_BEFORE_TIMEOUT: i32 = 10 * 4; // TODO check documentation. 10 fr
 /// Maintains a set of DefragBuffers per timeslot, indexed by SSI.
 /// This allows multiple MSes to send fragmented data in the same timeslot.
 pub struct BsDefrag {
-    pub buffers: [HashMap<u32, DefragBuffer>; 4],
+    // Indexed by logical timeslot. TS 2..4 are main carrier traffic, TS 5..7
+    // are secondary-carrier traffic mapped by UMAC before defrag.
+    pub buffers: [HashMap<u32, DefragBuffer>; 8],
 }
 
 impl BsDefrag {
     pub fn new() -> Self {
         Self {
-            buffers: [HashMap::new(), HashMap::new(), HashMap::new(), HashMap::new()],
+            buffers: [
+                HashMap::new(),
+                HashMap::new(),
+                HashMap::new(),
+                HashMap::new(),
+                HashMap::new(),
+                HashMap::new(),
+                HashMap::new(),
+                HashMap::new(),
+            ],
         }
     }
 

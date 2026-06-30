@@ -105,14 +105,16 @@ impl CcBsSubentity {
         // Local echo has no second MS leg. One bidirectional traffic slot is enough, regardless
         // of whether the requesting terminal marks the P2P call as simplex or duplex.
         self.preempt_for_priority(queue, 1, pdu.call_priority);
+        let traffic_slot_capacity = self.traffic_slot_capacity();
         let circuit = {
             let mut state = self.config.state_write();
-            match self.circuits.allocate_circuit_with_allocator(
+            match self.circuits.allocate_circuit_with_capacity(
                 Direction::Both,
                 pdu.basic_service_information.communication_type,
                 pdu.simplex_duplex_selection,
                 &mut state.timeslot_alloc,
                 TimeslotOwner::Cmce,
+                traffic_slot_capacity,
             ) {
                 Ok(circuit) => circuit.clone(),
                 Err(e) => {
@@ -214,15 +216,7 @@ impl CcBsSubentity {
 
         self.send_d_call_proceeding(queue, message, pdu, call_id, CallTimeoutSetupPhase::T10s, pdu.hook_method_selection);
 
-        let mut timeslots = [false; 4];
-        timeslots[ts as usize - 1] = true;
-        let chan_alloc = CmceChanAllocReq {
-            usage: Some(usage),
-            alloc_type: ChanAllocType::Replace,
-            carrier: None,
-            timeslots,
-            ul_dl_assigned: UlDlAssignment::Both,
-        };
+        let chan_alloc = Self::chan_alloc_for_ts(Some(usage), ts, ChanAllocType::Replace, UlDlAssignment::Both);
 
         let d_connect = DConnect {
             call_identifier: call_id,
@@ -323,14 +317,16 @@ impl CcBsSubentity {
         self.preempt_for_priority(queue, 1, pdu.call_priority);
 
         // Allocate circuit (DL+UL for group call)
+        let traffic_slot_capacity = self.traffic_slot_capacity();
         let circuit = match {
             let mut state = self.config.state_write();
-            self.circuits.allocate_circuit_with_allocator(
+            self.circuits.allocate_circuit_with_capacity(
                 Direction::Both,
                 pdu.basic_service_information.communication_type,
                 pdu.simplex_duplex_selection,
                 &mut state.timeslot_alloc,
                 TimeslotOwner::Cmce,
+                traffic_slot_capacity,
             )
         } {
             Ok(circuit) => circuit.clone(),
@@ -365,10 +361,6 @@ impl CcBsSubentity {
 
         // Signal UMAC to open DL+UL circuits.
         Self::signal_umac_circuit_open(queue, &circuit, self.dltime, None, CircuitDlMediaSource::LocalLoopback);
-
-        // Build channel allocation timeslot mask for this call.
-        let mut timeslots = [false; 4];
-        timeslots[circuit.ts as usize - 1] = true;
 
         // Extract UL message routing info for individually-addressed responses.
         let SapMsgInner::LcmcMleUnitdataInd(prim) = &message.msg else {
@@ -433,13 +425,12 @@ impl CcBsSubentity {
                 layer2_qos: 0,
                 stealing_permission: false,
                 stealing_repeats_flag: false,
-                chan_alloc: Some(CmceChanAllocReq {
-                    usage: Some(circuit.usage),
-                    alloc_type: ChanAllocType::Replace,
-                    carrier: None,
-                    timeslots,
-                    ul_dl_assigned: UlDlAssignment::Both,
-                }),
+                chan_alloc: Some(Self::chan_alloc_for_ts(
+                    Some(circuit.usage),
+                    circuit.ts,
+                    ChanAllocType::Replace,
+                    UlDlAssignment::Both,
+                )),
                 main_address: calling_party,
                 tx_reporter: None,
             }),
@@ -502,7 +493,7 @@ impl CcBsSubentity {
             gssi: dest_gssi,
             caller_issi: calling_party.ssi,
             ts: circuit.ts,
-            carrier_num: self.config.config().cell.main_carrier,
+            carrier_num: self.carrier_num_for_logical_ts(circuit.ts),
             priority: pdu.call_priority,
             source: "local".to_string(),
         });
@@ -637,14 +628,16 @@ impl CcBsSubentity {
         self.preempt_for_priority(queue, if pdu.simplex_duplex_selection { 2 } else { 1 }, pdu.call_priority);
 
         // Allocate circuit(s). Duplex uses two traffic timeslots, one per MS, with cross-routing.
+        let traffic_slot_capacity = self.traffic_slot_capacity();
         let (circuit_calling, circuit_called) = {
             let mut state = self.config.state_write();
-            let circuit_calling = match self.circuits.allocate_circuit_with_allocator(
+            let circuit_calling = match self.circuits.allocate_circuit_with_capacity(
                 Direction::Both,
                 pdu.basic_service_information.communication_type,
                 pdu.simplex_duplex_selection,
                 &mut state.timeslot_alloc,
                 TimeslotOwner::Cmce,
+                traffic_slot_capacity,
             ) {
                 Ok(circuit) => circuit.clone(),
                 Err(e) => {
@@ -667,13 +660,14 @@ impl CcBsSubentity {
             };
 
             let circuit_called = if pdu.simplex_duplex_selection {
-                match self.circuits.allocate_circuit_for_call_with_allocator(
+                match self.circuits.allocate_circuit_for_call_with_capacity(
                     circuit_calling.call_id,
                     Direction::Both,
                     pdu.basic_service_information.communication_type,
                     pdu.simplex_duplex_selection,
                     &mut state.timeslot_alloc,
                     TimeslotOwner::Cmce,
+                    traffic_slot_capacity,
                 ) {
                     Ok(circuit) => Some(circuit.clone()),
                     Err(e) => {
@@ -1012,14 +1006,16 @@ impl CcBsSubentity {
         }
 
         // Allocate one bearer for the local MS.
+        let traffic_slot_capacity = self.traffic_slot_capacity();
         let circuit_calling = {
             let mut state = self.config.state_write();
-            match self.circuits.allocate_circuit_with_allocator(
+            match self.circuits.allocate_circuit_with_capacity(
                 Direction::Both,
                 pdu.basic_service_information.communication_type,
                 pdu.simplex_duplex_selection,
                 &mut state.timeslot_alloc,
                 TimeslotOwner::Cmce,
+                traffic_slot_capacity,
             ) {
                 Ok(circuit) => circuit.clone(),
                 Err(e) => {
