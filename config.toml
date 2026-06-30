@@ -550,23 +550,7 @@ password = "DagurUranus2014#"
 # Set base_url to the LXC/host running NetCore Directory.
 enabled = true
 base_url = "http://10.0.1.23:8095"
-source = "TBS-01"
-bs_issi = 4010001
 timeout_ms = 2000
-
-# Active SwMI-Light enforcement. Calls/SDS are checked against /api/policy-check.
-# policy_fail_closed=false keeps the cell usable if Directory is briefly offline.
-enforce_policies = true
-policy_fail_closed = false
-
-# Fine-grained publish toggles. Leave true for the SwMI-Light dashboard.
-publish_presence = true
-publish_status = true
-publish_cdr = true
-publish_emergencies = true
-publish_health = true
-publish_sds_activity = true
-publish_positions = true
 
 ###############################################################################
 
