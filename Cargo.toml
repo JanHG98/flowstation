@@ -11,6 +11,7 @@ members = [
     
     # Binaries
     "bins/bluestation-bs",
+    "bins/netcore-control-room",
     #"bins/bluestation-telemetry",
     #"bins/bluestation-control",
     #"bins/pdu-tool",

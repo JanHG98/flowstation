@@ -1,0 +1,25 @@
+[package]
+name = "netcore-control-room"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "netcore-control-room"
+path = "src/main.rs"
+
+[dependencies]
+tetra-core = { workspace = true }
+tetra-entities = { workspace = true }
+
+clap = { workspace = true }
+chrono = { workspace = true }
+serde = { workspace = true }
+serde_json = "1.0"
+tungstenite = { workspace = true }
+uuid = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+[lints]
+workspace = true
