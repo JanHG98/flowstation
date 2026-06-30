@@ -580,15 +580,15 @@ timeout_ms = 2000
 
 [control_room]
 enabled = true
-host = "127.0.0.1"
+host = "10.0.1.25"
 port = 9010
 use_tls = false
 endpoint_path = "/node"
 
 # Optional, but recommended: stable and human-readable.
-node_id = "tbs-04010001"
-station_name = "NetCore TBS 04010001"
-site = "Lab / Rack"
+node_id = "SRV-M_TBS-01"
+station_name = "SRV-M_TBS-01"
+site = "Main"
 
 # Optional HTTP Basic Auth:
 # username = "tbs-04010001"
