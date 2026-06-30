@@ -40,10 +40,18 @@ site = "Lab / Rack"
 | `WS /node` | Base-Station-Verbindung |
 | `WS /ui` | Live-Feed für spätere Leitstellen-UI |
 | `GET /health` | einfacher Healthcheck |
-| `GET /api/state` | kompletter Leitstellen-State |
-| `GET /api/nodes` | nur Nodes |
-| `GET /api/events` | letzte Telemetry-/System-Events |
-| `POST /api/nodes/{node_id}/commands` | Command an Node senden |
+| `GET /api/overview` | schlanker Leitstellenstatus für UI/Dispo |
+| `GET /api/state` | kompletter Debug-State, bewusst groß |
+| `GET /api/rf` | RF-/SDR-Snapshot separat |
+| `GET /api/health/full` | technische Health-Daten separat |
+| `GET /api/nodes` | nur Nodes mit vollem Node-State |
+| `GET /api/events?limit=50&quiet=true` | letzte Events, optional ohne RF-/Health-Rauschen |
+| `GET /api/events?type=sds_log&limit=20` | Events nach Typ filtern |
+| `GET /api/commands?limit=50` | Command-Audit |
+| `POST /api/nodes/{node_id}/commands` | generisches Command an Node senden |
+| `POST /api/nodes/{node_id}/commands/kick` | Shortcut für `KickMs` |
+| `POST /api/nodes/{node_id}/commands/dgna` | Shortcut für DGNA Attach/Detach |
+| `POST /api/nodes/{node_id}/commands/clear-emergency` | Shortcut für Emergency Clear |
 | `POST /api/commands` | vollständigen `ControlCommandEnvelope` senden |
 
 ## Command-Beispiele
@@ -51,17 +59,17 @@ site = "Lab / Rack"
 ### Kick MS
 
 ```bash
-curl -X POST http://127.0.0.1:9010/api/nodes/tbs-04010001/commands \
+curl -X POST http://127.0.0.1:9010/api/nodes/tbs-04010001/commands/kick \
   -H 'Content-Type: application/json' \
-  -d '{"operator_id":"jan","command":{"KickMs":{"issi":2010001}}}'
+  -d '{"operator_id":"jan","issi":2010001}'
 ```
 
 ### Clear Emergency
 
 ```bash
-curl -X POST http://127.0.0.1:9010/api/nodes/tbs-04010001/commands \
+curl -X POST http://127.0.0.1:9010/api/nodes/tbs-04010001/commands/clear-emergency \
   -H 'Content-Type: application/json' \
-  -d '{"operator_id":"jan","command":{"ClearEmergency":{"issi":0}}}'
+  -d '{"operator_id":"jan","issi":0}'
 ```
 
 ### SDS senden
@@ -93,7 +101,10 @@ curl -X POST http://127.0.0.1:9010/api/nodes/tbs-04010001/commands \
 - Telemetry-Envelopes in State überführen
 - Teilnehmer, Gruppen, Calls, SDS, Notrufe, Health grob modellieren
 - Commands per HTTP entgegennehmen und an die BS weiterleiten
+- Shortcut-Routen für Kick, DGNA und Emergency-Clear bereitstellen
 - Acks/Responses auditieren
+- schlanken `/api/overview` für die spätere Leitstellenoberfläche bereitstellen
+- RF/Health/Debug-State getrennt ausgeben, damit die UI nicht mit Telemetry-Lawinen zugemüllt wird
 - UI-WebSocket für spätere Leitstellenoberfläche bereitstellen
 
 ## Bewusste Grenzen dieses ersten Core-MVP

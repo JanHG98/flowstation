@@ -16,6 +16,7 @@ const MAX_HTTP_REQUEST_BYTES: usize = 1024 * 1024;
 pub struct HttpRequest {
     pub method: String,
     pub path: String,
+    pub query: HashMap<String, String>,
     pub headers: HashMap<String, String>,
     pub body: Vec<u8>,
 }
@@ -75,6 +76,12 @@ pub fn handle_http_stream(mut stream: TcpStream, state: SharedControlRoom, node_
 }
 
 fn route_http(request: HttpRequest, state: SharedControlRoom, node_path: &str, ui_path: &str) -> HttpResponse {
+    let _has_authorization_header = request.headers.contains_key("authorization");
+
+    if request.method == "OPTIONS" {
+        return HttpResponse::text(204, "");
+    }
+
     match (request.method.as_str(), request.path.as_str()) {
         ("GET", "/") => HttpResponse::html(200, index_html(node_path, ui_path)),
         ("GET", "/health") => HttpResponse::json(200, &json!({
@@ -82,43 +89,156 @@ fn route_http(request: HttpRequest, state: SharedControlRoom, node_path: &str, u
             "service": "netcore-control-room",
             "timestamp": now_iso(),
         })),
+        ("GET", "/api/overview") => HttpResponse::json(200, &state.overview()),
         ("GET", "/api/state") => HttpResponse::json(200, &state.snapshot()),
+        ("GET", "/api/rf") => HttpResponse::json(200, &state.rf_snapshot()),
+        ("GET", "/api/health/full") => HttpResponse::json(200, &state.health_snapshot()),
         ("GET", "/api/nodes") => {
             let snapshot = state.snapshot();
             HttpResponse::json(200, &snapshot.nodes)
         }
-        ("GET", "/api/events") => HttpResponse::json(200, &state.recent_events(200)),
+        ("GET", "/api/commands") => HttpResponse::json(200, &state.recent_commands(query_usize(&request, "limit", 100, 1000))),
+        ("GET", "/api/events") => {
+            let limit = query_usize(&request, "limit", 200, 1000);
+            let quiet = query_bool(&request, "quiet", false);
+            let event_type = request
+                .query
+                .get("event_type")
+                .or_else(|| request.query.get("type"))
+                .map(String::as_str);
+            HttpResponse::json(200, &state.recent_events_filtered(limit, event_type, quiet))
+        }
         ("POST", "/api/commands") => submit_command_from_body(&request.body, state, None),
-        _ if request.method == "POST" && request.path.starts_with("/api/nodes/") && request.path.ends_with("/commands") => {
-            let node_id = request
-                .path
-                .trim_start_matches("/api/nodes/")
-                .trim_end_matches("/commands")
-                .trim_matches('/')
-                .to_string();
-            if node_id.is_empty() {
-                HttpResponse::json(400, &json!({ "error": "missing node id" }))
+        _ if request.method == "POST" => {
+            if let Some(route) = parse_node_command_route(&request.path) {
+                match route.shortcut.as_deref() {
+                    None => submit_command_from_body(&request.body, state, Some(route.node_id)),
+                    Some("kick") => submit_kick_command(&request.body, state, route.node_id),
+                    Some("dgna") => submit_dgna_command(&request.body, state, route.node_id),
+                    Some("clear-emergency") => submit_clear_emergency_command(&request.body, state, route.node_id),
+                    Some("restart-service") => submit_service_command(&request.body, state, route.node_id, ServiceAction::Restart),
+                    Some("shutdown-service") => submit_service_command(&request.body, state, route.node_id, ServiceAction::Shutdown),
+                    Some(other) => HttpResponse::json(404, &json!({
+                        "error": format!("unknown command shortcut '{}'", other),
+                        "available_shortcuts": ["kick", "dgna", "clear-emergency", "restart-service", "shutdown-service"]
+                    })),
+                }
             } else {
-                submit_command_from_body(&request.body, state, Some(node_id))
+                not_found(node_path, ui_path)
             }
         }
-        _ => HttpResponse::json(
-            404,
-            &json!({
-                "error": "not found",
-                "available": [
-                    "GET /",
-                    "GET /health",
-                    "GET /api/state",
-                    "GET /api/nodes",
-                    "GET /api/events",
-                    "POST /api/commands",
-                    "POST /api/nodes/{node_id}/commands",
-                    format!("WS {}", node_path),
-                    format!("WS {}", ui_path)
-                ]
-            }),
-        ),
+        _ => not_found(node_path, ui_path),
+    }
+}
+
+#[derive(Debug)]
+struct NodeCommandRoute {
+    node_id: String,
+    shortcut: Option<String>,
+}
+
+fn parse_node_command_route(path: &str) -> Option<NodeCommandRoute> {
+    let rest = path.strip_prefix("/api/nodes/")?;
+    let mut parts = rest.split('/').filter(|part| !part.is_empty());
+    let node_id = parts.next()?.to_string();
+    if parts.next()? != "commands" {
+        return None;
+    }
+    let shortcut = parts.next().map(ToString::to_string);
+    if parts.next().is_some() {
+        return None;
+    }
+    Some(NodeCommandRoute { node_id, shortcut })
+}
+
+#[derive(Debug, Deserialize)]
+struct OperatorOnlyRequest {
+    operator_id: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct KickCommandRequest {
+    operator_id: Option<String>,
+    issi: u32,
+}
+
+#[derive(Debug, Deserialize)]
+struct DgnaCommandRequest {
+    operator_id: Option<String>,
+    issi: u32,
+    gssi: u32,
+    attach: bool,
+}
+
+#[derive(Debug, Deserialize)]
+struct ClearEmergencyCommandRequest {
+    operator_id: Option<String>,
+    #[serde(default)]
+    issi: u32,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum ServiceAction {
+    Restart,
+    Shutdown,
+}
+
+fn submit_kick_command(body: &[u8], state: SharedControlRoom, node_id: String) -> HttpResponse {
+    let req: KickCommandRequest = match parse_json_body(body) {
+        Ok(req) => req,
+        Err(response) => return response,
+    };
+    let envelope = state.make_envelope(node_id, req.operator_id, ControlCommand::KickMs { issi: req.issi });
+    submit_envelope(envelope, state)
+}
+
+fn submit_dgna_command(body: &[u8], state: SharedControlRoom, node_id: String) -> HttpResponse {
+    let req: DgnaCommandRequest = match parse_json_body(body) {
+        Ok(req) => req,
+        Err(response) => return response,
+    };
+    let envelope = state.make_envelope(
+        node_id,
+        req.operator_id,
+        ControlCommand::Dgna {
+            issi: req.issi,
+            gssi: req.gssi,
+            attach: req.attach,
+        },
+    );
+    submit_envelope(envelope, state)
+}
+
+fn submit_clear_emergency_command(body: &[u8], state: SharedControlRoom, node_id: String) -> HttpResponse {
+    let req: ClearEmergencyCommandRequest = match parse_json_body(body) {
+        Ok(req) => req,
+        Err(response) => return response,
+    };
+    let envelope = state.make_envelope(node_id, req.operator_id, ControlCommand::ClearEmergency { issi: req.issi });
+    submit_envelope(envelope, state)
+}
+
+fn submit_service_command(body: &[u8], state: SharedControlRoom, node_id: String, action: ServiceAction) -> HttpResponse {
+    let req: OperatorOnlyRequest = match parse_json_body(body) {
+        Ok(req) => req,
+        Err(response) => return response,
+    };
+    let command = match action {
+        ServiceAction::Restart => ControlCommand::RestartService,
+        ServiceAction::Shutdown => ControlCommand::ShutdownService,
+    };
+    let envelope = state.make_envelope(node_id, req.operator_id, command);
+    submit_envelope(envelope, state)
+}
+
+fn parse_json_body<T: for<'de> Deserialize<'de>>(body: &[u8]) -> Result<T, HttpResponse> {
+    serde_json::from_slice(body).map_err(|e| HttpResponse::json(400, &json!({ "error": format!("invalid json: {}", e) })))
+}
+
+fn submit_envelope(envelope: ControlCommandEnvelope, state: SharedControlRoom) -> HttpResponse {
+    match state.submit_command(envelope) {
+        Ok(queued) => HttpResponse::json(202, &queued),
+        Err(e) => HttpResponse::json(409, &json!({ "error": e })),
     }
 }
 
@@ -133,10 +253,7 @@ fn submit_command_from_body(body: &[u8], state: SharedControlRoom, node_from_pat
         Err(e) => return HttpResponse::json(400, &json!({ "error": e })),
     };
 
-    match state.submit_command(envelope) {
-        Ok(queued) => HttpResponse::json(202, &queued),
-        Err(e) => HttpResponse::json(409, &json!({ "error": e })),
-    }
+    submit_envelope(envelope, state)
 }
 
 fn parse_command_request(value: Value, state: &SharedControlRoom, node_from_path: Option<String>) -> Result<ControlCommandEnvelope, String> {
@@ -195,7 +312,7 @@ pub fn read_http_request(stream: &mut TcpStream) -> Result<HttpRequest, String> 
     let mut parts = request_line.split_whitespace();
     let method = parts.next().ok_or_else(|| "missing method".to_string())?.to_string();
     let raw_path = parts.next().ok_or_else(|| "missing path".to_string())?;
-    let path = raw_path.split('?').next().unwrap_or(raw_path).to_string();
+    let (path, query) = parse_path_and_query(raw_path);
 
     let mut headers = HashMap::new();
     for line in lines {
@@ -225,12 +342,12 @@ pub fn read_http_request(stream: &mut TcpStream) -> Result<HttpRequest, String> 
     }
     body.truncate(content_length);
 
-    Ok(HttpRequest { method, path, headers, body })
+    Ok(HttpRequest { method, path, query, headers, body })
 }
 
 pub fn write_response(stream: &mut TcpStream, response: &HttpResponse) -> std::io::Result<()> {
     let header = format!(
-        "HTTP/1.1 {} {}\r\nContent-Type: {}\r\nContent-Length: {}\r\nAccess-Control-Allow-Origin: *\r\nConnection: close\r\n\r\n",
+        "HTTP/1.1 {} {}\r\nContent-Type: {}\r\nContent-Length: {}\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Methods: GET, POST, OPTIONS\r\nAccess-Control-Allow-Headers: Content-Type, Authorization\r\nConnection: close\r\n\r\n",
         response.status,
         response.reason,
         response.content_type,
@@ -253,10 +370,77 @@ pub fn find_subslice(hay: &[u8], needle: &[u8]) -> Option<usize> {
     hay.windows(needle.len()).position(|w| w == needle)
 }
 
+fn parse_path_and_query(raw_path: &str) -> (String, HashMap<String, String>) {
+    let mut split = raw_path.splitn(2, '?');
+    let path = split.next().unwrap_or(raw_path).to_string();
+    let query = split.next().map(parse_query_string).unwrap_or_default();
+    (path, query)
+}
+
+fn parse_query_string(query: &str) -> HashMap<String, String> {
+    let mut out = HashMap::new();
+    for pair in query.split('&').filter(|pair| !pair.is_empty()) {
+        let mut split = pair.splitn(2, '=');
+        let key = split.next().unwrap_or_default();
+        let value = split.next().unwrap_or("true");
+        out.insert(percentish_decode(key), percentish_decode(value));
+    }
+    out
+}
+
+fn percentish_decode(value: &str) -> String {
+    value.replace('+', " ")
+}
+
+fn query_usize(request: &HttpRequest, key: &str, default: usize, max: usize) -> usize {
+    request
+        .query
+        .get(key)
+        .and_then(|value| value.parse::<usize>().ok())
+        .unwrap_or(default)
+        .min(max)
+}
+
+fn query_bool(request: &HttpRequest, key: &str, default: bool) -> bool {
+    request
+        .query
+        .get(key)
+        .map(|value| matches!(value.as_str(), "1" | "true" | "yes" | "on"))
+        .unwrap_or(default)
+}
+
+fn not_found(node_path: &str, ui_path: &str) -> HttpResponse {
+    HttpResponse::json(
+        404,
+        &json!({
+            "error": "not found",
+            "available": [
+                "GET /",
+                "GET /health",
+                "GET /api/overview",
+                "GET /api/state",
+                "GET /api/rf",
+                "GET /api/health/full",
+                "GET /api/nodes",
+                "GET /api/events?limit=50&quiet=true",
+                "GET /api/commands?limit=50",
+                "POST /api/commands",
+                "POST /api/nodes/{node_id}/commands",
+                "POST /api/nodes/{node_id}/commands/kick",
+                "POST /api/nodes/{node_id}/commands/dgna",
+                "POST /api/nodes/{node_id}/commands/clear-emergency",
+                format!("WS {}", node_path),
+                format!("WS {}", ui_path)
+            ]
+        }),
+    )
+}
+
 fn reason_phrase(status: u16) -> &'static str {
     match status {
         200 => "OK",
         202 => "Accepted",
+        204 => "No Content",
         400 => "Bad Request",
         404 => "Not Found",
         409 => "Conflict",
@@ -287,15 +471,27 @@ fn index_html(node_path: &str, ui_path: &str) -> String {
   <h2>HTTP API</h2>
   <ul>
     <li><code>GET /health</code></li>
-    <li><code>GET /api/state</code></li>
+    <li><code>GET /api/overview</code> — schlanker Leitstellenstatus</li>
+    <li><code>GET /api/state</code> — kompletter Debug-State</li>
+    <li><code>GET /api/rf</code> — RF/SDR-Snapshot</li>
+    <li><code>GET /api/health/full</code> — technische Health-Daten</li>
     <li><code>GET /api/nodes</code></li>
-    <li><code>GET /api/events</code></li>
+    <li><code>GET /api/events?limit=50&amp;quiet=true</code></li>
+    <li><code>GET /api/commands?limit=50</code></li>
     <li><code>POST /api/nodes/&lt;node_id&gt;/commands</code></li>
+    <li><code>POST /api/nodes/&lt;node_id&gt;/commands/kick</code></li>
+    <li><code>POST /api/nodes/&lt;node_id&gt;/commands/dgna</code></li>
+    <li><code>POST /api/nodes/&lt;node_id&gt;/commands/clear-emergency</code></li>
   </ul>
   <h2>Beispiel: Kick MS</h2>
-  <pre>curl -X POST http://127.0.0.1:9010/api/nodes/tbs-04010001/commands \
+  <pre>curl -X POST http://127.0.0.1:9010/api/nodes/tbs-04010001/commands/kick \
   -H 'Content-Type: application/json' \
-  -d '{{"operator_id":"jan","command":{{"KickMs":{{"issi":2010001}}}}}}'</pre>
+  -d '{{"operator_id":"jan","issi":2010001}}'</pre>
+
+  <h2>Beispiel: DGNA Attach</h2>
+  <pre>curl -X POST http://127.0.0.1:9010/api/nodes/tbs-04010001/commands/dgna \
+  -H 'Content-Type: application/json' \
+  -d '{{"operator_id":"jan","issi":2010001,"gssi":1001,"attach":true}}'</pre>
 </body>
 </html>"#
     )

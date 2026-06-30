@@ -39,6 +39,37 @@ impl SharedControlRoom {
         self.inner.lock().expect("control room state poisoned").recent_events(limit)
     }
 
+    pub fn recent_events_filtered(&self, limit: usize, event_type: Option<&str>, quiet: bool) -> Vec<EventLogEntry> {
+        self.inner
+            .lock()
+            .expect("control room state poisoned")
+            .recent_events_filtered(limit, event_type, quiet)
+    }
+
+    pub fn recent_commands(&self, limit: usize) -> Vec<CommandAuditEntry> {
+        self.inner.lock().expect("control room state poisoned").recent_commands(limit)
+    }
+
+    pub fn overview(&self) -> ControlRoomOverview {
+        self.inner.lock().expect("control room state poisoned").overview()
+    }
+
+    pub fn rf_snapshot(&self) -> ControlRoomRfSnapshot {
+        self.inner.lock().expect("control room state poisoned").rf_snapshot()
+    }
+
+    pub fn health_snapshot(&self) -> ControlRoomHealthSnapshot {
+        self.inner.lock().expect("control room state poisoned").health_snapshot()
+    }
+
+    pub fn node_summary(&self, node_id: &str) -> Option<NodeOverview> {
+        self.inner.lock().expect("control room state poisoned").node_summary(node_id)
+    }
+
+    pub fn node_exists(&self, node_id: &str) -> bool {
+        self.inner.lock().expect("control room state poisoned").nodes.contains_key(node_id)
+    }
+
     pub fn handle_node_message(&self, message: NodeToControlRoomMessage) -> Option<String> {
         let mut state = self.inner.lock().expect("control room state poisoned");
         let node_id = state.apply_node_message(&message);
@@ -187,6 +218,114 @@ pub struct ControlRoomSnapshot {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ControlRoomOverview {
+    pub started_at: String,
+    pub now: String,
+    pub nodes_connected: usize,
+    pub node_count: usize,
+    pub subscribers_total: usize,
+    pub subscribers_online: usize,
+    pub groups_total: usize,
+    pub active_calls_total: usize,
+    pub emergencies_active: usize,
+    pub nodes: Vec<NodeOverview>,
+    pub recent_commands: Vec<CommandSummary>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NodeOverview {
+    pub node_id: String,
+    pub station_name: Option<String>,
+    pub site: Option<String>,
+    pub connected: bool,
+    pub transport_connected: bool,
+    pub last_seen: Option<String>,
+    pub stack_version: Option<String>,
+    pub mcc: Option<u16>,
+    pub mnc: Option<u16>,
+    pub location_area: Option<u16>,
+    pub main_carrier: Option<u16>,
+    pub secondary_carrier: Option<u16>,
+    pub colour_code: Option<u8>,
+    pub system_code: Option<u8>,
+    pub dual_carrier: bool,
+    pub telemetry_count: u64,
+    pub heartbeat_count: u64,
+    pub command_ack_count: u64,
+    pub control_response_count: u64,
+    pub subscribers_total: usize,
+    pub subscribers_online: usize,
+    pub groups_total: usize,
+    pub active_calls_total: usize,
+    pub emergencies_active: usize,
+    pub sds_log_count: usize,
+    pub brew_connected: Option<bool>,
+    pub health_overall: Option<String>,
+    pub rf_peak_dbfs: Option<f64>,
+    pub rf_rms_dbfs: Option<f64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CommandSummary {
+    pub command_id: String,
+    pub target_node_id: String,
+    pub operator_id: Option<String>,
+    pub issued_at: String,
+    pub updated_at: String,
+    pub status: String,
+    pub message: Option<String>,
+}
+
+impl From<&CommandAuditEntry> for CommandSummary {
+    fn from(entry: &CommandAuditEntry) -> Self {
+        Self {
+            command_id: entry.command_id.clone(),
+            target_node_id: entry.target_node_id.clone(),
+            operator_id: entry.operator_id.clone(),
+            issued_at: entry.issued_at.clone(),
+            updated_at: entry.updated_at.clone(),
+            status: entry.status.clone(),
+            message: entry.message.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ControlRoomRfSnapshot {
+    pub now: String,
+    pub nodes: Vec<NodeRfSnapshot>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NodeRfSnapshot {
+    pub node_id: String,
+    pub station_name: Option<String>,
+    pub connected: bool,
+    pub last_seen: Option<String>,
+    pub rf_quality: Option<Value>,
+    pub sdr_health: Option<Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ControlRoomHealthSnapshot {
+    pub now: String,
+    pub nodes: Vec<NodeHealthSnapshot>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NodeHealthSnapshot {
+    pub node_id: String,
+    pub station_name: Option<String>,
+    pub connected: bool,
+    pub transport_connected: bool,
+    pub last_seen: Option<String>,
+    pub health: Option<Value>,
+    pub sdr_health: Option<Value>,
+    pub sys_health: Option<Value>,
+    pub errors: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NodeState {
     pub node_id: String,
     pub station_name: Option<String>,
@@ -222,6 +361,71 @@ pub struct NodeState {
     pub sys_health: Option<Value>,
     pub health: Option<Value>,
     pub errors: VecDeque<String>,
+}
+
+impl NodeState {
+    fn overview(&self) -> NodeOverview {
+        NodeOverview {
+            node_id: self.node_id.clone(),
+            station_name: self.station_name.clone(),
+            site: self.site.clone(),
+            connected: self.connected,
+            transport_connected: self.transport_connected,
+            last_seen: self.last_seen.clone(),
+            stack_version: self.stack_version.clone(),
+            mcc: self.mcc,
+            mnc: self.mnc,
+            location_area: self.location_area,
+            main_carrier: self.main_carrier,
+            secondary_carrier: self.secondary_carrier,
+            colour_code: self.colour_code,
+            system_code: self.system_code,
+            dual_carrier: self.secondary_carrier.is_some(),
+            telemetry_count: self.telemetry_count,
+            heartbeat_count: self.heartbeat_count,
+            command_ack_count: self.command_ack_count,
+            control_response_count: self.control_response_count,
+            subscribers_total: self.subscribers.len(),
+            subscribers_online: self.subscribers.values().filter(|s| s.online).count(),
+            groups_total: self.groups.len(),
+            active_calls_total: self.active_calls.len(),
+            emergencies_active: self.active_emergencies_count(),
+            sds_log_count: self.sds_log.len(),
+            brew_connected: self.brew.get("default").map(|brew| brew.connected),
+            health_overall: extract_health_overall(&self.health),
+            rf_peak_dbfs: extract_f64_path(&self.rf_quality, &["peak_dbfs"]),
+            rf_rms_dbfs: extract_f64_path(&self.rf_quality, &["rms_dbfs"]),
+        }
+    }
+
+    fn rf_snapshot(&self) -> NodeRfSnapshot {
+        NodeRfSnapshot {
+            node_id: self.node_id.clone(),
+            station_name: self.station_name.clone(),
+            connected: self.connected || self.transport_connected,
+            last_seen: self.last_seen.clone(),
+            rf_quality: self.rf_quality.clone(),
+            sdr_health: self.sdr_health.clone(),
+        }
+    }
+
+    fn health_snapshot(&self) -> NodeHealthSnapshot {
+        NodeHealthSnapshot {
+            node_id: self.node_id.clone(),
+            station_name: self.station_name.clone(),
+            connected: self.connected,
+            transport_connected: self.transport_connected,
+            last_seen: self.last_seen.clone(),
+            health: self.health.clone(),
+            sdr_health: self.sdr_health.clone(),
+            sys_health: self.sys_health.clone(),
+            errors: self.errors.iter().cloned().collect(),
+        }
+    }
+
+    fn active_emergencies_count(&self) -> usize {
+        self.emergencies.values().filter(|e| e.active).count()
+    }
 }
 
 impl NodeState {
@@ -769,6 +973,56 @@ impl ControlRoomState {
         self.recent_events.iter().rev().take(limit).cloned().collect()
     }
 
+    fn recent_events_filtered(&self, limit: usize, event_type: Option<&str>, quiet: bool) -> Vec<EventLogEntry> {
+        self.recent_events
+            .iter()
+            .rev()
+            .filter(|entry| event_type.map(|wanted| entry.event_type == wanted).unwrap_or(true))
+            .filter(|entry| !quiet || !is_noisy_event_type(&entry.event_type))
+            .take(limit)
+            .cloned()
+            .collect()
+    }
+
+    fn recent_commands(&self, limit: usize) -> Vec<CommandAuditEntry> {
+        self.recent_commands.iter().rev().take(limit).cloned().collect()
+    }
+
+    fn overview(&self) -> ControlRoomOverview {
+        let nodes: Vec<NodeOverview> = self.nodes.values().map(NodeState::overview).collect();
+        ControlRoomOverview {
+            started_at: self.started_at.clone(),
+            now: now_iso(),
+            nodes_connected: nodes.iter().filter(|n| n.connected || n.transport_connected).count(),
+            node_count: nodes.len(),
+            subscribers_total: nodes.iter().map(|n| n.subscribers_total).sum(),
+            subscribers_online: nodes.iter().map(|n| n.subscribers_online).sum(),
+            groups_total: nodes.iter().map(|n| n.groups_total).sum(),
+            active_calls_total: nodes.iter().map(|n| n.active_calls_total).sum(),
+            emergencies_active: nodes.iter().map(|n| n.emergencies_active).sum(),
+            nodes,
+            recent_commands: self.recent_commands.iter().rev().take(20).map(|cmd| CommandSummary::from(cmd)).collect(),
+        }
+    }
+
+    fn rf_snapshot(&self) -> ControlRoomRfSnapshot {
+        ControlRoomRfSnapshot {
+            now: now_iso(),
+            nodes: self.nodes.values().map(NodeState::rf_snapshot).collect(),
+        }
+    }
+
+    fn health_snapshot(&self) -> ControlRoomHealthSnapshot {
+        ControlRoomHealthSnapshot {
+            now: now_iso(),
+            nodes: self.nodes.values().map(NodeState::health_snapshot).collect(),
+        }
+    }
+
+    fn node_summary(&self, node_id: &str) -> Option<NodeOverview> {
+        self.nodes.get(node_id).map(NodeState::overview)
+    }
+
     fn apply_node_message(&mut self, message: &NodeToControlRoomMessage) -> Option<String> {
         match message {
             NodeToControlRoomMessage::Hello { hello } => {
@@ -972,6 +1226,30 @@ pub fn telemetry_event_type(event: &TelemetryEvent) -> &'static str {
         TelemetryEvent::BrewSubscriberRegistered { .. } => "brew_subscriber_registered",
         TelemetryEvent::BrewSubscriberDeregistered { .. } => "brew_subscriber_deregistered",
     }
+}
+
+fn is_noisy_event_type(event_type: &str) -> bool {
+    matches!(
+        event_type,
+        "tx_visual" | "tx_quality" | "sdr_health" | "sys_health" | "health_snapshot" | "ms_rssi" | "ts_voice_activity"
+    )
+}
+
+fn extract_health_overall(value: &Option<Value>) -> Option<String> {
+    let value = value.as_ref()?;
+    value
+        .get("HealthSnapshot")
+        .and_then(|v| v.get("overall"))
+        .and_then(Value::as_str)
+        .map(ToString::to_string)
+}
+
+fn extract_f64_path(value: &Option<Value>, path: &[&str]) -> Option<f64> {
+    let mut current = value.as_ref()?;
+    for key in path {
+        current = current.get(*key)?;
+    }
+    current.as_f64()
 }
 
 fn event_for_log(event: &TelemetryEvent) -> Value {
