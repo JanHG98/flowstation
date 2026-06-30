@@ -238,7 +238,8 @@ impl BsChannelScheduler {
     }
 
     pub fn can_deliver_stealing(&self, ts: u8) -> bool {
-        (2..=4).contains(&ts) && self.circuits.is_active(Direction::Dl, ts)
+        let traffic_slot = (2..=4).contains(&ts) || (self.downlink_mode == CarrierDownlinkMode::TrafficOnly && ts == 1);
+        traffic_slot && self.circuits.is_active(Direction::Dl, ts)
     }
 
     fn generate_hangtime_idle_schf(&self) -> BitBuffer {
@@ -1216,7 +1217,8 @@ impl BsChannelScheduler {
 
         // During hangtime we stop sending traffic frames and switch to signalling mode.
         // Keep traffic mode while FACCH/stealing is still queued for delivery.
-        let hang_effective = if (2..=4).contains(&ts.t) {
+        let hang_slot = (2..=4).contains(&ts.t) || (self.downlink_mode == CarrierDownlinkMode::TrafficOnly && ts.t == 1);
+        let hang_effective = if hang_slot {
             self.is_hangtime_effective(ts.t)
         } else {
             false
@@ -1448,9 +1450,34 @@ impl BsChannelScheduler {
             let mut aach = AccessAssign::default();
 
             match ts.t {
+                1 if self.downlink_mode == CarrierDownlinkMode::TrafficOnly => {
+                    // On a secondary traffic-only carrier, air TS1 is available as a
+                    // normal traffic bearer. The primary carrier still owns MCCH/Control
+                    // on TS1; this branch is only used by the secondary scheduler.
+                    let in_hangtime = self.hangtime[ts.t as usize - 1];
+                    if in_hangtime && (dl_traffic_usage.is_some() || ul_traffic_usage.is_some()) {
+                        aach.dl_usage = AccessAssignDlUsage::AssignedControl;
+                        aach.ul_usage = AccessAssignUlUsage::AssignedOnly;
+                        aach.f2_af = Some(AccessField {
+                            access_code: 0,
+                            base_frame_len: 4,
+                        });
+                    } else {
+                        aach.dl_usage = if let Some(usage) = dl_traffic_usage {
+                            AccessAssignDlUsage::Traffic(usage)
+                        } else {
+                            AccessAssignDlUsage::Unallocated
+                        };
+                        aach.ul_usage = if let Some(usage) = ul_traffic_usage {
+                            AccessAssignUlUsage::Traffic(usage)
+                        } else {
+                            AccessAssignUlUsage::Unallocated
+                        };
+                    }
+                }
                 1 => {
-                    assert!(dl_traffic_usage.is_none(), "DL ts 1 can't be traffic");
-                    assert!(ul_traffic_usage.is_none(), "UL ts 1 can't be traffic (is this allowed?"); // TODO FIXME check spec
+                    assert!(dl_traffic_usage.is_none(), "DL ts 1 can't be traffic on the primary carrier");
+                    assert!(ul_traffic_usage.is_none(), "UL ts 1 can't be traffic on the primary carrier");
 
                     // TS1 (MCCH) DL is always CommonControl — that doesn't
                     // change for individual reservations.
