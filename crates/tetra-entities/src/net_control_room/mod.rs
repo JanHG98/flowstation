@@ -1,19 +1,19 @@
-//! NetCore Control-Room node side.
+//! NetCore Control-Room node side / shared protocol.
 //!
-//! This module is the base-station side of the future Leitstelle/Control-Room
-//! connection.  It intentionally lives next to the legacy `net_telemetry` and
-//! `net_control` modules instead of replacing them: dashboard, standalone
-//! telemetry and old command endpoints can keep working while a new Leitstelle
-//! uses one clean bidirectional node protocol.
+//! Protocol structs are always available.  The base-station worker is gated
+//! behind `runtime` so the Control Room Core can use the protocol without SDR,
+//! Brew, dashboard or voice-codec dependencies.
 
 pub mod codec;
 pub mod protocol;
+#[cfg(feature = "runtime")]
 pub mod worker;
 
 use std::time::Duration;
 
-pub use self::codec::ControlRoomCodecJson;
+pub use self::codec::{ControlRoomCodecError, ControlRoomCodecJson};
 pub use self::protocol::*;
+#[cfg(feature = "runtime")]
 pub use self::worker::ControlRoomWorker;
 
 /// Sent as WebSocket subprotocol in the node <-> control-room handshake.

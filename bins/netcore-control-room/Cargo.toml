@@ -8,9 +8,17 @@ license.workspace = true
 name = "netcore-control-room"
 path = "src/main.rs"
 
+
+[features]
+# Keep this no-op feature so habitual workspace commands such as
+# `cargo build -p netcore-control-room --features asterisk` do not accidentally
+# pull voice-codec/native base-station dependencies into the Control Room LXC.
+default = []
+asterisk = []
+
 [dependencies]
 tetra-core = { workspace = true }
-tetra-entities = { workspace = true }
+tetra-entities = { workspace = true, default-features = false }
 
 clap = { workspace = true }
 chrono = { workspace = true }

@@ -2,12 +2,22 @@
 //!
 //! JSON is deliberately used for v1: it is easy to inspect on the wire, easy for
 //! a Rust/Python/TypeScript Leitstelle backend to consume, and stable enough for
-//! early protocol evolution.  We can add a bitcode subprotocol later if needed.
+//! early protocol evolution.  This codec intentionally has no dependency on the
+//! runtime transport layer so `netcore-control-room` can build without SDR/audio
+//! libraries.
 
-use crate::{
-    net_control_room::protocol::{ControlRoomToNodeMessage, NodeToControlRoomMessage},
-    network::transports::NetworkError,
-};
+use crate::net_control_room::protocol::{ControlRoomToNodeMessage, NodeToControlRoomMessage};
+
+#[derive(Debug, Clone)]
+pub struct ControlRoomCodecError(pub String);
+
+impl std::fmt::Display for ControlRoomCodecError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+impl std::error::Error for ControlRoomCodecError {}
 
 #[derive(Default)]
 pub struct ControlRoomCodecJson;
@@ -17,16 +27,16 @@ impl ControlRoomCodecJson {
         serde_json::to_vec(message).unwrap_or_default()
     }
 
-    pub fn decode_uplink(&self, payload: &[u8]) -> Result<NodeToControlRoomMessage, NetworkError> {
-        serde_json::from_slice(payload).map_err(|e| NetworkError::SerializationError(format!("control-room uplink decode: {}", e)))
+    pub fn decode_uplink(&self, payload: &[u8]) -> Result<NodeToControlRoomMessage, ControlRoomCodecError> {
+        serde_json::from_slice(payload).map_err(|e| ControlRoomCodecError(format!("control-room uplink decode: {}", e)))
     }
 
     pub fn encode_downlink(&self, message: &ControlRoomToNodeMessage) -> Vec<u8> {
         serde_json::to_vec(message).unwrap_or_default()
     }
 
-    pub fn decode_downlink(&self, payload: &[u8]) -> Result<ControlRoomToNodeMessage, NetworkError> {
-        serde_json::from_slice(payload).map_err(|e| NetworkError::SerializationError(format!("control-room downlink decode: {}", e)))
+    pub fn decode_downlink(&self, payload: &[u8]) -> Result<ControlRoomToNodeMessage, ControlRoomCodecError> {
+        serde_json::from_slice(payload).map_err(|e| ControlRoomCodecError(format!("control-room downlink decode: {}", e)))
     }
 }
 
