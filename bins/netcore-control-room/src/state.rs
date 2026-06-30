@@ -97,6 +97,13 @@ impl SharedControlRoom {
             .emergencies_snapshot(node_id, active_only)
     }
 
+    pub fn locations_snapshot(&self, node_id: Option<&str>) -> Option<ControlRoomLocationsSnapshot> {
+        self.inner
+            .lock()
+            .expect("control room state poisoned")
+            .locations_snapshot(node_id)
+    }
+
     pub fn node_detail(&self, node_id: &str) -> Option<ControlRoomNodeDetail> {
         self.inner
             .lock()
@@ -391,6 +398,7 @@ pub struct SubscriberDetail {
     pub last_event: Option<String>,
     pub timeout_drop_count: u64,
     pub active_call_keys: Vec<String>,
+    pub last_location: Option<LocationState>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -483,6 +491,26 @@ pub struct EmergencyDetail {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ControlRoomLocationsSnapshot {
+    pub now: String,
+    pub node_filter: Option<String>,
+    pub count: usize,
+    pub locations: Vec<LocationDetail>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LocationDetail {
+    pub node_id: String,
+    pub station_name: Option<String>,
+    pub issi: u32,
+    pub latitude: f64,
+    pub longitude: f64,
+    pub source: String,
+    pub updated_at: String,
+    pub raw_text: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ControlRoomNodeDetail {
     pub now: String,
     pub node: NodeOverview,
@@ -490,6 +518,7 @@ pub struct ControlRoomNodeDetail {
     pub groups: Vec<GroupDetail>,
     pub active_calls: Vec<CallDetail>,
     pub emergencies: Vec<EmergencyDetail>,
+    pub locations: Vec<LocationDetail>,
     pub sds_log: Vec<SdsDetail>,
     pub brew: HashMap<String, BrewState>,
     pub timeslot_activity: HashMap<String, String>,
@@ -781,6 +810,7 @@ impl NodeState {
                 source,
             } => {
                 self.subscriber_mut(*speaker_issi).last_seen = Some(timestamp.to_string());
+                self.group_mut(*gssi).active_call_id = Some(*call_id);
                 let key = format!("group:{}", call_id);
                 if let Some(CallState::Group {
                     speaker_issi: current_speaker,
@@ -813,7 +843,17 @@ impl NodeState {
             TelemetryEvent::GroupCallEnded { call_id, gssi } => {
                 self.active_calls.remove(&format!("group:{}", call_id));
                 if let Some(group) = self.groups.get_mut(gssi) {
-                    group.active_call_id = None;
+                    if group.active_call_id == Some(*call_id) {
+                        group.active_call_id = None;
+                    }
+                }
+                // Be defensive: some stacks emit the correct call_id but the group may already
+                // have moved or been normalised differently. A group view must never advertise
+                // an active call that no longer exists in active_calls.
+                for group in self.groups.values_mut() {
+                    if group.active_call_id == Some(*call_id) {
+                        group.active_call_id = None;
+                    }
                 }
             }
             TelemetryEvent::IndividualCallStarted {
@@ -861,7 +901,7 @@ impl NodeState {
                 protocol_id,
                 text,
             } => {
-                self.push_sds(SdsLogEntry {
+                let entry = SdsLogEntry {
                     timestamp: timestamp.to_string(),
                     direction: direction.clone(),
                     source_issi: *source_issi,
@@ -869,7 +909,9 @@ impl NodeState {
                     is_group: *is_group,
                     protocol_id: *protocol_id,
                     text: text.clone(),
-                });
+                };
+                self.apply_position_from_sds(&entry);
+                self.push_sds(entry);
             }
             TelemetryEvent::TsVoiceActivity { carrier_num, ts } => {
                 self.timeslot_activity
@@ -973,6 +1015,22 @@ impl NodeState {
         }
     }
 
+    fn apply_position_from_sds(&mut self, entry: &SdsLogEntry) {
+        if let Some((latitude, longitude)) = parse_lip_position(&entry.text) {
+            let subscriber = self.subscriber_mut(entry.source_issi);
+            subscriber.online = true;
+            subscriber.last_seen = Some(entry.timestamp.clone());
+            subscriber.last_event = Some("lip_position".to_string());
+            subscriber.last_location = Some(LocationState {
+                latitude,
+                longitude,
+                source: "sds_lip".to_string(),
+                updated_at: entry.timestamp.clone(),
+                raw_text: Some(entry.text.clone()),
+            });
+        }
+    }
+
     fn push_error(&mut self, message: String) {
         self.errors.push_back(message);
         while self.errors.len() > 50 {
@@ -993,6 +1051,7 @@ pub struct SubscriberState {
     pub last_seen: Option<String>,
     pub last_event: Option<String>,
     pub timeout_drop_count: u64,
+    pub last_location: Option<LocationState>,
 }
 
 impl SubscriberState {
@@ -1008,8 +1067,18 @@ impl SubscriberState {
             last_seen: None,
             last_event: None,
             timeout_drop_count: 0,
+            last_location: None,
         }
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LocationState {
+    pub latitude: f64,
+    pub longitude: f64,
+    pub source: String,
+    pub updated_at: String,
+    pub raw_text: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1292,6 +1361,25 @@ impl ControlRoomState {
         })
     }
 
+    fn locations_snapshot(&self, node_filter: Option<&str>) -> Option<ControlRoomLocationsSnapshot> {
+        let nodes = self.selected_nodes(node_filter)?;
+        let mut locations = Vec::new();
+        for node in nodes {
+            for subscriber in node.subscribers.values() {
+                if let Some(location) = &subscriber.last_location {
+                    locations.push(location_detail(node, subscriber.issi, location));
+                }
+            }
+        }
+        locations.sort_by(|a, b| b.updated_at.cmp(&a.updated_at).then(a.node_id.cmp(&b.node_id)).then(a.issi.cmp(&b.issi)));
+        Some(ControlRoomLocationsSnapshot {
+            now: now_iso(),
+            node_filter: node_filter.map(ToString::to_string),
+            count: locations.len(),
+            locations,
+        })
+    }
+
     fn node_detail(&self, node_id: &str) -> Option<ControlRoomNodeDetail> {
         let node = self.nodes.get(node_id)?;
         let mut subscribers: Vec<_> = node.subscribers.values().map(|s| subscriber_detail(node, s)).collect();
@@ -1306,6 +1394,13 @@ impl ControlRoomState {
         let mut emergencies: Vec<_> = node.emergencies.values().map(|e| emergency_detail(node, e)).collect();
         emergencies.sort_by(|a, b| b.active.cmp(&a.active).then(b.raised_at.cmp(&a.raised_at)));
 
+        let mut locations: Vec<_> = node
+            .subscribers
+            .values()
+            .filter_map(|subscriber| subscriber.last_location.as_ref().map(|location| location_detail(node, subscriber.issi, location)))
+            .collect();
+        locations.sort_by(|a, b| b.updated_at.cmp(&a.updated_at).then(a.issi.cmp(&b.issi)));
+
         let mut sds_log: Vec<_> = node.sds_log.iter().rev().take(100).map(|entry| sds_detail(node, entry)).collect();
         sds_log.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
 
@@ -1316,6 +1411,7 @@ impl ControlRoomState {
             groups,
             active_calls,
             emergencies,
+            locations,
             sds_log,
             brew: node.brew.clone(),
             timeslot_activity: node.timeslot_activity.clone(),
@@ -1521,6 +1617,7 @@ fn subscriber_detail(node: &NodeState, subscriber: &SubscriberState) -> Subscrib
         last_event: subscriber.last_event.clone(),
         timeout_drop_count: subscriber.timeout_drop_count,
         active_call_keys: subscriber_active_call_keys(node, subscriber.issi),
+        last_location: subscriber.last_location.clone(),
     }
 }
 
@@ -1540,13 +1637,19 @@ fn group_detail(node: &NodeState, group: &GroupState) -> GroupDetail {
         })
     });
 
+    let active_call_id = if active_call_key.is_some() {
+        group.active_call_id
+    } else {
+        None
+    };
+
     GroupDetail {
         node_id: node.node_id.clone(),
         station_name: node.station_name.clone(),
         gssi: group.gssi,
         members,
         members_online,
-        active_call_id: group.active_call_id,
+        active_call_id,
         active_call_key,
     }
 }
@@ -1642,6 +1745,19 @@ fn emergency_detail(node: &NodeState, emergency: &EmergencyState) -> EmergencyDe
     }
 }
 
+fn location_detail(node: &NodeState, issi: u32, location: &LocationState) -> LocationDetail {
+    LocationDetail {
+        node_id: node.node_id.clone(),
+        station_name: node.station_name.clone(),
+        issi,
+        latitude: location.latitude,
+        longitude: location.longitude,
+        source: location.source.clone(),
+        updated_at: location.updated_at.clone(),
+        raw_text: location.raw_text.clone(),
+    }
+}
+
 fn subscriber_active_call_keys(node: &NodeState, issi: u32) -> Vec<String> {
     let mut keys: Vec<String> = node
         .active_calls
@@ -1658,6 +1774,35 @@ fn call_involves_subscriber(call: &CallState, issi: u32) -> bool {
         CallState::Group { caller_issi, speaker_issi, .. } => *caller_issi == issi || speaker_issi.map(|speaker| speaker == issi).unwrap_or(false),
         CallState::Individual { calling_issi, called_issi, .. } => *calling_issi == issi || *called_issi == issi,
     }
+}
+
+fn parse_lip_position(text: &str) -> Option<(f64, f64)> {
+    let trimmed = text.trim();
+    let lower = trimmed.to_ascii_lowercase();
+    if !lower.starts_with("lip position") {
+        return None;
+    }
+
+    let (_, rest) = trimmed.split_once(':')?;
+    let (lat_raw, lon_raw) = rest.split_once(',')?;
+    let latitude = parse_coordinate(lat_raw)?;
+    let longitude = parse_coordinate(lon_raw)?;
+
+    if !(-90.0..=90.0).contains(&latitude) || !(-180.0..=180.0).contains(&longitude) {
+        return None;
+    }
+
+    Some((latitude, longitude))
+}
+
+fn parse_coordinate(raw: &str) -> Option<f64> {
+    let cleaned = raw
+        .trim()
+        .trim_end_matches('.')
+        .trim_end_matches(';')
+        .trim_end_matches('°')
+        .trim();
+    cleaned.parse::<f64>().ok()
 }
 
 pub fn now_iso() -> String {

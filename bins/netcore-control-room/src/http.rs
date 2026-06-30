@@ -107,6 +107,7 @@ fn route_http(request: HttpRequest, state: SharedControlRoom, node_path: &str, u
             let active_only = query_bool(&request, "active", false) || query_bool(&request, "active_only", false);
             HttpResponse::json(200, &state.emergencies_snapshot(None, active_only).expect("global emergencies snapshot exists"))
         }
+        ("GET", "/api/locations") => HttpResponse::json(200, &state.locations_snapshot(None).expect("global locations snapshot exists")),
         ("GET", "/api/nodes") => {
             let snapshot = state.snapshot();
             HttpResponse::json(200, &snapshot.nodes)
@@ -141,9 +142,10 @@ fn route_http(request: HttpRequest, state: SharedControlRoom, node_path: &str, u
                         let active_only = query_bool(&request, "active", false) || query_bool(&request, "active_only", false);
                         node_or_404(state.emergencies_snapshot(Some(&route.node_id), active_only))
                     }
+                    Some("locations") => node_or_404(state.locations_snapshot(Some(&route.node_id))),
                     Some(other) => HttpResponse::json(404, &json!({
                         "error": format!("unknown node detail collection '{}'", other),
-                        "available_collections": ["subscribers", "groups", "calls", "sds", "emergencies"]
+                        "available_collections": ["subscribers", "groups", "calls", "sds", "emergencies", "locations"]
                     })),
                 }
             } else {
@@ -488,6 +490,7 @@ fn not_found(node_path: &str, ui_path: &str) -> HttpResponse {
                 "GET /api/calls",
                 "GET /api/sds?limit=100",
                 "GET /api/emergencies?active=true",
+                "GET /api/locations",
                 "GET /api/nodes",
                 "GET /api/nodes/{node_id}",
                 "GET /api/nodes/{node_id}/subscribers",
@@ -495,6 +498,7 @@ fn not_found(node_path: &str, ui_path: &str) -> HttpResponse {
                 "GET /api/nodes/{node_id}/calls",
                 "GET /api/nodes/{node_id}/sds",
                 "GET /api/nodes/{node_id}/emergencies",
+                "GET /api/nodes/{node_id}/locations",
                 "GET /api/state",
                 "GET /api/rf",
                 "GET /api/health/full",
@@ -553,6 +557,7 @@ fn index_html(node_path: &str, ui_path: &str) -> String {
     <li><code>GET /api/calls</code> — aktive Rufe</li>
     <li><code>GET /api/sds?limit=100</code> — SDS-Log</li>
     <li><code>GET /api/emergencies?active=true</code> — Notrufe</li>
+    <li><code>GET /api/locations</code> — zuletzt bekannte LIP-/Positionsdaten</li>
     <li><code>GET /api/nodes</code></li>
     <li><code>GET /api/nodes/&lt;node_id&gt;</code> — Node-Detailansicht</li>
     <li><code>GET /api/nodes/&lt;node_id&gt;/subscribers</code></li>
@@ -560,6 +565,7 @@ fn index_html(node_path: &str, ui_path: &str) -> String {
     <li><code>GET /api/nodes/&lt;node_id&gt;/calls</code></li>
     <li><code>GET /api/nodes/&lt;node_id&gt;/sds</code></li>
     <li><code>GET /api/nodes/&lt;node_id&gt;/emergencies</code></li>
+    <li><code>GET /api/nodes/&lt;node_id&gt;/locations</code></li>
     <li><code>GET /api/state</code> — kompletter Debug-State</li>
     <li><code>GET /api/rf</code> — RF/SDR-Snapshot</li>
     <li><code>GET /api/health/full</code> — technische Health-Daten</li>
