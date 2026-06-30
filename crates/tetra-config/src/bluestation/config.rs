@@ -3,7 +3,7 @@ use std::sync::{Arc, RwLock};
 use tetra_core::freqs::FreqInfo;
 
 use crate::bluestation::{
-    CfgAsterisk, CfgCellInfo, CfgControl, CfgDapnet, CfgEcholink, CfgEmergency, CfgGeoalarm, CfgHealth, CfgMeshcom, CfgNetInfo, CfgPhyIo,
+    CfgAsterisk, CfgCellInfo, CfgControl, CfgControlRoom, CfgDapnet, CfgEcholink, CfgEmergency, CfgGeoalarm, CfgHealth, CfgMeshcom, CfgNetInfo, CfgPhyIo,
     CfgRecovery, CfgSecurity, CfgSnomNotify, CfgTpg2200Action, CfgWxService, PhyBackend, StackState,
 };
 
@@ -107,6 +107,9 @@ pub struct StackConfig {
 
     /// Control endpoint configuration
     pub control: Option<CfgControl>,
+
+    /// NetCore Control-Room endpoint configuration
+    pub control_room: Option<CfgControlRoom>,
 
     /// Access control / security configuration
     pub security: CfgSecurity,
