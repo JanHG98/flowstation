@@ -13,7 +13,7 @@ const DEFAULT_API: &str = "http://127.0.0.1:9010";
 const DEFAULT_PROFILE: &str = "default";
 const DEFAULT_NODE: &str = "SRV-M_TBS-01";
 const DEFAULT_OPERATOR: &str = "jan";
-const UI_VERSION_LABEL: &str = "Native UI v5.9.1 · Clean Leitstellenarbeitsplatz · Buildfix";
+const UI_VERSION_LABEL: &str = "Native UI v5.9.3 · Clean Leitstellenarbeitsplatz · Nav-Fix";
 const DEFAULT_TILE_URL: &str = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
 const DEFAULT_TILE_ATTRIBUTION: &str = "© OpenStreetMap contributors";
 const TILE_SIZE: f64 = 256.0;
@@ -1223,56 +1223,88 @@ impl ControlRoomApp {
     fn render_nav_button(&mut self, ui: &mut egui::Ui, tab: Tab) {
         let selected = self.tab == tab;
         let row_height = 32.0;
-        let full_width = ui.available_width();
-        let button_width = 28.0;
-        let label_width = (full_width - button_width - 8.0).max(80.0);
+        let row_width = ui.available_width().max(160.0);
 
-        ui.horizontal(|ui| {
-            let (rect, response) = ui.allocate_exact_size(egui::vec2(label_width, row_height), egui::Sense::click());
-            if response.clicked() {
-                self.tab = tab;
-            }
+        let (rect, response) = ui.allocate_exact_size(
+            egui::vec2(row_width, row_height),
+            egui::Sense::click(),
+        );
 
-            let fill = if selected {
-                egui::Color32::from_rgb(0, 118, 214)
-            } else if response.hovered() {
-                egui::Color32::from_rgb(220, 232, 246)
-            } else {
-                egui::Color32::TRANSPARENT
-            };
+        let arrow_size = egui::vec2(28.0, 24.0);
+        let arrow_rect = egui::Rect::from_center_size(
+            egui::pos2(rect.right() - arrow_size.x * 0.5 - 4.0, rect.center().y),
+            arrow_size,
+        );
 
-            if selected || response.hovered() {
-                ui.painter().rect_filled(rect, egui::Rounding::same(4.0), fill);
-            }
+        let label_rect = egui::Rect::from_min_max(
+            rect.min,
+            egui::pos2(arrow_rect.left() - 8.0, rect.max.y),
+        );
 
-            let text_color = if selected {
-                egui::Color32::WHITE
-            } else {
-                ui.visuals().text_color()
-            };
+        let pointer_pos = ui.input(|input| input.pointer.interact_pos());
+        let clicked_arrow = response.clicked()
+            && pointer_pos.map(|pos| arrow_rect.contains(pos)).unwrap_or(false);
+        let clicked_label = response.clicked() && !clicked_arrow;
 
-            ui.painter().text(
-                rect.left_center() + egui::vec2(10.0, 0.0),
-                egui::Align2::LEFT_CENTER,
-                format!("{}  {}", tab.icon(), tab.label()),
-                egui::FontId::proportional(14.0),
-                text_color,
-            );
+        if clicked_label {
+            self.tab = tab;
+        }
 
+        if clicked_arrow {
             let is_open = *self.detached_windows.get(&tab).unwrap_or(&false);
-            let button_label = if is_open { "▣" } else { "↗" };
-            if ui.add_sized([button_width, 24.0], egui::Button::new(button_label)).on_hover_text("als OS-Fenster öffnen/schließen").clicked() {
-                self.detached_windows.insert(tab, !is_open);
-                self.window_mode = true;
-            }
-        });
+            self.detached_windows.insert(tab, !is_open);
+            self.window_mode = true;
+        }
+
+        let fill = if selected {
+            egui::Color32::from_rgb(0, 118, 214)
+        } else if response.hovered() {
+            egui::Color32::from_rgb(220, 232, 246)
+        } else {
+            egui::Color32::TRANSPARENT
+        };
+
+        if selected || response.hovered() {
+            ui.painter().rect_filled(rect.shrink2(egui::vec2(2.0, 2.0)), egui::Rounding::same(4.0), fill);
+        }
+
+        let text_color = if selected {
+            egui::Color32::WHITE
+        } else {
+            ui.visuals().text_color()
+        };
+
+        ui.painter().text(
+            label_rect.left_center() + egui::vec2(10.0, 0.0),
+            egui::Align2::LEFT_CENTER,
+            format!("{}  {}", tab.icon(), tab.label()),
+            egui::FontId::proportional(14.0),
+            text_color,
+        );
+
+        let is_open = *self.detached_windows.get(&tab).unwrap_or(&false);
+        let arrow_fill = if arrow_rect.contains(pointer_pos.unwrap_or(egui::pos2(-1.0, -1.0))) {
+            egui::Color32::from_rgb(210, 220, 232)
+        } else {
+            egui::Color32::from_rgb(230, 234, 240)
+        };
+        ui.painter().rect_filled(arrow_rect, egui::Rounding::same(4.0), arrow_fill);
+        ui.painter().text(
+            arrow_rect.center(),
+            egui::Align2::CENTER_CENTER,
+            if is_open { "▣" } else { "↗" },
+            egui::FontId::proportional(13.0),
+            ui.visuals().text_color(),
+        );
+
+        response.on_hover_text("Modul öffnen · Pfeil: als OS-Fenster öffnen/schließen");
     }
 
     fn clear_command_inputs(&mut self) {
         self.kick_issi.clear();
         self.dgna_issi.clear();
         self.dgna_gssi.clear();
-        self.emergency_clear_issi.clear();
+        self.clear_issi.clear();
         self.dgna_detach = false;
         self.command_result = None;
         self.last_ok = Some("Maske geleert".to_string());
