@@ -13,7 +13,7 @@ const DEFAULT_API: &str = "http://127.0.0.1:9010";
 const DEFAULT_PROFILE: &str = "default";
 const DEFAULT_NODE: &str = "SRV-M_TBS-01";
 const DEFAULT_OPERATOR: &str = "jan";
-const UI_VERSION_LABEL: &str = "Native UI v5.11.2 · Status-Tableau · Buildfix";
+const UI_VERSION_LABEL: &str = "Native UI v5.13.0 · API Directory Sync";
 const DEFAULT_TILE_URL: &str = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
 const DEFAULT_TILE_ATTRIBUTION: &str = "© OpenStreetMap contributors";
 const TILE_SIZE: f64 = 256.0;
@@ -36,11 +36,9 @@ fn main() -> eframe::Result<()> {
 
 #[derive(Debug, Clone)]
 struct ResolvedSettings {
-    config_path: Option<PathBuf>,
     profile: String,
     api: String,
     username: Option<String>,
-    username_source: Option<String>,
     default_node: String,
     operator_id: String,
     map: MapSettings,
@@ -95,7 +93,6 @@ struct DirectorySubscriberConfig {
     device_class: Option<String>,
     class: Option<String>,
     kind: Option<String>,
-    owner: Option<String>,
     status: Option<String>,
     status_group: Option<String>,
     #[serde(default)]
@@ -104,6 +101,8 @@ struct DirectorySubscriberConfig {
     static_groups: Vec<u64>,
     hidden: Option<bool>,
     hide_in_subscribers: Option<bool>,
+    #[serde(flatten)]
+    extra: HashMap<String, Value>,
 }
 
 #[derive(Debug, Default, Clone, Deserialize)]
@@ -174,11 +173,46 @@ impl DirectorySettings {
 
 
     fn merge_from(&mut self, other: &Self) {
-        self.subscribers.extend(other.subscribers.clone());
-        self.groups.extend(other.groups.clone());
-        self.status_groups.extend(other.status_groups.clone());
-        self.statuses.extend(other.statuses.clone());
-        self.hide_infrastructure = other.hide_infrastructure;
+        for (key, other_entry) in &other.subscribers {
+            self.subscribers
+                .entry(key.clone())
+                .and_modify(|entry| merge_subscriber_missing(entry, other_entry))
+                .or_insert_with(|| other_entry.clone());
+        }
+        for (key, other_entry) in &other.groups {
+            self.groups
+                .entry(key.clone())
+                .and_modify(|entry| merge_label_missing(entry, other_entry))
+                .or_insert_with(|| other_entry.clone());
+        }
+        for (key, other_entry) in &other.status_groups {
+            self.status_groups
+                .entry(key.clone())
+                .and_modify(|entry| merge_label_missing(entry, other_entry))
+                .or_insert_with(|| other_entry.clone());
+        }
+        for (key, other_entry) in &other.statuses {
+            self.statuses
+                .entry(key.clone())
+                .and_modify(|entry| merge_status_missing(entry, other_entry))
+                .or_insert_with(|| other_entry.clone());
+        }
+        self.hide_infrastructure = self.hide_infrastructure && other.hide_infrastructure;
+    }
+
+    fn fill_missing_from(&mut self, other: &Self) {
+        for (key, value) in &other.subscribers {
+            self.subscribers.entry(key.clone()).or_insert_with(|| value.clone());
+        }
+        for (key, value) in &other.groups {
+            self.groups.entry(key.clone()).or_insert_with(|| value.clone());
+        }
+        for (key, value) in &other.status_groups {
+            self.status_groups.entry(key.clone()).or_insert_with(|| value.clone());
+        }
+        for (key, value) in &other.statuses {
+            self.statuses.entry(key.clone()).or_insert_with(|| value.clone());
+        }
     }
 
     fn subscriber_issis(&self) -> Vec<u64> {
@@ -298,7 +332,7 @@ struct CliArgs {
 impl ResolvedSettings {
     fn load() -> (Self, Option<String>) {
         let cli = parse_args();
-        let (config_path, config, warning) = load_operator_config(cli.config.as_deref());
+        let (_config_path, config, warning) = load_operator_config(cli.config.as_deref());
         let profile = config
             .profiles
             .get(&cli.profile)
@@ -311,15 +345,11 @@ impl ResolvedSettings {
             .or_else(|| profile.and_then(|profile| profile.api.clone()))
             .unwrap_or_else(|| DEFAULT_API.to_string());
 
-        let mut username_source = None;
         let username = if let Some(username) = cli.username.clone().filter(|username| !username.trim().is_empty()) {
-            username_source = Some("CLI --username".to_string());
             Some(username)
         } else if let Some(username) = env_nonempty("NETCORE_CONTROL_ROOM_USER") {
-            username_source = Some("env NETCORE_CONTROL_ROOM_USER".to_string());
             Some(username)
         } else if let Some(username) = profile.and_then(|profile| profile.username.clone()).filter(|username| !username.trim().is_empty()) {
-            username_source = Some(format!("profile {} username", cli.profile));
             Some(username)
         } else {
             None
@@ -338,11 +368,9 @@ impl ResolvedSettings {
 
         (
             Self {
-                config_path,
                 profile: cli.profile,
                 api,
                 username,
-                username_source,
                 default_node,
                 operator_id,
                 map,
@@ -637,9 +665,12 @@ struct ControlRoomApp {
     map_wheel_zoom_accum: f32,
     map_manual_center: Option<(f64, f64)>,
     selected_location_issi: Option<u64>,
+    status_card_offsets: HashMap<String, egui::Vec2>,
     map_cache: MapTileCache,
     local_directory: DirectorySettings,
+    raw_directory: Option<Value>,
     directory_source: String,
+    directory_name_index: HashMap<u64, String>,
 }
 
 
@@ -668,9 +699,12 @@ impl ControlRoomApp {
             map_wheel_zoom_accum: 0.0,
             map_manual_center: None,
             selected_location_issi: None,
+            status_card_offsets: HashMap::new(),
             map_cache: MapTileCache::new(settings.map.clone()),
             local_directory,
+            raw_directory: None,
             directory_source: "operator.toml".to_string(),
+            directory_name_index: HashMap::new(),
             settings,
             api,
             tab: Tab::Overview,
@@ -801,21 +835,67 @@ impl ControlRoomApp {
 
 
     fn refresh_directory(&mut self, errors: &mut Vec<String>) {
-        match self.api.get("/api/directory") {
-            Ok(value) => match serde_json::from_value::<DirectoryConfig>(value) {
-                Ok(config) => {
-                    let mut directory = DirectorySettings::from_config(Some(&config));
-                    // Local operator.toml deliberately wins, so a Windows operator can
-                    // override labels while the LXC remains the central source.
-                    directory.merge_from(&self.local_directory);
-                    self.settings.directory = directory;
-                    self.directory_source = "LXC /api/directory + operator.toml overrides".to_string();
+        match self.api.get("/api/directory/resolved") {
+            Ok(value) => {
+                self.raw_directory = value.get("directory").cloned().or_else(|| Some(value.clone()));
+                self.directory_name_index = build_directory_name_index(&value);
+                let directory_value = value.get("directory").cloned().unwrap_or_else(|| value.clone());
+                let normalized = normalize_directory_value(directory_value);
+
+                match serde_json::from_value::<DirectoryConfig>(normalized) {
+                    Ok(config) => {
+                        let mut directory = DirectorySettings::from_config(Some(&config));
+                        directory.fill_missing_from(&self.local_directory);
+                        self.settings.directory = directory;
+                        self.directory_source = format!(
+                            "LXC /api/directory/resolved · {} Namen",
+                            self.directory_name_index.len()
+                        );
+                    }
+                    Err(error) => {
+                        self.settings.directory = self.local_directory.clone();
+                        self.directory_source = format!(
+                            "LXC /api/directory/resolved raw · {} Namen",
+                            self.directory_name_index.len()
+                        );
+                        errors.push(format!("/api/directory/resolved: Directory konnte nicht gelesen werden: {error}"));
+                    }
                 }
-                Err(error) => errors.push(format!("/api/directory: Directory konnte nicht gelesen werden: {error}")),
-            },
+                return;
+            }
             Err(error) => {
-                // Older cores do not have /api/directory. Keep the UI usable with local config.
+                if !error.contains("404") {
+                    errors.push(format!("/api/directory/resolved: {error}"));
+                }
+            }
+        }
+
+        match self.api.get("/api/directory") {
+            Ok(raw_value) => {
+                let deep_index = build_directory_name_index(&raw_value);
+                let normalized = normalize_directory_value(raw_value);
+                self.raw_directory = Some(normalized.clone());
+
+                match serde_json::from_value::<DirectoryConfig>(normalized) {
+                    Ok(config) => {
+                        let mut directory = DirectorySettings::from_config(Some(&config));
+                        directory.fill_missing_from(&self.local_directory);
+                        self.settings.directory = directory;
+                        self.directory_name_index = deep_index;
+                        self.directory_source = format!("LXC /api/directory · {} Namen", self.directory_name_index.len());
+                    }
+                    Err(error) => {
+                        self.directory_name_index = deep_index;
+                        errors.push(format!("/api/directory: Directory konnte nicht gelesen werden: {error}"));
+                        self.settings.directory = self.local_directory.clone();
+                        self.directory_source = format!("LXC /api/directory raw · {} Namen", self.directory_name_index.len());
+                    }
+                }
+            }
+            Err(error) => {
+                self.raw_directory = None;
                 self.settings.directory = self.local_directory.clone();
+                self.directory_name_index.clear();
                 self.directory_source = "operator.toml lokal".to_string();
                 if !error.contains("404") {
                     errors.push(format!("/api/directory: {error}"));
@@ -823,6 +903,7 @@ impl ControlRoomApp {
             }
         }
     }
+
 
     fn get_into(&mut self, path: &str, slot: DataSlot, errors: &mut Vec<String>) {
         match self.api.get(path) {
@@ -1643,9 +1724,9 @@ impl ControlRoomApp {
         table(ui, "sds_table", &["Zeit", "Richtung", "Source", "Dest", "Proto", "Text"], array_at(value, &["sds"]), |ui, row| {
             ui.small(str_at(row, &["timestamp"]).or_else(|| str_at(row, &["created_at"])).unwrap_or("?"));
             ui.label(str_at(row, &["direction"]).unwrap_or("?"));
-            ui.label(display_u64(row, &["source_issi"]));
-            ui.label(display_u64(row, &["dest_issi"]));
-            ui.label(display_u64(row, &["protocol_id"]));
+            ui.label(sds_source_issi(row).map(|value| value.to_string()).unwrap_or_else(|| "-".to_string()));
+            ui.label(u64_any_at(row, &["dest_issi"]).or_else(|| u64_any_at(row, &["destination_issi"])).or_else(|| u64_any_at(row, &["dest"])).map(|value| value.to_string()).unwrap_or_else(|| "-".to_string()));
+            ui.label(sds_protocol(row).map(|value| value.to_string()).unwrap_or_else(|| "-".to_string()));
             ui.label(str_at(row, &["text"]).unwrap_or(""));
         });
     }
@@ -1696,7 +1777,8 @@ impl ControlRoomApp {
 
     fn render_status_tableau(&mut self, ui: &mut egui::Ui) {
         ui.heading("Status-Tableau");
-        ui.small("Statusgruppen, Namen, Statuslabels und Gruppen kommen aus dem zentralen NetCore Directory-Server (/api/directory). Lokale operator.toml-Einträge wirken nur als Override.");
+        ui.small("Statusgruppen, Namen, Statuslabels und Gruppen kommen aus dem zentralen NetCore Directory-Server (/api/directory). Falls Live-Teilnehmer noch keinen Statuscode liefern, nutzt das Tableau den letzten passenden SDS-Status (z. B. Proto 218) als Fallback.");
+        ui.small(format!("Directory: {}", self.directory_source));
         ui.separator();
 
         let cards = self.build_status_tableau_cards();
@@ -1707,7 +1789,8 @@ impl ControlRoomApp {
             return;
         }
 
-        ui.horizontal_wrapped(|ui| {
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 10.0;
             ui.label("Legende:");
             status_badge(ui, "1", "Frei", status_colour_for_code(1));
             status_badge(ui, "2", "Bereit", status_colour_for_code(2));
@@ -1719,30 +1802,78 @@ impl ControlRoomApp {
             status_badge(ui, "8", "Sonderstatus", status_colour_for_code(8));
         });
         ui.separator();
+        ui.small(format!("Directory-Index: {}", self.directory_source));
+        if let Some((sds_rows, status_rows)) = self.sds_status_tableau_counts() {
+            ui.small(format!("SDS-Fallback: {status_rows}/{sds_rows} SDS-Zeilen als Statuskandidaten erkannt"));
+        }
+        ui.separator();
+
+        ui.horizontal(|ui| {
+            if ui.button("Tableau-Positionen zurücksetzen").clicked() {
+                self.status_card_offsets.clear();
+            }
+            ui.small("Karten per Maus ziehen und frei anordnen.");
+        });
 
         let available_width = ui.available_width().max(480.0);
         let column_count = if available_width > 1500.0 {
-            4.0
+            4_usize
         } else if available_width > 1120.0 {
-            3.0
+            3_usize
         } else if available_width > 760.0 {
-            2.0
+            2_usize
         } else {
-            1.0
+            1_usize
         };
-        let column_width = ((available_width - ((column_count - 1.0) * 8.0)) / column_count).max(320.0);
+        let gap = 10.0;
+        let column_width = ((available_width - ((column_count.saturating_sub(1)) as f32 * gap)) / column_count as f32).max(320.0);
 
         egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
-            ui.horizontal_wrapped(|ui| {
-                for card in cards {
-                    ui.allocate_ui_with_layout(
-                        egui::vec2(column_width, 0.0),
-                        egui::Layout::top_down(egui::Align::Min),
-                        |ui| self.render_status_card(ui, &card, column_width),
-                    );
-                }
-            });
+            let mut column_heights = vec![0.0_f32; column_count];
+            let mut placements: Vec<(StatusTableauCard, egui::Pos2, f32)> = Vec::new();
+
+            for card in cards {
+                let height = estimate_status_card_height(&card);
+                let column = column_heights
+                    .iter()
+                    .enumerate()
+                    .min_by(|left, right| left.1.partial_cmp(right.1).unwrap_or(std::cmp::Ordering::Equal))
+                    .map(|(index, _)| index)
+                    .unwrap_or(0);
+                let pos = egui::pos2(column as f32 * (column_width + gap), column_heights[column]);
+                column_heights[column] += height + gap;
+                placements.push((card, pos, height));
+            }
+
+            let canvas_height = column_heights
+                .into_iter()
+                .fold(420.0_f32, |acc, value| acc.max(value + 80.0));
+            let (canvas_rect, _) = ui.allocate_exact_size(egui::vec2(available_width, canvas_height), egui::Sense::hover());
+
+            for (card, base_pos, height) in placements {
+                let offset = *self.status_card_offsets.entry(card.id.clone()).or_insert(egui::Vec2::ZERO);
+                let rect = egui::Rect::from_min_size(
+                    canvas_rect.min + base_pos.to_vec2() + offset,
+                    egui::vec2(column_width, height),
+                );
+                self.render_status_card(ui, &card, rect);
+            }
         });
+    }
+
+    fn sds_status_tableau_counts(&self) -> Option<(usize, usize)> {
+        let value = self.sds.as_ref()?;
+        let rows = array_at(value, &["sds"]);
+        let total = rows.len();
+        let status = rows
+            .iter()
+            .filter(|row| {
+                let proto = sds_protocol(row);
+                let text = first_string(row, &["text", "message", "body", "payload_text", "payload"]).unwrap_or_default();
+                (proto == Some(218) || looks_like_status_text(&text)) && sds_source_issi(row).is_some()
+            })
+            .count();
+        Some((total, status))
     }
 
     fn build_status_tableau_cards(&self) -> Vec<StatusTableauCard> {
@@ -1751,8 +1882,20 @@ impl ControlRoomApp {
         if let Some(value) = &self.subscribers {
             let live_rows = array_at(value, &["subscribers"]);
             for row in live_rows {
-                if let Some(issi) = u64_at(row, &["issi"]).or_else(|| u64_at(row, &["individual_issi"])) {
+                if let Some(issi) = u64_any_at(row, &["issi"]).or_else(|| u64_any_at(row, &["individual_issi"])).or_else(|| u64_any_at(row, &["source_issi"])) {
                     ids.push(issi);
+                }
+            }
+        }
+
+        if let Some(value) = &self.sds {
+            for row in array_at(value, &["sds"]) {
+                let proto = sds_protocol(row);
+                let text = first_string(row, &["text", "message", "body", "payload_text", "payload"]).unwrap_or_default();
+                if proto == Some(218) || looks_like_status_text(&text) {
+                    if let Some(source) = sds_source_issi(row) {
+                        ids.push(source);
+                    }
                 }
             }
         }
@@ -1761,7 +1904,7 @@ impl ControlRoomApp {
         ids.dedup();
 
         let mut by_group: std::collections::BTreeMap<String, Vec<StatusTableauDevice>> = std::collections::BTreeMap::new();
-        let mut singles: Vec<StatusTableauDevice> = Vec::new();
+        let mut single_cards: Vec<StatusTableauCard> = Vec::new();
 
         for issi in ids {
             let pseudo = json!({ "issi": issi, "directory_only": true });
@@ -1777,7 +1920,15 @@ impl ControlRoomApp {
             if let Some(group_key) = raw_group.filter(|value| !value.trim().is_empty()) {
                 by_group.entry(group_key).or_default().push(device);
             } else {
-                singles.push(device);
+                let title = device.name.clone();
+                let subtitle = format!("ISSI {} · {}", device.issi, device.device_class);
+                single_cards.push(StatusTableauCard {
+                    id: format!("issi:{issi}"),
+                    title,
+                    subtitle,
+                    devices: vec![device],
+                    is_single_bucket: true,
+                });
             }
         }
 
@@ -1788,6 +1939,7 @@ impl ControlRoomApp {
             let title = self.status_group_display_name(&group_id);
             let subtitle = format!("{} Gerät(e)", devices.len());
             cards.push(StatusTableauCard {
+                id: format!("group:{group_id}"),
                 title,
                 subtitle,
                 devices,
@@ -1795,17 +1947,9 @@ impl ControlRoomApp {
             });
         }
 
-        singles.sort_by(|left, right| left.name.cmp(&right.name).then(left.issi.cmp(&right.issi)));
-        if !singles.is_empty() {
-            cards.push(StatusTableauCard {
-                title: "Einzelgeräte".to_string(),
-                subtitle: format!("{} Gerät(e) ohne Statusgruppe", singles.len()),
-                devices: singles,
-                is_single_bucket: true,
-            });
-        }
-
-        cards.sort_by(|left, right| left.title.cmp(&right.title));
+        single_cards.sort_by(|left, right| left.title.cmp(&right.title).then(left.subtitle.cmp(&right.subtitle)));
+        cards.extend(single_cards);
+        cards.sort_by(|left, right| left.title.cmp(&right.title).then(left.subtitle.cmp(&right.subtitle)));
         cards
     }
 
@@ -1814,7 +1958,7 @@ impl ControlRoomApp {
         let live_rows = array_at(value, &["subscribers"]);
         let clean_rows = self.clean_subscriber_rows(live_rows);
         for row in clean_rows {
-            if u64_at(row, &["issi"]).or_else(|| u64_at(row, &["individual_issi"])) == Some(issi) {
+            if u64_any_at(row, &["issi"]).or_else(|| u64_any_at(row, &["individual_issi"])) == Some(issi) {
                 return Some(row);
             }
         }
@@ -1842,30 +1986,127 @@ impl ControlRoomApp {
     }
 
     fn status_code_for_issi_or_row(&self, issi: u64, row: Option<&Value>) -> Option<u64> {
-        row.and_then(|row| u64_at(row, &["status"]).or_else(|| u64_at(row, &["status_code"])))
+        row.and_then(|row| u64_any_at(row, &["status"]).or_else(|| u64_any_at(row, &["status_code"])))
+            .or_else(|| {
+                row.and_then(|row| first_string(row, &["status_label", "status_text", "state", "registration_state"]))
+                    .and_then(|text| self.infer_status_code_from_text(&text))
+            })
             .or_else(|| {
                 self.settings.directory
                     .subscriber(issi)
                     .and_then(|entry| entry.status.as_deref())
-                    .and_then(parse_status_code)
+                    .and_then(|value| parse_status_code(value).or_else(|| self.infer_status_code_from_text(value)))
             })
+            .or_else(|| self.latest_sds_status_for_issi(issi).and_then(|(code, _)| code))
+    }
+
+    fn latest_sds_status_for_issi(&self, issi: u64) -> Option<(Option<u64>, String)> {
+        let value = self.sds.as_ref()?;
+        let rows = array_at(value, &["sds"]);
+        let mut latest: Option<&Value> = None;
+
+        for row in rows {
+            let source = sds_source_issi(row);
+            if source != Some(issi) {
+                continue;
+            }
+
+            let proto = sds_protocol(row);
+            let text = first_string(row, &["text", "message", "body", "payload_text", "payload"]).unwrap_or_default();
+            if proto != Some(218) && !looks_like_status_text(&text) {
+                continue;
+            }
+
+            match latest {
+                Some(current) if !sds_row_is_newer(row, current) => {}
+                _ => latest = Some(row),
+            }
+        }
+
+        let row = latest?;
+        let raw_text = first_string(row, &["text", "message", "body", "payload_text", "payload"]).unwrap_or_default();
+        let text = extract_status_label_from_text(&raw_text).unwrap_or_else(|| raw_text.trim().to_string());
+        let code = u64_any_at(row, &["status"])
+            .or_else(|| u64_any_at(row, &["status_code"]))
+            .or_else(|| u64_any_at(row, &["status_id"]))
+            .or_else(|| u64_any_at(row, &["status_number"]))
+            .or_else(|| self.infer_status_code_from_text(&text));
+        Some((code, text))
+    }
+
+    fn infer_status_code_from_text(&self, text: &str) -> Option<u64> {
+        let normalized = normalize_status_text(text);
+        if normalized.is_empty() {
+            return None;
+        }
+
+        for (key, entry) in &self.settings.directory.statuses {
+            let candidates = [
+                entry.label.as_deref(),
+                entry.name.as_deref(),
+                entry.description.as_deref(),
+            ];
+            for candidate in candidates.into_iter().flatten() {
+                if normalize_status_text(candidate) == normalized {
+                    return parse_status_code(key);
+                }
+            }
+        }
+
+        let checks: &[(u64, &[&str])] = &[
+            (6, &["nicht bereit", "nicht einsatzbereit", "abgemeldet", "ausser dienst", "außer dienst"]),
+            (3, &["sprechwunsch", "sprech wunsch"]),
+            (7, &["transport"]),
+            (8, &["sonderstatus", "sonder status"]),
+            (5, &["am ziel", "eingetroffen", "ziel"]),
+            (4, &["einsatz", "alarm", "unterwegs"]),
+            (2, &["bereit"]),
+            (1, &["frei auf wache", "frei auf funk", "auf wache", "auf funk", "frei"]),
+        ];
+        for (code, patterns) in checks {
+            if patterns.iter().any(|pattern| normalized.contains(*pattern)) {
+                return Some(*code);
+            }
+        }
+        None
     }
 
     fn status_tableau_device(&self, issi: u64, live_row: Option<&Value>) -> StatusTableauDevice {
         let pseudo = json!({ "issi": issi, "directory_only": true });
         let row = live_row.unwrap_or(&pseudo);
 
-        let name = self.subscriber_display_name(row);
+        let name = self.best_device_name_for_issi_or_row(issi, live_row)
+            .unwrap_or_else(|| issi.to_string());
         let device_class = self.subscriber_type_label(row);
-        let status_code = self.status_code_for_issi_or_row(issi, live_row).unwrap_or(0);
-        let status_text = if status_code > 0 {
+        let sds_status = self.latest_sds_status_for_issi(issi);
+        let explicit_code = self.status_code_for_issi_or_row(issi, live_row);
+        let mut status_text = if let Some((_, text)) = sds_status.clone() {
+            if !text.trim().is_empty() {
+                text
+            } else if let Some(code) = explicit_code {
+                self.settings.directory
+                    .status(code)
+                    .and_then(|entry| first_config_text(&[entry.label.as_ref(), entry.name.as_ref()]))
+                    .unwrap_or_else(|| status_label_default(code).to_string())
+            } else {
+                self.subscriber_status_label(row)
+            }
+        } else if let Some(code) = explicit_code {
             self.settings.directory
-                .status(status_code)
+                .status(code)
                 .and_then(|entry| first_config_text(&[entry.label.as_ref(), entry.name.as_ref()]))
-                .unwrap_or_else(|| status_label_default(status_code).to_string())
+                .unwrap_or_else(|| status_label_default(code).to_string())
         } else {
             self.subscriber_status_label(row)
         };
+        if status_text.trim().is_empty() {
+            status_text = "Status unbekannt".to_string();
+        }
+
+        let status_code = explicit_code
+            .or_else(|| self.infer_status_code_from_text(&status_text))
+            .unwrap_or(0);
+
         let status_group = self.status_group_key_for_issi_or_row(issi, live_row)
             .map(|raw| self.status_group_display_name(&raw))
             .unwrap_or_else(|| "-".to_string());
@@ -1893,35 +2134,53 @@ impl ControlRoomApp {
         }
     }
 
-    fn render_status_card(&self, ui: &mut egui::Ui, card: &StatusTableauCard, width: f32) {
-        egui::Frame::none()
-            .fill(egui::Color32::from_rgb(166, 166, 158))
-            .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(64, 64, 64)))
-            .rounding(egui::Rounding::same(5.0))
-            .inner_margin(egui::Margin::same(5.0))
-            .show(ui, |ui| {
-                ui.set_width((width - 8.0).max(280.0));
 
-                egui::Frame::none()
-                    .fill(egui::Color32::from_rgb(54, 60, 64))
-                    .rounding(egui::Rounding::same(3.0))
-                    .inner_margin(egui::Margin::symmetric(6.0, 4.0))
-                    .show(ui, |ui| {
-                        ui.horizontal(|ui| {
-                            ui.colored_label(egui::Color32::WHITE, egui::RichText::new(&card.title).strong());
-                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                ui.small(egui::RichText::new(&card.subtitle).color(egui::Color32::LIGHT_GRAY));
+    fn render_status_card(&mut self, ui: &mut egui::Ui, card: &StatusTableauCard, rect: egui::Rect) {
+        let response = ui.allocate_rect(rect, egui::Sense::click_and_drag());
+        if response.dragged() {
+            let delta = ui.ctx().input(|input| input.pointer.delta());
+            if delta != egui::Vec2::ZERO {
+                *self.status_card_offsets.entry(card.id.clone()).or_insert(egui::Vec2::ZERO) += delta;
+            }
+        }
+
+        let frame_fill = if card.is_single_bucket {
+            egui::Color32::from_rgb(174, 174, 166)
+        } else {
+            egui::Color32::from_rgb(166, 166, 158)
+        };
+
+        ui.allocate_ui_at_rect(rect, |ui| {
+            egui::Frame::none()
+                .fill(frame_fill)
+                .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(64, 64, 64)))
+                .rounding(egui::Rounding::same(5.0))
+                .inner_margin(egui::Margin::same(5.0))
+                .show(ui, |ui| {
+                    ui.set_width((rect.width() - 8.0).max(280.0));
+
+                    egui::Frame::none()
+                        .fill(egui::Color32::from_rgb(54, 60, 64))
+                        .rounding(egui::Rounding::same(3.0))
+                        .inner_margin(egui::Margin::symmetric(6.0, 4.0))
+                        .show(ui, |ui| {
+                            ui.horizontal(|ui| {
+                                ui.colored_label(egui::Color32::WHITE, egui::RichText::new(&card.title).strong());
+                                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                    ui.small(egui::RichText::new(&card.subtitle).color(egui::Color32::LIGHT_GRAY));
+                                });
                             });
                         });
-                    });
 
-                ui.add_space(5.0);
-                for device in &card.devices {
-                    self.render_status_device_row(ui, device, width - 18.0, card.is_single_bucket);
-                    ui.add_space(3.0);
-                }
-            });
+                    ui.add_space(5.0);
+                    for device in &card.devices {
+                        self.render_status_device_row(ui, device, rect.width() - 18.0, card.is_single_bucket);
+                        ui.add_space(3.0);
+                    }
+                });
+        });
     }
+
 
     fn render_status_device_row(&self, ui: &mut egui::Ui, device: &StatusTableauDevice, width: f32, single_bucket: bool) {
         let row_height = 46.0;
@@ -1943,18 +2202,28 @@ impl ControlRoomApp {
         painter.rect_filled(status_rect, egui::Rounding::same(4.0), status_colour);
         painter.rect_stroke(rect, egui::Rounding::same(4.0), egui::Stroke::new(1.0, egui::Color32::from_rgb(55, 55, 55)));
 
+        let heading = if device.name.trim() == device.issi.to_string() {
+            device.issi.to_string()
+        } else {
+            device.name.clone()
+        };
         painter.text(
             name_rect.center_top() + egui::vec2(0.0, 6.0),
             egui::Align2::CENTER_TOP,
-            format!("{} {}", device.name, device.issi),
+            heading,
             egui::FontId::proportional(15.0),
             egui::Color32::BLACK,
         );
 
+        let detail_text = if single_bucket {
+            format!("ISSI {} · [{}] {}", device.issi, device.device_class, device.status_text)
+        } else {
+            format!("[{}] {}", device.device_class, device.status_text)
+        };
         painter.text(
             name_rect.center_bottom() - egui::vec2(0.0, 6.0),
             egui::Align2::CENTER_BOTTOM,
-            format!("[{}] {}", device.device_class, device.status_text),
+            detail_text,
             egui::FontId::proportional(11.0),
             egui::Color32::from_rgb(30, 30, 30),
         );
@@ -2684,14 +2953,66 @@ Klick = Gerätedetails",
 
     fn subscriber_display_name(&self, row: &Value) -> String {
         let issi = u64_at(row, &["issi"]).or_else(|| u64_at(row, &["individual_issi"])).unwrap_or(0);
-        self.directory_name_for_issi(issi)
-            .or_else(|| first_string(row, &["display_name", "label", "name", "alias", "radio_alias"]))
-            .unwrap_or_else(|| "-".to_string())
+        self.best_device_name_for_issi_or_row(issi, Some(row)).unwrap_or_else(|| "-".to_string())
     }
 
     fn directory_name_for_issi(&self, issi: u64) -> Option<String> {
+        if let Some(value) = self.directory_name_index.get(&issi) {
+            let value = value.trim();
+            if !value.is_empty() && value != "-" && value != issi.to_string() {
+                return Some(value.to_string());
+            }
+        }
+
         let entry = self.settings.directory.subscriber(issi)?;
         first_config_text(&[entry.display_name.as_ref(), entry.name.as_ref(), entry.label.as_ref(), entry.alias.as_ref()])
+            .or_else(|| first_extra_string(&entry.extra, &[
+                "rufname",
+                "callsign",
+                "call_sign",
+                "radio_alias",
+                "radioAlias",
+                "short_name",
+                "shortName",
+                "shortLabel",
+                "terminal_name",
+                "terminalName",
+                "bezeichnung",
+                "description",
+                "display",
+            ]))
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty() && value != "-" && value != &issi.to_string())
+    }
+
+
+    fn best_device_name_for_issi_or_row(&self, issi: u64, row: Option<&Value>) -> Option<String> {
+        let directory_name = self.directory_name_for_issi(issi)
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty() && value != "-" && value != &issi.to_string());
+
+        if directory_name.is_some() {
+            return directory_name;
+        }
+
+        row.and_then(|row| first_string(row, &[
+                "display_name",
+                "displayName",
+                "label",
+                "name",
+                "alias",
+                "radio_alias",
+                "radioAlias",
+                "short_name",
+                "shortName",
+                "shortLabel",
+                "callsign",
+                "call_sign",
+                "rufname",
+                "title",
+            ]))
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty() && value != "-" && value != &issi.to_string())
     }
 
     fn subscriber_type_label(&self, row: &Value) -> String {
@@ -2819,13 +3140,6 @@ Klick = Gerätedetails",
         }
     }
 
-    fn device_label_for_location(&self, row: &Value) -> String {
-        let issi = u64_at(row, &["issi"]).unwrap_or(0);
-        if let Some(subscriber) = self.subscriber_for_issi(issi) {
-            return self.subscriber_display_name(subscriber);
-        }
-        self.directory_name_for_issi(issi).unwrap_or_else(|| "-".to_string())
-    }
 
     fn render_commands(&self, ui: &mut egui::Ui) {
         ui.heading("Command-/Audit-Log");
@@ -3008,6 +3322,7 @@ Klick = Gerätedetails",
 
 #[derive(Debug, Clone)]
 struct StatusTableauCard {
+    id: String,
     title: String,
     subtitle: String,
     devices: Vec<StatusTableauDevice>,
@@ -3319,7 +3634,7 @@ fn collect_points(rows: &[&Value]) -> Vec<LocationPoint> {
                 return None;
             }
             Some(LocationPoint {
-                issi: u64_at(row, &["issi"]).unwrap_or(0),
+                issi: u64_any_at(row, &["issi"]).or_else(|| u64_any_at(row, &["individual_issi"])).or_else(|| u64_any_at(row, &["source_issi"])).or_else(|| u64_any_at(row, &["address"])).unwrap_or(0),
                 lat,
                 lon,
                 source: str_at(row, &["source"]).unwrap_or("-").to_string(),
@@ -3442,23 +3757,316 @@ fn compact_marker_label(label: &str) -> String {
     out
 }
 
-fn nearest_marker<'a>(pos: egui::Pos2, points: &'a [LocationPoint], map_rect: egui::Rect, viewport: &MapViewport, radius: f32) -> Option<&'a LocationPoint> {
-    let max_distance_sq = radius * radius;
-    points
-        .iter()
-        .filter_map(|point| {
-            let marker_pos = viewport.lat_lon_to_screen(point.lat, point.lon, map_rect);
-            let distance_sq = (marker_pos - pos).length_sq();
-            if distance_sq <= max_distance_sq {
-                Some((distance_sq, point))
-            } else {
-                None
-            }
-        })
-        .min_by(|left, right| left.0.partial_cmp(&right.0).unwrap_or(std::cmp::Ordering::Equal))
-        .map(|(_, point)| point)
+
+fn merge_subscriber_missing(entry: &mut DirectorySubscriberConfig, other: &DirectorySubscriberConfig) {
+    if entry.name.is_none() { entry.name = other.name.clone(); }
+    if entry.label.is_none() { entry.label = other.label.clone(); }
+    if entry.display_name.is_none() { entry.display_name = other.display_name.clone(); }
+    if entry.alias.is_none() { entry.alias = other.alias.clone(); }
+    if entry.device_class.is_none() { entry.device_class = other.device_class.clone(); }
+    if entry.class.is_none() { entry.class = other.class.clone(); }
+    if entry.kind.is_none() { entry.kind = other.kind.clone(); }
+    if entry.status.is_none() { entry.status = other.status.clone(); }
+    if entry.status_group.is_none() { entry.status_group = other.status_group.clone(); }
+    if entry.groups.is_empty() { entry.groups = other.groups.clone(); }
+    if entry.static_groups.is_empty() { entry.static_groups = other.static_groups.clone(); }
+    if entry.hidden.is_none() { entry.hidden = other.hidden; }
+    if entry.hide_in_subscribers.is_none() { entry.hide_in_subscribers = other.hide_in_subscribers; }
+    for (key, value) in &other.extra {
+        entry.extra.entry(key.clone()).or_insert_with(|| value.clone());
+    }
 }
 
+fn merge_label_missing(entry: &mut DirectoryLabelConfig, other: &DirectoryLabelConfig) {
+    if entry.name.is_none() { entry.name = other.name.clone(); }
+    if entry.label.is_none() { entry.label = other.label.clone(); }
+    if entry.kind.is_none() { entry.kind = other.kind.clone(); }
+    if entry.description.is_none() { entry.description = other.description.clone(); }
+}
+
+fn merge_status_missing(entry: &mut DirectoryStatusConfig, other: &DirectoryStatusConfig) {
+    if entry.name.is_none() { entry.name = other.name.clone(); }
+    if entry.label.is_none() { entry.label = other.label.clone(); }
+    if entry.group.is_none() { entry.group = other.group.clone(); }
+    if entry.description.is_none() { entry.description = other.description.clone(); }
+}
+
+fn directory_entry_has_name(entry: &DirectorySubscriberConfig) -> bool {
+    directory_name_from_entry(entry).is_some()
+}
+
+fn directory_name_from_entry(entry: &DirectorySubscriberConfig) -> Option<String> {
+    first_config_text(&[entry.display_name.as_ref(), entry.name.as_ref(), entry.label.as_ref(), entry.alias.as_ref()])
+        .or_else(|| first_extra_string(&entry.extra, &[
+            "rufname", "Rufname", "callsign", "callSign", "call_sign", "radio_alias",
+            "radioAlias", "short_name", "shortName", "shortLabel", "terminal_name",
+            "terminalName", "description", "bezeichnung", "Bezeichnung", "title",
+        ]))
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty() && value != "-")
+}
+
+fn raw_directory_name_for_id(value: &Value, id: u64) -> Option<String> {
+    match value {
+        Value::Object(object) => {
+            for (key, child) in object {
+                if text_matches_directory_id(key, id) {
+                    if let Some(name) = raw_directory_name_from_value(child, id) {
+                        return Some(name);
+                    }
+                }
+            }
+            if object_matches_directory_id(object, id) {
+                if let Some(name) = raw_directory_name_from_object(object, id) {
+                    return Some(name);
+                }
+            }
+            for child in object.values() {
+                if let Some(name) = raw_directory_name_for_id(child, id) {
+                    return Some(name);
+                }
+            }
+            None
+        }
+        Value::Array(items) => {
+            for item in items {
+                if let Some(name) = raw_directory_name_for_id(item, id) {
+                    return Some(name);
+                }
+            }
+            None
+        }
+        _ => None,
+    }
+}
+
+fn raw_directory_name_from_value(value: &Value, id: u64) -> Option<String> {
+    match value {
+        Value::Object(object) => raw_directory_name_from_object(object, id),
+        Value::String(text) => clean_directory_name_candidate(text, id),
+        _ => None,
+    }
+}
+
+fn raw_directory_name_from_object(object: &serde_json::Map<String, Value>, id: u64) -> Option<String> {
+    let direct_keys = [
+        "display_name", "displayName", "name", "label", "alias", "rufname", "Rufname",
+        "callsign", "callSign", "call_sign", "radio_alias", "radioAlias", "short_name",
+        "shortName", "shortLabel", "terminal_name", "terminalName", "bezeichnung", "Bezeichnung",
+        "description", "title",
+    ];
+    for key in direct_keys {
+        if let Some(value) = object.get(key) {
+            if let Some(text) = value.as_str().and_then(|text| clean_directory_name_candidate(text, id)) {
+                return Some(text);
+            }
+            if let Some(number) = value.as_u64() {
+                let text = number.to_string();
+                if !text_matches_directory_id(&text, id) {
+                    return Some(text);
+                }
+            }
+        }
+    }
+    for nested_key in ["subscriber", "terminal", "radio", "device", "meta", "profile"] {
+        if let Some(Value::Object(nested)) = object.get(nested_key) {
+            if let Some(name) = raw_directory_name_from_object(nested, id) {
+                return Some(name);
+            }
+        }
+    }
+    None
+}
+
+fn object_matches_directory_id(object: &serde_json::Map<String, Value>, id: u64) -> bool {
+    let id_keys = [
+        "issi", "individual_issi", "source_issi", "subscriber_issi", "address", "id",
+        "terminal_id", "terminalId", "radio_id", "radioId", "number", "issi_number",
+    ];
+    id_keys.iter().any(|key| object.get(*key).and_then(value_as_directory_id) == Some(id))
+}
+
+fn value_as_directory_id(value: &Value) -> Option<u64> {
+    if let Some(number) = value.as_u64() { return Some(number); }
+    if let Some(number) = value.as_i64() { return u64::try_from(number).ok(); }
+    value.as_str().and_then(parse_directory_id_text)
+}
+
+fn parse_directory_id_text(text: &str) -> Option<u64> {
+    let trimmed = text.trim();
+    if trimmed.is_empty() { return None; }
+    trimmed.parse::<u64>().ok().or_else(|| trimmed.trim_start_matches('0').parse::<u64>().ok())
+}
+
+fn text_matches_directory_id(text: &str, id: u64) -> bool {
+    parse_directory_id_text(text) == Some(id) || id_key_variants(id).iter().any(|key| key == text.trim())
+}
+
+fn clean_directory_name_candidate(text: &str, id: u64) -> Option<String> {
+    let candidate = text.trim();
+    if candidate.is_empty() || candidate == "-" { return None; }
+    if id > 0 && text_matches_directory_id(candidate, id) { return None; }
+    Some(candidate.to_string())
+}
+
+fn build_directory_name_index(value: &Value) -> HashMap<u64, String> {
+    let mut index = HashMap::new();
+    collect_directory_names(value, &mut index);
+    index.retain(|issi, name| {
+        let trimmed = name.trim();
+        !trimmed.is_empty() && trimmed != "-" && trimmed != issi.to_string()
+    });
+    index
+}
+
+fn collect_directory_names(value: &Value, index: &mut HashMap<u64, String>) {
+    match value {
+        Value::Array(items) => {
+            for item in items {
+                collect_directory_names(item, index);
+            }
+        }
+        Value::Object(map) => {
+            if let Some(issi) = directory_object_issi(map) {
+                if let Some(name) = directory_object_name(map, issi) {
+                    index.entry(issi).or_insert(name);
+                }
+            }
+
+            for (key, child) in map {
+                if let Ok(issi) = key.trim().parse::<u64>() {
+                    if let Some(child_map) = child.as_object() {
+                        if let Some(name) = directory_object_name(child_map, issi) {
+                            index.entry(issi).or_insert(name);
+                        }
+                    } else if let Some(text) = child.as_str().map(str::trim).filter(|text| !text.is_empty()) {
+                        if text != issi.to_string() {
+                            index.entry(issi).or_insert(text.to_string());
+                        }
+                    }
+                }
+                collect_directory_names(child, index);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn directory_object_issi(map: &serde_json::Map<String, Value>) -> Option<u64> {
+    for key in [
+        "issi",
+        "individual_issi",
+        "source_issi",
+        "address",
+        "id",
+        "subscriber_id",
+        "subscriberId",
+        "terminal_id",
+        "terminalId",
+        "radio_id",
+        "radioId",
+    ] {
+        let Some(value) = map.get(key) else { continue; };
+        if let Some(number) = value.as_u64() {
+            return Some(number);
+        }
+        if let Some(number) = value.as_i64().and_then(|value| u64::try_from(value).ok()) {
+            return Some(number);
+        }
+        if let Some(text) = value.as_str().map(str::trim) {
+            if let Ok(number) = text.parse::<u64>() {
+                return Some(number);
+            }
+        }
+    }
+    None
+}
+
+fn directory_object_name(map: &serde_json::Map<String, Value>, issi: u64) -> Option<String> {
+    for key in [
+        "name",
+        "display_name",
+        "displayName",
+        "label",
+        "alias",
+        "rufname",
+        "callsign",
+        "call_sign",
+        "radio_alias",
+        "radioAlias",
+        "short_name",
+        "shortName",
+        "shortLabel",
+        "terminal_name",
+        "terminalName",
+        "bezeichnung",
+        "description",
+        "title",
+    ] {
+        let Some(value) = map.get(key) else { continue; };
+        let text = match value {
+            Value::String(text) => text.trim().to_string(),
+            Value::Number(number) => number.to_string(),
+            _ => continue,
+        };
+        if !text.is_empty() && text != "-" && text != issi.to_string() {
+            return Some(text);
+        }
+    }
+    None
+}
+
+fn estimate_status_card_height(card: &StatusTableauCard) -> f32 {
+    let row_count = card.devices.len().max(1) as f32;
+    42.0 + row_count * 49.0 + 12.0
+}
+
+fn normalize_directory_value(mut value: Value) -> Value {
+    if let Some(inner) = value.get("directory").cloned() {
+        value = inner;
+    }
+
+    let Some(object) = value.as_object_mut() else {
+        return value;
+    };
+
+    normalize_directory_collection(object, "subscribers", &["issi", "individual_issi", "source_issi", "id", "address"]);
+    normalize_directory_collection(object, "groups", &["gssi", "group", "id", "address"]);
+    normalize_directory_collection(object, "status_groups", &["id", "key", "name", "label"]);
+    normalize_directory_collection(object, "statuses", &["code", "status", "id", "number"]);
+
+    value
+}
+
+fn normalize_directory_collection(object: &mut serde_json::Map<String, Value>, field: &str, key_fields: &[&str]) {
+    let Some(value) = object.get_mut(field) else {
+        return;
+    };
+    let Some(items) = value.as_array() else {
+        return;
+    };
+
+    let mut map = serde_json::Map::new();
+    for item in items {
+        let Some(key) = directory_item_key(item, key_fields) else {
+            continue;
+        };
+        map.insert(key, item.clone());
+    }
+    *value = Value::Object(map);
+}
+
+fn directory_item_key(item: &Value, key_fields: &[&str]) -> Option<String> {
+    for key in key_fields {
+        if let Some(text) = str_at(item, &[*key]).map(str::trim).filter(|text| !text.is_empty()) {
+            return Some(text.to_string());
+        }
+        if let Some(number) = u64_any_at(item, &[*key]) {
+            return Some(number.to_string());
+        }
+    }
+    None
+}
 
 fn id_key_variants(id: u64) -> Vec<String> {
     let mut keys = vec![id.to_string(), format!("{id:07}"), format!("{id:08}")];
@@ -3476,12 +4084,25 @@ fn first_config_text(values: &[Option<&String>]) -> Option<String> {
         .map(|value| value.to_string())
 }
 
+fn first_extra_string(values: &HashMap<String, Value>, keys: &[&str]) -> Option<String> {
+    for key in keys {
+        let Some(value) = values.get(*key) else { continue; };
+        if let Some(text) = value.as_str().map(str::trim).filter(|text| !text.is_empty()) {
+            return Some(text.to_string());
+        }
+        if let Some(number) = value.as_u64() {
+            return Some(number.to_string());
+        }
+    }
+    None
+}
+
 fn first_string(value: &Value, keys: &[&str]) -> Option<String> {
     for key in keys {
         if let Some(text) = str_at(value, &[*key]).map(str::trim).filter(|text| !text.is_empty()) {
             return Some(text.to_string());
         }
-        if let Some(number) = u64_at(value, &[*key]) {
+        if let Some(number) = u64_any_at(value, &[*key]) {
             return Some(number.to_string());
         }
     }
@@ -3563,6 +4184,88 @@ fn group_ids_from_path(value: &Value, path: &[&str]) -> Vec<u64> {
     ids
 }
 
+fn sds_source_issi(row: &Value) -> Option<u64> {
+    u64_any_at(row, &["source_issi"])
+        .or_else(|| u64_any_at(row, &["source"]))
+        .or_else(|| u64_any_at(row, &["src_issi"]))
+        .or_else(|| u64_any_at(row, &["src"]))
+        .or_else(|| u64_any_at(row, &["from_issi"]))
+        .or_else(|| u64_any_at(row, &["from"]))
+        .or_else(|| u64_any_at(row, &["sender_issi"]))
+        .or_else(|| u64_any_at(row, &["sender"]))
+        .or_else(|| u64_any_at(row, &["issi"]))
+}
+
+fn sds_protocol(row: &Value) -> Option<u64> {
+    u64_any_at(row, &["protocol_id"])
+        .or_else(|| u64_any_at(row, &["proto"]))
+        .or_else(|| u64_any_at(row, &["protocol"]))
+        .or_else(|| u64_any_at(row, &["pid"]))
+}
+
+fn sds_row_is_newer(candidate: &Value, current: &Value) -> bool {
+    let candidate_time = sds_timestamp(candidate);
+    let current_time = sds_timestamp(current);
+    if candidate_time != current_time {
+        return candidate_time > current_time;
+    }
+    true
+}
+
+fn sds_timestamp(row: &Value) -> &str {
+    str_at(row, &["timestamp"])
+        .or_else(|| str_at(row, &["time"]))
+        .or_else(|| str_at(row, &["updated_at"]))
+        .or_else(|| str_at(row, &["created_at"]))
+        .unwrap_or("")
+}
+
+fn looks_like_status_text(text: &str) -> bool {
+    let normalized = normalize_status_text(text);
+    normalized.starts_with("status")
+        || normalized.contains("frei")
+        || normalized.contains("bereit")
+        || normalized.contains("einsatz")
+        || normalized.contains("transport")
+        || normalized.contains("sonderstatus")
+}
+
+fn extract_status_label_from_text(text: &str) -> Option<String> {
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    let mut value = trimmed;
+    if let Some(rest) = trimmed.strip_prefix("Status:") {
+        value = rest.trim();
+    } else if let Some(rest) = trimmed.strip_prefix("status:") {
+        value = rest.trim();
+    }
+
+    for separator in ["—", "–", " - ", " -- ", " => "] {
+        if let Some((first, _)) = value.split_once(separator) {
+            let candidate = first.trim();
+            if !candidate.is_empty() {
+                return Some(candidate.to_string());
+            }
+        }
+    }
+
+    Some(value.to_string())
+}
+
+fn normalize_status_text(text: &str) -> String {
+    text.to_ascii_lowercase()
+        .replace('—', " ")
+        .replace('–', " ")
+        .replace(':', " ")
+        .replace('_', " ")
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
 enum UserAction {
     SetEnabled(String, bool),
     Delete(String),
@@ -3578,18 +4281,7 @@ fn metric(ui: &mut egui::Ui, label: &str, value: String) {
     });
 }
 
-fn small_toolbar_button(ui: &mut egui::Ui, label: &str, hint: &str) {
-    let response = ui.add_sized([92.0, 28.0], egui::Button::new(egui::RichText::new(label).size(13.0)));
-    response.on_hover_text(hint);
-}
 
-fn ribbon_button(ui: &mut egui::Ui, label: &str, hint: &str, width: f32, height: f32) {
-    ui.vertical_centered(|ui| {
-        let text = egui::RichText::new(label).strong().size(13.0);
-        ui.add_sized([width, height], egui::Button::new(text));
-        ui.small(hint);
-    });
-}
 
 fn status_pill(ui: &mut egui::Ui, label: &str, value: &str, ok: bool) {
     let color = if ok { egui::Color32::from_rgb(0, 130, 70) } else { egui::Color32::from_rgb(185, 40, 40) };
@@ -3732,6 +4424,20 @@ fn str_at<'a>(value: &'a Value, path: &[&str]) -> Option<&'a str> {
 
 fn u64_at(value: &Value, path: &[&str]) -> Option<u64> {
     get_at(value, path)?.as_u64()
+}
+
+fn u64_any_at(value: &Value, path: &[&str]) -> Option<u64> {
+    let value = get_at(value, path)?;
+    if let Some(number) = value.as_u64() {
+        return Some(number);
+    }
+    if let Some(number) = value.as_i64() {
+        return u64::try_from(number).ok();
+    }
+    if let Some(text) = value.as_str() {
+        return text.trim().parse::<u64>().ok();
+    }
+    None
 }
 
 fn f64_at(value: &Value, path: &[&str]) -> Option<f64> {

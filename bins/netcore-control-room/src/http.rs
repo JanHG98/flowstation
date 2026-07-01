@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::net::TcpStream;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use serde::Deserialize;
@@ -15,6 +16,8 @@ use crate::auth::{
 use crate::state::{SharedControlRoom, now_iso};
 
 const MAX_HTTP_REQUEST_BYTES: usize = 1024 * 1024;
+
+pub type SharedDirectory = Arc<Mutex<Value>>;
 
 #[derive(Debug)]
 pub struct HttpRequest {
@@ -64,7 +67,7 @@ impl HttpResponse {
     }
 }
 
-pub fn handle_http_stream(mut stream: TcpStream, state: SharedControlRoom, node_path: &str, ui_path: &str, auth: AuthState, directory: Value) {
+pub fn handle_http_stream(mut stream: TcpStream, state: SharedControlRoom, node_path: &str, ui_path: &str, auth: AuthState, directory: SharedDirectory) {
     let _ = stream.set_read_timeout(Some(Duration::from_secs(5)));
     let request = match read_http_request(&mut stream) {
         Ok(req) => req,
@@ -79,7 +82,7 @@ pub fn handle_http_stream(mut stream: TcpStream, state: SharedControlRoom, node_
     let _ = write_response(&mut stream, &response);
 }
 
-fn route_http(request: HttpRequest, state: SharedControlRoom, node_path: &str, ui_path: &str, auth: &AuthState, directory: &Value) -> HttpResponse {
+fn route_http(request: HttpRequest, state: SharedControlRoom, node_path: &str, ui_path: &str, auth: &AuthState, directory: &SharedDirectory) -> HttpResponse {
     if request.method == "OPTIONS" {
         return HttpResponse::text(204, "");
     }
@@ -112,7 +115,9 @@ fn route_http(request: HttpRequest, state: SharedControlRoom, node_path: &str, u
             "auth_mode": "user_password"
         })),
         ("GET", "/api/overview") => HttpResponse::json(200, &state.overview()),
-        ("GET", "/api/directory") => HttpResponse::json(200, directory),
+        ("GET", "/api/directory") => HttpResponse::json(200, &directory_snapshot(directory)),
+        ("GET", "/api/directory/resolved") => HttpResponse::json(200, &directory_resolved_response(directory)),
+        ("POST", "/api/directory/import") | ("POST", "/api/directory/merge") => api_directory_import(&request.body, directory),
         ("GET", "/api/state") => HttpResponse::json(200, &state.snapshot()),
         ("GET", "/api/rf") => HttpResponse::json(200, &state.rf_snapshot()),
         ("GET", "/api/health/full") => HttpResponse::json(200, &state.health_snapshot()),
@@ -208,7 +213,7 @@ fn route_http(request: HttpRequest, state: SharedControlRoom, node_path: &str, u
 }
 
 fn required_role_for_request(request: &HttpRequest) -> AuthRole {
-    if request.path.starts_with("/api/admin/users") {
+    if request.path.starts_with("/api/admin/users") || request.path == "/api/directory/import" || request.path == "/api/directory/merge" {
         return AuthRole::Admin;
     }
     if request.method == "POST" {
@@ -223,6 +228,228 @@ fn required_role_for_request(request: &HttpRequest) -> AuthRole {
         }
     }
     AuthRole::Viewer
+}
+
+
+fn directory_snapshot(directory: &SharedDirectory) -> Value {
+    directory
+        .lock()
+        .map(|value| value.clone())
+        .unwrap_or_else(|_| json!({ "error": "directory lock poisoned" }))
+}
+
+fn api_directory_import(body: &[u8], directory: &SharedDirectory) -> HttpResponse {
+    let incoming: Value = match serde_json::from_slice(body) {
+        Ok(value) => value,
+        Err(error) => return HttpResponse::json(400, &json!({ "error": format!("invalid json: {error}") })),
+    };
+
+    let mut guard = match directory.lock() {
+        Ok(guard) => guard,
+        Err(_) => return HttpResponse::json(500, &json!({ "error": "directory lock poisoned" })),
+    };
+
+    merge_directory_value(&mut guard, incoming);
+    let resolved = directory_resolved_from_value(&guard);
+    HttpResponse::json(200, &json!({
+        "ok": true,
+        "message": "directory imported",
+        "resolved_subscriber_count": resolved.len(),
+        "directory": guard.clone(),
+        "resolved": {
+            "subscribers": resolved,
+        },
+        "timestamp": now_iso(),
+    }))
+}
+
+fn directory_resolved_response(directory: &SharedDirectory) -> Value {
+    let guard = match directory.lock() {
+        Ok(guard) => guard,
+        Err(_) => return json!({ "error": "directory lock poisoned" }),
+    };
+    let subscribers = directory_resolved_from_value(&guard);
+    json!({
+        "directory": guard.clone(),
+        "resolved": {
+            "subscribers": subscribers,
+        },
+        "resolved_subscriber_count": subscribers.as_object().map(|object| object.len()).unwrap_or(0),
+        "timestamp": now_iso(),
+    })
+}
+
+fn merge_directory_value(target: &mut Value, incoming: Value) {
+    let incoming = canonical_directory_value(incoming);
+    if !target.is_object() {
+        *target = json!({});
+    }
+    merge_json_objects(target, &incoming);
+    if target.get("hide_infrastructure").is_none() {
+        target["hide_infrastructure"] = json!(true);
+    }
+}
+
+fn canonical_directory_value(value: Value) -> Value {
+    if let Some(directory) = value.get("directory").cloned() {
+        return canonical_directory_value(directory);
+    }
+
+    let mut value = value;
+    if let Some(object) = value.as_object_mut() {
+        canonicalize_directory_collection(object, "subscribers", &["issi", "individual_issi", "source_issi", "address", "id", "subscriber_id", "terminal_id", "radio_id"]);
+        canonicalize_directory_collection(object, "groups", &["gssi", "group", "id", "address"]);
+        canonicalize_directory_collection(object, "status_groups", &["id", "key", "name", "label"]);
+        canonicalize_directory_collection(object, "statuses", &["code", "status", "id", "number"]);
+    }
+    value
+}
+
+fn canonicalize_directory_collection(object: &mut serde_json::Map<String, Value>, field: &str, key_fields: &[&str]) {
+    let Some(value) = object.get_mut(field) else { return; };
+    let Some(array) = value.as_array() else { return; };
+
+    let mut map = serde_json::Map::new();
+    for item in array {
+        if let Some(key) = directory_item_key(item, key_fields) {
+            map.insert(key, item.clone());
+        }
+    }
+    *value = Value::Object(map);
+}
+
+fn directory_item_key(item: &Value, key_fields: &[&str]) -> Option<String> {
+    for key in key_fields {
+        if let Some(value) = item.get(*key) {
+            if let Some(text) = value.as_str().map(str::trim).filter(|text| !text.is_empty()) {
+                return Some(text.to_string());
+            }
+            if let Some(number) = value.as_u64() {
+                return Some(number.to_string());
+            }
+            if let Some(number) = value.as_i64().and_then(|number| u64::try_from(number).ok()) {
+                return Some(number.to_string());
+            }
+        }
+    }
+    None
+}
+
+fn merge_json_objects(target: &mut Value, incoming: &Value) {
+    match (target, incoming) {
+        (Value::Object(target), Value::Object(incoming)) => {
+            for (key, incoming_value) in incoming {
+                match target.get_mut(key) {
+                    Some(target_value) => merge_json_objects(target_value, incoming_value),
+                    None => {
+                        target.insert(key.clone(), incoming_value.clone());
+                    }
+                }
+            }
+        }
+        (target, incoming) => *target = incoming.clone(),
+    }
+}
+
+fn directory_resolved_from_value(directory: &Value) -> Value {
+    let mut resolved: serde_json::Map<String, Value> = serde_json::Map::new();
+    collect_resolved_subscribers(directory, &mut resolved);
+    Value::Object(resolved)
+}
+
+fn collect_resolved_subscribers(value: &Value, resolved: &mut serde_json::Map<String, Value>) {
+    match value {
+        Value::Array(items) => {
+            for item in items {
+                collect_resolved_subscribers(item, resolved);
+            }
+        }
+        Value::Object(object) => {
+            if let Some(issi) = directory_object_issi(object) {
+                if let Some(name) = directory_object_name(object, issi) {
+                    resolved.entry(issi.to_string()).or_insert_with(|| json!({
+                        "issi": issi,
+                        "name": name,
+                        "source": "directory",
+                    }));
+                }
+            }
+
+            for (key, child) in object {
+                if let Ok(issi) = key.trim().parse::<u64>() {
+                    if let Some(child_object) = child.as_object() {
+                        if let Some(name) = directory_object_name(child_object, issi) {
+                            let mut entry = json!({
+                                "issi": issi,
+                                "name": name,
+                                "source": "directory_map",
+                            });
+                            if let Some(device_class) = directory_object_text(child_object, &["device_class", "class", "kind", "type"]) {
+                                entry["device_class"] = json!(device_class);
+                            }
+                            if let Some(status_group) = directory_object_text(child_object, &["status_group", "statusGroup", "statusgroup"]) {
+                                entry["status_group"] = json!(status_group);
+                            }
+                            resolved.entry(issi.to_string()).or_insert(entry);
+                        }
+                    } else if let Some(text) = child.as_str().map(str::trim).filter(|text| !text.is_empty()) {
+                        if text != issi.to_string() {
+                            resolved.entry(issi.to_string()).or_insert_with(|| json!({
+                                "issi": issi,
+                                "name": text,
+                                "source": "directory_map_string",
+                            }));
+                        }
+                    }
+                }
+                collect_resolved_subscribers(child, resolved);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn directory_object_issi(object: &serde_json::Map<String, Value>) -> Option<u64> {
+    for key in ["issi", "individual_issi", "source_issi", "address", "id", "subscriber_id", "subscriberId", "terminal_id", "terminalId", "radio_id", "radioId"] {
+        let Some(value) = object.get(key) else { continue; };
+        if let Some(number) = value.as_u64() {
+            return Some(number);
+        }
+        if let Some(number) = value.as_i64().and_then(|number| u64::try_from(number).ok()) {
+            return Some(number);
+        }
+        if let Some(text) = value.as_str().map(str::trim) {
+            if let Ok(number) = text.parse::<u64>() {
+                return Some(number);
+            }
+        }
+    }
+    None
+}
+
+fn directory_object_name(object: &serde_json::Map<String, Value>, issi: u64) -> Option<String> {
+    directory_object_text(object, &["name", "display_name", "displayName", "label", "alias", "rufname", "callsign", "call_sign", "radio_alias", "radioAlias", "short_name", "shortName", "shortLabel", "terminal_name", "terminalName", "bezeichnung", "description", "title"])
+        .filter(|text| {
+            let trimmed = text.trim();
+            !trimmed.is_empty() && trimmed != "-" && trimmed != issi.to_string()
+        })
+}
+
+fn directory_object_text(object: &serde_json::Map<String, Value>, keys: &[&str]) -> Option<String> {
+    for key in keys {
+        let Some(value) = object.get(*key) else { continue; };
+        match value {
+            Value::String(text) => {
+                let trimmed = text.trim();
+                if !trimmed.is_empty() {
+                    return Some(trimmed.to_string());
+                }
+            }
+            Value::Number(number) => return Some(number.to_string()),
+            _ => {}
+        }
+    }
+    None
 }
 
 fn api_login(body: &[u8], auth: &AuthState) -> HttpResponse {

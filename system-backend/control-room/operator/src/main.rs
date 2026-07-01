@@ -47,7 +47,8 @@ enum Command {
     Locations,
     Sds { #[arg(long, default_value_t = 20)] limit: usize },
     Commands { #[arg(long, default_value_t = 20)] limit: usize },
-    Directory,
+    Directory { #[arg(long)] resolved: bool },
+    DirectoryImport { #[arg(long)] file: PathBuf },
     Me,
     Kick { #[arg(long)] node: Option<String>, #[arg(long)] issi: u32, #[arg(long)] operator: Option<String> },
     Dgna { #[arg(long)] node: Option<String>, #[arg(long)] issi: u32, #[arg(long)] gssi: u32, #[arg(long)] detach: bool, #[arg(long)] operator: Option<String> },
@@ -137,7 +138,12 @@ fn main() -> AppResult<()> {
         Command::Locations => print_json(api.get_json("/api/locations")?),
         Command::Sds { limit } => print_json(api.get_json(&format!("/api/sds?limit={limit}"))?),
         Command::Commands { limit } => print_json(api.get_json(&format!("/api/commands?limit={limit}"))?),
-        Command::Directory => print_json(api.get_json("/api/directory")?),
+        Command::Directory { resolved } => print_json(api.get_json(if resolved { "/api/directory/resolved" } else { "/api/directory" })?),
+        Command::DirectoryImport { file } => {
+            let raw = fs::read_to_string(&file)?;
+            let value: Value = serde_json::from_str(&raw)?;
+            print_json(api.post_json("/api/directory/import", &value)?)
+        },
         Command::Me => print_json(api.get_json("/api/me")?),
         Command::Kick { node, issi, operator } => { let node = node.unwrap_or_else(|| settings.default_node.clone()); let operator = operator.unwrap_or_else(|| settings.operator_id.clone()); print_json(api.post_json(&format!("/api/nodes/{node}/commands/kick"), &json!({"operator_id": operator, "issi": issi}))?) }
         Command::Dgna { node, issi, gssi, detach, operator } => { let node = node.unwrap_or_else(|| settings.default_node.clone()); let operator = operator.unwrap_or_else(|| settings.operator_id.clone()); print_json(api.post_json(&format!("/api/nodes/{node}/commands/dgna"), &json!({"operator_id": operator, "issi": issi, "gssi": gssi, "attach": !detach}))?) }

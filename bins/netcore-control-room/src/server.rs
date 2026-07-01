@@ -6,7 +6,7 @@ use std::time::Duration;
 use serde_json::Value;
 
 use crate::auth::AuthState;
-use crate::http::{handle_http_stream, looks_like_websocket_upgrade};
+use crate::http::{handle_http_stream, looks_like_websocket_upgrade, SharedDirectory};
 use crate::state::SharedControlRoom;
 use crate::ws::handle_websocket_stream;
 
@@ -16,7 +16,7 @@ pub struct ControlRoomServer {
     ui_path: String,
     state: SharedControlRoom,
     auth: AuthState,
-    directory: Value,
+    directory: SharedDirectory,
 }
 
 impl ControlRoomServer {
@@ -27,7 +27,7 @@ impl ControlRoomServer {
             ui_path: normalize_path(ui_path),
             state,
             auth,
-            directory,
+            directory: std::sync::Arc::new(std::sync::Mutex::new(directory)),
         }
     }
 
