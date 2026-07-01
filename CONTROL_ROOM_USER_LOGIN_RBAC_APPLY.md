@@ -1,4 +1,4 @@
-# NetCore Control Room v5.0 – User/Passwort Login + RBAC
+# NetCore Control Room v5.1.1 – User/Passwort Login + RBAC
 
 Dieser Stand ersetzt Operator-/Admin-Tokens durch klassischen Login:
 

@@ -1,6 +1,6 @@
 # NetCore Control Room Operator CLI
 
-Ab v5.0 nutzt die CLI klassischen User/Passwort-Login per HTTP Basic Auth.
+Ab v5.1 nutzt die CLI klassischen User/Passwort-Login per HTTP Basic Auth.
 
 Beispiel:
 

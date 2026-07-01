@@ -121,8 +121,8 @@ impl ApiClient {
 }
 
 fn main() -> AppResult<()> {
-    let cli = Cli::parse();
-    let command = cli.command.unwrap_or(Command::Dashboard { refresh: 2 });
+    let mut cli = Cli::parse();
+    let command = cli.command.take().unwrap_or(Command::Dashboard { refresh: 2 });
     if let Command::Profiles { command: ProfileCommand::Init { profile, system, path, api, username, default_node, operator_id, force } } = &command { return write_profile_config(&cli, profile, *system, path.as_ref(), api.as_deref(), username.as_deref(), default_node.as_deref(), operator_id.as_deref(), *force); }
     let (config_path, config) = load_operator_config(cli.config.as_deref())?;
     let settings = resolve_settings(&cli, config_path, &config)?;
