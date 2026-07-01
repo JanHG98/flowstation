@@ -1,32 +1,50 @@
+mod config;
 mod http;
+mod persistence;
 mod server;
 mod state;
 mod ws;
 
 use std::net::SocketAddr;
+use std::path::PathBuf;
 
 use clap::Parser;
 use tracing_subscriber::EnvFilter;
+
+use crate::config::ControlRoomConfig;
+use crate::persistence::PersistenceHandle;
 
 #[derive(Debug, Clone, Parser)]
 #[command(name = "netcore-control-room")]
 #[command(about = "NetCore-Tetra Control-Room Core server for FlowStation nodes")]
 struct Args {
-    /// Address to bind. Keep 127.0.0.1 for local testing; use 0.0.0.0 behind a reverse proxy/VPN only.
-    #[arg(long, default_value = "127.0.0.1:9010")]
-    bind: SocketAddr,
+    /// Optional TOML config file. CLI flags override values from this file.
+    #[arg(long)]
+    config: Option<PathBuf>,
+
+    /// Address to bind. Keep 127.0.0.1 for local testing; use 0.0.0.0 in the LXC/VPN/VLAN.
+    #[arg(long)]
+    bind: Option<SocketAddr>,
 
     /// WebSocket path used by base-station nodes.
-    #[arg(long, default_value = "/node")]
-    node_path: String,
+    #[arg(long)]
+    node_path: Option<String>,
 
-    /// WebSocket path used by future Leitstelle/UI clients.
-    #[arg(long, default_value = "/ui")]
-    ui_path: String,
+    /// WebSocket path used by future Leitstelle/operator clients.
+    #[arg(long)]
+    ui_path: Option<String>,
 
     /// Number of recent event/audit entries retained in memory.
-    #[arg(long, default_value_t = 500)]
-    history_limit: usize,
+    #[arg(long)]
+    history_limit: Option<usize>,
+
+    /// Enable SQLite persistence at this database path, regardless of config file.
+    #[arg(long)]
+    database: Option<PathBuf>,
+
+    /// Force-disable SQLite persistence, regardless of config file.
+    #[arg(long)]
+    no_persistence: bool,
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -38,8 +56,27 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .compact()
         .init();
 
-    let state = state::SharedControlRoom::new(args.history_limit);
-    let server = server::ControlRoomServer::new(args.bind, args.node_path, args.ui_path, state);
+    let mut config = ControlRoomConfig::load(args.config.as_deref())?;
+    config.apply_cli_overrides(
+        args.bind,
+        args.node_path,
+        args.ui_path,
+        args.history_limit,
+        args.database,
+        args.no_persistence,
+    );
+
+    let persistence = if config.persistence.enabled {
+        let handle = PersistenceHandle::open(&config.persistence)?;
+        tracing::info!(database = %config.persistence.database_path.display(), "SQLite persistence enabled");
+        Some(handle)
+    } else {
+        tracing::info!("SQLite persistence disabled");
+        None
+    };
+
+    let state = state::SharedControlRoom::new_with_persistence(config.server.history_limit, persistence);
+    let server = server::ControlRoomServer::new(config.server.bind, config.server.node_path, config.server.ui_path, state);
     server.run()?;
     Ok(())
 }

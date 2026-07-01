@@ -12,6 +12,8 @@ use tetra_entities::net_control_room::{
 use tetra_entities::net_telemetry::TelemetryEvent;
 use uuid::Uuid;
 
+use crate::persistence::{PersistenceBootstrap, PersistenceHandle};
+
 pub type NodeCommandSender = mpsc::Sender<ControlRoomToNodeMessage>;
 pub type UiSender = mpsc::Sender<UiMessage>;
 
@@ -24,8 +26,12 @@ pub struct SharedControlRoom {
 
 impl SharedControlRoom {
     pub fn new(history_limit: usize) -> Self {
+        Self::new_with_persistence(history_limit, None)
+    }
+
+    pub fn new_with_persistence(history_limit: usize, persistence: Option<PersistenceHandle>) -> Self {
         Self {
-            inner: Arc::new(Mutex::new(ControlRoomState::new(history_limit))),
+            inner: Arc::new(Mutex::new(ControlRoomState::new(history_limit, persistence))),
             node_senders: Arc::new(Mutex::new(HashMap::new())),
             ui_senders: Arc::new(Mutex::new(HashMap::new())),
         }
@@ -1183,16 +1189,74 @@ struct ControlRoomState {
     nodes: HashMap<String, NodeState>,
     recent_events: VecDeque<EventLogEntry>,
     recent_commands: VecDeque<CommandAuditEntry>,
+    persistence: Option<PersistenceHandle>,
 }
 
 impl ControlRoomState {
-    fn new(history_limit: usize) -> Self {
-        Self {
+    fn new(history_limit: usize, persistence: Option<PersistenceHandle>) -> Self {
+        let mut state = Self {
             started_at: now_iso(),
             history_limit,
             nodes: HashMap::new(),
             recent_events: VecDeque::new(),
             recent_commands: VecDeque::new(),
+            persistence: persistence.clone(),
+        };
+
+        if let Some(persistence) = &persistence {
+            match persistence.load_bootstrap(history_limit) {
+                Ok(bootstrap) => {
+                    let event_count = bootstrap.events.len();
+                    let command_count = bootstrap.commands.len();
+                    let sds_count = bootstrap.sds.len();
+                    let location_count = bootstrap.locations.len();
+                    let emergency_count = bootstrap.emergencies.len();
+                    state.apply_persistence_bootstrap(bootstrap);
+                    tracing::info!(event_count, command_count, sds_count, location_count, emergency_count, "loaded persisted Control Room history");
+                }
+                Err(err) => tracing::warn!("failed to load persisted Control Room history: {}", err),
+            }
+        }
+
+        state
+    }
+
+    fn apply_persistence_bootstrap(&mut self, bootstrap: PersistenceBootstrap) {
+        for entry in bootstrap.events {
+            self.push_event_memory(entry);
+        }
+        for entry in bootstrap.commands {
+            self.push_command_memory(entry);
+        }
+        for row in bootstrap.sds {
+            let node = self.node_mut(&row.node_id);
+            if node.station_name.is_none() {
+                node.station_name = row.station_name.clone();
+            }
+            node.apply_position_from_sds(&row.entry);
+            node.push_sds(row.entry);
+        }
+        for row in bootstrap.locations {
+            let node = self.node_mut(&row.node_id);
+            if node.station_name.is_none() {
+                node.station_name = row.station_name.clone();
+            }
+            let ms = node.subscriber_mut(row.issi);
+            ms.last_seen = Some(row.location.updated_at.clone());
+            ms.last_event = Some("persisted_location".to_string());
+            ms.last_location = Some(row.location);
+        }
+        for row in bootstrap.emergencies {
+            let node = self.node_mut(&row.node_id);
+            if node.station_name.is_none() {
+                node.station_name = row.station_name.clone();
+            }
+            if row.emergency.active {
+                let ms = node.subscriber_mut(row.emergency.source_issi);
+                ms.emergency = true;
+                ms.last_seen = Some(row.emergency.raised_at.clone());
+            }
+            node.emergencies.insert(row.emergency.source_issi, row.emergency);
         }
     }
 
@@ -1437,13 +1501,27 @@ impl ControlRoomState {
             NodeToControlRoomMessage::Hello { hello } => {
                 let node_id = hello.node.node_id.clone();
                 self.node_mut(&node_id).apply_hello(hello);
+                let hello_value = serde_json::to_value(hello).unwrap_or_else(|_| json!({ "error": "hello serialisation failed" }));
                 self.push_event(EventLogEntry {
                     timestamp: now_iso(),
                     node_id: node_id.clone(),
                     seq: None,
                     event_type: "hello".to_string(),
-                    event: serde_json::to_value(hello).unwrap_or_else(|_| json!({ "error": "hello serialisation failed" })),
+                    event: hello_value.clone(),
                 });
+                if let Some(persistence) = &self.persistence {
+                    if let Some(node) = self.nodes.get(&node_id) {
+                        persistence.persist_node_hello(
+                            &node_id,
+                            node.station_name.as_deref(),
+                            node.site.as_deref(),
+                            node.last_seen.as_deref().unwrap_or_else(|| hello.started_at.as_str()),
+                            node.protocol_version.as_deref(),
+                            node.stack_version.as_deref(),
+                            &hello_value,
+                        );
+                    }
+                }
                 Some(node_id)
             }
             NodeToControlRoomMessage::Heartbeat { heartbeat } => {
@@ -1461,6 +1539,7 @@ impl ControlRoomState {
                     event_type: telemetry_event_type(&envelope.event).to_string(),
                     event: event_for_log(&envelope.event),
                 });
+                self.persist_telemetry_side_effects(&node_id, &envelope.timestamp, &envelope.event);
                 Some(node_id)
             }
             NodeToControlRoomMessage::ControlAck { ack } => {
@@ -1505,10 +1584,14 @@ impl ControlRoomState {
     }
 
     fn mark_node_disconnected(&mut self, node_id: &str) {
+        let timestamp = now_iso();
         let node = self.node_mut(node_id);
         node.connected = false;
         node.transport_connected = false;
-        node.last_seen = Some(now_iso());
+        node.last_seen = Some(timestamp.clone());
+        if let Some(persistence) = &self.persistence {
+            persistence.mark_node_disconnected(node_id, &timestamp);
+        }
     }
 
     fn record_command_queued(&mut self, envelope: &ControlCommandEnvelope) {
@@ -1530,11 +1613,16 @@ impl ControlRoomState {
         let idx = self.recent_commands.iter().position(|cmd| cmd.command_id == ack.command_id);
         let status = if ack.accepted { "accepted" } else { "rejected" }.to_string();
         if let Some(idx) = idx {
+            let mut updated = None;
             if let Some(cmd) = self.recent_commands.get_mut(idx) {
                 cmd.updated_at = ack.timestamp.clone();
                 cmd.status = status;
                 cmd.target_entity = ack.target_entity;
                 cmd.message = Some(ack.message.clone());
+                updated = Some(cmd.clone());
+            }
+            if let Some(entry) = updated {
+                self.persist_command_entry(&entry);
             }
         } else {
             self.push_command(CommandAuditEntry {
@@ -1555,11 +1643,16 @@ impl ControlRoomState {
     fn record_control_response(&mut self, envelope: &ControlResponseEnvelope) {
         let response_value = serde_json::to_value(&envelope.response).unwrap_or_else(|_| json!({ "error": "response serialisation failed" }));
         if let Some(command_id) = &envelope.command_id {
+            let mut updated = None;
             if let Some(cmd) = self.recent_commands.iter_mut().find(|cmd| cmd.command_id == *command_id) {
                 cmd.updated_at = envelope.timestamp.clone();
                 cmd.status = "completed".to_string();
                 cmd.target_entity = envelope.target_entity;
                 cmd.responses.push(response_value);
+                updated = Some(cmd.clone());
+            }
+            if let Some(entry) = updated {
+                self.persist_command_entry(&entry);
                 return;
             }
         }
@@ -1578,6 +1671,47 @@ impl ControlRoomState {
         });
     }
 
+    fn persist_telemetry_side_effects(&self, node_id: &str, timestamp: &str, event: &TelemetryEvent) {
+        let Some(persistence) = &self.persistence else {
+            return;
+        };
+        let Some(node) = self.nodes.get(node_id) else {
+            return;
+        };
+        let station_name = node.station_name.as_deref();
+
+        match event {
+            TelemetryEvent::SdsLog {
+                direction,
+                source_issi,
+                dest_issi,
+                is_group,
+                protocol_id,
+                text,
+            } => {
+                let entry = SdsLogEntry {
+                    timestamp: timestamp.to_string(),
+                    direction: direction.clone(),
+                    source_issi: *source_issi,
+                    dest_issi: *dest_issi,
+                    is_group: *is_group,
+                    protocol_id: *protocol_id,
+                    text: text.clone(),
+                };
+                persistence.persist_sds(node_id, station_name, &entry);
+                if let Some(location) = node.subscribers.get(source_issi).and_then(|subscriber| subscriber.last_location.as_ref()) {
+                    persistence.persist_location(node_id, station_name, *source_issi, location);
+                }
+            }
+            TelemetryEvent::EmergencyAlarm { source_issi, .. } | TelemetryEvent::EmergencyCancel { source_issi } => {
+                if let Some(emergency) = node.emergencies.get(source_issi) {
+                    persistence.persist_emergency(node_id, station_name, emergency);
+                }
+            }
+            _ => {}
+        }
+    }
+
     fn node_mut(&mut self, node_id: &str) -> &mut NodeState {
         self.nodes
             .entry(node_id.to_string())
@@ -1585,6 +1719,13 @@ impl ControlRoomState {
     }
 
     fn push_event(&mut self, entry: EventLogEntry) {
+        if let Some(persistence) = &self.persistence {
+            persistence.persist_event(&entry);
+        }
+        self.push_event_memory(entry);
+    }
+
+    fn push_event_memory(&mut self, entry: EventLogEntry) {
         self.recent_events.push_back(entry);
         while self.recent_events.len() > self.history_limit {
             self.recent_events.pop_front();
@@ -1592,9 +1733,22 @@ impl ControlRoomState {
     }
 
     fn push_command(&mut self, entry: CommandAuditEntry) {
+        if let Some(persistence) = &self.persistence {
+            persistence.persist_command(&entry);
+        }
+        self.push_command_memory(entry);
+    }
+
+    fn push_command_memory(&mut self, entry: CommandAuditEntry) {
         self.recent_commands.push_back(entry);
         while self.recent_commands.len() > self.history_limit {
             self.recent_commands.pop_front();
+        }
+    }
+
+    fn persist_command_entry(&self, entry: &CommandAuditEntry) {
+        if let Some(persistence) = &self.persistence {
+            persistence.persist_command(entry);
         }
     }
 }

@@ -1,0 +1,29 @@
+# NetCore Control Room Core configuration for LXC/container deployment.
+# CLI flags override values from this file.
+
+[server]
+# In the LXC this should usually bind to all interfaces in the trusted VLAN/VPN.
+bind = "0.0.0.0:9010"
+
+# Base-station nodes connect here via WebSocket.
+node_path = "/node"
+
+# Reserved for native operator clients/live feeds. This is protocol/API, not a browser UI requirement.
+ui_path = "/ui"
+
+# In-memory ring buffer for recent events and command audit entries.
+history_limit = 1000
+
+[persistence]
+# Enables SQLite persistence for audit/history data.
+enabled = true
+
+# Recommended path when running as systemd service in the LXC.
+database_path = "/var/lib/netcore-control-room/control-room.sqlite3"
+
+# Persist event log rows. High-rate RF/health noise is filtered unless persist_noisy_events=true.
+persist_events = true
+persist_noisy_events = false
+
+# Number of recent persisted rows loaded back into memory on startup.
+load_recent_limit = 1000
