@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 pub struct ControlRoomConfig {
     pub server: ServerConfig,
     pub persistence: PersistenceConfig,
+    pub auth: AuthConfig,
 }
 
 impl Default for ControlRoomConfig {
@@ -16,6 +17,7 @@ impl Default for ControlRoomConfig {
         Self {
             server: ServerConfig::default(),
             persistence: PersistenceConfig::default(),
+            auth: AuthConfig::default(),
         }
     }
 }
@@ -40,6 +42,10 @@ impl ControlRoomConfig {
         history_limit: Option<usize>,
         database: Option<PathBuf>,
         no_persistence: bool,
+        auth_enabled: bool,
+        no_auth: bool,
+        node_token: Option<String>,
+        operator_token: Option<String>,
     ) {
         if let Some(bind) = bind {
             self.server.bind = bind;
@@ -60,6 +66,18 @@ impl ControlRoomConfig {
         if no_persistence {
             self.persistence.enabled = false;
         }
+        if auth_enabled {
+            self.auth.enabled = true;
+        }
+        if no_auth {
+            self.auth.enabled = false;
+        }
+        if let Some(node_token) = node_token {
+            self.auth.node_token = Some(node_token);
+        }
+        if let Some(operator_token) = operator_token {
+            self.auth.operator_token = Some(operator_token);
+        }
         self.normalise();
     }
 
@@ -72,6 +90,7 @@ impl ControlRoomConfig {
         if self.persistence.load_recent_limit == 0 {
             self.persistence.load_recent_limit = self.server.history_limit;
         }
+        self.auth.normalise();
     }
 }
 
@@ -92,6 +111,45 @@ impl Default for ServerConfig {
             ui_path: "/ui".to_string(),
             history_limit: 500,
         }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct AuthConfig {
+    /// Master switch. Keep disabled until tokens are configured on both the LXC and the TBS/operator.
+    pub enabled: bool,
+    /// Keep /health public for service checks even when auth is enabled.
+    pub allow_health_unauthenticated: bool,
+    /// Node token for BS -> Control Room WebSocket authentication. Prefer node_token_env for production.
+    pub node_token: Option<String>,
+    /// Operator token for HTTP API and operator clients. Prefer operator_token_env for production.
+    pub operator_token: Option<String>,
+    /// Environment variable containing the node token.
+    pub node_token_env: Option<String>,
+    /// Environment variable containing the operator token.
+    pub operator_token_env: Option<String>,
+}
+
+impl Default for AuthConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            allow_health_unauthenticated: true,
+            node_token: None,
+            operator_token: None,
+            node_token_env: Some("NETCORE_CONTROL_ROOM_NODE_TOKEN".to_string()),
+            operator_token_env: Some("NETCORE_CONTROL_ROOM_OPERATOR_TOKEN".to_string()),
+        }
+    }
+}
+
+impl AuthConfig {
+    fn normalise(&mut self) {
+        self.node_token = normalise_optional_secret(self.node_token.take());
+        self.operator_token = normalise_optional_secret(self.operator_token.take());
+        self.node_token_env = normalise_optional_secret(self.node_token_env.take());
+        self.operator_token_env = normalise_optional_secret(self.operator_token_env.take());
     }
 }
 
@@ -123,4 +181,15 @@ fn normalise_path(path: &str) -> String {
     } else {
         format!("/{}", path)
     }
+}
+
+fn normalise_optional_secret(value: Option<String>) -> Option<String> {
+    value.and_then(|v| {
+        let trimmed = v.trim();
+        if trimmed.is_empty() {
+            None
+        } else {
+            Some(trimmed.to_string())
+        }
+    })
 }

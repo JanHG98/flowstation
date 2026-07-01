@@ -14,7 +14,7 @@ Der Control Room benötigt keine SDR-/Codec-Libraries. Für den Build reichen di
 
 ```bash
 apt update
-apt install -y git curl build-essential pkg-config ca-certificates jq sqlite3
+apt install -y git curl build-essential pkg-config ca-certificates jq sqlite3 openssl
 ```
 
 Rust installieren, falls noch nicht vorhanden:
@@ -28,12 +28,7 @@ source ~/.cargo/env
 
 ```bash
 cd /opt/netcore/flowstation
-git fetch && \
-git checkout control-room && \
-git pull --ff-only && \
-cargo build --release \
-  -p netcore-control-room \
-  -p netcore-control-room-operator
+git fetch && git checkout control-room && git pull --ff-only && cargo build --release   -p netcore-control-room   -p netcore-control-room-operator
 ```
 
 Wichtig: Im LXC **nicht** `bluestation-bs` bauen, sonst werden unnötige Funk-/Codec-Abhängigkeiten gezogen.
@@ -43,9 +38,26 @@ Wichtig: Im LXC **nicht** `bluestation-bs` bauen, sonst werden unnötige Funk-/C
 ```bash
 install -d -o root -g root /etc/netcore-control-room
 install -m 0644 system-backend/control-room/config/control-room.example.toml /etc/netcore-control-room/control-room.toml
+install -m 0600 system-backend/control-room/systemd/netcore-control-room.env.example /etc/netcore-control-room/control-room.env
 ```
 
-Bei Bedarf die Bind-Adresse oder den Datenbankpfad in `/etc/netcore-control-room/control-room.toml` anpassen.
+Tokens erzeugen und eintragen:
+
+```bash
+NODE_TOKEN=$(openssl rand -hex 32)
+OPERATOR_TOKEN=$(openssl rand -hex 32)
+
+sed -i "s/^NETCORE_CONTROL_ROOM_NODE_TOKEN=.*/NETCORE_CONTROL_ROOM_NODE_TOKEN=$NODE_TOKEN/" /etc/netcore-control-room/control-room.env
+sed -i "s/^NETCORE_CONTROL_ROOM_OPERATOR_TOKEN=.*/NETCORE_CONTROL_ROOM_OPERATOR_TOKEN=$OPERATOR_TOKEN/" /etc/netcore-control-room/control-room.env
+
+cat /etc/netcore-control-room/control-room.env
+```
+
+Auth einschalten, sobald die TBS den Node-Token kennt:
+
+```bash
+sed -i 's/^enabled = false/enabled = true/' /etc/netcore-control-room/control-room.toml
+```
 
 ## Service-User und Datenverzeichnis
 
@@ -68,19 +80,29 @@ Logs:
 journalctl -u netcore-control-room -f
 ```
 
-## Tests
-
-Im LXC:
+## Tests ohne Auth
 
 ```bash
 curl http://127.0.0.1:9010/health | jq
 curl http://127.0.0.1:9010/api/overview | jq
 ```
 
-Von der TBS oder vom Operator-Rechner:
+## Tests mit Auth
 
 ```bash
-curl http://10.0.1.25:9010/health | jq
+source /etc/netcore-control-room/control-room.env
+
+curl http://127.0.0.1:9010/health | jq
+curl -H "Authorization: Bearer $NETCORE_CONTROL_ROOM_OPERATOR_TOKEN"   http://127.0.0.1:9010/api/overview | jq
+
+./target/release/netcore-control-room-operator   --api http://10.0.1.25:9010   --token "$NETCORE_CONTROL_ROOM_OPERATOR_TOKEN"   overview
+```
+
+Oder dauerhaft für den Operator:
+
+```bash
+export NETCORE_CONTROL_ROOM_OPERATOR_TOKEN="..."
+./target/release/netcore-control-room-operator --api http://10.0.1.25:9010 dashboard
 ```
 
 ## Persistenz prüfen
@@ -100,9 +122,9 @@ Die Datenbank speichert aktuell:
 - letzte bekannte Locations
 - Emergencies
 
-## TBS-Config
+## TBS-Config mit Auth
 
-Auf der TBS muss der Control Room auf den LXC zeigen:
+Auf der TBS muss der Control Room auf den LXC zeigen und den Node-Token mitsenden.
 
 ```toml
 [control_room]
@@ -111,4 +133,13 @@ host = "10.0.1.25"
 port = 9010
 use_tls = false
 endpoint_path = "/node"
+
+node_id = "tbs-04010001"
+station_name = "NetCore TBS 04010001"
+site = "Main"
+
+# Gleicher Wert wie NETCORE_CONTROL_ROOM_NODE_TOKEN im LXC.
+token = "<node-token>"
 ```
+
+Danach TBS neu starten.

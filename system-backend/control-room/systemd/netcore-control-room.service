@@ -8,6 +8,7 @@ Type=simple
 User=netcore
 Group=netcore
 WorkingDirectory=/opt/netcore/flowstation
+EnvironmentFile=-/etc/netcore-control-room/control-room.env
 ExecStart=/opt/netcore/flowstation/target/release/netcore-control-room --config /etc/netcore-control-room/control-room.toml
 Restart=always
 RestartSec=5

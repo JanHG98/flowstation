@@ -1,3 +1,4 @@
+mod auth;
 mod config;
 mod http;
 mod persistence;
@@ -11,6 +12,7 @@ use std::path::PathBuf;
 use clap::Parser;
 use tracing_subscriber::EnvFilter;
 
+use crate::auth::AuthState;
 use crate::config::ControlRoomConfig;
 use crate::persistence::PersistenceHandle;
 
@@ -42,6 +44,22 @@ struct Args {
     #[arg(long)]
     database: Option<PathBuf>,
 
+    /// Force-enable API/WebSocket token auth, regardless of config file.
+    #[arg(long)]
+    auth_enabled: bool,
+
+    /// Force-disable API/WebSocket token auth, regardless of config file.
+    #[arg(long)]
+    no_auth: bool,
+
+    /// Node token for BS -> Control Room WebSocket authentication. Prefer env/config in production.
+    #[arg(long)]
+    node_token: Option<String>,
+
+    /// Operator/API token for HTTP and operator clients. Prefer env/config in production.
+    #[arg(long)]
+    operator_token: Option<String>,
+
     /// Force-disable SQLite persistence, regardless of config file.
     #[arg(long)]
     no_persistence: bool,
@@ -64,6 +82,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         args.history_limit,
         args.database,
         args.no_persistence,
+        args.auth_enabled,
+        args.no_auth,
+        args.node_token,
+        args.operator_token,
     );
 
     let persistence = if config.persistence.enabled {
@@ -75,8 +97,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         None
     };
 
+    let auth = AuthState::from_config(&config.auth)
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))?;
+    if auth.enabled() {
+        tracing::info!(health_public = auth.allow_health_unauthenticated(), "Control Room token authentication enabled");
+    } else {
+        tracing::warn!("Control Room token authentication disabled");
+    }
+
     let state = state::SharedControlRoom::new_with_persistence(config.server.history_limit, persistence);
-    let server = server::ControlRoomServer::new(config.server.bind, config.server.node_path, config.server.ui_path, state);
+    let server = server::ControlRoomServer::new(config.server.bind, config.server.node_path, config.server.ui_path, state, auth);
     server.run()?;
     Ok(())
 }

@@ -21,6 +21,10 @@ struct Cli {
     #[arg(long, default_value = DEFAULT_API)]
     api: String,
 
+    /// Operator/API bearer token. Can also be set with NETCORE_CONTROL_ROOM_OPERATOR_TOKEN or NETCORE_CONTROL_ROOM_TOKEN.
+    #[arg(long)]
+    token: Option<String>,
+
     #[command(subcommand)]
     command: Option<Command>,
 }
@@ -106,26 +110,36 @@ enum Command {
 
 struct ApiClient {
     base: String,
+    token: Option<String>,
     http: reqwest::blocking::Client,
 }
 
 impl ApiClient {
-    fn new(base: &str) -> Self {
+    fn new(base: &str, token: Option<String>) -> Self {
         Self {
             base: base.trim_end_matches('/').to_string(),
+            token,
             http: reqwest::blocking::Client::new(),
         }
     }
 
     fn get_json(&self, path: &str) -> AppResult<Value> {
         let url = self.url(path);
-        let response = self.http.get(url).send()?.error_for_status()?;
+        let mut request = self.http.get(url);
+        if let Some(token) = &self.token {
+            request = request.bearer_auth(token);
+        }
+        let response = request.send()?.error_for_status()?;
         Ok(response.json()?)
     }
 
     fn post_json<T: Serialize + ?Sized>(&self, path: &str, body: &T) -> AppResult<Value> {
         let url = self.url(path);
-        let response = self.http.post(url).json(body).send()?.error_for_status()?;
+        let mut request = self.http.post(url).json(body);
+        if let Some(token) = &self.token {
+            request = request.bearer_auth(token);
+        }
+        let response = request.send()?.error_for_status()?;
         Ok(response.json()?)
     }
 
@@ -149,7 +163,8 @@ fn main() -> AppResult<()> {
         }
     }
 
-    let api = ApiClient::new(&cli.api);
+    let token = cli.token.take().or_else(|| env::var("NETCORE_CONTROL_ROOM_OPERATOR_TOKEN").ok()).or_else(|| env::var("NETCORE_CONTROL_ROOM_TOKEN").ok());
+    let api = ApiClient::new(&cli.api, token);
 
     match cli.command.unwrap_or(Command::Dashboard { refresh: 2 }) {
         Command::Dashboard { refresh } => run_dashboard(&api, refresh),

@@ -46,3 +46,17 @@ netcore-control-room-operator --api http://10.10.40.20:9010 dgna --node tbs-0401
 netcore-control-room-operator --api http://10.10.40.20:9010 dgna --node tbs-04010001 --issi 2020004 --gssi 15205 --detach
 netcore-control-room-operator --api http://10.10.40.20:9010 clear-emergency --node tbs-04010001
 ```
+
+
+## Auth
+
+Wenn der Control-Room-Core Auth aktiviert hat, nutze entweder `--token` oder die Umgebungvariable `NETCORE_CONTROL_ROOM_OPERATOR_TOKEN`:
+
+```bash
+./target/release/netcore-control-room-operator --api http://10.0.1.25:9010 --token <operator-token> dashboard
+```
+
+```bash
+export NETCORE_CONTROL_ROOM_OPERATOR_TOKEN=<operator-token>
+./target/release/netcore-control-room-operator --api http://10.0.1.25:9010 dashboard
+```

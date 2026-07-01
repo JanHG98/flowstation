@@ -27,3 +27,19 @@ persist_noisy_events = false
 
 # Number of recent persisted rows loaded back into memory on startup.
 load_recent_limit = 1000
+
+[auth]
+# Set to true after you configured both tokens in /etc/netcore-control-room/control-room.env
+# and added the node token to the TBS [control_room] config.
+enabled = false
+
+# Keep /health available without token for systemd/monitoring checks.
+allow_health_unauthenticated = true
+
+# Prefer environment variables over writing secrets into this TOML file.
+node_token_env = "NETCORE_CONTROL_ROOM_NODE_TOKEN"
+operator_token_env = "NETCORE_CONTROL_ROOM_OPERATOR_TOKEN"
+
+# Development-only alternative. Do not commit real tokens.
+# node_token = "change-me-node-token"
+# operator_token = "change-me-operator-token"

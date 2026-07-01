@@ -8,6 +8,7 @@ use serde_json::{Value, json};
 use tetra_entities::net_control::ControlCommand;
 use tetra_entities::net_control_room::ControlCommandEnvelope;
 
+use crate::auth::AuthState;
 use crate::state::{SharedControlRoom, now_iso};
 
 const MAX_HTTP_REQUEST_BYTES: usize = 1024 * 1024;
@@ -60,7 +61,7 @@ impl HttpResponse {
     }
 }
 
-pub fn handle_http_stream(mut stream: TcpStream, state: SharedControlRoom, node_path: &str, ui_path: &str) {
+pub fn handle_http_stream(mut stream: TcpStream, state: SharedControlRoom, node_path: &str, ui_path: &str, auth: AuthState) {
     let _ = stream.set_read_timeout(Some(Duration::from_secs(5)));
     let request = match read_http_request(&mut stream) {
         Ok(req) => req,
@@ -71,15 +72,19 @@ pub fn handle_http_stream(mut stream: TcpStream, state: SharedControlRoom, node_
     };
 
     tracing::debug!(method = %request.method, path = %request.path, "http request");
-    let response = route_http(request, state, node_path, ui_path);
+    let response = route_http(request, state, node_path, ui_path, &auth);
     let _ = write_response(&mut stream, &response);
 }
 
-fn route_http(request: HttpRequest, state: SharedControlRoom, node_path: &str, ui_path: &str) -> HttpResponse {
-    let _has_authorization_header = request.headers.contains_key("authorization");
-
+fn route_http(request: HttpRequest, state: SharedControlRoom, node_path: &str, ui_path: &str, auth: &AuthState) -> HttpResponse {
     if request.method == "OPTIONS" {
         return HttpResponse::text(204, "");
+    }
+
+    let health_public = request.method == "GET" && request.path == "/health" && auth.allow_health_unauthenticated();
+    if !health_public && !auth.authorize_http_operator(&request.headers, &request.query) {
+        tracing::warn!(method = %request.method, path = %request.path, "http request rejected: unauthorized");
+        return unauthorized();
     }
 
     match (request.method.as_str(), request.path.as_str()) {
@@ -516,12 +521,20 @@ fn not_found(node_path: &str, ui_path: &str) -> HttpResponse {
     )
 }
 
+fn unauthorized() -> HttpResponse {
+    HttpResponse::json(401, &json!({
+        "error": "unauthorized",
+        "hint": "send Authorization: Bearer <operator-token> or X-Control-Room-Token"
+    }))
+}
+
 fn reason_phrase(status: u16) -> &'static str {
     match status {
         200 => "OK",
         202 => "Accepted",
         204 => "No Content",
         400 => "Bad Request",
+        401 => "Unauthorized",
         404 => "Not Found",
         409 => "Conflict",
         500 => "Internal Server Error",

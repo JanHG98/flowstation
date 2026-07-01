@@ -8,19 +8,35 @@ use tetra_entities::net_control_room::{
 use tungstenite::handshake::server::{Request, Response};
 use tungstenite::{Message, WebSocket, accept_hdr};
 
+use crate::auth::{AuthRole, AuthState};
 use crate::state::{SharedControlRoom, UiMessage, now_iso};
 
 const WS_READ_TIMEOUT: Duration = Duration::from_millis(100);
 const NODE_PING_INTERVAL: Duration = Duration::from_secs(15);
 
-pub fn handle_websocket_stream(stream: TcpStream, state: SharedControlRoom, node_path: String, ui_path: String) {
+pub fn handle_websocket_stream(stream: TcpStream, state: SharedControlRoom, node_path: String, ui_path: String, auth: AuthState) {
     let peer = stream.peer_addr().ok();
     let selected_path = Arc::new(Mutex::new(String::new()));
     let selected_path_cb = selected_path.clone();
+    let authorized = Arc::new(Mutex::new(false));
+    let authorized_cb = authorized.clone();
+    let node_path_cb = node_path.clone();
+    let ui_path_cb = ui_path.clone();
+    let auth_cb = auth.clone();
 
     let callback = move |req: &Request, mut response: Response| {
         let path = req.uri().path().to_string();
-        *selected_path_cb.lock().expect("ws path mutex poisoned") = path;
+        *selected_path_cb.lock().expect("ws path mutex poisoned") = path.clone();
+
+        let role = if path == node_path_cb {
+            Some(AuthRole::Node)
+        } else if path == ui_path_cb {
+            Some(AuthRole::Operator)
+        } else {
+            None
+        };
+        let ok = role.map(|role| auth_cb.authorize_ws_request(role, req)).unwrap_or(true);
+        *authorized_cb.lock().expect("ws auth mutex poisoned") = ok;
 
         // The BS requests a subprotocol. Echo it when it is the expected one so
         // strict clients and future tooling can see the negotiated protocol.
@@ -49,6 +65,14 @@ pub fn handle_websocket_stream(stream: TcpStream, state: SharedControlRoom, node
 
     let path = selected_path.lock().expect("ws path mutex poisoned").clone();
     tracing::info!(?peer, path = %path, "websocket connected");
+
+    let auth_ok = *authorized.lock().expect("ws auth mutex poisoned");
+    if (path == node_path || path == ui_path) && !auth_ok {
+        tracing::warn!(?peer, path = %path, "websocket rejected: unauthorized");
+        let mut ws = ws;
+        let _ = ws.close(None);
+        return;
+    }
 
     if path == node_path {
         handle_node_websocket(ws, state);

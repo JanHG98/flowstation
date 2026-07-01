@@ -42,3 +42,15 @@ Operator workstation:
 ```
 
 See [`docs/lxc-deployment.md`](docs/lxc-deployment.md) for the full LXC deployment flow.
+
+
+## Auth / API-Token
+
+Der Control-Room-Core unterstützt Token-Auth für Basisstation-Nodes und Operator/API-Clients. Details siehe `docs/auth.md`.
+
+Kurzform:
+
+```bash
+export NETCORE_CONTROL_ROOM_OPERATOR_TOKEN=<operator-token>
+./target/release/netcore-control-room-operator --api http://10.0.1.25:9010 dashboard
+```

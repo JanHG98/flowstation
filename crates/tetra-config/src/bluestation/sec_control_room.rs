@@ -22,6 +22,7 @@ pub struct CfgControlRoom {
     /// Optional path to a DER-encoded CA certificate for self-signed TLS.
     pub ca_cert: Option<String>,
     /// Optional HTTP Basic Auth credentials.
+    /// For token auth, this is usually ("node", token).
     pub credentials: Option<(String, String)>,
     /// Stable node id.  When unset, the BS derives one from MCC/MNC/LA/CC/carrier.
     pub node_id: Option<String>,
@@ -43,6 +44,10 @@ pub struct CfgControlRoomDto {
     pub ca_cert: Option<String>,
     pub username: Option<String>,
     pub password: Option<String>,
+    /// Convenience token field. When set without username/password, the BS sends it as Basic password with username "node".
+    pub token: Option<String>,
+    /// Alias for token. Useful when config naming should be explicit.
+    pub auth_token: Option<String>,
     pub node_id: Option<String>,
     pub station_name: Option<String>,
     pub site: Option<String>,
@@ -58,10 +63,23 @@ pub fn apply_control_room_patch(src: CfgControlRoomDto) -> Result<CfgControlRoom
         return Err("control_room: ca_cert requires use_tls = true".to_string());
     }
 
-    let credentials = match (src.username, src.password) {
-        (Some(u), Some(p)) => Some((u, p)),
-        (None, None) => None,
-        _ => return Err("control_room: both username and password must be set for credentials".to_string()),
+    let token = src.auth_token.or(src.token).and_then(|v| {
+        let trimmed = v.trim();
+        if trimmed.is_empty() {
+            None
+        } else {
+            Some(trimmed.to_string())
+        }
+    });
+
+    let credentials = match (src.username, src.password, token) {
+        (Some(u), Some(p), None) => Some((u, p)),
+        (None, None, Some(token)) => Some(("node".to_string(), token)),
+        (None, None, None) => None,
+        (Some(_), Some(_), Some(_)) => {
+            return Err("control_room: use either username/password or token/auth_token, not both".to_string());
+        }
+        _ => return Err("control_room: username and password must be set together, or use token/auth_token".to_string()),
     };
 
     let host = match (enabled, src.host) {
