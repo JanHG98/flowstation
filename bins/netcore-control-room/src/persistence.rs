@@ -10,7 +10,7 @@ use crate::auth::{AuthRole, AuthTokenRecord};
 use crate::config::PersistenceConfig;
 use crate::state::{CommandAuditEntry, EmergencyState, EventLogEntry, LocationState, SdsLogEntry};
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct PersistenceHandle {
     inner: Arc<Mutex<PersistenceInner>>,
 }
