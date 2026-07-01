@@ -6,7 +6,7 @@ use rusqlite::{Connection, params};
 use serde_json::{Value, json};
 use tetra_core::tetra_entities::TetraEntity;
 
-use crate::auth::{AuthRole, AuthTokenRecord};
+use crate::auth::{AuthRole, StoredUserRecord, UserRecord};
 use crate::config::PersistenceConfig;
 use crate::state::{CommandAuditEntry, EmergencyState, EventLogEntry, LocationState, SdsLogEntry};
 
@@ -255,81 +255,93 @@ impl PersistenceHandle {
     }
 
 
-    pub fn list_auth_tokens(&self) -> rusqlite::Result<Vec<AuthTokenRecord>> {
+    pub fn list_users(&self) -> rusqlite::Result<Vec<UserRecord>> {
         let inner = self.inner.lock().expect("persistence mutex poisoned");
         let mut stmt = inner.conn.prepare(
-            "SELECT id, label, role, enabled, created_at, updated_at, last_used_at, expires_at, created_by \
-             FROM auth_tokens ORDER BY created_at DESC",
+            "SELECT id, username, display_name, role, enabled, created_at, updated_at, last_login_at, created_by \
+             FROM auth_users ORDER BY username ASC",
         )?;
-        stmt.query_map([], row_to_auth_token)?.collect()
+        stmt.query_map([], row_to_user)?.collect()
     }
 
-    pub fn find_auth_token_by_hash(&self, token_hash: &str) -> rusqlite::Result<Option<AuthTokenRecord>> {
+    pub fn find_user_by_username(&self, username: &str) -> rusqlite::Result<Option<StoredUserRecord>> {
         let inner = self.inner.lock().expect("persistence mutex poisoned");
         let mut stmt = inner.conn.prepare(
-            "SELECT id, label, role, enabled, created_at, updated_at, last_used_at, expires_at, created_by \
-             FROM auth_tokens WHERE token_hash = ?1 AND enabled = 1 LIMIT 1",
+            "SELECT id, username, display_name, role, enabled, password_salt, password_hash, created_at, updated_at, last_login_at, created_by \
+             FROM auth_users WHERE lower(username) = lower(?1) LIMIT 1",
         )?;
-        let mut rows = stmt.query(params![token_hash])?;
+        let mut rows = stmt.query(params![username])?;
         if let Some(row) = rows.next()? {
-            Ok(Some(row_to_auth_token(row)?))
+            Ok(Some(row_to_stored_user(row)?))
         } else {
             Ok(None)
         }
     }
 
-    pub fn insert_auth_token(
+    #[allow(clippy::too_many_arguments)]
+    pub fn insert_user(
         &self,
         id: &str,
-        label: &str,
+        username: &str,
+        display_name: &str,
         role: AuthRole,
-        token_hash: &str,
+        enabled: bool,
+        password_salt: &str,
+        password_hash: &str,
         now: &str,
-        expires_at: Option<&str>,
         created_by: Option<&str>,
-    ) -> rusqlite::Result<AuthTokenRecord> {
+    ) -> rusqlite::Result<UserRecord> {
         let inner = self.inner.lock().expect("persistence mutex poisoned");
         inner.conn.execute(
-            "INSERT INTO auth_tokens \
-             (id, label, role, token_hash, enabled, created_at, updated_at, last_used_at, expires_at, created_by) \
-             VALUES (?1, ?2, ?3, ?4, 1, ?5, ?5, NULL, ?6, ?7)",
-            params![id, label, role.as_str(), token_hash, now, expires_at, created_by],
+            "INSERT INTO auth_users \
+             (id, username, display_name, role, enabled, password_salt, password_hash, created_at, updated_at, last_login_at, created_by) \
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?8, NULL, ?9)",
+            params![id, username, display_name, role.as_str(), if enabled { 1_i64 } else { 0_i64 }, password_salt, password_hash, now, created_by],
         )?;
-        load_auth_token_by_id(&inner.conn, id)?.ok_or(rusqlite::Error::QueryReturnedNoRows)
+        load_user_by_username(&inner.conn, username)?.ok_or(rusqlite::Error::QueryReturnedNoRows)
     }
 
-    pub fn update_auth_token(
+    pub fn update_user(
         &self,
-        id: &str,
+        username: &str,
+        display_name: Option<&str>,
+        role: Option<AuthRole>,
         enabled: Option<bool>,
-        label: Option<&str>,
-        expires_at: Option<&str>,
         now: &str,
-    ) -> rusqlite::Result<Option<AuthTokenRecord>> {
+    ) -> rusqlite::Result<Option<UserRecord>> {
         let inner = self.inner.lock().expect("persistence mutex poisoned");
         inner.conn.execute(
-            "UPDATE auth_tokens SET \
-               enabled = COALESCE(?2, enabled), \
-               label = COALESCE(NULLIF(?3, ''), label), \
-               expires_at = CASE WHEN ?4 IS NULL THEN expires_at ELSE NULLIF(?4, '') END, \
+            "UPDATE auth_users SET \
+               display_name = COALESCE(NULLIF(?2, ''), display_name), \
+               role = COALESCE(?3, role), \
+               enabled = COALESCE(?4, enabled), \
                updated_at = ?5 \
-             WHERE id = ?1",
-            params![id, enabled.map(|v| if v { 1_i64 } else { 0_i64 }), label, expires_at, now],
+             WHERE lower(username) = lower(?1)",
+            params![username, display_name, role.map(|role| role.as_str().to_string()), enabled.map(|v| if v { 1_i64 } else { 0_i64 }), now],
         )?;
-        load_auth_token_by_id(&inner.conn, id)
+        load_user_by_username(&inner.conn, username)
     }
 
-    pub fn delete_auth_token(&self, id: &str) -> rusqlite::Result<bool> {
+    pub fn update_user_password(&self, username: &str, password_salt: &str, password_hash: &str, now: &str) -> rusqlite::Result<Option<UserRecord>> {
         let inner = self.inner.lock().expect("persistence mutex poisoned");
-        let affected = inner.conn.execute("DELETE FROM auth_tokens WHERE id = ?1", params![id])?;
+        inner.conn.execute(
+            "UPDATE auth_users SET password_salt = ?2, password_hash = ?3, updated_at = ?4 WHERE lower(username) = lower(?1)",
+            params![username, password_salt, password_hash, now],
+        )?;
+        load_user_by_username(&inner.conn, username)
+    }
+
+    pub fn delete_user(&self, username: &str) -> rusqlite::Result<bool> {
+        let inner = self.inner.lock().expect("persistence mutex poisoned");
+        let affected = inner.conn.execute("DELETE FROM auth_users WHERE lower(username) = lower(?1)", params![username])?;
         Ok(affected > 0)
     }
 
-    pub fn update_auth_token_last_used(&self, id: &str, now: &str) {
-        self.with_conn("update auth token last used", |conn| {
+    pub fn update_user_last_login(&self, username: &str, now: &str) {
+        self.with_conn("update user last login", |conn| {
             conn.execute(
-                "UPDATE auth_tokens SET last_used_at = ?2, updated_at = ?2 WHERE id = ?1",
-                params![id, now],
+                "UPDATE auth_users SET last_login_at = ?2, updated_at = ?2 WHERE lower(username) = lower(?1)",
+                params![username, now],
             )?;
             Ok(())
         });
@@ -451,8 +463,25 @@ fn migrate(conn: &Connection) -> rusqlite::Result<()> {
         CREATE INDEX IF NOT EXISTS idx_auth_tokens_role ON auth_tokens(role, enabled);
         CREATE INDEX IF NOT EXISTS idx_auth_tokens_created ON auth_tokens(created_at DESC);
 
+        CREATE TABLE IF NOT EXISTS auth_users (
+            id TEXT PRIMARY KEY,
+            username TEXT NOT NULL UNIQUE,
+            display_name TEXT NOT NULL,
+            role TEXT NOT NULL,
+            enabled INTEGER NOT NULL DEFAULT 1,
+            password_salt TEXT NOT NULL,
+            password_hash TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            last_login_at TEXT,
+            created_by TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_auth_users_role ON auth_users(role, enabled);
+        CREATE INDEX IF NOT EXISTS idx_auth_users_updated ON auth_users(updated_at DESC);
+
         INSERT OR IGNORE INTO schema_migrations(version) VALUES (1);
         INSERT OR IGNORE INTO schema_migrations(version) VALUES (2);
+        INSERT OR IGNORE INTO schema_migrations(version) VALUES (3);
         "#,
     )
 }
@@ -586,32 +615,50 @@ fn load_emergencies(conn: &Connection, limit: usize) -> rusqlite::Result<Vec<Per
 }
 
 
-fn load_auth_token_by_id(conn: &Connection, id: &str) -> rusqlite::Result<Option<AuthTokenRecord>> {
+fn load_user_by_username(conn: &Connection, username: &str) -> rusqlite::Result<Option<UserRecord>> {
     let mut stmt = conn.prepare(
-        "SELECT id, label, role, enabled, created_at, updated_at, last_used_at, expires_at, created_by \
-         FROM auth_tokens WHERE id = ?1 LIMIT 1",
+        "SELECT id, username, display_name, role, enabled, created_at, updated_at, last_login_at, created_by \
+         FROM auth_users WHERE lower(username) = lower(?1) LIMIT 1",
     )?;
-    let mut rows = stmt.query(params![id])?;
+    let mut rows = stmt.query(params![username])?;
     if let Some(row) = rows.next()? {
-        Ok(Some(row_to_auth_token(row)?))
+        Ok(Some(row_to_user(row)?))
     } else {
         Ok(None)
     }
 }
 
-fn row_to_auth_token(row: &rusqlite::Row<'_>) -> rusqlite::Result<AuthTokenRecord> {
-    let role_raw: String = row.get(2)?;
-    let enabled: i64 = row.get(3)?;
-    Ok(AuthTokenRecord {
+fn row_to_user(row: &rusqlite::Row<'_>) -> rusqlite::Result<UserRecord> {
+    let role_raw: String = row.get(3)?;
+    let enabled: i64 = row.get(4)?;
+    Ok(UserRecord {
         id: row.get(0)?,
-        label: row.get(1)?,
+        username: row.get(1)?,
+        display_name: row.get(2)?,
         role: AuthRole::from_str(&role_raw).unwrap_or(AuthRole::Viewer),
         enabled: enabled != 0,
-        created_at: row.get(4)?,
-        updated_at: row.get(5)?,
-        last_used_at: row.get(6)?,
-        expires_at: row.get(7)?,
+        created_at: row.get(5)?,
+        updated_at: row.get(6)?,
+        last_login_at: row.get(7)?,
         created_by: row.get(8)?,
+    })
+}
+
+fn row_to_stored_user(row: &rusqlite::Row<'_>) -> rusqlite::Result<StoredUserRecord> {
+    let role_raw: String = row.get(3)?;
+    let enabled: i64 = row.get(4)?;
+    Ok(StoredUserRecord {
+        id: row.get(0)?,
+        username: row.get(1)?,
+        display_name: row.get(2)?,
+        role: AuthRole::from_str(&role_raw).unwrap_or(AuthRole::Viewer),
+        enabled: enabled != 0,
+        password_salt: row.get(5)?,
+        password_hash: row.get(6)?,
+        created_at: row.get(7)?,
+        updated_at: row.get(8)?,
+        last_login_at: row.get(9)?,
+        created_by: row.get(10)?,
     })
 }
 

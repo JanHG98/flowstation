@@ -2,13 +2,13 @@
 api = "http://10.0.1.25:9010"
 default_node = "SRV-M_TBS-01"
 operator_id = "jan"
-token_file = "C:\\Users\\Jan\\AppData\\Roaming\\netcore\\control-room\\operator.token"
+username = "jan"
 
-[profiles.admin]
+[profiles.event]
 api = "http://10.0.1.25:9010"
 default_node = "SRV-M_TBS-01"
-operator_id = "jan"
-token_file = "C:\\Users\\Jan\\AppData\\Roaming\\netcore\\control-room\\admin.token"
+operator_id = "event-lst"
+username = "event"
 
 [ui.map]
 online_tiles = true
@@ -22,8 +22,8 @@ max_zoom = 18
 # Optional. Wenn leer, nutzt die UI den normalen Windows-Cacheordner.
 # cache_dir = "C:\\Users\\Jan\\AppData\\Local\\netcore\\control-room\\tiles"
 
-# Lokales Directory für die UI.
-# Das Backend bleibt dadurch unverändert; die Windows-UI nutzt diese Daten nur zur Anzeige.
+# Optionales lokales Directory für die UI.
+# Ab v5 zieht die UI zuerst das zentrale Directory vom LXC und nutzt lokale Einträge nur als Override.
 [directory]
 hide_infrastructure = true
 

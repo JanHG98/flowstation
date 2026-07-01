@@ -44,11 +44,11 @@ struct Args {
     #[arg(long)]
     database: Option<PathBuf>,
 
-    /// Force-enable API/WebSocket token auth, regardless of config file.
+    /// Force-enable user/password + RBAC auth, regardless of config file.
     #[arg(long)]
     auth_enabled: bool,
 
-    /// Force-disable API/WebSocket token auth, regardless of config file.
+    /// Force-disable user/password + RBAC auth, regardless of config file.
     #[arg(long)]
     no_auth: bool,
 
@@ -56,9 +56,13 @@ struct Args {
     #[arg(long)]
     node_token: Option<String>,
 
-    /// Operator/API token for HTTP and operator clients. Prefer env/config in production.
+    /// Bootstrap admin username for HTTP login. Prefer env/config in production.
     #[arg(long)]
-    operator_token: Option<String>,
+    bootstrap_user: Option<String>,
+
+    /// Bootstrap admin password for HTTP login. Prefer env/config in production.
+    #[arg(long)]
+    bootstrap_password: Option<String>,
 
     /// Force-disable SQLite persistence, regardless of config file.
     #[arg(long)]
@@ -85,7 +89,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         args.auth_enabled,
         args.no_auth,
         args.node_token,
-        args.operator_token,
+        args.bootstrap_user,
+        args.bootstrap_password,
     );
 
     let persistence = if config.persistence.enabled {
@@ -100,9 +105,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let auth = AuthState::from_config(&config.auth, persistence.clone())
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))?;
     if auth.enabled() {
-        tracing::info!(health_public = auth.allow_health_unauthenticated(), "Control Room token authentication enabled");
+        tracing::info!(health_public = auth.allow_health_unauthenticated(), "Control Room user/password authentication enabled");
     } else {
-        tracing::warn!("Control Room token authentication disabled");
+        tracing::warn!("Control Room user/password authentication disabled");
     }
 
     let state = state::SharedControlRoom::new_with_persistence(config.server.history_limit, persistence);

@@ -1,59 +1,23 @@
-# Operator-Profile
+# Operator Profiles ab v5.0
 
-Der native Operator kann lokale Profile lesen. Dadurch müssen API-URL, Token, Standard-Node und Operator-ID nicht bei jedem Befehl angegeben werden.
+Operator-Profile speichern nur lokale Komfortwerte. Keine Tokens und keine Passwörter.
 
-## Suchreihenfolge der Config
-
-1. `--config /pfad/operator.toml`
-2. `NETCORE_CONTROL_ROOM_OPERATOR_CONFIG`
-3. `$XDG_CONFIG_HOME/netcore/control-room/operator.toml`
-4. `$HOME/.config/netcore/control-room/operator.toml`
-5. `/etc/netcore-control-room/operator.toml`
-
-## Suchreihenfolge der Werte
-
-API:
-
-1. `--api`
-2. `NETCORE_CONTROL_ROOM_API`
-3. Profilwert `api`
-4. `http://127.0.0.1:9010`
-
-Token:
-
-1. `--token`
-2. `--token-file`
-3. `NETCORE_CONTROL_ROOM_TOKEN`
-4. `NETCORE_CONTROL_ROOM_OPERATOR_TOKEN`
-5. Profilwert `token`
-6. Profilwert `token_file`
-
-Default Node:
-
-1. `NETCORE_CONTROL_ROOM_NODE_ID`
-2. Profilwert `default_node`
-3. `tbs-04010001`
-
-Operator-ID:
-
-1. `NETCORE_CONTROL_ROOM_OPERATOR_ID`
-2. Profilwert `operator_id`
-3. `operator`
-
-## Beispiel
+Beispiel:
 
 ```toml
 [profiles.default]
 api = "http://10.0.1.25:9010"
 default_node = "SRV-M_TBS-01"
 operator_id = "jan"
-token_file = "/etc/netcore-control-room/operator.token"
+username = "jan"
 ```
 
-## Prüfen
+Die Windows-UI fragt das Passwort beim Start ab.
+
+Die CLI kann Passwort optional per Env oder Datei bekommen:
 
 ```bash
-netcore-control-room-operator profiles show
+export NETCORE_CONTROL_ROOM_USER=jan
+export NETCORE_CONTROL_ROOM_PASSWORD='<passwort>'
+./target/release/netcore-control-room-operator overview
 ```
-
-Die Ausgabe zeigt nicht den Klartext-Token, sondern nur `token_present` und `token_source`.

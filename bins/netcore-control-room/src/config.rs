@@ -56,7 +56,8 @@ impl ControlRoomConfig {
         auth_enabled: bool,
         no_auth: bool,
         node_token: Option<String>,
-        operator_token: Option<String>,
+        bootstrap_username: Option<String>,
+        bootstrap_password: Option<String>,
     ) {
         if let Some(bind) = bind {
             self.server.bind = bind;
@@ -86,8 +87,11 @@ impl ControlRoomConfig {
         if let Some(node_token) = node_token {
             self.auth.node_token = Some(node_token);
         }
-        if let Some(operator_token) = operator_token {
-            self.auth.operator_token = Some(operator_token);
+        if let Some(bootstrap_username) = bootstrap_username {
+            self.auth.bootstrap_username = Some(bootstrap_username);
+        }
+        if let Some(bootstrap_password) = bootstrap_password {
+            self.auth.bootstrap_password = Some(bootstrap_password);
         }
         self.normalise();
     }
@@ -137,20 +141,24 @@ impl Default for ServerConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct AuthConfig {
-    /// Master switch. Keep disabled until tokens are configured on both the LXC and the TBS/operator.
+    /// Master switch. Keep disabled only for first lab tests.
     pub enabled: bool,
     /// Keep /health public for service checks even when auth is enabled.
     pub allow_health_unauthenticated: bool,
-    /// Node token for BS -> Control Room WebSocket authentication. Prefer node_token_env for production.
+    /// Node token for BS -> Control Room WebSocket authentication. This remains machine auth for the TBS.
     pub node_token: Option<String>,
-    /// Operator bootstrap token for HTTP API and operator clients. Prefer operator_token_env for production.
-    pub operator_token: Option<String>,
-    /// Role for the bootstrap operator token. Keep admin until registry tokens are created.
-    pub operator_token_role: String,
     /// Environment variable containing the node token.
     pub node_token_env: Option<String>,
-    /// Environment variable containing the operator token.
-    pub operator_token_env: Option<String>,
+    /// Bootstrap admin username for initial recovery/login. Prefer bootstrap_username_env for production.
+    pub bootstrap_username: Option<String>,
+    /// Bootstrap admin password for initial recovery/login. Prefer bootstrap_password_env for production.
+    pub bootstrap_password: Option<String>,
+    /// Role for the bootstrap user. Keep admin unless you intentionally want a weaker recovery account.
+    pub bootstrap_role: String,
+    /// Environment variable containing the bootstrap username.
+    pub bootstrap_username_env: Option<String>,
+    /// Environment variable containing the bootstrap password.
+    pub bootstrap_password_env: Option<String>,
 }
 
 impl Default for AuthConfig {
@@ -159,26 +167,30 @@ impl Default for AuthConfig {
             enabled: false,
             allow_health_unauthenticated: true,
             node_token: None,
-            operator_token: None,
-            operator_token_role: "admin".to_string(),
             node_token_env: Some("NETCORE_CONTROL_ROOM_NODE_TOKEN".to_string()),
-            operator_token_env: Some("NETCORE_CONTROL_ROOM_OPERATOR_TOKEN".to_string()),
+            bootstrap_username: None,
+            bootstrap_password: None,
+            bootstrap_role: "admin".to_string(),
+            bootstrap_username_env: Some("NETCORE_CONTROL_ROOM_BOOTSTRAP_USER".to_string()),
+            bootstrap_password_env: Some("NETCORE_CONTROL_ROOM_BOOTSTRAP_PASSWORD".to_string()),
         }
     }
 }
 
 impl AuthConfig {
     fn normalise(&mut self) {
-        let role = self.operator_token_role.trim().to_ascii_lowercase();
-        self.operator_token_role = match role.as_str() {
+        let role = self.bootstrap_role.trim().to_ascii_lowercase();
+        self.bootstrap_role = match role.as_str() {
             "viewer" | "operator" | "admin" => role,
             "" => "admin".to_string(),
             _ => "admin".to_string(),
         };
         self.node_token = normalise_optional_secret(self.node_token.take());
-        self.operator_token = normalise_optional_secret(self.operator_token.take());
         self.node_token_env = normalise_optional_secret(self.node_token_env.take());
-        self.operator_token_env = normalise_optional_secret(self.operator_token_env.take());
+        self.bootstrap_username = normalise_optional_secret(self.bootstrap_username.take());
+        self.bootstrap_password = normalise_optional_secret(self.bootstrap_password.take());
+        self.bootstrap_username_env = normalise_optional_secret(self.bootstrap_username_env.take());
+        self.bootstrap_password_env = normalise_optional_secret(self.bootstrap_password_env.take());
     }
 }
 

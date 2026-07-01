@@ -8,7 +8,10 @@ use serde_json::{Value, json};
 use tetra_entities::net_control::ControlCommand;
 use tetra_entities::net_control_room::ControlCommandEnvelope;
 
-use crate::auth::{AuthError, AuthIdentity, AuthRole, AuthState, AuthTokenListResponse, CreateAuthTokenRequest, UpdateAuthTokenRequest};
+use crate::auth::{
+    AuthError, AuthIdentity, AuthRole, AuthState, ChangePasswordRequest, CreateUserRequest, LoginRequest,
+    LoginResponse, UpdateUserRequest, UserListResponse,
+};
 use crate::state::{SharedControlRoom, now_iso};
 
 const MAX_HTTP_REQUEST_BYTES: usize = 1024 * 1024;
@@ -82,10 +85,11 @@ fn route_http(request: HttpRequest, state: SharedControlRoom, node_path: &str, u
     }
 
     let health_public = request.method == "GET" && request.path == "/health" && auth.allow_health_unauthenticated();
-    let identity = if health_public {
+    let login_public = request.method == "POST" && request.path == "/api/login";
+    let identity = if health_public || login_public {
         None
     } else {
-        match auth.authorize_http_role(&request.headers, &request.query, required_role_for_request(&request)) {
+        match auth.authorize_http_role(&request.headers, required_role_for_request(&request)) {
             Ok(identity) => Some(identity),
             Err(err) => {
                 tracing::warn!(method = %request.method, path = %request.path, required = %required_role_for_request(&request), "http request rejected by RBAC");
@@ -100,6 +104,12 @@ fn route_http(request: HttpRequest, state: SharedControlRoom, node_path: &str, u
             "ok": true,
             "service": "netcore-control-room",
             "timestamp": now_iso(),
+        })),
+        ("POST", "/api/login") => api_login(&request.body, auth),
+        ("GET", "/api/me") => HttpResponse::json(200, &json!({
+            "ok": true,
+            "user": identity.as_ref(),
+            "auth_mode": "user_password"
         })),
         ("GET", "/api/overview") => HttpResponse::json(200, &state.overview()),
         ("GET", "/api/directory") => HttpResponse::json(200, directory),
@@ -136,14 +146,15 @@ fn route_http(request: HttpRequest, state: SharedControlRoom, node_path: &str, u
                 .map(String::as_str);
             HttpResponse::json(200, &state.recent_events_filtered(limit, event_type, quiet))
         }
-        ("GET", "/api/admin/tokens") => admin_list_tokens(auth),
-        ("POST", "/api/admin/tokens") => admin_create_token(&request.body, auth, identity.as_ref()),
+        ("GET", "/api/admin/users") => admin_list_users(auth),
+        ("POST", "/api/admin/users") => admin_create_user(&request.body, auth, identity.as_ref()),
         ("POST", "/api/commands") => submit_command_from_body(&request.body, state, None),
-        _ if request.path.starts_with("/api/admin/tokens/") => {
-            match parse_admin_token_route(&request.path) {
-                Some(token_id) if request.method == "PATCH" || request.method == "POST" => admin_update_token(&token_id, &request.body, auth),
-                Some(token_id) if request.method == "DELETE" => admin_delete_token(&token_id, auth),
-                _ => HttpResponse::json(404, &json!({ "error": "unknown admin token route" })),
+        _ if request.path.starts_with("/api/admin/users/") => {
+            match parse_admin_user_route(&request.path) {
+                Some((username, Some("password"))) if request.method == "POST" => admin_change_user_password(&username, &request.body, auth),
+                Some((username, None)) if request.method == "PATCH" || request.method == "POST" => admin_update_user(&username, &request.body, auth),
+                Some((username, None)) if request.method == "DELETE" => admin_delete_user(&username, auth),
+                _ => HttpResponse::json(404, &json!({ "error": "unknown admin user route" })),
             }
         }
         _ if request.method == "GET" => {
@@ -197,7 +208,7 @@ fn route_http(request: HttpRequest, state: SharedControlRoom, node_path: &str, u
 }
 
 fn required_role_for_request(request: &HttpRequest) -> AuthRole {
-    if request.path.starts_with("/api/admin/tokens") {
+    if request.path.starts_with("/api/admin/users") {
         return AuthRole::Admin;
     }
     if request.method == "POST" {
@@ -214,52 +225,76 @@ fn required_role_for_request(request: &HttpRequest) -> AuthRole {
     AuthRole::Viewer
 }
 
-fn admin_list_tokens(auth: &AuthState) -> HttpResponse {
-    match auth.list_tokens() {
-        Ok(tokens) => HttpResponse::json(200, &AuthTokenListResponse { now: now_iso(), count: tokens.len(), tokens }),
+fn api_login(body: &[u8], auth: &AuthState) -> HttpResponse {
+    let req: LoginRequest = match parse_json_body(body) {
+        Ok(req) => req,
+        Err(response) => return response,
+    };
+    match auth.login(&req.username, &req.password) {
+        Ok(user) => HttpResponse::json(200, &LoginResponse { ok: true, user, auth_mode: "user_password" }),
+        Err(err) => auth_error_response(err, AuthRole::Viewer),
+    }
+}
+
+fn admin_list_users(auth: &AuthState) -> HttpResponse {
+    match auth.list_users() {
+        Ok(users) => HttpResponse::json(200, &UserListResponse { now: now_iso(), count: users.len(), users }),
         Err(err) => HttpResponse::json(500, &json!({ "error": err })),
     }
 }
 
-fn admin_create_token(body: &[u8], auth: &AuthState, identity: Option<&AuthIdentity>) -> HttpResponse {
-    let req: CreateAuthTokenRequest = match parse_json_body(body) {
+fn admin_create_user(body: &[u8], auth: &AuthState, identity: Option<&AuthIdentity>) -> HttpResponse {
+    let req: CreateUserRequest = match parse_json_body(body) {
         Ok(req) => req,
         Err(response) => return response,
     };
-    match auth.create_token(req, identity.map(|i| i.label.as_str())) {
+    match auth.create_user(req, identity.map(|i| i.username.as_str())) {
         Ok(created) => HttpResponse::json(201, &created),
         Err(err) => HttpResponse::json(400, &json!({ "error": err })),
     }
 }
 
-fn admin_update_token(token_id: &str, body: &[u8], auth: &AuthState) -> HttpResponse {
-    let req: UpdateAuthTokenRequest = match parse_json_body(body) {
+fn admin_update_user(username: &str, body: &[u8], auth: &AuthState) -> HttpResponse {
+    let req: UpdateUserRequest = match parse_json_body(body) {
         Ok(req) => req,
         Err(response) => return response,
     };
-    match auth.update_token(token_id, req) {
+    match auth.update_user(username, req) {
         Ok(updated) => HttpResponse::json(200, &updated),
-        Err(err) if err == "token not found" => HttpResponse::json(404, &json!({ "error": err })),
+        Err(err) if err == "user not found" => HttpResponse::json(404, &json!({ "error": err })),
         Err(err) => HttpResponse::json(400, &json!({ "error": err })),
     }
 }
 
-fn admin_delete_token(token_id: &str, auth: &AuthState) -> HttpResponse {
-    match auth.delete_token(token_id) {
-        Ok(true) => HttpResponse::json(200, &json!({ "deleted": true, "id": token_id })),
-        Ok(false) => HttpResponse::json(404, &json!({ "error": "token not found", "id": token_id })),
+fn admin_change_user_password(username: &str, body: &[u8], auth: &AuthState) -> HttpResponse {
+    let req: ChangePasswordRequest = match parse_json_body(body) {
+        Ok(req) => req,
+        Err(response) => return response,
+    };
+    match auth.change_user_password(username, req) {
+        Ok(updated) => HttpResponse::json(200, &updated),
+        Err(err) if err == "user not found" => HttpResponse::json(404, &json!({ "error": err })),
+        Err(err) => HttpResponse::json(400, &json!({ "error": err })),
+    }
+}
+
+fn admin_delete_user(username: &str, auth: &AuthState) -> HttpResponse {
+    match auth.delete_user(username) {
+        Ok(true) => HttpResponse::json(200, &json!({ "deleted": true, "username": username })),
+        Ok(false) => HttpResponse::json(404, &json!({ "error": "user not found", "username": username })),
         Err(err) => HttpResponse::json(500, &json!({ "error": err })),
     }
 }
 
-fn parse_admin_token_route(path: &str) -> Option<String> {
-    let rest = path.strip_prefix("/api/admin/tokens/")?;
+fn parse_admin_user_route(path: &str) -> Option<(String, Option<&'static str>)> {
+    let rest = path.strip_prefix("/api/admin/users/")?;
     let mut parts = rest.split('/').filter(|part| !part.is_empty());
-    let id = parts.next()?.to_string();
-    if parts.next().is_some() {
-        return None;
+    let username = parts.next()?.to_string();
+    match parts.next() {
+        None => Some((username, None)),
+        Some("password") if parts.next().is_none() => Some((username, Some("password"))),
+        _ => None,
     }
-    Some(id)
 }
 
 
@@ -503,7 +538,7 @@ pub fn read_http_request(stream: &mut TcpStream) -> Result<HttpRequest, String> 
 
 pub fn write_response(stream: &mut TcpStream, response: &HttpResponse) -> std::io::Result<()> {
     let header = format!(
-        "HTTP/1.1 {} {}\r\nContent-Type: {}\r\nContent-Length: {}\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Methods: GET, POST, PATCH, DELETE, OPTIONS\r\nAccess-Control-Allow-Headers: Content-Type, Authorization, X-Control-Room-Token, X-NetCore-Token, X-Operator-Token\r\nConnection: close\r\n\r\n",
+        "HTTP/1.1 {} {}\r\nContent-Type: {}\r\nContent-Length: {}\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Methods: GET, POST, PATCH, DELETE, OPTIONS\r\nAccess-Control-Allow-Headers: Content-Type, Authorization\r\nConnection: close\r\n\r\n",
         response.status,
         response.reason,
         response.content_type,
@@ -594,10 +629,13 @@ fn not_found(node_path: &str, ui_path: &str) -> HttpResponse {
                 "GET /api/health/full",
                 "GET /api/events?limit=50&quiet=true",
                 "GET /api/commands?limit=50",
-                "GET /api/admin/tokens",
-                "POST /api/admin/tokens",
-                "POST/PATCH /api/admin/tokens/{token_id}",
-                "DELETE /api/admin/tokens/{token_id}",
+                "POST /api/login",
+                "GET /api/me",
+                "GET /api/admin/users",
+                "POST /api/admin/users",
+                "PATCH /api/admin/users/{username}",
+                "POST /api/admin/users/{username}/password",
+                "DELETE /api/admin/users/{username}",
                 "POST /api/commands",
                 "POST /api/nodes/{node_id}/commands",
                 "POST /api/nodes/{node_id}/commands/kick",
@@ -615,7 +653,7 @@ fn auth_error_response(error: AuthError, required: AuthRole) -> HttpResponse {
         AuthError::Missing | AuthError::Invalid => HttpResponse::json(401, &json!({
             "error": "unauthorized",
             "required_role": required.as_str(),
-            "hint": "send Authorization: Bearer <token> or X-Control-Room-Token"
+            "hint": "login with username/password or send HTTP Basic auth"
         })),
         AuthError::Insufficient => HttpResponse::json(403, &json!({
             "error": "forbidden",
@@ -683,10 +721,13 @@ fn index_html(node_path: &str, ui_path: &str) -> String {
     <li><code>GET /api/health/full</code> — technische Health-Daten</li>
     <li><code>GET /api/events?limit=50&amp;quiet=true</code></li>
     <li><code>GET /api/commands?limit=50</code></li>
-    <li><code>GET /api/admin/tokens</code> — Admin: Tokenliste</li>
-    <li><code>POST /api/admin/tokens</code> — Admin: Token erzeugen</li>
-    <li><code>PATCH /api/admin/tokens/&lt;token_id&gt;</code> — Admin: Token ändern/deaktivieren</li>
-    <li><code>DELETE /api/admin/tokens/&lt;token_id&gt;</code> — Admin: Token löschen</li>
+    <li><code>POST /api/login</code> — Benutzer/Passwort Login-Prüfung</li>
+    <li><code>GET /api/me</code> — angemeldeter Benutzer</li>
+    <li><code>GET /api/admin/users</code> — Admin: Benutzerliste</li>
+    <li><code>POST /api/admin/users</code> — Admin: Benutzer anlegen</li>
+    <li><code>PATCH /api/admin/users/&lt;username&gt;</code> — Admin: Rolle/Aktivierung ändern</li>
+    <li><code>POST /api/admin/users/&lt;username&gt;/password</code> — Admin: Passwort ändern</li>
+    <li><code>DELETE /api/admin/users/&lt;username&gt;</code> — Admin: Benutzer löschen</li>
     <li><code>POST /api/nodes/&lt;node_id&gt;/commands</code></li>
     <li><code>POST /api/nodes/&lt;node_id&gt;/commands/kick</code></li>
     <li><code>POST /api/nodes/&lt;node_id&gt;/commands/dgna</code></li>

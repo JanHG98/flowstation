@@ -15,7 +15,7 @@ ui_path = "/ui"
 history_limit = 1000
 
 [persistence]
-# Enables SQLite persistence for audit/history data and RBAC token registry.
+# Enables SQLite persistence for audit/history data and user/RBAC registry.
 enabled = true
 
 # Recommended path when running as systemd service in the LXC.
@@ -29,24 +29,25 @@ persist_noisy_events = false
 load_recent_limit = 1000
 
 [auth]
-# Set to true after you configured both bootstrap tokens in /etc/netcore-control-room/control-room.env
-# and added the node token to the TBS [control_room] config.
+# Set to true after you configured the node token and bootstrap user/password in
+# /etc/netcore-control-room/control-room.env and added the node token to the TBS config.toml.
 enabled = false
 
-# Keep /health available without token for systemd/monitoring checks.
+# Keep /health available without login for systemd/monitoring checks.
 allow_health_unauthenticated = true
 
-# Prefer environment variables over writing secrets into this TOML file.
+# TBS machine auth. Prefer environment variable over writing the secret here.
 node_token_env = "NETCORE_CONTROL_ROOM_NODE_TOKEN"
-operator_token_env = "NETCORE_CONTROL_ROOM_OPERATOR_TOKEN"
 
-# Bootstrap operator token role. Keep admin until you created proper registry tokens.
-# Valid: viewer, operator, admin
-operator_token_role = "admin"
+# Initial/recovery admin login. Prefer environment variables over writing secrets here.
+bootstrap_username_env = "NETCORE_CONTROL_ROOM_BOOTSTRAP_USER"
+bootstrap_password_env = "NETCORE_CONTROL_ROOM_BOOTSTRAP_PASSWORD"
+bootstrap_role = "admin"
 
-# Development-only alternative. Do not commit real tokens.
+# Development-only alternative. Do not commit real secrets.
 # node_token = "change-me-node-token"
-# operator_token = "change-me-operator-token"
+# bootstrap_username = "jan"
+# bootstrap_password = "change-me-admin-password"
 
 
 # Zentrales Directory für Operator-UI und API. Keine Secrets hier eintragen.

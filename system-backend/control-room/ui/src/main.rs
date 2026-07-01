@@ -13,7 +13,7 @@ const DEFAULT_API: &str = "http://127.0.0.1:9010";
 const DEFAULT_PROFILE: &str = "default";
 const DEFAULT_NODE: &str = "SRV-M_TBS-01";
 const DEFAULT_OPERATOR: &str = "jan";
-const UI_VERSION_LABEL: &str = "Native UI v4.7 · Directory-first · Zombie-frei";
+const UI_VERSION_LABEL: &str = "Native UI v5.0 · klassischer Login · RBAC";
 const DEFAULT_TILE_URL: &str = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
 const DEFAULT_TILE_ATTRIBUTION: &str = "© OpenStreetMap contributors";
 const TILE_SIZE: f64 = 256.0;
@@ -39,8 +39,8 @@ struct ResolvedSettings {
     config_path: Option<PathBuf>,
     profile: String,
     api: String,
-    token: Option<String>,
-    token_source: Option<String>,
+    username: Option<String>,
+    username_source: Option<String>,
     default_node: String,
     operator_id: String,
     map: MapSettings,
@@ -282,8 +282,7 @@ fn default_tile_cache_dir() -> PathBuf {
 #[derive(Debug, Default, Clone, Deserialize)]
 struct ProfileConfig {
     api: Option<String>,
-    token: Option<String>,
-    token_file: Option<PathBuf>,
+    username: Option<String>,
     default_node: Option<String>,
     operator_id: Option<String>,
 }
@@ -291,8 +290,7 @@ struct ProfileConfig {
 #[derive(Debug, Default)]
 struct CliArgs {
     api: Option<String>,
-    token: Option<String>,
-    token_file: Option<PathBuf>,
+    username: Option<String>,
     config: Option<PathBuf>,
     profile: String,
 }
@@ -313,25 +311,16 @@ impl ResolvedSettings {
             .or_else(|| profile.and_then(|profile| profile.api.clone()))
             .unwrap_or_else(|| DEFAULT_API.to_string());
 
-        let mut token_source = None;
-        let token = if let Some(token) = cli.token.clone().filter(|token| !token.trim().is_empty()) {
-            token_source = Some("CLI --token".to_string());
-            Some(token)
-        } else if let Some(path) = cli.token_file.as_ref() {
-            token_source = Some(format!("CLI --token-file {}", path.display()));
-            read_token_file(path).ok().flatten()
-        } else if let Some(token) = env_nonempty("NETCORE_CONTROL_ROOM_TOKEN") {
-            token_source = Some("env NETCORE_CONTROL_ROOM_TOKEN".to_string());
-            Some(token)
-        } else if let Some(token) = env_nonempty("NETCORE_CONTROL_ROOM_OPERATOR_TOKEN") {
-            token_source = Some("env NETCORE_CONTROL_ROOM_OPERATOR_TOKEN".to_string());
-            Some(token)
-        } else if let Some(token) = profile.and_then(|profile| profile.token.clone()).filter(|token| !token.trim().is_empty()) {
-            token_source = Some(format!("profile {} token", cli.profile));
-            Some(token)
-        } else if let Some(path) = profile.and_then(|profile| profile.token_file.as_ref()) {
-            token_source = Some(format!("profile {} token_file {}", cli.profile, path.display()));
-            read_token_file(path).ok().flatten()
+        let mut username_source = None;
+        let username = if let Some(username) = cli.username.clone().filter(|username| !username.trim().is_empty()) {
+            username_source = Some("CLI --username".to_string());
+            Some(username)
+        } else if let Some(username) = env_nonempty("NETCORE_CONTROL_ROOM_USER") {
+            username_source = Some("env NETCORE_CONTROL_ROOM_USER".to_string());
+            Some(username)
+        } else if let Some(username) = profile.and_then(|profile| profile.username.clone()).filter(|username| !username.trim().is_empty()) {
+            username_source = Some(format!("profile {} username", cli.profile));
+            Some(username)
         } else {
             None
         };
@@ -352,8 +341,8 @@ impl ResolvedSettings {
                 config_path,
                 profile: cli.profile,
                 api,
-                token,
-                token_source,
+                username,
+                username_source,
                 default_node,
                 operator_id,
                 map,
@@ -373,15 +362,13 @@ fn parse_args() -> CliArgs {
     while let Some(arg) = iter.next() {
         match arg.as_str() {
             "--api" => args.api = iter.next(),
-            "--token" => args.token = iter.next(),
-            "--token-file" => args.token_file = iter.next().map(PathBuf::from),
+            "--username" => args.username = iter.next(),
             "--config" => args.config = iter.next().map(PathBuf::from),
             "--profile" => args.profile = iter.next().unwrap_or_else(|| DEFAULT_PROFILE.to_string()),
             "--help" | "-h" => {
                 println!("NetCore Control Room Operator UI");
                 println!("  --api <url>");
-                println!("  --token <token>");
-                println!("  --token-file <path>");
+                println!("  --username <user>");
                 println!("  --config <operator.toml>");
                 println!("  --profile <name>");
                 std::process::exit(0);
@@ -446,10 +433,6 @@ fn env_nonempty(name: &str) -> Option<String> {
     env::var(name).ok().map(|value| value.trim().to_string()).filter(|value| !value.is_empty())
 }
 
-fn read_token_file(path: &Path) -> Result<Option<String>, std::io::Error> {
-    let token = fs::read_to_string(path)?.trim().to_string();
-    if token.is_empty() { Ok(None) } else { Ok(Some(token)) }
-}
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 enum Tab {
@@ -461,7 +444,7 @@ enum Tab {
     Locations,
     Map,
     Commands,
-    AdminTokens,
+    AdminUsers,
     Raw,
 }
 
@@ -475,7 +458,7 @@ impl Tab {
         Tab::Locations,
         Tab::Map,
         Tab::Commands,
-        Tab::AdminTokens,
+        Tab::AdminUsers,
         Tab::Raw,
     ];
 
@@ -489,7 +472,7 @@ impl Tab {
             Tab::Locations => "Standorte",
             Tab::Map => "Karte",
             Tab::Commands => "Commands",
-            Tab::AdminTokens => "Admin/Tokens",
+            Tab::AdminUsers => "Admin/User",
             Tab::Raw => "Raw JSON",
         }
     }
@@ -497,7 +480,8 @@ impl Tab {
 
 struct ApiClient {
     base: String,
-    token: Option<String>,
+    username: Option<String>,
+    password: Option<String>,
     http: reqwest::blocking::Client,
 }
 
@@ -509,45 +493,57 @@ impl ApiClient {
             .unwrap_or_else(|_| reqwest::blocking::Client::new());
         Self {
             base: settings.api.trim_end_matches('/').to_string(),
-            token: settings.token.clone(),
+            username: None,
+            password: None,
             http,
         }
     }
 
     fn get(&self, path: &str) -> Result<Value, String> {
         let url = self.url(path);
-        let mut request = self.http.get(&url);
-        if let Some(token) = &self.token {
-            request = request.bearer_auth(token);
-        }
+        let request = self.with_auth(self.http.get(&url));
         self.read(url, request.send().map_err(|error| error.to_string())?)
     }
 
     fn post<T: Serialize + ?Sized>(&self, path: &str, body: &T) -> Result<Value, String> {
         let url = self.url(path);
-        let mut request = self.http.post(&url).json(body);
-        if let Some(token) = &self.token {
-            request = request.bearer_auth(token);
-        }
+        let request = self.with_auth(self.http.post(&url).json(body));
         self.read(url, request.send().map_err(|error| error.to_string())?)
     }
 
     fn patch<T: Serialize + ?Sized>(&self, path: &str, body: &T) -> Result<Value, String> {
         let url = self.url(path);
-        let mut request = self.http.patch(&url).json(body);
-        if let Some(token) = &self.token {
-            request = request.bearer_auth(token);
-        }
+        let request = self.with_auth(self.http.patch(&url).json(body));
         self.read(url, request.send().map_err(|error| error.to_string())?)
     }
 
     fn delete(&self, path: &str) -> Result<Value, String> {
         let url = self.url(path);
-        let mut request = self.http.delete(&url);
-        if let Some(token) = &self.token {
-            request = request.bearer_auth(token);
-        }
+        let request = self.with_auth(self.http.delete(&url));
         self.read(url, request.send().map_err(|error| error.to_string())?)
+    }
+
+    fn set_login(&mut self, username: String, password: String) {
+        self.username = Some(username);
+        self.password = Some(password);
+    }
+
+    fn clear_login(&mut self) {
+        self.username = None;
+        self.password = None;
+    }
+
+    fn login(&self, username: &str, password: &str) -> Result<Value, String> {
+        let url = self.url("/api/login");
+        let body = json!({ "username": username, "password": password });
+        self.read(url.clone(), self.http.post(&url).json(&body).send().map_err(|error| error.to_string())?)
+    }
+
+    fn with_auth(&self, request: reqwest::blocking::RequestBuilder) -> reqwest::blocking::RequestBuilder {
+        match (self.username.as_ref(), self.password.as_ref()) {
+            (Some(username), Some(password)) => request.basic_auth(username, Some(password)),
+            _ => request,
+        }
     }
 
     fn read(&self, url: String, response: reqwest::blocking::Response) -> Result<Value, String> {
@@ -594,7 +590,12 @@ struct ControlRoomApp {
     locations: Option<Value>,
     commands: Option<Value>,
     emergencies: Option<Value>,
-    admin_tokens: Option<Value>,
+    admin_users: Option<Value>,
+    current_user: Option<Value>,
+    logged_in: bool,
+    login_username: String,
+    login_password: String,
+    login_result: Option<String>,
 
     kick_issi: String,
     dgna_issi: String,
@@ -603,11 +604,11 @@ struct ControlRoomApp {
     clear_issi: String,
     command_result: Option<String>,
 
-    new_token_label: String,
-    new_token_role: String,
-    new_token_expires: String,
-    new_token_created_by: String,
-    token_result: Option<String>,
+    new_user_username: String,
+    new_user_display_name: String,
+    new_user_password: String,
+    new_user_role: String,
+    user_result: Option<String>,
 
     detached_windows: HashMap<Tab, bool>,
     window_mode: bool,
@@ -634,11 +635,11 @@ impl ControlRoomApp {
             dgna_detach: false,
             clear_issi: String::new(),
             command_result: None,
-            new_token_label: String::new(),
-            new_token_role: "viewer".to_string(),
-            new_token_expires: String::new(),
-            new_token_created_by: settings.operator_id.clone(),
-            token_result: None,
+            new_user_username: String::new(),
+            new_user_display_name: String::new(),
+            new_user_password: String::new(),
+            new_user_role: "viewer".to_string(),
+            user_result: None,
             map_tiles_enabled: settings.map.online_tiles,
             map_zoom_adjust: 0,
             map_wheel_zoom_accum: 0.0,
@@ -664,7 +665,12 @@ impl ControlRoomApp {
             locations: None,
             commands: None,
             emergencies: None,
-            admin_tokens: None,
+            admin_users: None,
+            current_user: None,
+            logged_in: false,
+            login_username: settings.username.clone().unwrap_or_else(|| settings.operator_id.clone()),
+            login_password: String::new(),
+            login_result: None,
             detached_windows: HashMap::new(),
             window_mode: false,
             map_follow_latest: true,
@@ -683,9 +689,13 @@ impl ControlRoomApp {
         self.get_into("/api/commands?limit=50", DataSlot::Commands, &mut errors);
         self.get_into("/api/emergencies", DataSlot::Emergencies, &mut errors);
 
-        match self.api.get("/api/admin/tokens") {
-            Ok(value) => self.admin_tokens = Some(value),
-            Err(error) => self.admin_tokens = Some(json!({ "error": error })),
+        match self.api.get("/api/me") {
+            Ok(value) => self.current_user = Some(value),
+            Err(error) => self.current_user = Some(json!({ "error": error })),
+        }
+        match self.api.get("/api/admin/users") {
+            Ok(value) => self.admin_users = Some(value),
+            Err(error) => self.admin_users = Some(json!({ "error": error })),
         }
 
         self.last_refresh = Some(Instant::now());
@@ -806,37 +816,78 @@ impl ControlRoomApp {
         self.refresh_all();
     }
 
-    fn create_token(&mut self) {
-        let label = self.new_token_label.trim();
-        if label.is_empty() {
-            self.token_result = Some("Label fehlt".to_string());
+    fn login(&mut self) {
+        let username = self.login_username.trim().to_string();
+        let password = self.login_password.clone();
+        if username.is_empty() || password.is_empty() {
+            self.login_result = Some("Benutzername und Passwort sind erforderlich".to_string());
             return;
         }
-        let expires_at = self.new_token_expires.trim();
+        match self.api.login(&username, &password) {
+            Ok(value) => {
+                self.api.set_login(username, password);
+                self.current_user = Some(value);
+                self.logged_in = true;
+                self.login_result = None;
+                self.refresh_all();
+            }
+            Err(error) => self.login_result = Some(error),
+        }
+    }
+
+    fn logout(&mut self) {
+        self.api.clear_login();
+        self.logged_in = false;
+        self.login_password.clear();
+        self.current_user = None;
+        self.overview = None;
+        self.subscribers = None;
+        self.groups = None;
+        self.calls = None;
+        self.sds = None;
+        self.locations = None;
+        self.commands = None;
+        self.emergencies = None;
+        self.admin_users = None;
+    }
+
+    fn create_user(&mut self) {
+        let username = self.new_user_username.trim();
+        if username.is_empty() {
+            self.user_result = Some("Benutzername fehlt".to_string());
+            return;
+        }
+        if self.new_user_password.trim().len() < 6 {
+            self.user_result = Some("Passwort muss mindestens 6 Zeichen haben".to_string());
+            return;
+        }
         let body = json!({
-            "label": label,
-            "role": self.new_token_role.trim(),
-            "expires_at": if expires_at.is_empty() { Value::Null } else { Value::String(expires_at.to_string()) },
-            "created_by": self.new_token_created_by.trim(),
+            "username": username,
+            "display_name": self.new_user_display_name.trim(),
+            "password": self.new_user_password.clone(),
+            "role": self.new_user_role.trim(),
+            "enabled": true,
+            "created_by": self.login_username.trim(),
         });
-        self.token_result = Some(match self.api.post("/api/admin/tokens", &body) {
+        self.user_result = Some(match self.api.post("/api/admin/users", &body) {
             Ok(value) => pretty(&value),
             Err(error) => error,
         });
+        self.new_user_password.clear();
         self.refresh_all();
     }
 
-    fn set_token_enabled(&mut self, id: &str, enabled: bool) {
+    fn set_user_enabled(&mut self, username: &str, enabled: bool) {
         let body = json!({ "enabled": enabled });
-        self.token_result = Some(match self.api.patch(&format!("/api/admin/tokens/{id}"), &body) {
+        self.user_result = Some(match self.api.patch(&format!("/api/admin/users/{username}"), &body) {
             Ok(value) => pretty(&value),
             Err(error) => error,
         });
         self.refresh_all();
     }
 
-    fn delete_token(&mut self, id: &str) {
-        self.token_result = Some(match self.api.delete(&format!("/api/admin/tokens/{id}")) {
+    fn delete_user(&mut self, username: &str) {
+        self.user_result = Some(match self.api.delete(&format!("/api/admin/users/{username}")) {
             Ok(value) => pretty(&value),
             Err(error) => error,
         });
@@ -858,6 +909,10 @@ enum DataSlot {
 
 impl eframe::App for ControlRoomApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        if !self.logged_in {
+            self.render_login_screen(ctx);
+            return;
+        }
         if self.overview.is_none() {
             self.refresh_all();
         }
@@ -881,14 +936,17 @@ impl eframe::App for ControlRoomApp {
                 ui.label(format!("Profil: {}", self.settings.profile));
                 ui.label(format!("Node: {}", self.settings.default_node));
                 ui.label(format!("Operator: {}", self.settings.operator_id));
-                if self.settings.token.is_some() {
-                    ui.label("Token: geladen");
+                if self.logged_in {
+                    ui.label(format!("Login: {}", self.login_username));
                 } else {
-                    ui.colored_label(egui::Color32::YELLOW, "Token: fehlt");
+                    ui.colored_label(egui::Color32::YELLOW, "Nicht angemeldet");
                 }
                 ui.label(format!("Directory: {}", self.directory_source));
                 if ui.button("Refresh").clicked() {
                     self.refresh_all();
+                }
+                if ui.button("Logout").clicked() {
+                    self.logout();
                 }
                 ui.checkbox(&mut self.auto_refresh, "Auto");
                 ui.add(egui::Slider::new(&mut self.refresh_seconds, 1.0..=15.0).text("s"));
@@ -896,8 +954,8 @@ impl eframe::App for ControlRoomApp {
             if let Some(path) = &self.settings.config_path {
                 ui.small(format!("Config: {}", path.display()));
             }
-            if let Some(source) = &self.settings.token_source {
-                ui.small(format!("Token-Quelle: {source}"));
+            if let Some(source) = &self.settings.username_source {
+                ui.small(format!("Benutzer-Quelle: {source}"));
             }
             if let Some(warning) = &self.startup_warning {
                 ui.colored_label(egui::Color32::YELLOW, warning);
@@ -962,7 +1020,7 @@ impl ControlRoomApp {
             Tab::Locations => self.render_locations(ui),
             Tab::Map => self.render_map(ui),
             Tab::Commands => self.render_commands(ui),
-            Tab::AdminTokens => self.render_admin_tokens(ui),
+            Tab::AdminUsers => self.render_admin_users(ui),
             Tab::Raw => self.render_raw(ui),
         }
     }
@@ -984,7 +1042,7 @@ impl ControlRoomApp {
             let default_size = match tab {
                 Tab::Map => [1100.0, 760.0],
                 Tab::Overview => [1180.0, 760.0],
-                Tab::AdminTokens => [1050.0, 720.0],
+                Tab::AdminUsers => [1050.0, 720.0],
                 Tab::Raw => [980.0, 720.0],
                 _ => [900.0, 640.0],
             };
@@ -1971,38 +2029,77 @@ Klick auf GPS-Punkt = Details",
         });
     }
 
-    fn render_admin_tokens(&mut self, ui: &mut egui::Ui) {
-        ui.heading("Admin / Tokenverwaltung");
-        ui.label("Tokenwerte werden nur beim Erstellen einmal angezeigt. Die Liste enthält keine Klartext-Tokens.");
+    fn render_login_screen(&mut self, ctx: &egui::Context) {
+        egui::CentralPanel::default().show(ctx, |ui| {
+            ui.vertical_centered(|ui| {
+                ui.add_space(80.0);
+                ui.heading("NetCore Control Room Login");
+                ui.colored_label(egui::Color32::LIGHT_BLUE, UI_VERSION_LABEL);
+                ui.add_space(18.0);
+                ui.label(format!("API: {}", self.settings.api));
+                ui.label(format!("Profil: {}", self.settings.profile));
+                ui.add_space(12.0);
+                egui::Frame::group(ui.style()).show(ui, |ui| {
+                    egui::Grid::new("login_grid").show(ui, |ui| {
+                        ui.label("Benutzer");
+                        ui.text_edit_singleline(&mut self.login_username);
+                        ui.end_row();
+                        ui.label("Passwort");
+                        let response = ui.add(egui::TextEdit::singleline(&mut self.login_password).password(true));
+                        ui.end_row();
+                        if response.lost_focus() && ui.input(|input| input.key_pressed(egui::Key::Enter)) {
+                            self.login();
+                        }
+                    });
+                    ui.add_space(8.0);
+                    if ui.button("Anmelden").clicked() {
+                        self.login();
+                    }
+                    if let Some(result) = &self.login_result {
+                        ui.add_space(8.0);
+                        ui.colored_label(egui::Color32::RED, result);
+                    }
+                });
+                ui.add_space(10.0);
+                ui.small("Der Login nutzt User+Passwort + RBAC. Der TBS-Node-Token bleibt nur Maschinen-Auth für /node.");
+                if let Some(warning) = &self.startup_warning {
+                    ui.colored_label(egui::Color32::YELLOW, warning);
+                }
+            });
+        });
+    }
+
+    fn render_admin_users(&mut self, ui: &mut egui::Ui) {
+        ui.heading("Admin / Benutzer & RBAC");
+        ui.label("Klassische Benutzerverwaltung: Username + Passwort + Rolle. Keine Operator-Tokens mehr.");
         ui.separator();
 
         ui.group(|ui| {
-            ui.heading("Neuen Token erstellen");
-            egui::Grid::new("new_token_grid").show(ui, |ui| {
-                ui.label("Label");
-                ui.text_edit_singleline(&mut self.new_token_label);
+            ui.heading("Neuen Benutzer erstellen");
+            egui::Grid::new("new_user_grid").show(ui, |ui| {
+                ui.label("Username");
+                ui.text_edit_singleline(&mut self.new_user_username);
+                ui.end_row();
+                ui.label("Anzeigename");
+                ui.text_edit_singleline(&mut self.new_user_display_name);
+                ui.end_row();
+                ui.label("Passwort");
+                ui.add(egui::TextEdit::singleline(&mut self.new_user_password).password(true));
                 ui.end_row();
                 ui.label("Role");
-                egui::ComboBox::from_id_source("role_combo")
-                    .selected_text(&self.new_token_role)
+                egui::ComboBox::from_id_source("user_role_combo")
+                    .selected_text(&self.new_user_role)
                     .show_ui(ui, |ui| {
-                        for role in ["viewer", "operator", "admin", "node"] {
-                            ui.selectable_value(&mut self.new_token_role, role.to_string(), role);
+                        for role in ["viewer", "operator", "admin"] {
+                            ui.selectable_value(&mut self.new_user_role, role.to_string(), role);
                         }
                     });
                 ui.end_row();
-                ui.label("Expires at");
-                ui.text_edit_singleline(&mut self.new_token_expires);
-                ui.small("optional, ISO-Zeit");
-                ui.end_row();
-                ui.label("Created by");
-                ui.text_edit_singleline(&mut self.new_token_created_by);
-                ui.end_row();
             });
-            if ui.button("Token erstellen").clicked() {
-                self.create_token();
+            if ui.button("Benutzer erstellen").clicked() {
+                self.create_user();
             }
-            if let Some(result) = &self.token_result {
+            if let Some(result) = &self.user_result {
                 ui.separator();
                 ui.label("Ergebnis:");
                 egui::ScrollArea::vertical().max_height(180.0).show(ui, |ui| ui.monospace(result));
@@ -2010,36 +2107,36 @@ Klick auf GPS-Punkt = Details",
         });
 
         ui.separator();
-        let Some(value) = &self.admin_tokens else { ui.label("Noch keine Daten"); return; };
+        let Some(value) = &self.admin_users else { ui.label("Noch keine Daten"); return; };
         if let Some(error) = str_at(value, &["error"]) {
-            ui.colored_label(egui::Color32::YELLOW, format!("Tokenliste nicht verfügbar: {error}"));
+            ui.colored_label(egui::Color32::YELLOW, format!("Benutzerliste nicht verfügbar: {error}"));
             ui.label("Das ist normal, wenn du nur operator statt admin bist.");
             return;
         }
 
-        let mut action: Option<TokenAction> = None;
+        let mut action: Option<UserAction> = None;
         egui::ScrollArea::vertical().show(ui, |ui| {
-            egui::Grid::new("tokens_grid").striped(true).show(ui, |ui| {
-                header_row(ui, &["ID", "Label", "Role", "Enabled", "Created", "Last used", "Aktion"]);
-                for token in array_at(value, &["tokens"]) {
-                    let id = str_at(token, &["id"]).unwrap_or("?").to_string();
-                    let enabled = bool_at(token, &["enabled"]).unwrap_or(false);
-                    ui.monospace(&id);
-                    ui.label(str_at(token, &["label"]).unwrap_or("?"));
-                    ui.label(str_at(token, &["role"]).unwrap_or("?"));
+            egui::Grid::new("users_grid").striped(true).show(ui, |ui| {
+                header_row(ui, &["Username", "Name", "Role", "Enabled", "Created", "Last login", "Aktion"]);
+                for user in array_at(value, &["users"]) {
+                    let username = str_at(user, &["username"]).unwrap_or("?").to_string();
+                    let enabled = bool_at(user, &["enabled"]).unwrap_or(false);
+                    ui.monospace(&username);
+                    ui.label(str_at(user, &["display_name"]).unwrap_or("?"));
+                    ui.label(str_at(user, &["role"]).unwrap_or("?"));
                     bool_label(ui, enabled);
-                    ui.small(str_at(token, &["created_at"]).unwrap_or("?"));
-                    ui.small(str_at(token, &["last_used_at"]).unwrap_or("-"));
+                    ui.small(str_at(user, &["created_at"]).unwrap_or("?"));
+                    ui.small(str_at(user, &["last_login_at"]).unwrap_or("-"));
                     ui.horizontal(|ui| {
                         if enabled {
                             if ui.button("Disable").clicked() {
-                                action = Some(TokenAction::SetEnabled(id.clone(), false));
+                                action = Some(UserAction::SetEnabled(username.clone(), false));
                             }
                         } else if ui.button("Enable").clicked() {
-                            action = Some(TokenAction::SetEnabled(id.clone(), true));
+                            action = Some(UserAction::SetEnabled(username.clone(), true));
                         }
                         if ui.button("Delete").clicked() {
-                            action = Some(TokenAction::Delete(id.clone()));
+                            action = Some(UserAction::Delete(username.clone()));
                         }
                     });
                     ui.end_row();
@@ -2048,8 +2145,8 @@ Klick auf GPS-Punkt = Details",
         });
         if let Some(action) = action {
             match action {
-                TokenAction::SetEnabled(id, enabled) => self.set_token_enabled(&id, enabled),
-                TokenAction::Delete(id) => self.delete_token(&id),
+                UserAction::SetEnabled(username, enabled) => self.set_user_enabled(&username, enabled),
+                UserAction::Delete(username) => self.delete_user(&username),
             }
         }
     }
@@ -2064,7 +2161,7 @@ Klick auf GPS-Punkt = Details",
             raw_block(ui, "sds", &self.sds);
             raw_block(ui, "locations", &self.locations);
             raw_block(ui, "commands", &self.commands);
-            raw_block(ui, "admin_tokens", &self.admin_tokens);
+            raw_block(ui, "admin_users", &self.admin_users);
         });
     }
 }
@@ -2538,7 +2635,7 @@ fn group_ids_from_path(value: &Value, path: &[&str]) -> Vec<u64> {
     ids
 }
 
-enum TokenAction {
+enum UserAction {
     SetEnabled(String, bool),
     Delete(String),
 }

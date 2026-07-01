@@ -100,5 +100,22 @@ CREATE TABLE IF NOT EXISTS auth_tokens (
 CREATE INDEX IF NOT EXISTS idx_auth_tokens_role ON auth_tokens(role, enabled);
 CREATE INDEX IF NOT EXISTS idx_auth_tokens_created ON auth_tokens(created_at DESC);
 
+CREATE TABLE IF NOT EXISTS auth_users (
+    id TEXT PRIMARY KEY,
+    username TEXT NOT NULL UNIQUE,
+    display_name TEXT NOT NULL,
+    role TEXT NOT NULL,
+    enabled INTEGER NOT NULL DEFAULT 1,
+    password_salt TEXT NOT NULL,
+    password_hash TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    last_login_at TEXT,
+    created_by TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_auth_users_role ON auth_users(role, enabled);
+CREATE INDEX IF NOT EXISTS idx_auth_users_updated ON auth_users(updated_at DESC);
+
 INSERT OR IGNORE INTO schema_migrations(version) VALUES (1);
 INSERT OR IGNORE INTO schema_migrations(version) VALUES (2);
+INSERT OR IGNORE INTO schema_migrations(version) VALUES (3);
