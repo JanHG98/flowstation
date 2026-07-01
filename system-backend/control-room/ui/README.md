@@ -1,42 +1,26 @@
 # NetCore Control Room UI
 
-Native desktop UI for NetCore Control Room.
+Native Desktop-UI für den NetCore Control Room.
 
-This is intentionally not a web app. It is an egui/eframe desktop client that talks to the Control Room Core HTTP API.
+## Build unter Windows
 
-## Build
-
-```bash
-cargo build --release --manifest-path system-backend/control-room/ui/Cargo.toml
+```cmd
+cargo build --release --manifest-path system-backend\control-room\ui\Cargo.toml
 ```
 
-## Run
+## Start unter Windows
 
-```bash
-./system-backend/control-room/ui/target/release/netcore-control-room-ui
+```cmd
+system-backend\control-room\ui\target\release\netcore-control-room-ui.exe --config "%APPDATA%\netcore\control-room\operator.toml" --profile default
 ```
 
-## Config
+## Features
 
-The UI uses the same profile format as the operator CLI:
+- Übersicht über Basisstationen
+- Teilnehmer, Gruppen, Rufe, SDS, Commands/Audit
+- Admin-/Tokenverwaltung
+- Befehle: Kick, DGNA Attach/Detach, Emergency Clear
+- Multi-Window-Modus: jedes Modul als eigenes Fenster
+- Offline-Karte für `/api/locations`
 
-```toml
-[profiles.default]
-api = "http://10.0.1.25:9010"
-default_node = "SRV-M_TBS-01"
-operator_id = "jan"
-token_file = "/home/jan/.config/netcore/control-room/operator.token"
-```
-
-Resolution order:
-
-1. CLI args
-2. environment variables
-3. profile config
-4. defaults
-
-CLI args:
-
-```bash
-netcore-control-room-ui --api http://10.0.1.25:9010 --token-file ~/.config/netcore/control-room/operator.token
-```
+Die UI ist ein Client. Der Control-Room-Core bleibt auf dem LXC.

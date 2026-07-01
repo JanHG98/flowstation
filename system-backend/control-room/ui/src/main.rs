@@ -211,7 +211,7 @@ fn read_token_file(path: &Path) -> Result<Option<String>, std::io::Error> {
     if token.is_empty() { Ok(None) } else { Ok(Some(token)) }
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 enum Tab {
     Overview,
     Subscribers,
@@ -219,19 +219,21 @@ enum Tab {
     Calls,
     Sds,
     Locations,
+    Map,
     Commands,
     AdminTokens,
     Raw,
 }
 
 impl Tab {
-    const ALL: [Tab; 9] = [
+    const ALL: [Tab; 10] = [
         Tab::Overview,
         Tab::Subscribers,
         Tab::Groups,
         Tab::Calls,
         Tab::Sds,
         Tab::Locations,
+        Tab::Map,
         Tab::Commands,
         Tab::AdminTokens,
         Tab::Raw,
@@ -245,6 +247,7 @@ impl Tab {
             Tab::Calls => "Rufe",
             Tab::Sds => "SDS",
             Tab::Locations => "Standorte",
+            Tab::Map => "Karte",
             Tab::Commands => "Commands",
             Tab::AdminTokens => "Admin/Tokens",
             Tab::Raw => "Raw JSON",
@@ -365,7 +368,12 @@ struct ControlRoomApp {
     new_token_expires: String,
     new_token_created_by: String,
     token_result: Option<String>,
+
+    detached_windows: HashMap<Tab, bool>,
+    window_mode: bool,
+    map_follow_latest: bool,
 }
+
 
 impl ControlRoomApp {
     fn new(settings: ResolvedSettings, startup_warning: Option<String>) -> Self {
@@ -400,6 +408,9 @@ impl ControlRoomApp {
             commands: None,
             emergencies: None,
             admin_tokens: None,
+            detached_windows: HashMap::new(),
+            window_mode: false,
+            map_follow_latest: true,
         }
     }
 
@@ -616,30 +627,91 @@ impl eframe::App for ControlRoomApp {
         egui::SidePanel::left("tabs").resizable(false).default_width(160.0).show(ctx, |ui| {
             ui.vertical_centered(|ui| ui.heading("Module"));
             ui.separator();
-            for tab in Tab::ALL {
-                if ui.selectable_label(self.tab == tab, tab.label()).clicked() {
-                    self.tab = tab;
+            ui.checkbox(&mut self.window_mode, "Fenster-Modus");
+            if ui.button("Alle Module öffnen").clicked() {
+                self.window_mode = true;
+                for tab in Tab::ALL {
+                    if tab != Tab::Raw {
+                        self.detached_windows.insert(tab, true);
+                    }
                 }
+            }
+            if ui.button("Alle Modulfenster schließen").clicked() {
+                self.detached_windows.clear();
+            }
+            ui.separator();
+            for tab in Tab::ALL {
+                ui.horizontal(|ui| {
+                    if ui.selectable_label(self.tab == tab, tab.label()).clicked() {
+                        self.tab = tab;
+                    }
+                    let is_open = *self.detached_windows.get(&tab).unwrap_or(&false);
+                    let button_label = if is_open { "▣" } else { "↗" };
+                    if ui.small_button(button_label).on_hover_text("Modul als eigenes Fenster öffnen/schließen").clicked() {
+                        self.detached_windows.insert(tab, !is_open);
+                        self.window_mode = true;
+                    }
+                });
             }
             ui.separator();
             self.render_command_box(ui);
         });
 
-        egui::CentralPanel::default().show(ctx, |ui| match self.tab {
+        egui::CentralPanel::default().show(ctx, |ui| {
+            self.render_module_content(ui, self.tab);
+        });
+
+        self.render_detached_windows(ctx);
+    }
+}
+
+impl ControlRoomApp {
+    fn render_module_content(&mut self, ui: &mut egui::Ui, tab: Tab) {
+        match tab {
             Tab::Overview => self.render_overview(ui),
             Tab::Subscribers => self.render_subscribers(ui),
             Tab::Groups => self.render_groups(ui),
             Tab::Calls => self.render_calls(ui),
             Tab::Sds => self.render_sds(ui),
             Tab::Locations => self.render_locations(ui),
+            Tab::Map => self.render_map(ui),
             Tab::Commands => self.render_commands(ui),
             Tab::AdminTokens => self.render_admin_tokens(ui),
             Tab::Raw => self.render_raw(ui),
-        });
+        }
     }
-}
 
-impl ControlRoomApp {
+    fn render_detached_windows(&mut self, ctx: &egui::Context) {
+        if !self.window_mode {
+            return;
+        }
+        for tab in Tab::ALL {
+            let mut open = *self.detached_windows.get(&tab).unwrap_or(&false);
+            if !open {
+                continue;
+            }
+            egui::Window::new(format!("{} – NetCore", tab.label()))
+                .id(egui::Id::new(format!("module_window_{:?}", tab)))
+                .open(&mut open)
+                .default_width(match tab {
+                    Tab::Map => 920.0,
+                    Tab::Overview => 980.0,
+                    _ => 760.0,
+                })
+                .default_height(match tab {
+                    Tab::Map => 620.0,
+                    Tab::AdminTokens => 620.0,
+                    _ => 520.0,
+                })
+                .resizable(true)
+                .vscroll(false)
+                .show(ctx, |ui| {
+                    self.render_module_content(ui, tab);
+                });
+            self.detached_windows.insert(tab, open);
+        }
+    }
+
     fn render_command_box(&mut self, ui: &mut egui::Ui) {
         ui.heading("Befehle");
         ui.small("nutzt default_node/operator_id aus dem Profil");
@@ -779,16 +851,130 @@ impl ControlRoomApp {
         });
     }
 
-    fn render_locations(&self, ui: &mut egui::Ui) {
+    fn render_locations(&mut self, ui: &mut egui::Ui) {
         ui.heading("Standorte");
         let Some(value) = &self.locations else { ui.label("Noch keine Daten"); return; };
-        table(ui, "locations_table", &["ISSI", "Latitude", "Longitude", "Source", "Updated"], array_at(value, &["locations"]), |ui, row| {
+        let rows = array_at(value, &["locations"]);
+        ui.horizontal_wrapped(|ui| {
+            metric(ui, "Positionsmeldungen", rows.len().to_string());
+            let latest = rows.iter().filter_map(|row| str_at(row, &["updated_at"])).max().unwrap_or("-");
+            metric(ui, "Letztes Update", latest.to_string());
+        });
+        ui.separator();
+        self.render_location_map(ui, &rows);
+        ui.separator();
+        table(ui, "locations_table", &["ISSI", "Latitude", "Longitude", "Source", "Updated"], rows, |ui, row| {
             ui.monospace(display_u64(row, &["issi"]));
             ui.label(display_f64(row, &["latitude"]));
             ui.label(display_f64(row, &["longitude"]));
             ui.label(str_at(row, &["source"]).unwrap_or("-"));
             ui.small(str_at(row, &["updated_at"]).unwrap_or("?"));
         });
+    }
+
+    fn render_map(&mut self, ui: &mut egui::Ui) {
+        ui.heading("Karte / LIP-Standorte");
+        ui.horizontal(|ui| {
+            ui.checkbox(&mut self.map_follow_latest, "automatisch auf vorhandene Punkte zoomen");
+            ui.small("v1 offline: keine Tile-Server, keine Internetabhängigkeit; Punkte kommen aus /api/locations");
+        });
+        let Some(value) = &self.locations else { ui.label("Noch keine Standortdaten"); return; };
+        let rows = array_at(value, &["locations"]);
+        self.render_location_map(ui, &rows);
+        ui.separator();
+        table(ui, "map_locations_table", &["ISSI", "Koordinaten", "Quelle", "Update"], rows, |ui, row| {
+            ui.monospace(display_u64(row, &["issi"]));
+            ui.label(format!("{}, {}", display_f64(row, &["latitude"]), display_f64(row, &["longitude"])));
+            ui.label(str_at(row, &["source"]).unwrap_or("-"));
+            ui.small(str_at(row, &["updated_at"]).unwrap_or("?"));
+        });
+    }
+
+    fn render_location_map(&self, ui: &mut egui::Ui, rows: &[&Value]) {
+        let points = collect_points(rows);
+        let desired_size = egui::vec2(ui.available_width().max(520.0), 420.0);
+        let (rect, _response) = ui.allocate_exact_size(desired_size, egui::Sense::hover());
+        let painter = ui.painter_at(rect);
+        let visuals = ui.visuals();
+        painter.rect_filled(rect, egui::Rounding::same(8.0), visuals.extreme_bg_color);
+        painter.rect_stroke(rect, egui::Rounding::same(8.0), egui::Stroke::new(1.0, visuals.widgets.noninteractive.bg_stroke.color));
+
+        let margin = 28.0;
+        let map_rect = rect.shrink(margin);
+        for i in 0..=4 {
+            let t = i as f32 / 4.0;
+            let x = egui::lerp(map_rect.left()..=map_rect.right(), t);
+            let y = egui::lerp(map_rect.top()..=map_rect.bottom(), t);
+            painter.line_segment(
+                [egui::pos2(x, map_rect.top()), egui::pos2(x, map_rect.bottom())],
+                egui::Stroke::new(0.5, visuals.faint_bg_color),
+            );
+            painter.line_segment(
+                [egui::pos2(map_rect.left(), y), egui::pos2(map_rect.right(), y)],
+                egui::Stroke::new(0.5, visuals.faint_bg_color),
+            );
+        }
+
+        if points.is_empty() {
+            painter.text(
+                rect.center(),
+                egui::Align2::CENTER_CENTER,
+                "Keine LIP-/Standortdaten vorhanden",
+                egui::FontId::proportional(18.0),
+                visuals.text_color(),
+            );
+            return;
+        }
+
+        let (mut min_lat, mut max_lat) = (f64::INFINITY, f64::NEG_INFINITY);
+        let (mut min_lon, mut max_lon) = (f64::INFINITY, f64::NEG_INFINITY);
+        for point in &points {
+            min_lat = min_lat.min(point.lat);
+            max_lat = max_lat.max(point.lat);
+            min_lon = min_lon.min(point.lon);
+            max_lon = max_lon.max(point.lon);
+        }
+        if (max_lat - min_lat).abs() < 0.000_1 {
+            min_lat -= 0.005;
+            max_lat += 0.005;
+        }
+        if (max_lon - min_lon).abs() < 0.000_1 {
+            min_lon -= 0.005;
+            max_lon += 0.005;
+        }
+        let lat_span = max_lat - min_lat;
+        let lon_span = max_lon - min_lon;
+
+        painter.text(
+            rect.left_top() + egui::vec2(10.0, 8.0),
+            egui::Align2::LEFT_TOP,
+            format!("{} Punkt(e) · Lat {:.5}..{:.5} · Lon {:.5}..{:.5}", points.len(), min_lat, max_lat, min_lon, max_lon),
+            egui::FontId::monospace(12.0),
+            visuals.text_color(),
+        );
+
+        for point in &points {
+            let x = map_rect.left() + (((point.lon - min_lon) / lon_span) as f32 * map_rect.width());
+            let y = map_rect.bottom() - (((point.lat - min_lat) / lat_span) as f32 * map_rect.height());
+            let pos = egui::pos2(x, y);
+            painter.circle_filled(pos, 6.0, egui::Color32::from_rgb(40, 180, 90));
+            painter.circle_stroke(pos, 8.0, egui::Stroke::new(1.0, egui::Color32::WHITE));
+            painter.text(
+                pos + egui::vec2(10.0, -10.0),
+                egui::Align2::LEFT_BOTTOM,
+                format!("{}", point.issi),
+                egui::FontId::monospace(12.0),
+                visuals.text_color(),
+            );
+        }
+
+        painter.text(
+            rect.right_bottom() - egui::vec2(10.0, 8.0),
+            egui::Align2::RIGHT_BOTTOM,
+            "Offline-Karte · schematische Projektion",
+            egui::FontId::proportional(11.0),
+            visuals.weak_text_color(),
+        );
     }
 
     fn render_commands(&self, ui: &mut egui::Ui) {
@@ -902,6 +1088,30 @@ impl ControlRoomApp {
             raw_block(ui, "admin_tokens", &self.admin_tokens);
         });
     }
+}
+
+#[derive(Debug, Clone)]
+struct LocationPoint {
+    issi: u64,
+    lat: f64,
+    lon: f64,
+}
+
+fn collect_points(rows: &[&Value]) -> Vec<LocationPoint> {
+    rows.iter()
+        .filter_map(|row| {
+            let lat = f64_at(row, &["latitude"])?;
+            let lon = f64_at(row, &["longitude"])?;
+            if !lat.is_finite() || !lon.is_finite() {
+                return None;
+            }
+            Some(LocationPoint {
+                issi: u64_at(row, &["issi"]).unwrap_or(0),
+                lat,
+                lon,
+            })
+        })
+        .collect()
 }
 
 enum TokenAction {
