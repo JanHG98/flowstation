@@ -13,7 +13,7 @@ const DEFAULT_API: &str = "http://127.0.0.1:9010";
 const DEFAULT_PROFILE: &str = "default";
 const DEFAULT_NODE: &str = "SRV-M_TBS-01";
 const DEFAULT_OPERATOR: &str = "jan";
-const UI_VERSION_LABEL: &str = "Native UI v5.5 · responsive UI · rollenbasierte Module";
+const UI_VERSION_LABEL: &str = "Native UI v5.8 · kompakter Leitstellenkopf · RBAC";
 const DEFAULT_TILE_URL: &str = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
 const DEFAULT_TILE_ATTRIBUTION: &str = "© OpenStreetMap contributors";
 const TILE_SIZE: f64 = 256.0;
@@ -22,8 +22,8 @@ fn main() -> eframe::Result<()> {
     let (settings, startup_warning) = ResolvedSettings::load();
     let native_options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_inner_size([1360.0, 900.0])
-            .with_min_inner_size([920.0, 620.0]),
+            .with_inner_size([1440.0, 920.0])
+            .with_min_inner_size([1024.0, 700.0]),
         ..Default::default()
     };
 
@@ -474,6 +474,21 @@ impl Tab {
             Tab::Commands => "Commands",
             Tab::AdminUsers => "Admin/User",
             Tab::Raw => "Raw JSON",
+        }
+    }
+
+    fn icon(self) -> &'static str {
+        match self {
+            Tab::Overview => "⌂",
+            Tab::Subscribers => "●",
+            Tab::Groups => "▦",
+            Tab::Calls => "☎",
+            Tab::Sds => "✉",
+            Tab::Locations => "⌖",
+            Tab::Map => "◎",
+            Tab::Commands => "⚡",
+            Tab::AdminUsers => "⚙",
+            Tab::Raw => "{}",
         }
     }
 }
@@ -1007,9 +1022,14 @@ enum DataSlot {
 impl eframe::App for ControlRoomApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         ctx.style_mut(|style| {
-            style.spacing.item_spacing = egui::vec2(8.0, 6.0);
-            style.spacing.button_padding = egui::vec2(10.0, 5.0);
-            style.spacing.text_edit_width = 220.0;
+            style.spacing.item_spacing = egui::vec2(8.0, 7.0);
+            style.spacing.button_padding = egui::vec2(12.0, 7.0);
+            style.spacing.text_edit_width = 260.0;
+            style.visuals.widgets.noninteractive.bg_fill = egui::Color32::from_rgb(242, 245, 248);
+            style.visuals.widgets.inactive.bg_fill = egui::Color32::from_rgb(235, 239, 244);
+            style.visuals.widgets.hovered.bg_fill = egui::Color32::from_rgb(220, 232, 246);
+            style.visuals.widgets.active.bg_fill = egui::Color32::from_rgb(199, 220, 244);
+            style.visuals.selection.bg_fill = egui::Color32::from_rgb(0, 118, 214);
         });
 
         if !self.logged_in {
@@ -1030,67 +1050,40 @@ impl eframe::App for ControlRoomApp {
             ctx.request_repaint_after(Duration::from_millis(250));
         }
 
-        egui::TopBottomPanel::top("top_bar").show(ctx, |ui| {
-            ui.add_space(4.0);
-            ui.horizontal_wrapped(|ui| {
-                ui.heading("NetCore Control Room");
-                ui.colored_label(egui::Color32::LIGHT_BLUE, UI_VERSION_LABEL);
-                ui.separator();
-                ui.label(format!("API: {}", self.settings.api));
-                ui.label(format!("Profil: {}", self.settings.profile));
-                ui.label(format!("Node: {}", self.settings.default_node));
-                ui.label(format!("Operator: {}", self.settings.operator_id));
-                ui.label(format!("Login: {}", self.login_username));
-                ui.label(format!("Rolle: {}", self.role_label()));
-                if ui.button("Refresh").clicked() {
-                    self.refresh_all();
-                }
-                if ui.button("Logout").clicked() {
-                    self.logout();
-                }
-                ui.checkbox(&mut self.auto_refresh, "Auto");
-                ui.add_sized([140.0, 18.0], egui::Slider::new(&mut self.refresh_seconds, 1.0..=15.0).text("s"));
-            });
-            ui.horizontal_wrapped(|ui| {
-                if let Some(path) = &self.settings.config_path {
-                    ui.small(format!("Config: {}", path.display()));
-                    ui.separator();
-                }
-                if let Some(source) = &self.settings.username_source {
-                    ui.small(format!("Benutzer-Quelle: {source}"));
-                    ui.separator();
-                }
-                ui.small(format!("Directory: {}", self.directory_source));
-            });
-            if let Some(warning) = &self.startup_warning {
-                ui.colored_label(egui::Color32::YELLOW, warning);
-            }
-            if let Some(error) = &self.last_error {
-                egui::Frame::group(ui.style()).show(ui, |ui| {
-                    ui.colored_label(egui::Color32::RED, error);
-                });
-            } else if let Some(ok) = &self.last_ok {
-                ui.small(format!("Letzter erfolgreicher Refresh: {ok}"));
-            }
-            ui.add_space(2.0);
-        });
-
         let screen_width = ctx.input(|input| input.screen_rect().width());
-        let compact_layout = screen_width < 1050.0;
-        let side_width = if compact_layout { 180.0 } else { 230.0 };
+        let compact_layout = screen_width < 1280.0;
+        let side_width = if screen_width < 1180.0 {
+            190.0
+        } else if screen_width < 1450.0 {
+            220.0
+        } else {
+            250.0
+        };
 
-        egui::SidePanel::left("tabs")
+        egui::TopBottomPanel::top("top_bar")
+            .resizable(false)
+            .show(ctx, |ui| {
+                self.render_elz_header(ui, screen_width, compact_layout);
+            });
+
+        egui::SidePanel::left("leitstelle_nav")
             .resizable(true)
             .default_width(side_width)
-            .min_width(160.0)
+            .min_width(180.0)
             .max_width(320.0)
             .show(ctx, |ui| {
                 egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
-                    ui.vertical_centered(|ui| ui.heading("Module"));
+                    ui.add_space(4.0);
+                    ui.heading("Module");
+                    ui.small(format!("angemeldet: {} / {}", self.login_username, self.role_label()));
                     ui.separator();
-                    ui.checkbox(&mut self.window_mode, "OS-Fenster-Modus");
-                    ui.small("öffnet Module als echte Betriebssystem-Fenster");
-                    if ui.add_sized([ui.available_width(), 30.0], egui::Button::new("Alle erlaubten Module als OS-Fenster öffnen")).clicked() {
+                    for tab in self.visible_tabs() {
+                        self.render_nav_button(ui, tab);
+                    }
+                    ui.separator();
+                    ui.checkbox(&mut self.window_mode, "OS-Fenster");
+                    ui.small("Module auf andere Monitore ziehen");
+                    if ui.add_sized([ui.available_width(), 30.0], egui::Button::new("Alle erlaubten Fenster öffnen")).clicked() {
                         self.window_mode = true;
                         for tab in self.visible_tabs() {
                             if tab != Tab::Raw {
@@ -1098,29 +1091,15 @@ impl eframe::App for ControlRoomApp {
                             }
                         }
                     }
-                    if ui.add_sized([ui.available_width(), 30.0], egui::Button::new("Alle OS-Fenster schließen")).clicked() {
+                    if ui.add_sized([ui.available_width(), 30.0], egui::Button::new("Fenster schließen")).clicked() {
                         self.detached_windows.clear();
-                    }
-                    ui.separator();
-                    for tab in self.visible_tabs() {
-                        ui.horizontal(|ui| {
-                            if ui.selectable_label(self.tab == tab, tab.label()).clicked() {
-                                self.tab = tab;
-                            }
-                            let is_open = *self.detached_windows.get(&tab).unwrap_or(&false);
-                            let button_label = if is_open { "▣" } else { "↗" };
-                            if ui.small_button(button_label).on_hover_text("Modul als echtes OS-Fenster öffnen/schließen").clicked() {
-                                self.detached_windows.insert(tab, !is_open);
-                                self.window_mode = true;
-                            }
-                        });
                     }
                     ui.separator();
                     if self.can_operate() {
                         self.render_command_box(ui);
                     } else {
                         ui.heading("Lesezugriff");
-                        ui.small("Deine Rolle darf keine Funkbefehle senden.");
+                        ui.small("Keine Funkbefehle mit dieser Rolle.");
                     }
                 });
             });
@@ -1137,6 +1116,117 @@ impl eframe::App for ControlRoomApp {
 }
 
 impl ControlRoomApp {
+    fn render_elz_header(&mut self, ui: &mut egui::Ui, screen_width: f32, compact_layout: bool) {
+        let dense = screen_width < 1450.0;
+
+        // Row 1: title/login/actions. Keep this compact and predictable.
+        egui::Frame::none()
+            .fill(egui::Color32::from_rgb(0, 72, 128))
+            .show(ui, |ui| {
+                ui.set_width(ui.available_width());
+                ui.horizontal(|ui| {
+                    ui.colored_label(
+                        egui::Color32::WHITE,
+                        egui::RichText::new("NetCore Control Room").strong().size(if compact_layout { 18.0 } else { 20.0 }),
+                    );
+                    ui.separator();
+                    ui.colored_label(egui::Color32::from_rgb(220, 238, 255), UI_VERSION_LABEL);
+                    ui.separator();
+                    ui.colored_label(egui::Color32::WHITE, format!("{} · {}", self.login_username, self.role_label()));
+
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if ui.add_sized([82.0, 26.0], egui::Button::new("Logout")).clicked() { self.logout(); }
+                        if ui.add_sized([82.0, 26.0], egui::Button::new("Refresh")).clicked() { self.refresh_all(); }
+                        ui.checkbox(&mut self.auto_refresh, "Auto");
+                    });
+                });
+            });
+
+        // Row 2: compact toolbar. No giant empty ribbon area.
+        egui::Frame::none()
+            .fill(egui::Color32::from_rgb(232, 238, 246))
+            .inner_margin(egui::Margin::symmetric(8.0, 5.0))
+            .show(ui, |ui| {
+                ui.set_width(ui.available_width());
+
+                ui.horizontal_wrapped(|ui| {
+                    small_toolbar_button(ui, "Maske leer", "F2");
+                    small_toolbar_button(ui, "Speichern", "F11");
+                    small_toolbar_button(ui, "Vorschlag", "F12");
+                    if self.can_operate() {
+                        small_toolbar_button(ui, "Alarm/Befehl", "F6");
+                    }
+                    small_toolbar_button(ui, "Karte", "Live");
+                    small_toolbar_button(ui, "Teilnehmer", "Funk");
+                    small_toolbar_button(ui, "Gruppen", "GSSI");
+                    if self.is_admin() {
+                        small_toolbar_button(ui, "Benutzer", "RBAC");
+                    }
+
+                    ui.separator();
+
+                    if !dense {
+                        ui.small(format!("API: {}", self.settings.api));
+                        ui.separator();
+                        ui.small(format!("Profil: {} · Node: {}", self.settings.profile, self.settings.default_node));
+                        ui.separator();
+                    } else {
+                        ui.small(format!("{} · {}", self.settings.profile, self.settings.default_node));
+                        ui.separator();
+                    }
+
+                    ui.label("Refresh");
+                    ui.add_sized([140.0, 18.0], egui::Slider::new(&mut self.refresh_seconds, 1.0..=15.0).text("s"));
+                });
+            });
+
+        // Row 3: compact status line.
+        egui::Frame::none()
+            .fill(egui::Color32::from_rgb(248, 250, 252))
+            .inner_margin(egui::Margin::symmetric(8.0, 4.0))
+            .show(ui, |ui| {
+                ui.set_width(ui.available_width());
+                ui.horizontal_wrapped(|ui| {
+                    if let Some(overview) = &self.overview {
+                        let connected = u64_at(overview, &["nodes_connected"]).unwrap_or(0);
+                        let total = u64_at(overview, &["node_count"]).unwrap_or(0);
+                        status_pill(ui, "TBS", &format!("{connected}/{total}"), connected > 0);
+                        status_pill(ui, "Teilnehmer", &format!("{}/{}", u64_at(overview, &["subscribers_online"]).unwrap_or(0), u64_at(overview, &["subscribers_total"]).unwrap_or(0)), true);
+                        status_pill(ui, "Rufe", &u64_at(overview, &["active_calls_total"]).unwrap_or(0).to_string(), true);
+                        status_pill(ui, "Notrufe", &u64_at(overview, &["emergencies_active"]).unwrap_or(0).to_string(), u64_at(overview, &["emergencies_active"]).unwrap_or(0) == 0);
+                    } else {
+                        status_pill(ui, "Status", "keine Daten", false);
+                    }
+
+                    ui.separator();
+
+                    if let Some(error) = &self.last_error {
+                        ui.colored_label(egui::Color32::RED, error);
+                    } else if let Some(ok) = &self.last_ok {
+                        ui.small(format!("Refresh: {ok}"));
+                    }
+
+                    ui.separator();
+                    ui.small(format!("Directory: {}", self.directory_source));
+                });
+            });
+    }
+
+    fn render_nav_button(&mut self, ui: &mut egui::Ui, tab: Tab) {
+        let selected = self.tab == tab;
+        let label = format!("{}  {}", tab.icon(), tab.label());
+        ui.horizontal(|ui| {
+            let response = ui.add_sized([ui.available_width() - 34.0, 30.0], egui::SelectableLabel::new(selected, label));
+            if response.clicked() { self.tab = tab; }
+            let is_open = *self.detached_windows.get(&tab).unwrap_or(&false);
+            let button_label = if is_open { "▣" } else { "↗" };
+            if ui.small_button(button_label).on_hover_text("als OS-Fenster öffnen/schließen").clicked() {
+                self.detached_windows.insert(tab, !is_open);
+                self.window_mode = true;
+            }
+        });
+    }
+
     fn render_module_content(&mut self, ui: &mut egui::Ui, tab: Tab) {
         if !self.can_access_tab(tab) {
             ui.heading("Kein Zugriff");
@@ -1272,42 +1362,62 @@ impl ControlRoomApp {
     }
 
     fn render_overview(&self, ui: &mut egui::Ui) {
-        ui.heading("Übersicht");
+        ui.heading("Einsatzleitplatz / Funklage");
         let Some(overview) = &self.overview else {
             ui.label("Noch keine Daten");
             return;
         };
 
         ui.horizontal_wrapped(|ui| {
-            metric(ui, "Nodes", format!("{}/{}", u64_at(overview, &["nodes_connected"]).unwrap_or(0), u64_at(overview, &["node_count"]).unwrap_or(0)));
+            metric(ui, "TBS online", format!("{}/{}", u64_at(overview, &["nodes_connected"]).unwrap_or(0), u64_at(overview, &["node_count"]).unwrap_or(0)));
             metric(ui, "Teilnehmer", format!("{}/{}", u64_at(overview, &["subscribers_online"]).unwrap_or(0), u64_at(overview, &["subscribers_total"]).unwrap_or(0)));
             metric(ui, "Gruppen", u64_at(overview, &["groups_total"]).unwrap_or(0).to_string());
             metric(ui, "Aktive Rufe", u64_at(overview, &["active_calls_total"]).unwrap_or(0).to_string());
             metric(ui, "Notrufe", u64_at(overview, &["emergencies_active"]).unwrap_or(0).to_string());
         });
 
-        ui.separator();
-        ui.heading("Basisstationen");
-        egui::ScrollArea::both().auto_shrink([false, false]).show(ui, |ui| {
-            egui::Grid::new("nodes_grid").striped(true).min_col_width(70.0).show(ui, |ui| {
-                header_row(ui, &["Node", "Station", "Site", "Online", "Health", "Carrier", "MCC/MNC", "LA", "CC", "Subs", "Calls", "Brew", "RF Peak", "RF RMS", "Seen"]);
-                for node in array_at(overview, &["nodes"]) {
-                    ui.monospace(str_at(node, &["node_id"]).unwrap_or("?"));
-                    ui.label(str_at(node, &["station_name"]).unwrap_or("?"));
-                    ui.label(str_at(node, &["site"]).unwrap_or("-"));
-                    bool_label(ui, bool_at(node, &["connected"]).unwrap_or(false));
-                    ui.label(str_at(node, &["health_overall"]).unwrap_or("?"));
-                    ui.label(format!("{} / {}", display_u64(node, &["main_carrier"]), display_u64(node, &["secondary_carrier"])));
-                    ui.label(format!("{} / {}", display_u64(node, &["mcc"]), display_u64(node, &["mnc"])));
-                    ui.label(display_u64(node, &["location_area"]));
-                    ui.label(display_u64(node, &["colour_code"]));
-                    ui.label(format!("{}/{}", display_u64(node, &["subscribers_online"]), display_u64(node, &["subscribers_total"])));
-                    ui.label(display_u64(node, &["active_calls_total"]));
-                    tri_label(ui, node.get("brew_connected"));
-                    ui.label(display_f64(node, &["rf_peak_dbfs"]));
-                    ui.label(display_f64(node, &["rf_rms_dbfs"]));
-                    ui.small(str_at(node, &["last_seen"]).unwrap_or("?"));
-                    ui.end_row();
+        ui.add_space(8.0);
+        ui.columns(2, |columns| {
+            columns[0].group(|ui| {
+                ui.heading("Basisstationen");
+                ui.small("Netzstatus, Carrier, RF-Werte und letzte Meldung");
+                ui.separator();
+                egui::ScrollArea::both().auto_shrink([false, false]).show(ui, |ui| {
+                    egui::Grid::new("nodes_grid_elz").striped(true).min_col_width(72.0).show(ui, |ui| {
+                        header_row(ui, &["Node", "Online", "Health", "Carrier", "Subs", "Calls", "Brew", "RF", "Seen"]);
+                        for node in array_at(overview, &["nodes"]) {
+                            ui.monospace(str_at(node, &["node_id"]).unwrap_or("?"));
+                            bool_label(ui, bool_at(node, &["connected"]).unwrap_or(false));
+                            ui.label(str_at(node, &["health_overall"]).unwrap_or("?"));
+                            ui.label(format!("{} / {}", display_u64(node, &["main_carrier"]), display_u64(node, &["secondary_carrier"])));
+                            ui.label(format!("{}/{}", display_u64(node, &["subscribers_online"]), display_u64(node, &["subscribers_total"])));
+                            ui.label(display_u64(node, &["active_calls_total"]));
+                            tri_label(ui, node.get("brew_connected"));
+                            ui.label(format!("{} / {}", display_f64(node, &["rf_peak_dbfs"]), display_f64(node, &["rf_rms_dbfs"])));
+                            ui.small(str_at(node, &["last_seen"]).unwrap_or("?"));
+                            ui.end_row();
+                        }
+                    });
+                });
+            });
+            columns[1].group(|ui| {
+                ui.heading("Aktuelle Meldungen / Audit");
+                ui.small("letzte Commands und Systemreaktionen");
+                ui.separator();
+                let recent = array_at(overview, &["recent_commands"]);
+                if recent.is_empty() {
+                    ui.label("Keine aktuellen Commands");
+                } else {
+                    egui::ScrollArea::vertical().max_height(260.0).show(ui, |ui| {
+                        for row in recent.iter().take(10) {
+                            ui.horizontal_wrapped(|ui| {
+                                ui.monospace(str_at(row, &["status"]).unwrap_or("?"));
+                                ui.label(str_at(row, &["message"]).unwrap_or(""));
+                                ui.small(str_at(row, &["updated_at"]).unwrap_or("?"));
+                            });
+                            ui.separator();
+                        }
+                    });
                 }
             });
         });
@@ -2165,63 +2275,64 @@ Klick auf GPS-Punkt = Details",
 
     fn render_login_screen(&mut self, ctx: &egui::Context) {
         ctx.style_mut(|style| {
-            style.spacing.item_spacing = egui::vec2(8.0, 8.0);
-            style.spacing.button_padding = egui::vec2(12.0, 8.0);
-            style.spacing.text_edit_width = 320.0;
+            style.spacing.item_spacing = egui::vec2(10.0, 9.0);
+            style.spacing.button_padding = egui::vec2(14.0, 9.0);
+            style.spacing.text_edit_width = 360.0;
+            style.visuals.widgets.inactive.bg_fill = egui::Color32::from_rgb(238, 242, 247);
+            style.visuals.selection.bg_fill = egui::Color32::from_rgb(0, 118, 214);
         });
 
-        egui::CentralPanel::default().show(ctx, |ui| {
-            let available = ui.available_size();
-            let card_width = available.x.clamp(340.0, 520.0);
-            let top_space = ((available.y - 360.0) * 0.25).clamp(24.0, 120.0);
-            ui.add_space(top_space);
+        egui::CentralPanel::default()
+            .frame(egui::Frame::none().fill(egui::Color32::from_rgb(235, 240, 246)))
+            .show(ctx, |ui| {
+                let available = ui.available_size();
+                let card_width = available.x.clamp(420.0, 580.0);
+                let top_space = ((available.y - 420.0) * 0.35).clamp(32.0, 160.0);
+                ui.add_space(top_space);
 
-            ui.vertical_centered(|ui| {
-                ui.heading("NetCore Control Room Login");
-                ui.colored_label(egui::Color32::LIGHT_BLUE, UI_VERSION_LABEL);
-                ui.add_space(8.0);
-                ui.label(format!("API: {}", self.settings.api));
-                ui.label(format!("Profil: {}", self.settings.profile));
-                ui.add_space(14.0);
-
-                ui.allocate_ui_with_layout(
-                    egui::vec2(card_width, 260.0),
-                    egui::Layout::top_down(egui::Align::Center),
-                    |ui| {
-                        egui::Frame::group(ui.style()).show(ui, |ui| {
-                            ui.set_min_width(card_width - 24.0);
+                ui.vertical_centered(|ui| {
+                    egui::Frame::group(ui.style()).show(ui, |ui| {
+                        ui.set_width(card_width);
+                        ui.add_space(10.0);
+                        ui.vertical_centered(|ui| {
+                            ui.heading(egui::RichText::new("NetCore Control Room").size(26.0));
+                            ui.colored_label(egui::Color32::from_rgb(0, 118, 214), UI_VERSION_LABEL);
                             ui.add_space(6.0);
-                            ui.label("Benutzername");
-                            ui.add_sized([ui.available_width(), 30.0], egui::TextEdit::singleline(&mut self.login_username));
-                            ui.add_space(6.0);
-                            ui.label("Passwort");
-                            let response = ui.add_sized(
-                                [ui.available_width(), 30.0],
-                                egui::TextEdit::singleline(&mut self.login_password).password(true),
-                            );
-                            if response.lost_focus() && ui.input(|input| input.key_pressed(egui::Key::Enter)) {
-                                self.login();
-                            }
-                            ui.add_space(12.0);
-                            if ui.add_sized([ui.available_width(), 34.0], egui::Button::new("Anmelden")).clicked() {
-                                self.login();
-                            }
-                            if let Some(result) = &self.login_result {
-                                ui.add_space(8.0);
-                                ui.colored_label(egui::Color32::RED, result);
-                            }
-                            ui.add_space(4.0);
+                            ui.label("Einsatzleitplatz / Operator Login");
                         });
-                    },
-                );
-
-                ui.add_space(10.0);
-                ui.small("User+Passwort + RBAC. Der TBS-Node-Token bleibt reine Maschinen-Auth für /node.");
-                if let Some(warning) = &self.startup_warning {
-                    ui.colored_label(egui::Color32::YELLOW, warning);
-                }
+                        ui.separator();
+                        ui.horizontal_wrapped(|ui| {
+                            ui.small(format!("API: {}", self.settings.api));
+                            ui.separator();
+                            ui.small(format!("Profil: {}", self.settings.profile));
+                        });
+                        ui.add_space(12.0);
+                        ui.label("Benutzername");
+                        ui.add_sized([ui.available_width(), 34.0], egui::TextEdit::singleline(&mut self.login_username));
+                        ui.label("Passwort");
+                        let response = ui.add_sized(
+                            [ui.available_width(), 34.0],
+                            egui::TextEdit::singleline(&mut self.login_password).password(true),
+                        );
+                        if response.lost_focus() && ui.input(|input| input.key_pressed(egui::Key::Enter)) {
+                            self.login();
+                        }
+                        ui.add_space(12.0);
+                        if ui.add_sized([ui.available_width(), 38.0], egui::Button::new("Anmelden")).clicked() {
+                            self.login();
+                        }
+                        if let Some(result) = &self.login_result {
+                            ui.add_space(8.0);
+                            ui.colored_label(egui::Color32::RED, result);
+                        }
+                        ui.add_space(8.0);
+                        ui.small("User+Passwort + RBAC. Der TBS-Node-Token bleibt reine Maschinen-Auth für /node.");
+                        if let Some(warning) = &self.startup_warning {
+                            ui.colored_label(egui::Color32::YELLOW, warning);
+                        }
+                    });
+                });
             });
-        });
     }
 
     fn render_admin_users(&mut self, ui: &mut egui::Ui) {
@@ -2801,9 +2912,36 @@ enum UserAction {
 }
 
 fn metric(ui: &mut egui::Ui, label: &str, value: String) {
+    egui::Frame::group(ui.style()).show(ui, |ui| {
+        ui.set_min_width(110.0);
+        ui.vertical_centered(|ui| {
+            ui.heading(egui::RichText::new(value).size(24.0));
+            ui.small(label);
+        });
+    });
+}
+
+fn small_toolbar_button(ui: &mut egui::Ui, label: &str, hint: &str) {
+    let response = ui.add_sized([92.0, 28.0], egui::Button::new(egui::RichText::new(label).size(13.0)));
+    response.on_hover_text(hint);
+}
+
+fn ribbon_button(ui: &mut egui::Ui, label: &str, hint: &str, width: f32, height: f32) {
+    ui.vertical_centered(|ui| {
+        let text = egui::RichText::new(label).strong().size(13.0);
+        ui.add_sized([width, height], egui::Button::new(text));
+        ui.small(hint);
+    });
+}
+
+fn status_pill(ui: &mut egui::Ui, label: &str, value: &str, ok: bool) {
+    let color = if ok { egui::Color32::from_rgb(0, 130, 70) } else { egui::Color32::from_rgb(185, 40, 40) };
     ui.group(|ui| {
-        ui.heading(value);
-        ui.label(label);
+        ui.horizontal(|ui| {
+            ui.colored_label(color, "●");
+            ui.strong(label);
+            ui.monospace(value);
+        });
     });
 }
 
@@ -2816,7 +2954,7 @@ where
         return;
     }
     egui::ScrollArea::both().auto_shrink([false, false]).show(ui, |ui| {
-        egui::Grid::new(id).striped(true).min_col_width(90.0).show(ui, |ui| {
+        egui::Grid::new(id).striped(true).min_col_width(110.0).spacing(egui::vec2(12.0, 6.0)).show(ui, |ui| {
             header_row(ui, headers);
             for row in rows {
                 row_fn(ui, row);
