@@ -13,7 +13,7 @@ const DEFAULT_API: &str = "http://127.0.0.1:9010";
 const DEFAULT_PROFILE: &str = "default";
 const DEFAULT_NODE: &str = "SRV-M_TBS-01";
 const DEFAULT_OPERATOR: &str = "jan";
-const UI_VERSION_LABEL: &str = "Native UI v5.3 · Login/RBAC · Node-Basic-Fix";
+const UI_VERSION_LABEL: &str = "Native UI v5.4 · responsives Layout · Login/RBAC";
 const DEFAULT_TILE_URL: &str = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
 const DEFAULT_TILE_ATTRIBUTION: &str = "© OpenStreetMap contributors";
 const TILE_SIZE: f64 = 256.0;
@@ -22,8 +22,8 @@ fn main() -> eframe::Result<()> {
     let (settings, startup_warning) = ResolvedSettings::load();
     let native_options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_inner_size([1320.0, 860.0])
-            .with_min_inner_size([1080.0, 720.0]),
+            .with_inner_size([1360.0, 900.0])
+            .with_min_inner_size([920.0, 620.0]),
         ..Default::default()
     };
 
@@ -913,6 +913,12 @@ enum DataSlot {
 
 impl eframe::App for ControlRoomApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        ctx.style_mut(|style| {
+            style.spacing.item_spacing = egui::vec2(8.0, 6.0);
+            style.spacing.button_padding = egui::vec2(10.0, 5.0);
+            style.spacing.text_edit_width = 220.0;
+        });
+
         if !self.logged_in {
             self.render_login_screen(ctx);
             return;
@@ -932,6 +938,7 @@ impl eframe::App for ControlRoomApp {
         }
 
         egui::TopBottomPanel::top("top_bar").show(ctx, |ui| {
+            ui.add_space(4.0);
             ui.horizontal_wrapped(|ui| {
                 ui.heading("NetCore Control Room");
                 ui.colored_label(egui::Color32::LIGHT_BLUE, UI_VERSION_LABEL);
@@ -940,12 +947,7 @@ impl eframe::App for ControlRoomApp {
                 ui.label(format!("Profil: {}", self.settings.profile));
                 ui.label(format!("Node: {}", self.settings.default_node));
                 ui.label(format!("Operator: {}", self.settings.operator_id));
-                if self.logged_in {
-                    ui.label(format!("Login: {}", self.login_username));
-                } else {
-                    ui.colored_label(egui::Color32::YELLOW, "Nicht angemeldet");
-                }
-                ui.label(format!("Directory: {}", self.directory_source));
+                ui.label(format!("Login: {}", self.login_username));
                 if ui.button("Refresh").clicked() {
                     self.refresh_all();
                 }
@@ -953,60 +955,82 @@ impl eframe::App for ControlRoomApp {
                     self.logout();
                 }
                 ui.checkbox(&mut self.auto_refresh, "Auto");
-                ui.add(egui::Slider::new(&mut self.refresh_seconds, 1.0..=15.0).text("s"));
+                ui.add_sized([140.0, 18.0], egui::Slider::new(&mut self.refresh_seconds, 1.0..=15.0).text("s"));
             });
-            if let Some(path) = &self.settings.config_path {
-                ui.small(format!("Config: {}", path.display()));
-            }
-            if let Some(source) = &self.settings.username_source {
-                ui.small(format!("Benutzer-Quelle: {source}"));
-            }
+            ui.horizontal_wrapped(|ui| {
+                if let Some(path) = &self.settings.config_path {
+                    ui.small(format!("Config: {}", path.display()));
+                    ui.separator();
+                }
+                if let Some(source) = &self.settings.username_source {
+                    ui.small(format!("Benutzer-Quelle: {source}"));
+                    ui.separator();
+                }
+                ui.small(format!("Directory: {}", self.directory_source));
+            });
             if let Some(warning) = &self.startup_warning {
                 ui.colored_label(egui::Color32::YELLOW, warning);
             }
             if let Some(error) = &self.last_error {
-                ui.colored_label(egui::Color32::RED, error);
+                egui::Frame::group(ui.style()).show(ui, |ui| {
+                    ui.colored_label(egui::Color32::RED, error);
+                });
             } else if let Some(ok) = &self.last_ok {
                 ui.small(format!("Letzter erfolgreicher Refresh: {ok}"));
             }
+            ui.add_space(2.0);
         });
 
-        egui::SidePanel::left("tabs").resizable(false).default_width(160.0).show(ctx, |ui| {
-            ui.vertical_centered(|ui| ui.heading("Module"));
-            ui.separator();
-            ui.checkbox(&mut self.window_mode, "OS-Fenster-Modus");
-            ui.small("öffnet Module als echte Betriebssystem-Fenster");
-            if ui.button("Alle Module als OS-Fenster öffnen").clicked() {
-                self.window_mode = true;
-                for tab in Tab::ALL {
-                    if tab != Tab::Raw {
-                        self.detached_windows.insert(tab, true);
-                    }
-                }
-            }
-            if ui.button("Alle OS-Fenster schließen").clicked() {
-                self.detached_windows.clear();
-            }
-            ui.separator();
-            for tab in Tab::ALL {
-                ui.horizontal(|ui| {
-                    if ui.selectable_label(self.tab == tab, tab.label()).clicked() {
-                        self.tab = tab;
-                    }
-                    let is_open = *self.detached_windows.get(&tab).unwrap_or(&false);
-                    let button_label = if is_open { "▣" } else { "↗" };
-                    if ui.small_button(button_label).on_hover_text("Modul als echtes OS-Fenster öffnen/schließen").clicked() {
-                        self.detached_windows.insert(tab, !is_open);
+        let screen_width = ctx.input(|input| input.screen_rect().width());
+        let compact_layout = screen_width < 1050.0;
+        let side_width = if compact_layout { 180.0 } else { 230.0 };
+
+        egui::SidePanel::left("tabs")
+            .resizable(true)
+            .default_width(side_width)
+            .min_width(160.0)
+            .max_width(320.0)
+            .show(ctx, |ui| {
+                egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
+                    ui.vertical_centered(|ui| ui.heading("Module"));
+                    ui.separator();
+                    ui.checkbox(&mut self.window_mode, "OS-Fenster-Modus");
+                    ui.small("öffnet Module als echte Betriebssystem-Fenster");
+                    if ui.add_sized([ui.available_width(), 30.0], egui::Button::new("Alle Module als OS-Fenster öffnen")).clicked() {
                         self.window_mode = true;
+                        for tab in Tab::ALL {
+                            if tab != Tab::Raw {
+                                self.detached_windows.insert(tab, true);
+                            }
+                        }
                     }
+                    if ui.add_sized([ui.available_width(), 30.0], egui::Button::new("Alle OS-Fenster schließen")).clicked() {
+                        self.detached_windows.clear();
+                    }
+                    ui.separator();
+                    for tab in Tab::ALL {
+                        ui.horizontal(|ui| {
+                            if ui.selectable_label(self.tab == tab, tab.label()).clicked() {
+                                self.tab = tab;
+                            }
+                            let is_open = *self.detached_windows.get(&tab).unwrap_or(&false);
+                            let button_label = if is_open { "▣" } else { "↗" };
+                            if ui.small_button(button_label).on_hover_text("Modul als echtes OS-Fenster öffnen/schließen").clicked() {
+                                self.detached_windows.insert(tab, !is_open);
+                                self.window_mode = true;
+                            }
+                        });
+                    }
+                    ui.separator();
+                    self.render_command_box(ui);
                 });
-            }
-            ui.separator();
-            self.render_command_box(ui);
-        });
+            });
 
         egui::CentralPanel::default().show(ctx, |ui| {
-            self.render_module_content(ui, self.tab);
+            egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
+                ui.set_min_width(ui.available_width());
+                self.render_module_content(ui, self.tab);
+            });
         });
 
         self.render_detached_windows(ctx);
@@ -1104,38 +1128,34 @@ impl ControlRoomApp {
         ui.separator();
 
         ui.label("Kick ISSI");
-        ui.text_edit_singleline(&mut self.kick_issi);
-        if ui.button("Kick senden").clicked() {
+        ui.add_sized([ui.available_width(), 26.0], egui::TextEdit::singleline(&mut self.kick_issi));
+        if ui.add_sized([ui.available_width(), 28.0], egui::Button::new("Kick senden")).clicked() {
             self.send_kick();
         }
 
         ui.separator();
         ui.label("DGNA");
-        ui.horizontal(|ui| {
-            ui.label("ISSI");
-            ui.text_edit_singleline(&mut self.dgna_issi);
-        });
-        ui.horizontal(|ui| {
-            ui.label("GSSI");
-            ui.text_edit_singleline(&mut self.dgna_gssi);
-        });
+        ui.label("ISSI");
+        ui.add_sized([ui.available_width(), 26.0], egui::TextEdit::singleline(&mut self.dgna_issi));
+        ui.label("GSSI");
+        ui.add_sized([ui.available_width(), 26.0], egui::TextEdit::singleline(&mut self.dgna_gssi));
         ui.checkbox(&mut self.dgna_detach, "Detach statt Attach");
-        if ui.button("DGNA senden").clicked() {
+        if ui.add_sized([ui.available_width(), 28.0], egui::Button::new("DGNA senden")).clicked() {
             self.send_dgna();
         }
 
         ui.separator();
         ui.label("Emergency Clear");
-        ui.text_edit_singleline(&mut self.clear_issi);
+        ui.add_sized([ui.available_width(), 26.0], egui::TextEdit::singleline(&mut self.clear_issi));
         ui.small("leer/0 = alle");
-        if ui.button("Emergency löschen").clicked() {
+        if ui.add_sized([ui.available_width(), 28.0], egui::Button::new("Emergency löschen")).clicked() {
             self.send_clear_emergency();
         }
 
         if let Some(result) = &self.command_result {
             ui.separator();
             ui.label("Letztes Ergebnis:");
-            egui::ScrollArea::vertical().max_height(140.0).show(ui, |ui| {
+            egui::ScrollArea::vertical().max_height(180.0).auto_shrink([false, false]).show(ui, |ui| {
                 ui.monospace(result);
             });
         }
@@ -1158,7 +1178,7 @@ impl ControlRoomApp {
 
         ui.separator();
         ui.heading("Basisstationen");
-        egui::ScrollArea::vertical().show(ui, |ui| {
+        egui::ScrollArea::both().auto_shrink([false, false]).show(ui, |ui| {
             egui::Grid::new("nodes_grid").striped(true).min_col_width(70.0).show(ui, |ui| {
                 header_row(ui, &["Node", "Station", "Site", "Online", "Health", "Carrier", "MCC/MNC", "LA", "CC", "Subs", "Calls", "Brew", "RF Peak", "RF RMS", "Seen"]);
                 for node in array_at(overview, &["nodes"]) {
@@ -2034,38 +2054,59 @@ Klick auf GPS-Punkt = Details",
     }
 
     fn render_login_screen(&mut self, ctx: &egui::Context) {
+        ctx.style_mut(|style| {
+            style.spacing.item_spacing = egui::vec2(8.0, 8.0);
+            style.spacing.button_padding = egui::vec2(12.0, 8.0);
+            style.spacing.text_edit_width = 320.0;
+        });
+
         egui::CentralPanel::default().show(ctx, |ui| {
+            let available = ui.available_size();
+            let card_width = available.x.clamp(340.0, 520.0);
+            let top_space = ((available.y - 360.0) * 0.25).clamp(24.0, 120.0);
+            ui.add_space(top_space);
+
             ui.vertical_centered(|ui| {
-                ui.add_space(80.0);
                 ui.heading("NetCore Control Room Login");
                 ui.colored_label(egui::Color32::LIGHT_BLUE, UI_VERSION_LABEL);
-                ui.add_space(18.0);
+                ui.add_space(8.0);
                 ui.label(format!("API: {}", self.settings.api));
                 ui.label(format!("Profil: {}", self.settings.profile));
-                ui.add_space(12.0);
-                egui::Frame::group(ui.style()).show(ui, |ui| {
-                    egui::Grid::new("login_grid").show(ui, |ui| {
-                        ui.label("Benutzer");
-                        ui.text_edit_singleline(&mut self.login_username);
-                        ui.end_row();
-                        ui.label("Passwort");
-                        let response = ui.add(egui::TextEdit::singleline(&mut self.login_password).password(true));
-                        ui.end_row();
-                        if response.lost_focus() && ui.input(|input| input.key_pressed(egui::Key::Enter)) {
-                            self.login();
-                        }
-                    });
-                    ui.add_space(8.0);
-                    if ui.button("Anmelden").clicked() {
-                        self.login();
-                    }
-                    if let Some(result) = &self.login_result {
-                        ui.add_space(8.0);
-                        ui.colored_label(egui::Color32::RED, result);
-                    }
-                });
+                ui.add_space(14.0);
+
+                ui.allocate_ui_with_layout(
+                    egui::vec2(card_width, 260.0),
+                    egui::Layout::top_down(egui::Align::Center),
+                    |ui| {
+                        egui::Frame::group(ui.style()).show(ui, |ui| {
+                            ui.set_min_width(card_width - 24.0);
+                            ui.add_space(6.0);
+                            ui.label("Benutzername");
+                            ui.add_sized([ui.available_width(), 30.0], egui::TextEdit::singleline(&mut self.login_username));
+                            ui.add_space(6.0);
+                            ui.label("Passwort");
+                            let response = ui.add_sized(
+                                [ui.available_width(), 30.0],
+                                egui::TextEdit::singleline(&mut self.login_password).password(true),
+                            );
+                            if response.lost_focus() && ui.input(|input| input.key_pressed(egui::Key::Enter)) {
+                                self.login();
+                            }
+                            ui.add_space(12.0);
+                            if ui.add_sized([ui.available_width(), 34.0], egui::Button::new("Anmelden")).clicked() {
+                                self.login();
+                            }
+                            if let Some(result) = &self.login_result {
+                                ui.add_space(8.0);
+                                ui.colored_label(egui::Color32::RED, result);
+                            }
+                            ui.add_space(4.0);
+                        });
+                    },
+                );
+
                 ui.add_space(10.0);
-                ui.small("Der Login nutzt User+Passwort + RBAC. Der TBS-Node-Token bleibt nur Maschinen-Auth für /node.");
+                ui.small("User+Passwort + RBAC. Der TBS-Node-Token bleibt reine Maschinen-Auth für /node.");
                 if let Some(warning) = &self.startup_warning {
                     ui.colored_label(egui::Color32::YELLOW, warning);
                 }
@@ -2082,13 +2123,13 @@ Klick auf GPS-Punkt = Details",
             ui.heading("Neuen Benutzer erstellen");
             egui::Grid::new("new_user_grid").show(ui, |ui| {
                 ui.label("Username");
-                ui.text_edit_singleline(&mut self.new_user_username);
+                ui.add_sized([260.0, 26.0], egui::TextEdit::singleline(&mut self.new_user_username));
                 ui.end_row();
                 ui.label("Anzeigename");
-                ui.text_edit_singleline(&mut self.new_user_display_name);
+                ui.add_sized([260.0, 26.0], egui::TextEdit::singleline(&mut self.new_user_display_name));
                 ui.end_row();
                 ui.label("Passwort");
-                ui.add(egui::TextEdit::singleline(&mut self.new_user_password).password(true));
+                ui.add_sized([260.0, 26.0], egui::TextEdit::singleline(&mut self.new_user_password).password(true));
                 ui.end_row();
                 ui.label("Role");
                 egui::ComboBox::from_id_source("user_role_combo")
@@ -2659,8 +2700,8 @@ where
         ui.label("Keine Einträge");
         return;
     }
-    egui::ScrollArea::both().show(ui, |ui| {
-        egui::Grid::new(id).striped(true).min_col_width(70.0).show(ui, |ui| {
+    egui::ScrollArea::both().auto_shrink([false, false]).show(ui, |ui| {
+        egui::Grid::new(id).striped(true).min_col_width(90.0).show(ui, |ui| {
             header_row(ui, headers);
             for row in rows {
                 row_fn(ui, row);
