@@ -3,6 +3,7 @@ use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
@@ -10,6 +11,9 @@ pub struct ControlRoomConfig {
     pub server: ServerConfig,
     pub persistence: PersistenceConfig,
     pub auth: AuthConfig,
+    /// Central operator directory served to native UIs via /api/directory.
+    /// Keep secrets out of this block; it is visible to every authenticated viewer.
+    pub directory: Value,
 }
 
 impl Default for ControlRoomConfig {
@@ -18,6 +22,13 @@ impl Default for ControlRoomConfig {
             server: ServerConfig::default(),
             persistence: PersistenceConfig::default(),
             auth: AuthConfig::default(),
+            directory: json!({
+                "subscribers": {},
+                "groups": {},
+                "status_groups": {},
+                "statuses": {},
+                "hide_infrastructure": true
+            }),
         }
     }
 }
@@ -91,6 +102,15 @@ impl ControlRoomConfig {
             self.persistence.load_recent_limit = self.server.history_limit;
         }
         self.auth.normalise();
+        if !self.directory.is_object() {
+            self.directory = json!({
+                "subscribers": {},
+                "groups": {},
+                "status_groups": {},
+                "statuses": {},
+                "hide_infrastructure": true
+            });
+        }
     }
 }
 

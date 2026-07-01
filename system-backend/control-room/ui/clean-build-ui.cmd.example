@@ -1,0 +1,9 @@
+@echo off
+cd /d "%~dp0\..\..\..\.."
+taskkill /IM netcore-control-room-ui.exe /F 2>NUL
+cargo clean --manifest-path system-backend\control-room\ui\Cargo.toml
+rmdir /S /Q system-backend\control-room\ui\target 2>NUL
+del /F /Q target\release\netcore-control-room-ui.exe 2>NUL
+cargo build --release --manifest-path system-backend\control-room\ui\Cargo.toml
+powershell -NoProfile -Command "Get-ChildItem -Recurse -Filter netcore-control-room-ui.exe | Sort-Object LastWriteTime -Descending | Select-Object LastWriteTime,FullName"
+pause

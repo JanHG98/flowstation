@@ -47,3 +47,26 @@ operator_token_role = "admin"
 # Development-only alternative. Do not commit real tokens.
 # node_token = "change-me-node-token"
 # operator_token = "change-me-operator-token"
+
+
+# Zentrales Directory für Operator-UI und API. Keine Secrets hier eintragen.
+[directory]
+hide_infrastructure = true
+
+[directory.subscribers."2010002"]
+name = "Jan HRT"
+device_class = "HRT"
+status = "Einsatzbereit"
+status_group = "crew"
+groups = [15201, 15205]
+
+[directory.groups."15201"]
+name = "NetCore Crew"
+kind = "Sprechgruppe"
+
+[directory.status_groups."crew"]
+name = "Crew-Status"
+
+[directory.statuses."1"]
+label = "Frei / bereit"
+group = "crew"

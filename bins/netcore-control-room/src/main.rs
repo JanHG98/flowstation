@@ -106,7 +106,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let state = state::SharedControlRoom::new_with_persistence(config.server.history_limit, persistence);
-    let server = server::ControlRoomServer::new(config.server.bind, config.server.node_path, config.server.ui_path, state, auth);
+    let server = server::ControlRoomServer::new(config.server.bind, config.server.node_path, config.server.ui_path, state, auth, config.directory.clone());
     server.run()?;
     Ok(())
 }

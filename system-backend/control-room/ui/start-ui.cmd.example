@@ -1,0 +1,4 @@
+@echo off
+cd /d "%~dp0\..\..\..\.."
+target\release\netcore-control-room-ui.exe --config "%APPDATA%\netcore\control-room\operator.toml" --profile default
+pause

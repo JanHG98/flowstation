@@ -61,7 +61,7 @@ impl HttpResponse {
     }
 }
 
-pub fn handle_http_stream(mut stream: TcpStream, state: SharedControlRoom, node_path: &str, ui_path: &str, auth: AuthState) {
+pub fn handle_http_stream(mut stream: TcpStream, state: SharedControlRoom, node_path: &str, ui_path: &str, auth: AuthState, directory: Value) {
     let _ = stream.set_read_timeout(Some(Duration::from_secs(5)));
     let request = match read_http_request(&mut stream) {
         Ok(req) => req,
@@ -72,11 +72,11 @@ pub fn handle_http_stream(mut stream: TcpStream, state: SharedControlRoom, node_
     };
 
     tracing::debug!(method = %request.method, path = %request.path, "http request");
-    let response = route_http(request, state, node_path, ui_path, &auth);
+    let response = route_http(request, state, node_path, ui_path, &auth, &directory);
     let _ = write_response(&mut stream, &response);
 }
 
-fn route_http(request: HttpRequest, state: SharedControlRoom, node_path: &str, ui_path: &str, auth: &AuthState) -> HttpResponse {
+fn route_http(request: HttpRequest, state: SharedControlRoom, node_path: &str, ui_path: &str, auth: &AuthState, directory: &Value) -> HttpResponse {
     if request.method == "OPTIONS" {
         return HttpResponse::text(204, "");
     }
@@ -102,6 +102,7 @@ fn route_http(request: HttpRequest, state: SharedControlRoom, node_path: &str, u
             "timestamp": now_iso(),
         })),
         ("GET", "/api/overview") => HttpResponse::json(200, &state.overview()),
+        ("GET", "/api/directory") => HttpResponse::json(200, directory),
         ("GET", "/api/state") => HttpResponse::json(200, &state.snapshot()),
         ("GET", "/api/rf") => HttpResponse::json(200, &state.rf_snapshot()),
         ("GET", "/api/health/full") => HttpResponse::json(200, &state.health_snapshot()),
@@ -573,6 +574,7 @@ fn not_found(node_path: &str, ui_path: &str) -> HttpResponse {
                 "GET /",
                 "GET /health",
                 "GET /api/overview",
+                "GET /api/directory",
                 "GET /api/subscribers?online=true",
                 "GET /api/groups",
                 "GET /api/calls",
@@ -661,6 +663,7 @@ fn index_html(node_path: &str, ui_path: &str) -> String {
   <ul>
     <li><code>GET /health</code></li>
     <li><code>GET /api/overview</code> — schlanker Leitstellenstatus</li>
+    <li><code>GET /api/directory</code> — zentrales Teilnehmer-/Gruppen-/Status-Directory</li>
     <li><code>GET /api/subscribers?online=true</code> — Teilnehmerliste</li>
     <li><code>GET /api/groups</code> — Gruppen und Mitglieder</li>
     <li><code>GET /api/calls</code> — aktive Rufe</li>
