@@ -17,6 +17,7 @@ use crate::auth::{
 use crate::state::{SharedControlRoom, now_iso};
 
 const MAX_HTTP_REQUEST_BYTES: usize = 1024 * 1024;
+const V5_14_2_NO_RESOLVED_LEN_MARKER: &str = "v5.14.2-no-resolved-len";
 
 pub type SharedDirectory = Arc<Mutex<Value>>;
 
