@@ -13,7 +13,7 @@ const DEFAULT_API: &str = "http://127.0.0.1:9010";
 const DEFAULT_PROFILE: &str = "default";
 const DEFAULT_NODE: &str = "SRV-M_TBS-01";
 const DEFAULT_OPERATOR: &str = "jan";
-const UI_VERSION_LABEL: &str = "Native UI v5.4 · responsives Layout · Login/RBAC";
+const UI_VERSION_LABEL: &str = "Native UI v5.5 · responsive UI · rollenbasierte Module";
 const DEFAULT_TILE_URL: &str = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
 const DEFAULT_TILE_ATTRIBUTION: &str = "© OpenStreetMap contributors";
 const TILE_SIZE: f64 = 256.0;
@@ -681,8 +681,70 @@ impl ControlRoomApp {
         }
     }
 
+    fn current_role(&self) -> &str {
+        self.current_user
+            .as_ref()
+            .and_then(|value| str_at(value, &["user", "role"]).or_else(|| str_at(value, &["role"])))
+            .unwrap_or("viewer")
+    }
+
+    fn role_label(&self) -> String {
+        match self.current_role() {
+            "admin" => "Admin".to_string(),
+            "operator" => "Operator".to_string(),
+            "viewer" => "Viewer".to_string(),
+            other => other.to_string(),
+        }
+    }
+
+    fn is_admin(&self) -> bool {
+        self.current_role() == "admin"
+    }
+
+    fn can_operate(&self) -> bool {
+        matches!(self.current_role(), "admin" | "operator")
+    }
+
+    fn can_access_tab(&self, tab: Tab) -> bool {
+        match tab {
+            Tab::AdminUsers | Tab::Raw => self.is_admin(),
+            Tab::Commands => self.can_operate(),
+            _ => true,
+        }
+    }
+
+    fn visible_tabs(&self) -> Vec<Tab> {
+        Tab::ALL
+            .iter()
+            .copied()
+            .filter(|tab| self.can_access_tab(*tab))
+            .collect()
+    }
+
+    fn enforce_rbac_view(&mut self) {
+        if !self.can_access_tab(self.tab) {
+            self.tab = Tab::Overview;
+        }
+        let denied = self
+            .detached_windows
+            .keys()
+            .copied()
+            .filter(|tab| !self.can_access_tab(*tab))
+            .collect::<Vec<_>>();
+        for tab in denied {
+            self.detached_windows.insert(tab, false);
+        }
+    }
+
     fn refresh_all(&mut self) {
         let mut errors = Vec::new();
+
+        match self.api.get("/api/me") {
+            Ok(value) => self.current_user = Some(value),
+            Err(error) => self.current_user = Some(json!({ "error": error })),
+        }
+        self.enforce_rbac_view();
+
         self.refresh_directory(&mut errors);
         self.get_into("/api/overview", DataSlot::Overview, &mut errors);
         self.get_into("/api/subscribers", DataSlot::Subscribers, &mut errors);
@@ -690,16 +752,23 @@ impl ControlRoomApp {
         self.get_into("/api/calls", DataSlot::Calls, &mut errors);
         self.get_into("/api/sds?limit=50", DataSlot::Sds, &mut errors);
         self.get_into("/api/locations", DataSlot::Locations, &mut errors);
-        self.get_into("/api/commands?limit=50", DataSlot::Commands, &mut errors);
         self.get_into("/api/emergencies", DataSlot::Emergencies, &mut errors);
 
-        match self.api.get("/api/me") {
-            Ok(value) => self.current_user = Some(value),
-            Err(error) => self.current_user = Some(json!({ "error": error })),
+        if self.can_operate() {
+            self.get_into("/api/commands?limit=50", DataSlot::Commands, &mut errors);
+        } else {
+            self.commands = None;
+            self.command_result = None;
         }
-        match self.api.get("/api/admin/users") {
-            Ok(value) => self.admin_users = Some(value),
-            Err(error) => self.admin_users = Some(json!({ "error": error })),
+
+        if self.is_admin() {
+            match self.api.get("/api/admin/users") {
+                Ok(value) => self.admin_users = Some(value),
+                Err(error) => self.admin_users = Some(json!({ "error": error })),
+            }
+        } else {
+            self.admin_users = None;
+            self.user_result = None;
         }
 
         self.last_refresh = Some(Instant::now());
@@ -757,6 +826,10 @@ impl ControlRoomApp {
     }
 
     fn send_kick(&mut self) {
+        if !self.can_operate() {
+            self.command_result = Some("Kein Zugriff: deine Rolle darf keine Befehle senden".to_string());
+            return;
+        }
         let issi = match parse_u32(&self.kick_issi, "ISSI") {
             Ok(value) => value,
             Err(error) => {
@@ -773,6 +846,10 @@ impl ControlRoomApp {
     }
 
     fn send_dgna(&mut self) {
+        if !self.can_operate() {
+            self.command_result = Some("Kein Zugriff: deine Rolle darf keine Befehle senden".to_string());
+            return;
+        }
         let issi = match parse_u32(&self.dgna_issi, "ISSI") {
             Ok(value) => value,
             Err(error) => {
@@ -801,6 +878,10 @@ impl ControlRoomApp {
     }
 
     fn send_clear_emergency(&mut self) {
+        if !self.can_operate() {
+            self.command_result = Some("Kein Zugriff: deine Rolle darf keine Befehle senden".to_string());
+            return;
+        }
         let issi = if self.clear_issi.trim().is_empty() {
             0
         } else {
@@ -856,6 +937,10 @@ impl ControlRoomApp {
     }
 
     fn create_user(&mut self) {
+        if !self.is_admin() {
+            self.user_result = Some("Kein Zugriff: nur Admins dürfen Benutzer anlegen".to_string());
+            return;
+        }
         let username = self.new_user_username.trim();
         if username.is_empty() {
             self.user_result = Some("Benutzername fehlt".to_string());
@@ -882,6 +967,10 @@ impl ControlRoomApp {
     }
 
     fn set_user_enabled(&mut self, username: &str, enabled: bool) {
+        if !self.is_admin() {
+            self.user_result = Some("Kein Zugriff: nur Admins dürfen Benutzer ändern".to_string());
+            return;
+        }
         let body = json!({ "enabled": enabled });
         self.user_result = Some(match self.api.patch(&format!("/api/admin/users/{username}"), &body) {
             Ok(value) => pretty(&value),
@@ -891,6 +980,10 @@ impl ControlRoomApp {
     }
 
     fn delete_user(&mut self, username: &str) {
+        if !self.is_admin() {
+            self.user_result = Some("Kein Zugriff: nur Admins dürfen Benutzer löschen".to_string());
+            return;
+        }
         self.user_result = Some(match self.api.delete(&format!("/api/admin/users/{username}")) {
             Ok(value) => pretty(&value),
             Err(error) => error,
@@ -948,6 +1041,7 @@ impl eframe::App for ControlRoomApp {
                 ui.label(format!("Node: {}", self.settings.default_node));
                 ui.label(format!("Operator: {}", self.settings.operator_id));
                 ui.label(format!("Login: {}", self.login_username));
+                ui.label(format!("Rolle: {}", self.role_label()));
                 if ui.button("Refresh").clicked() {
                     self.refresh_all();
                 }
@@ -996,9 +1090,9 @@ impl eframe::App for ControlRoomApp {
                     ui.separator();
                     ui.checkbox(&mut self.window_mode, "OS-Fenster-Modus");
                     ui.small("öffnet Module als echte Betriebssystem-Fenster");
-                    if ui.add_sized([ui.available_width(), 30.0], egui::Button::new("Alle Module als OS-Fenster öffnen")).clicked() {
+                    if ui.add_sized([ui.available_width(), 30.0], egui::Button::new("Alle erlaubten Module als OS-Fenster öffnen")).clicked() {
                         self.window_mode = true;
-                        for tab in Tab::ALL {
+                        for tab in self.visible_tabs() {
                             if tab != Tab::Raw {
                                 self.detached_windows.insert(tab, true);
                             }
@@ -1008,7 +1102,7 @@ impl eframe::App for ControlRoomApp {
                         self.detached_windows.clear();
                     }
                     ui.separator();
-                    for tab in Tab::ALL {
+                    for tab in self.visible_tabs() {
                         ui.horizontal(|ui| {
                             if ui.selectable_label(self.tab == tab, tab.label()).clicked() {
                                 self.tab = tab;
@@ -1022,7 +1116,12 @@ impl eframe::App for ControlRoomApp {
                         });
                     }
                     ui.separator();
-                    self.render_command_box(ui);
+                    if self.can_operate() {
+                        self.render_command_box(ui);
+                    } else {
+                        ui.heading("Lesezugriff");
+                        ui.small("Deine Rolle darf keine Funkbefehle senden.");
+                    }
                 });
             });
 
@@ -1039,6 +1138,11 @@ impl eframe::App for ControlRoomApp {
 
 impl ControlRoomApp {
     fn render_module_content(&mut self, ui: &mut egui::Ui, tab: Tab) {
+        if !self.can_access_tab(tab) {
+            ui.heading("Kein Zugriff");
+            ui.label(format!("Deine Rolle '{}' darf dieses Modul nicht öffnen.", self.current_role()));
+            return;
+        }
         match tab {
             Tab::Overview => self.render_overview(ui),
             Tab::Subscribers => self.render_subscribers(ui),
@@ -1062,6 +1166,7 @@ impl ControlRoomApp {
             .iter()
             .copied()
             .filter(|tab| *self.detached_windows.get(tab).unwrap_or(&false))
+            .filter(|tab| self.can_access_tab(*tab))
             .collect::<Vec<_>>();
 
         for tab in open_tabs {
@@ -1123,6 +1228,11 @@ impl ControlRoomApp {
     }
 
     fn render_command_box(&mut self, ui: &mut egui::Ui) {
+        if !self.can_operate() {
+            ui.heading("Lesezugriff");
+            ui.small("Deine Rolle darf keine Funkbefehle senden.");
+            return;
+        }
         ui.heading("Befehle");
         ui.small("nutzt default_node/operator_id aus dem Profil");
         ui.separator();
@@ -2115,6 +2225,11 @@ Klick auf GPS-Punkt = Details",
     }
 
     fn render_admin_users(&mut self, ui: &mut egui::Ui) {
+        if !self.is_admin() {
+            ui.heading("Kein Zugriff");
+            ui.label("Benutzerverwaltung ist nur für Admins sichtbar.");
+            return;
+        }
         ui.heading("Admin / Benutzer & RBAC");
         ui.label("Klassische Benutzerverwaltung: Username + Passwort + Rolle. Keine Operator-Tokens mehr.");
         ui.separator();
