@@ -1648,7 +1648,7 @@ impl ControlRoomState {
                 cmd.updated_at = envelope.timestamp.clone();
                 cmd.status = "completed".to_string();
                 cmd.target_entity = envelope.target_entity;
-                cmd.responses.push(response_value);
+                cmd.responses.push(response_value.clone());
                 updated = Some(cmd.clone());
             }
             if let Some(entry) = updated {

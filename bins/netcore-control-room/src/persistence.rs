@@ -2,7 +2,7 @@ use std::fs;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
-use rusqlite::{Connection, OptionalExtension, params};
+use rusqlite::{Connection, params};
 use serde_json::{Value, json};
 use tetra_core::tetra_entities::TetraEntity;
 
