@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::env;
 use std::io::{Read, Write};
 use std::net::TcpStream;
 use std::sync::{Arc, Mutex};
@@ -118,9 +117,7 @@ fn route_http(request: HttpRequest, state: SharedControlRoom, node_path: &str, u
         ("GET", "/api/overview") => HttpResponse::json(200, &state.overview()),
         ("GET", "/api/directory") => HttpResponse::json(200, &directory_snapshot(directory)),
         ("GET", "/api/directory/resolved") => HttpResponse::json(200, &directory_resolved_response(directory)),
-        ("GET", "/api/directory/upstream") => HttpResponse::json(200, &directory_upstream_debug()),
         ("POST", "/api/directory/import") | ("POST", "/api/directory/merge") => api_directory_import(&request.body, directory),
-        ("POST", "/api/directory/refresh") => api_directory_refresh(directory),
         ("GET", "/api/state") => HttpResponse::json(200, &state.snapshot()),
         ("GET", "/api/rf") => HttpResponse::json(200, &state.rf_snapshot()),
         ("GET", "/api/health/full") => HttpResponse::json(200, &state.health_snapshot()),
@@ -216,11 +213,7 @@ fn route_http(request: HttpRequest, state: SharedControlRoom, node_path: &str, u
 }
 
 fn required_role_for_request(request: &HttpRequest) -> AuthRole {
-    if request.path.starts_with("/api/admin/users")
-        || request.path == "/api/directory/import"
-        || request.path == "/api/directory/merge"
-        || request.path == "/api/directory/refresh"
-    {
+    if request.path.starts_with("/api/admin/users") || request.path == "/api/directory/import" || request.path == "/api/directory/merge" {
         return AuthRole::Admin;
     }
     if request.method == "POST" {
@@ -239,16 +232,10 @@ fn required_role_for_request(request: &HttpRequest) -> AuthRole {
 
 
 fn directory_snapshot(directory: &SharedDirectory) -> Value {
-    let mut guard = match directory.lock() {
-        Ok(guard) => guard,
-        Err(_) => return json!({ "error": "directory lock poisoned" }),
-    };
-    let upstream_status = sync_directory_upstream(&mut guard);
-    let mut value = guard.clone();
-    if let Some(status) = upstream_status {
-        value["upstream_status"] = json!(status);
-    }
-    value
+    directory
+        .lock()
+        .map(|value| value.clone())
+        .unwrap_or_else(|_| json!({ "error": "directory lock poisoned" }))
 }
 
 fn api_directory_import(body: &[u8], directory: &SharedDirectory) -> HttpResponse {
@@ -267,27 +254,7 @@ fn api_directory_import(body: &[u8], directory: &SharedDirectory) -> HttpRespons
     HttpResponse::json(200, &json!({
         "ok": true,
         "message": "directory imported",
-        "resolved_subscriber_count": resolved.as_object().map(|object| object.len()).unwrap_or(0),
-        "directory": guard.clone(),
-        "resolved": {
-            "subscribers": resolved,
-        },
-        "timestamp": now_iso(),
-    }))
-}
-
-fn api_directory_refresh(directory: &SharedDirectory) -> HttpResponse {
-    let mut guard = match directory.lock() {
-        Ok(guard) => guard,
-        Err(_) => return HttpResponse::json(500, &json!({ "error": "directory lock poisoned" })),
-    };
-    let upstream_status = sync_directory_upstream(&mut guard).unwrap_or_else(|| "no upstream data".to_string());
-    let resolved = directory_resolved_from_value(&guard);
-    HttpResponse::json(200, &json!({
-        "ok": true,
-        "message": "directory refreshed",
-        "upstream_status": upstream_status,
-        "resolved_subscriber_count": resolved.as_object().map(|object| object.len()).unwrap_or(0),
+        "resolved_subscriber_count": resolved.len(),
         "directory": guard.clone(),
         "resolved": {
             "subscribers": resolved,
@@ -297,11 +264,10 @@ fn api_directory_refresh(directory: &SharedDirectory) -> HttpResponse {
 }
 
 fn directory_resolved_response(directory: &SharedDirectory) -> Value {
-    let mut guard = match directory.lock() {
+    let guard = match directory.lock() {
         Ok(guard) => guard,
         Err(_) => return json!({ "error": "directory lock poisoned" }),
     };
-    let upstream_status = sync_directory_upstream(&mut guard);
     let subscribers = directory_resolved_from_value(&guard);
     json!({
         "directory": guard.clone(),
@@ -309,294 +275,8 @@ fn directory_resolved_response(directory: &SharedDirectory) -> Value {
             "subscribers": subscribers,
         },
         "resolved_subscriber_count": subscribers.as_object().map(|object| object.len()).unwrap_or(0),
-        "upstream_status": upstream_status.unwrap_or_else(|| "no upstream data".to_string()),
         "timestamp": now_iso(),
     })
-}
-
-fn directory_upstream_debug() -> Value {
-    let base = directory_upstream_base();
-    match fetch_netcore_directory_upstream() {
-        Some(value) => json!({
-            "ok": true,
-            "base": base,
-            "directory": value,
-            "resolved_subscriber_count": directory_resolved_from_value(&value).as_object().map(|object| object.len()).unwrap_or(0),
-            "timestamp": now_iso(),
-        }),
-        None => json!({
-            "ok": false,
-            "base": base,
-            "message": "no upstream directory data fetched",
-            "hint": "Set NETCORE_DIRECTORY_API, NETCORE_DIRECTORY_URL or NETCORE_DIRECTORY_BASE_URL, or run NetCore Directory on http://127.0.0.1:8095",
-            "timestamp": now_iso(),
-        }),
-    }
-}
-
-fn sync_directory_upstream(target: &mut Value) -> Option<String> {
-    let upstream = fetch_netcore_directory_upstream()?;
-    let count = directory_resolved_from_value(&upstream).as_object().map(|object| object.len()).unwrap_or(0);
-    merge_directory_value(target, upstream);
-    Some(format!("NetCore Directory upstream synced: {count} subscriber name(s)"))
-}
-
-
-fn directory_upstream_base() -> String {
-    env::var("NETCORE_DIRECTORY_API")
-        .or_else(|_| env::var("NETCORE_DIRECTORY_URL"))
-        .or_else(|_| env::var("NETCORE_DIRECTORY_BASE_URL"))
-        .unwrap_or_else(|_| "http://127.0.0.1:8095".to_string())
-        .trim_end_matches('/')
-        .to_string()
-}
-
-fn fetch_netcore_directory_upstream() -> Option<Value> {
-    let base = directory_upstream_base();
-
-    let devices = http_get_json(&format!("{base}/api/devices")).unwrap_or_else(|| json!([]));
-    let basestations = http_get_json(&format!("{base}/api/basestations")).unwrap_or_else(|| json!([]));
-    let groups = http_get_json(&format!("{base}/api/groups")).unwrap_or_else(|| json!([]));
-    let device_groups = http_get_json(&format!("{base}/api/device-groups")).unwrap_or_else(|| json!([]));
-    let statuses = http_get_json(&format!("{base}/api/status")).unwrap_or_else(|| json!([]));
-
-    let any_data = devices.as_array().map(|items| !items.is_empty()).unwrap_or(false)
-        || basestations.as_array().map(|items| !items.is_empty()).unwrap_or(false)
-        || groups.as_array().map(|items| !items.is_empty()).unwrap_or(false)
-        || device_groups.as_array().map(|items| !items.is_empty()).unwrap_or(false)
-        || statuses.as_array().map(|items| !items.is_empty()).unwrap_or(false);
-
-    if !any_data {
-        return None;
-    }
-
-    Some(netcore_directory_api_to_control_room(devices, basestations, groups, device_groups, statuses, &base))
-}
-
-fn http_get_json(url: &str) -> Option<Value> {
-    let (host, port, path) = parse_http_url(url)?;
-    let mut stream = TcpStream::connect((host.as_str(), port)).ok()?;
-    let _ = stream.set_read_timeout(Some(Duration::from_millis(900)));
-    let _ = stream.set_write_timeout(Some(Duration::from_millis(900)));
-
-    let request = format!(
-        "GET {path} HTTP/1.1\r\nHost: {host}\r\nAccept: application/json\r\nConnection: close\r\n\r\n"
-    );
-    stream.write_all(request.as_bytes()).ok()?;
-
-    let mut response = String::new();
-    stream.read_to_string(&mut response).ok()?;
-
-    if !response.starts_with("HTTP/1.1 200") && !response.starts_with("HTTP/1.0 200") {
-        return None;
-    }
-
-    let body = response
-        .split_once("\r\n\r\n")
-        .map(|(_, body)| body)
-        .unwrap_or(response.as_str());
-
-    serde_json::from_str(body.trim()).ok()
-}
-
-fn parse_http_url(url: &str) -> Option<(String, u16, String)> {
-    let without_scheme = url.strip_prefix("http://")?;
-    let (authority, path) = without_scheme
-        .split_once('/')
-        .map(|(authority, path)| (authority, format!("/{path}")))
-        .unwrap_or((without_scheme, "/".to_string()));
-
-    let (host, port) = authority
-        .split_once(':')
-        .map(|(host, port)| (host.to_string(), port.parse::<u16>().ok()))
-        .unwrap_or((authority.to_string(), Some(80)));
-
-    Some((host, port?, path))
-}
-
-fn netcore_directory_api_to_control_room(
-    devices: Value,
-    basestations: Value,
-    groups: Value,
-    device_groups: Value,
-    statuses: Value,
-    base: &str,
-) -> Value {
-    let mut subscribers = serde_json::Map::new();
-    let mut group_map = serde_json::Map::new();
-    let mut status_groups = serde_json::Map::new();
-    let mut status_map = serde_json::Map::new();
-
-    if let Some(items) = devices.as_array() {
-        for item in items {
-            let Some(issi) = value_field_u64(item, &["issi", "id"]) else { continue; };
-            let name = value_field_string(item, &["name", "short", "label"]).unwrap_or_else(|| issi.to_string());
-            let short = value_field_string(item, &["short", "label"]);
-            let mut entry = json!({
-                "name": name,
-                "device_class": value_field_string(item, &["type", "kind", "device_class"]).unwrap_or_else(|| "HRT".to_string()),
-                "source": "netcore-directory",
-            });
-            if let Some(short) = short { entry["label"] = json!(short); }
-            copy_string_field(item, &mut entry, "owner", &["owner"]);
-            copy_string_field(item, &mut entry, "role", &["role"]);
-            copy_string_field(item, &mut entry, "icon", &["icon"]);
-            copy_string_field(item, &mut entry, "color", &["color"]);
-            copy_bool_field(item, &mut entry, "visible", &["visible"]);
-            subscribers.insert(issi.to_string(), entry);
-        }
-    }
-
-    if let Some(items) = basestations.as_array() {
-        for item in items {
-            let Some(issi) = value_field_u64(item, &["issi", "id"]) else { continue; };
-            let name = value_field_string(item, &["name", "short", "label"]).unwrap_or_else(|| issi.to_string());
-            let mut entry = json!({
-                "name": name,
-                "device_class": "Infrastruktur",
-                "hidden": true,
-                "hide_in_subscribers": true,
-                "source": "netcore-directory-basestation",
-            });
-            copy_string_field(item, &mut entry, "label", &["short", "label"]);
-            copy_string_field(item, &mut entry, "location", &["location"]);
-            copy_string_field(item, &mut entry, "color", &["color"]);
-            subscribers.insert(issi.to_string(), entry);
-        }
-    }
-
-    if let Some(items) = groups.as_array() {
-        for item in items {
-            let Some(gssi) = value_field_u64(item, &["gssi", "id"]) else { continue; };
-            let name = value_field_string(item, &["name", "short", "label"]).unwrap_or_else(|| gssi.to_string());
-            let mut entry = json!({ "name": name, "source": "netcore-directory" });
-            copy_string_field(item, &mut entry, "label", &["short", "label"]);
-            copy_string_field(item, &mut entry, "kind", &["type", "kind"]);
-            copy_string_field(item, &mut entry, "color", &["color"]);
-            group_map.insert(gssi.to_string(), entry);
-        }
-    }
-
-    if let Some(items) = device_groups.as_array() {
-        for item in items {
-            let Some(group_id) = value_field_u64(item, &["group_id", "id"]) else { continue; };
-            let group_key = group_id.to_string();
-            let name = value_field_string(item, &["name", "short", "opta", "label"]).unwrap_or_else(|| group_key.clone());
-            let mut entry = json!({ "name": name, "source": "netcore-directory-device-group" });
-            copy_string_field(item, &mut entry, "label", &["short", "opta", "label"]);
-            copy_string_field(item, &mut entry, "kind", &["type", "kind"]);
-            copy_string_field(item, &mut entry, "color", &["color"]);
-            status_groups.insert(group_key.clone(), entry);
-
-            if let Some(members) = item.get("members").and_then(Value::as_array) {
-                for member in members {
-                    if let Some(issi) = value_as_u64(member) {
-                        let subscriber = subscribers
-                            .entry(issi.to_string())
-                            .or_insert_with(|| json!({ "name": issi.to_string(), "source": "netcore-directory-device-group" }));
-                        subscriber["status_group"] = json!(group_key);
-                    }
-                }
-            }
-            if let Some(member_devices) = item.get("member_devices").and_then(Value::as_array) {
-                for member in member_devices {
-                    let Some(issi) = value_field_u64(member, &["issi", "id"]) else { continue; };
-                    let subscriber = subscribers.entry(issi.to_string()).or_insert_with(|| {
-                        json!({
-                            "name": value_field_string(member, &["name", "short", "label"]).unwrap_or_else(|| issi.to_string()),
-                            "device_class": value_field_string(member, &["type", "kind"]).unwrap_or_else(|| "HRT".to_string()),
-                            "source": "netcore-directory-device-group-member",
-                        })
-                    });
-                    subscriber["status_group"] = json!(group_key);
-                }
-            }
-        }
-    }
-
-    if let Some(items) = statuses.as_array() {
-        for item in items {
-            let Some(code) = value_field_u64(item, &["code", "status", "id"]) else { continue; };
-            let label = value_field_string(item, &["label", "name", "description"]).unwrap_or_else(|| format!("Status {code}"));
-            let mut entry = json!({ "label": label, "source": "netcore-directory" });
-            copy_string_field(item, &mut entry, "description", &["description"]);
-            copy_string_field(item, &mut entry, "color", &["color"]);
-            copy_string_field(item, &mut entry, "severity", &["severity"]);
-            status_map.insert(code.to_string(), entry);
-        }
-    }
-
-    json!({
-        "subscribers": subscribers,
-        "groups": group_map,
-        "status_groups": status_groups,
-        "statuses": status_map,
-        "hide_infrastructure": true,
-        "upstream": {
-            "kind": "netcore-directory",
-            "base": base,
-            "timestamp": now_iso(),
-        }
-    })
-}
-
-fn value_field_string(value: &Value, keys: &[&str]) -> Option<String> {
-    let object = value.as_object()?;
-    for key in keys {
-        let Some(value) = object.get(*key) else { continue; };
-        if let Some(text) = value.as_str().map(str::trim).filter(|text| !text.is_empty()) {
-            return Some(text.to_string());
-        }
-        if let Some(number) = value.as_u64() {
-            return Some(number.to_string());
-        }
-        if let Some(number) = value.as_i64() {
-            return Some(number.to_string());
-        }
-    }
-    None
-}
-
-fn value_field_u64(value: &Value, keys: &[&str]) -> Option<u64> {
-    let object = value.as_object()?;
-    for key in keys {
-        let Some(value) = object.get(*key) else { continue; };
-        if let Some(number) = value_as_u64(value) {
-            return Some(number);
-        }
-    }
-    None
-}
-
-fn value_as_u64(value: &Value) -> Option<u64> {
-    if let Some(number) = value.as_u64() {
-        return Some(number);
-    }
-    if let Some(number) = value.as_i64().and_then(|number| u64::try_from(number).ok()) {
-        return Some(number);
-    }
-    value.as_str()?.trim().parse::<u64>().ok()
-}
-
-fn copy_string_field(source: &Value, target: &mut Value, target_key: &str, source_keys: &[&str]) {
-    if let Some(value) = value_field_string(source, source_keys) {
-        target[target_key] = json!(value);
-    }
-}
-
-fn copy_bool_field(source: &Value, target: &mut Value, target_key: &str, source_keys: &[&str]) {
-    let Some(object) = source.as_object() else { return; };
-    for key in source_keys {
-        let Some(value) = object.get(*key) else { continue; };
-        if let Some(flag) = value.as_bool() {
-            target[target_key] = json!(flag);
-            return;
-        }
-        if let Some(number) = value.as_i64() {
-            target[target_key] = json!(number != 0);
-            return;
-        }
-    }
 }
 
 fn merge_directory_value(target: &mut Value, incoming: Value) {
