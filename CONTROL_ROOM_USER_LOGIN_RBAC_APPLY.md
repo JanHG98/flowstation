@@ -1,4 +1,4 @@
-# NetCore Control Room v5.1.1 – User/Passwort Login + RBAC
+# NetCore Control Room v5.2 – User/Passwort Login + RBAC
 
 Dieser Stand ersetzt Operator-/Admin-Tokens durch klassischen Login:
 
@@ -47,3 +47,9 @@ username = "jan"
 ```
 
 Das Passwort wird in der UI eingegeben, nicht als Token-Datei gespeichert.
+
+
+## v5.2 Buildfix
+
+- Fix für Windows-UI Buildfehler `E0382 borrow of moved value: settings` in `ControlRoomApp::new`.
+- `login_username` wird vor dem Move von `settings` vorbereitet.

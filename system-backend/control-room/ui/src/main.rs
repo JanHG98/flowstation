@@ -13,7 +13,7 @@ const DEFAULT_API: &str = "http://127.0.0.1:9010";
 const DEFAULT_PROFILE: &str = "default";
 const DEFAULT_NODE: &str = "SRV-M_TBS-01";
 const DEFAULT_OPERATOR: &str = "jan";
-const UI_VERSION_LABEL: &str = "Native UI v5.0 · klassischer Login · RBAC";
+const UI_VERSION_LABEL: &str = "Native UI v5.2 · klassischer Login · RBAC · Buildfix";
 const DEFAULT_TILE_URL: &str = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
 const DEFAULT_TILE_ATTRIBUTION: &str = "© OpenStreetMap contributors";
 const TILE_SIZE: f64 = 256.0;
@@ -628,6 +628,10 @@ impl ControlRoomApp {
     fn new(settings: ResolvedSettings, startup_warning: Option<String>) -> Self {
         let api = ApiClient::new(&settings);
         let local_directory = settings.directory.clone();
+        let login_username = settings
+            .username
+            .clone()
+            .unwrap_or_else(|| settings.operator_id.clone());
         Self {
             kick_issi: String::new(),
             dgna_issi: String::new(),
@@ -668,7 +672,7 @@ impl ControlRoomApp {
             admin_users: None,
             current_user: None,
             logged_in: false,
-            login_username: settings.username.clone().unwrap_or_else(|| settings.operator_id.clone()),
+            login_username,
             login_password: String::new(),
             login_result: None,
             detached_windows: HashMap::new(),
