@@ -143,3 +143,33 @@ token = "<node-token>"
 ```
 
 Danach TBS neu starten.
+
+## RBAC-Token verwalten
+
+Der Bootstrap-Operator-Token aus `/etc/netcore-control-room/control-room.env` hat standardmäßig Admin-Rechte. Damit erzeugst du benannte Tokens:
+
+```bash
+source /etc/netcore-control-room/control-room.env
+
+./target/release/netcore-control-room-operator \
+  --api http://10.0.1.25:9010 \
+  --token "$NETCORE_CONTROL_ROOM_OPERATOR_TOKEN" \
+  tokens create --label "Jan Admin" --role admin --created-by jan
+```
+
+Die Ausgabe enthält den Klartext-Token genau einmal. Danach liegt nur noch der Hash in SQLite.
+
+Weitere Beispiele:
+
+```bash
+./target/release/netcore-control-room-operator --api http://10.0.1.25:9010 --token "$NETCORE_CONTROL_ROOM_OPERATOR_TOKEN" tokens create --label "ELW Display" --role viewer --created-by jan
+./target/release/netcore-control-room-operator --api http://10.0.1.25:9010 --token "$NETCORE_CONTROL_ROOM_OPERATOR_TOKEN" tokens create --label "Operator Jan" --role operator --created-by jan
+./target/release/netcore-control-room-operator --api http://10.0.1.25:9010 --token "$NETCORE_CONTROL_ROOM_OPERATOR_TOKEN" tokens list
+```
+
+Deaktivieren/löschen:
+
+```bash
+./target/release/netcore-control-room-operator --api http://10.0.1.25:9010 --token "$NETCORE_CONTROL_ROOM_OPERATOR_TOKEN" tokens disable --id tok_...
+./target/release/netcore-control-room-operator --api http://10.0.1.25:9010 --token "$NETCORE_CONTROL_ROOM_OPERATOR_TOKEN" tokens delete --id tok_...
+```

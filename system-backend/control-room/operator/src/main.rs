@@ -104,8 +104,50 @@ enum Command {
         operator: String,
     },
 
+    /// Manage RBAC/API tokens. Requires admin role.
+    Tokens {
+        #[command(subcommand)]
+        command: TokenCommand,
+    },
+
     /// Check /health.
     Health,
+}
+
+#[derive(Debug, Subcommand)]
+enum TokenCommand {
+    /// List configured tokens. Plain token values are never shown here.
+    List,
+
+    /// Create a new token. The plain token is shown exactly once.
+    Create {
+        #[arg(long)]
+        label: String,
+        #[arg(long)]
+        role: String,
+        #[arg(long)]
+        expires_at: Option<String>,
+        #[arg(long)]
+        created_by: Option<String>,
+    },
+
+    /// Enable a token.
+    Enable {
+        #[arg(long)]
+        id: String,
+    },
+
+    /// Disable a token without deleting its audit metadata.
+    Disable {
+        #[arg(long)]
+        id: String,
+    },
+
+    /// Delete a token.
+    Delete {
+        #[arg(long)]
+        id: String,
+    },
 }
 
 struct ApiClient {
@@ -136,6 +178,26 @@ impl ApiClient {
     fn post_json<T: Serialize + ?Sized>(&self, path: &str, body: &T) -> AppResult<Value> {
         let url = self.url(path);
         let mut request = self.http.post(url).json(body);
+        if let Some(token) = &self.token {
+            request = request.bearer_auth(token);
+        }
+        let response = request.send()?.error_for_status()?;
+        Ok(response.json()?)
+    }
+
+    fn patch_json<T: Serialize + ?Sized>(&self, path: &str, body: &T) -> AppResult<Value> {
+        let url = self.url(path);
+        let mut request = self.http.patch(url).json(body);
+        if let Some(token) = &self.token {
+            request = request.bearer_auth(token);
+        }
+        let response = request.send()?.error_for_status()?;
+        Ok(response.json()?)
+    }
+
+    fn delete_json(&self, path: &str) -> AppResult<Value> {
+        let url = self.url(path);
+        let mut request = self.http.delete(url);
         if let Some(token) = &self.token {
             request = request.bearer_auth(token);
         }
@@ -190,7 +252,33 @@ fn main() -> AppResult<()> {
             let body = json!({ "operator_id": operator, "issi": issi });
             print_json(api.post_json(&format!("/api/nodes/{node}/commands/clear-emergency"), &body)?)
         }
+        Command::Tokens { command } => handle_token_command(&api, command),
         Command::Health => print_json(api.get_json("/health")?),
+    }
+}
+
+
+fn handle_token_command(api: &ApiClient, command: TokenCommand) -> AppResult<()> {
+    match command {
+        TokenCommand::List => print_json(api.get_json("/api/admin/tokens")?),
+        TokenCommand::Create { label, role, expires_at, created_by } => {
+            let body = json!({
+                "label": label,
+                "role": role,
+                "expires_at": expires_at,
+                "created_by": created_by,
+            });
+            print_json(api.post_json("/api/admin/tokens", &body)?)
+        }
+        TokenCommand::Enable { id } => {
+            let body = json!({ "enabled": true });
+            print_json(api.patch_json(&format!("/api/admin/tokens/{id}"), &body)?)
+        }
+        TokenCommand::Disable { id } => {
+            let body = json!({ "enabled": false });
+            print_json(api.patch_json(&format!("/api/admin/tokens/{id}"), &body)?)
+        }
+        TokenCommand::Delete { id } => print_json(api.delete_json(&format!("/api/admin/tokens/{id}"))?),
     }
 }
 

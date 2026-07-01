@@ -1,79 +1,166 @@
-# Control Room Auth / API-Token
+# Control Room Auth, RBAC und Token-Verwaltung
 
-Der Control Room unterstützt einfache Token-Authentifizierung für zwei Rollen:
+Der Control Room unterstützt Token-Authentifizierung mit Rollenmodell.
+
+## Rollen
 
 ```text
-Node      = Basisstation / TBS am WebSocket /node
-Operator  = native Leitstellen-Konsole und HTTP API
+node      Basisstation/TBS am WebSocket /node
+viewer    nur lesende API/Operator-Dashboard
+operator  viewer + Funkbedienung: Kick, DGNA, Emergency Clear, SDS/Commands
+admin     operator + gefährliche Commands + Tokenverwaltung
 ```
 
-## LXC
+Rollen sind hierarchisch, außer `node`:
 
-Token erzeugen:
-
-```bash
-openssl rand -hex 32
-openssl rand -hex 32
+```text
+admin > operator > viewer
+node ist nur für Basisstationen
 ```
 
-In `/etc/netcore-control-room/control-room.env` eintragen:
+## Geschützte Bereiche
+
+```text
+WS /node                                      node
+WS /ui                                        viewer/operator/admin
+GET /api/*                                    viewer
+POST /api/nodes/{node}/commands/kick          operator
+POST /api/nodes/{node}/commands/dgna          operator
+POST /api/nodes/{node}/commands/clear-emergency operator
+POST /api/nodes/{node}/commands/restart-service admin
+POST /api/nodes/{node}/commands/shutdown-service admin
+/api/admin/tokens/*                           admin
+```
+
+`/health` kann über `allow_health_unauthenticated = true` offen bleiben.
+
+## Bootstrap-Tokens
+
+Für den Start gibt es weiterhin zwei Bootstrap-Tokens in:
+
+```text
+/etc/netcore-control-room/control-room.env
+```
 
 ```bash
 NETCORE_CONTROL_ROOM_NODE_TOKEN=<node-token>
 NETCORE_CONTROL_ROOM_OPERATOR_TOKEN=<operator-token>
 ```
 
-In `/etc/netcore-control-room/control-room.toml` aktivieren:
+Der Operator-Token hat per Default Admin-Rechte:
 
 ```toml
 [auth]
-enabled = true
-allow_health_unauthenticated = true
-node_token_env = "NETCORE_CONTROL_ROOM_NODE_TOKEN"
-operator_token_env = "NETCORE_CONTROL_ROOM_OPERATOR_TOKEN"
+operator_token_role = "admin"
 ```
 
-Service neu starten:
+Damit kannst du später echte, benannte Tokens erzeugen.
+
+## Token-Registry
+
+Registry-Tokens werden in SQLite gespeichert:
+
+```text
+/var/lib/netcore-control-room/control-room.sqlite3
+auth_tokens
+```
+
+Der Klartext-Token wird **nur beim Erstellen einmal angezeigt**. In SQLite liegt nur ein SHA-256-Hash.
+
+## Operator CLI
+
+Tokenliste anzeigen:
 
 ```bash
-systemctl restart netcore-control-room
-journalctl -u netcore-control-room -f
+./target/release/netcore-control-room-operator \
+  --api http://10.0.1.25:9010 \
+  --token "$NETCORE_CONTROL_ROOM_OPERATOR_TOKEN" \
+  tokens list
 ```
 
-## TBS
-
-In der TBS-Config:
-
-```toml
-[control_room]
-enabled = true
-host = "10.0.1.25"
-port = 9010
-endpoint_path = "/node"
-token = "<node-token>"
-```
-
-Die TBS sendet den Token als Basic-Auth-Passwort mit Username `node`. Der Server prüft den Token.
-
-## Operator
-
-Einmalig:
+Viewer-Token erstellen:
 
 ```bash
-./target/release/netcore-control-room-operator   --api http://10.0.1.25:9010   --token <operator-token>   overview
+./target/release/netcore-control-room-operator \
+  --api http://10.0.1.25:9010 \
+  --token "$NETCORE_CONTROL_ROOM_OPERATOR_TOKEN" \
+  tokens create --label "ELW Display" --role viewer --created-by jan
 ```
 
-Dauerhaft:
+Operator-Token erstellen:
 
 ```bash
-export NETCORE_CONTROL_ROOM_OPERATOR_TOKEN=<operator-token>
-./target/release/netcore-control-room-operator --api http://10.0.1.25:9010 dashboard
+./target/release/netcore-control-room-operator \
+  --api http://10.0.1.25:9010 \
+  --token "$NETCORE_CONTROL_ROOM_OPERATOR_TOKEN" \
+  tokens create --label "Jan Operator" --role operator --created-by jan
 ```
 
-## Curl
+Admin-Token erstellen:
 
 ```bash
-curl -H "Authorization: Bearer <operator-token>" http://10.0.1.25:9010/api/overview | jq
+./target/release/netcore-control-room-operator \
+  --api http://10.0.1.25:9010 \
+  --token "$NETCORE_CONTROL_ROOM_OPERATOR_TOKEN" \
+  tokens create --label "Jan Admin" --role admin --created-by jan
 ```
 
-`/health` kann bewusst offen bleiben, wenn `allow_health_unauthenticated = true` gesetzt ist.
+Node-Token für weitere TBS erstellen:
+
+```bash
+./target/release/netcore-control-room-operator \
+  --api http://10.0.1.25:9010 \
+  --token "$NETCORE_CONTROL_ROOM_OPERATOR_TOKEN" \
+  tokens create --label "TBS Event" --role node --created-by jan
+```
+
+Token deaktivieren:
+
+```bash
+./target/release/netcore-control-room-operator \
+  --api http://10.0.1.25:9010 \
+  --token "$NETCORE_CONTROL_ROOM_OPERATOR_TOKEN" \
+  tokens disable --id tok_...
+```
+
+Token wieder aktivieren:
+
+```bash
+./target/release/netcore-control-room-operator \
+  --api http://10.0.1.25:9010 \
+  --token "$NETCORE_CONTROL_ROOM_OPERATOR_TOKEN" \
+  tokens enable --id tok_...
+```
+
+Token löschen:
+
+```bash
+./target/release/netcore-control-room-operator \
+  --api http://10.0.1.25:9010 \
+  --token "$NETCORE_CONTROL_ROOM_OPERATOR_TOKEN" \
+  tokens delete --id tok_...
+```
+
+## HTTP/curl
+
+```bash
+curl -H "Authorization: Bearer <token>" http://10.0.1.25:9010/api/overview | jq
+```
+
+Token erstellen:
+
+```bash
+curl -X POST http://10.0.1.25:9010/api/admin/tokens \
+  -H "Authorization: Bearer $NETCORE_CONTROL_ROOM_OPERATOR_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"label":"ELW Display","role":"viewer","created_by":"jan"}' | jq
+```
+
+## Sicherheitshinweis
+
+Die Bootstrap-Tokens sind praktisch für den Start. Für den Betrieb ist sauberer:
+
+1. Bootstrap-Admin nutzen.
+2. Benannte Registry-Tokens erstellen.
+3. Clients auf Registry-Tokens umstellen.
+4. Bootstrap-Operator-Token lang und geheim halten oder später aus der Config entfernen.

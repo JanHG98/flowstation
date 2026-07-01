@@ -1,56 +1,63 @@
 # NetCore Control Room
 
-This directory contains the software and deployment assets that belong to the external Control Room / Leitstelle side of NetCore-Tetra.
+Dieser Bereich enthält die Control-Room-/Leitstellen-Bausteine.
 
-The radio base station remains responsible for RF/TETRA runtime. The Control Room side runs outside of the TBS, typically in an LXC/VM, and native operator clients connect to it.
-
-## Layout
+## Komponenten
 
 ```text
-system-backend/control-room/
-  config/       Example TOML config for the Control-Room-Core service
-  docs/         LXC/deployment notes
-  operator/     Native operator client / Leitstellenkonsole
-  schema/       SQLite schema reference
-  systemd/      Example systemd unit for the LXC service
+bins/netcore-control-room                 Control-Room-Core als Dienst
+system-backend/control-room/operator      native Operator-Konsole
+system-backend/control-room/config        Beispiel-Config
+system-backend/control-room/systemd       systemd-Unit/env-Beispiele
+system-backend/control-room/schema        SQLite-Schema-Doku
+system-backend/control-room/docs          Deployment/Auth/RBAC-Doku
 ```
 
-## Runtime split
+## Architektur
 
 ```text
-TBS:
-- bluestation-bs
-- SDR / RF / Asterisk / codec runtime
-- connects as node to the Control-Room-Core
-
-Control-Room LXC:
-- netcore-control-room
-- State / API / telemetry aggregation / command audit / SQLite persistence
-- no SDR hardware and no Soapy/GSM/TETRA codec dependencies needed
-
-Operator workstation:
-- netcore-control-room-operator
-- native Leitstellenkonsole
-- talks to the Control-Room-Core API
+TBS / FlowStation  →  /node WebSocket  →  Control-Room-Core im LXC
+Operator-Konsole   →  HTTP/API         →  Control-Room-Core im LXC
 ```
 
-## Recommended LXC start
+Die Operator-Konsole ist bewusst **keine Web-App**, sondern ein eigenständig lauffähiges Programm.
+
+## RBAC
+
+Rollen:
+
+```text
+node      Basisstation/TBS
+viewer    Lesen/Dashboard
+operator  Funkbedienung
+admin     Administration/Tokenverwaltung
+```
+
+Details: `docs/auth.md`
+
+## Build im LXC
+
+```bash
+git fetch && \
+git checkout control-room && \
+git pull --ff-only && \
+cargo build --release \
+  -p netcore-control-room \
+  -p netcore-control-room-operator
+```
+
+## Start Core
 
 ```bash
 ./target/release/netcore-control-room \
   --config /etc/netcore-control-room/control-room.toml
 ```
 
-See [`docs/lxc-deployment.md`](docs/lxc-deployment.md) for the full LXC deployment flow.
-
-
-## Auth / API-Token
-
-Der Control-Room-Core unterstützt Token-Auth für Basisstation-Nodes und Operator/API-Clients. Details siehe `docs/auth.md`.
-
-Kurzform:
+## Start Operator
 
 ```bash
-export NETCORE_CONTROL_ROOM_OPERATOR_TOKEN=<operator-token>
-./target/release/netcore-control-room-operator --api http://10.0.1.25:9010 dashboard
+./target/release/netcore-control-room-operator \
+  --api http://10.0.1.25:9010 \
+  --token "$NETCORE_CONTROL_ROOM_OPERATOR_TOKEN" \
+  dashboard
 ```

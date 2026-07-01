@@ -8,7 +8,7 @@ use serde_json::{Value, json};
 use tetra_entities::net_control::ControlCommand;
 use tetra_entities::net_control_room::ControlCommandEnvelope;
 
-use crate::auth::AuthState;
+use crate::auth::{AuthError, AuthIdentity, AuthRole, AuthState, AuthTokenListResponse, CreateAuthTokenRequest, UpdateAuthTokenRequest};
 use crate::state::{SharedControlRoom, now_iso};
 
 const MAX_HTTP_REQUEST_BYTES: usize = 1024 * 1024;
@@ -82,10 +82,17 @@ fn route_http(request: HttpRequest, state: SharedControlRoom, node_path: &str, u
     }
 
     let health_public = request.method == "GET" && request.path == "/health" && auth.allow_health_unauthenticated();
-    if !health_public && !auth.authorize_http_operator(&request.headers, &request.query) {
-        tracing::warn!(method = %request.method, path = %request.path, "http request rejected: unauthorized");
-        return unauthorized();
-    }
+    let identity = if health_public {
+        None
+    } else {
+        match auth.authorize_http_role(&request.headers, &request.query, required_role_for_request(&request)) {
+            Ok(identity) => Some(identity),
+            Err(err) => {
+                tracing::warn!(method = %request.method, path = %request.path, required = %required_role_for_request(&request), "http request rejected by RBAC");
+                return auth_error_response(err, required_role_for_request(&request));
+            }
+        }
+    };
 
     match (request.method.as_str(), request.path.as_str()) {
         ("GET", "/") => HttpResponse::html(200, index_html(node_path, ui_path)),
@@ -128,7 +135,16 @@ fn route_http(request: HttpRequest, state: SharedControlRoom, node_path: &str, u
                 .map(String::as_str);
             HttpResponse::json(200, &state.recent_events_filtered(limit, event_type, quiet))
         }
+        ("GET", "/api/admin/tokens") => admin_list_tokens(auth),
+        ("POST", "/api/admin/tokens") => admin_create_token(&request.body, auth, identity.as_ref()),
         ("POST", "/api/commands") => submit_command_from_body(&request.body, state, None),
+        _ if request.path.starts_with("/api/admin/tokens/") => {
+            match parse_admin_token_route(&request.path) {
+                Some(token_id) if request.method == "PATCH" || request.method == "POST" => admin_update_token(&token_id, &request.body, auth),
+                Some(token_id) if request.method == "DELETE" => admin_delete_token(&token_id, auth),
+                _ => HttpResponse::json(404, &json!({ "error": "unknown admin token route" })),
+            }
+        }
         _ if request.method == "GET" => {
             if let Some(route) = parse_node_detail_route(&request.path) {
                 match route.collection.as_deref() {
@@ -178,6 +194,73 @@ fn route_http(request: HttpRequest, state: SharedControlRoom, node_path: &str, u
         _ => not_found(node_path, ui_path),
     }
 }
+
+fn required_role_for_request(request: &HttpRequest) -> AuthRole {
+    if request.path.starts_with("/api/admin/tokens") {
+        return AuthRole::Admin;
+    }
+    if request.method == "POST" {
+        if let Some(route) = parse_node_command_route(&request.path) {
+            return match route.shortcut.as_deref() {
+                Some("restart-service") | Some("shutdown-service") => AuthRole::Admin,
+                _ => AuthRole::Operator,
+            };
+        }
+        if request.path == "/api/commands" {
+            return AuthRole::Operator;
+        }
+    }
+    AuthRole::Viewer
+}
+
+fn admin_list_tokens(auth: &AuthState) -> HttpResponse {
+    match auth.list_tokens() {
+        Ok(tokens) => HttpResponse::json(200, &AuthTokenListResponse { now: now_iso(), count: tokens.len(), tokens }),
+        Err(err) => HttpResponse::json(500, &json!({ "error": err })),
+    }
+}
+
+fn admin_create_token(body: &[u8], auth: &AuthState, identity: Option<&AuthIdentity>) -> HttpResponse {
+    let req: CreateAuthTokenRequest = match parse_json_body(body) {
+        Ok(req) => req,
+        Err(response) => return response,
+    };
+    match auth.create_token(req, identity.map(|i| i.label.as_str())) {
+        Ok(created) => HttpResponse::json(201, &created),
+        Err(err) => HttpResponse::json(400, &json!({ "error": err })),
+    }
+}
+
+fn admin_update_token(token_id: &str, body: &[u8], auth: &AuthState) -> HttpResponse {
+    let req: UpdateAuthTokenRequest = match parse_json_body(body) {
+        Ok(req) => req,
+        Err(response) => return response,
+    };
+    match auth.update_token(token_id, req) {
+        Ok(updated) => HttpResponse::json(200, &updated),
+        Err(err) if err == "token not found" => HttpResponse::json(404, &json!({ "error": err })),
+        Err(err) => HttpResponse::json(400, &json!({ "error": err })),
+    }
+}
+
+fn admin_delete_token(token_id: &str, auth: &AuthState) -> HttpResponse {
+    match auth.delete_token(token_id) {
+        Ok(true) => HttpResponse::json(200, &json!({ "deleted": true, "id": token_id })),
+        Ok(false) => HttpResponse::json(404, &json!({ "error": "token not found", "id": token_id })),
+        Err(err) => HttpResponse::json(500, &json!({ "error": err })),
+    }
+}
+
+fn parse_admin_token_route(path: &str) -> Option<String> {
+    let rest = path.strip_prefix("/api/admin/tokens/")?;
+    let mut parts = rest.split('/').filter(|part| !part.is_empty());
+    let id = parts.next()?.to_string();
+    if parts.next().is_some() {
+        return None;
+    }
+    Some(id)
+}
+
 
 #[derive(Debug)]
 struct NodeCommandRoute {
@@ -419,7 +502,7 @@ pub fn read_http_request(stream: &mut TcpStream) -> Result<HttpRequest, String> 
 
 pub fn write_response(stream: &mut TcpStream, response: &HttpResponse) -> std::io::Result<()> {
     let header = format!(
-        "HTTP/1.1 {} {}\r\nContent-Type: {}\r\nContent-Length: {}\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Methods: GET, POST, OPTIONS\r\nAccess-Control-Allow-Headers: Content-Type, Authorization\r\nConnection: close\r\n\r\n",
+        "HTTP/1.1 {} {}\r\nContent-Type: {}\r\nContent-Length: {}\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Methods: GET, POST, PATCH, DELETE, OPTIONS\r\nAccess-Control-Allow-Headers: Content-Type, Authorization, X-Control-Room-Token, X-NetCore-Token, X-Operator-Token\r\nConnection: close\r\n\r\n",
         response.status,
         response.reason,
         response.content_type,
@@ -509,6 +592,10 @@ fn not_found(node_path: &str, ui_path: &str) -> HttpResponse {
                 "GET /api/health/full",
                 "GET /api/events?limit=50&quiet=true",
                 "GET /api/commands?limit=50",
+                "GET /api/admin/tokens",
+                "POST /api/admin/tokens",
+                "POST/PATCH /api/admin/tokens/{token_id}",
+                "DELETE /api/admin/tokens/{token_id}",
                 "POST /api/commands",
                 "POST /api/nodes/{node_id}/commands",
                 "POST /api/nodes/{node_id}/commands/kick",
@@ -521,20 +608,29 @@ fn not_found(node_path: &str, ui_path: &str) -> HttpResponse {
     )
 }
 
-fn unauthorized() -> HttpResponse {
-    HttpResponse::json(401, &json!({
-        "error": "unauthorized",
-        "hint": "send Authorization: Bearer <operator-token> or X-Control-Room-Token"
-    }))
+fn auth_error_response(error: AuthError, required: AuthRole) -> HttpResponse {
+    match error {
+        AuthError::Missing | AuthError::Invalid => HttpResponse::json(401, &json!({
+            "error": "unauthorized",
+            "required_role": required.as_str(),
+            "hint": "send Authorization: Bearer <token> or X-Control-Room-Token"
+        })),
+        AuthError::Insufficient => HttpResponse::json(403, &json!({
+            "error": "forbidden",
+            "required_role": required.as_str()
+        })),
+    }
 }
 
 fn reason_phrase(status: u16) -> &'static str {
     match status {
         200 => "OK",
+        201 => "Created",
         202 => "Accepted",
         204 => "No Content",
         400 => "Bad Request",
         401 => "Unauthorized",
+        403 => "Forbidden",
         404 => "Not Found",
         409 => "Conflict",
         500 => "Internal Server Error",
@@ -584,6 +680,10 @@ fn index_html(node_path: &str, ui_path: &str) -> String {
     <li><code>GET /api/health/full</code> — technische Health-Daten</li>
     <li><code>GET /api/events?limit=50&amp;quiet=true</code></li>
     <li><code>GET /api/commands?limit=50</code></li>
+    <li><code>GET /api/admin/tokens</code> — Admin: Tokenliste</li>
+    <li><code>POST /api/admin/tokens</code> — Admin: Token erzeugen</li>
+    <li><code>PATCH /api/admin/tokens/&lt;token_id&gt;</code> — Admin: Token ändern/deaktivieren</li>
+    <li><code>DELETE /api/admin/tokens/&lt;token_id&gt;</code> — Admin: Token löschen</li>
     <li><code>POST /api/nodes/&lt;node_id&gt;/commands</code></li>
     <li><code>POST /api/nodes/&lt;node_id&gt;/commands/kick</code></li>
     <li><code>POST /api/nodes/&lt;node_id&gt;/commands/dgna</code></li>

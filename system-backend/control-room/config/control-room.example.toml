@@ -15,7 +15,7 @@ ui_path = "/ui"
 history_limit = 1000
 
 [persistence]
-# Enables SQLite persistence for audit/history data.
+# Enables SQLite persistence for audit/history data and RBAC token registry.
 enabled = true
 
 # Recommended path when running as systemd service in the LXC.
@@ -29,7 +29,7 @@ persist_noisy_events = false
 load_recent_limit = 1000
 
 [auth]
-# Set to true after you configured both tokens in /etc/netcore-control-room/control-room.env
+# Set to true after you configured both bootstrap tokens in /etc/netcore-control-room/control-room.env
 # and added the node token to the TBS [control_room] config.
 enabled = false
 
@@ -39,6 +39,10 @@ allow_health_unauthenticated = true
 # Prefer environment variables over writing secrets into this TOML file.
 node_token_env = "NETCORE_CONTROL_ROOM_NODE_TOKEN"
 operator_token_env = "NETCORE_CONTROL_ROOM_OPERATOR_TOKEN"
+
+# Bootstrap operator token role. Keep admin until you created proper registry tokens.
+# Valid: viewer, operator, admin
+operator_token_role = "admin"
 
 # Development-only alternative. Do not commit real tokens.
 # node_token = "change-me-node-token"

@@ -123,8 +123,10 @@ pub struct AuthConfig {
     pub allow_health_unauthenticated: bool,
     /// Node token for BS -> Control Room WebSocket authentication. Prefer node_token_env for production.
     pub node_token: Option<String>,
-    /// Operator token for HTTP API and operator clients. Prefer operator_token_env for production.
+    /// Operator bootstrap token for HTTP API and operator clients. Prefer operator_token_env for production.
     pub operator_token: Option<String>,
+    /// Role for the bootstrap operator token. Keep admin until registry tokens are created.
+    pub operator_token_role: String,
     /// Environment variable containing the node token.
     pub node_token_env: Option<String>,
     /// Environment variable containing the operator token.
@@ -138,6 +140,7 @@ impl Default for AuthConfig {
             allow_health_unauthenticated: true,
             node_token: None,
             operator_token: None,
+            operator_token_role: "admin".to_string(),
             node_token_env: Some("NETCORE_CONTROL_ROOM_NODE_TOKEN".to_string()),
             operator_token_env: Some("NETCORE_CONTROL_ROOM_OPERATOR_TOKEN".to_string()),
         }
@@ -146,6 +149,12 @@ impl Default for AuthConfig {
 
 impl AuthConfig {
     fn normalise(&mut self) {
+        let role = self.operator_token_role.trim().to_ascii_lowercase();
+        self.operator_token_role = match role.as_str() {
+            "viewer" | "operator" | "admin" => role,
+            "" => "admin".to_string(),
+            _ => "admin".to_string(),
+        };
         self.node_token = normalise_optional_secret(self.node_token.take());
         self.operator_token = normalise_optional_secret(self.operator_token.take());
         self.node_token_env = normalise_optional_secret(self.node_token_env.take());

@@ -97,7 +97,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         None
     };
 
-    let auth = AuthState::from_config(&config.auth)
+    let auth = AuthState::from_config(&config.auth, persistence.clone())
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))?;
     if auth.enabled() {
         tracing::info!(health_public = auth.allow_health_unauthenticated(), "Control Room token authentication enabled");

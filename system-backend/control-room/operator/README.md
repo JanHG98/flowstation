@@ -1,62 +1,76 @@
 # NetCore Control Room Operator
 
-Native operator console for the NetCore Control Room.
+Native Operator-Konsole für den NetCore Control Room. Keine Web-App.
 
-This is intentionally **not** a web app. It is a standalone executable that connects to a running `netcore-control-room` core service by HTTP API.
-
-## Build
-
-From the repository root:
-
-```bash
-cargo build --release -p netcore-control-room-operator
-```
-
-## Run dashboard
+## Start
 
 ```bash
 ./target/release/netcore-control-room-operator \
-  --api http://10.10.40.20:9010 \
+  --api http://10.0.1.25:9010 \
+  --token "$NETCORE_CONTROL_ROOM_OPERATOR_TOKEN" \
   dashboard
 ```
 
-or with an environment variable:
+Alternativ:
 
 ```bash
-export NETCORE_CONTROL_ROOM_API=http://10.10.40.20:9010
+export NETCORE_CONTROL_ROOM_API=http://10.0.1.25:9010
+export NETCORE_CONTROL_ROOM_OPERATOR_TOKEN=<token>
+
 ./target/release/netcore-control-room-operator dashboard
 ```
 
-## Useful commands
+## Ansichten
 
 ```bash
-netcore-control-room-operator --api http://10.10.40.20:9010 overview
-netcore-control-room-operator --api http://10.10.40.20:9010 subscribers --online
-netcore-control-room-operator --api http://10.10.40.20:9010 groups
-netcore-control-room-operator --api http://10.10.40.20:9010 calls
-netcore-control-room-operator --api http://10.10.40.20:9010 locations
-netcore-control-room-operator --api http://10.10.40.20:9010 sds --limit 20
+netcore-control-room-operator overview
+netcore-control-room-operator subscribers --online
+netcore-control-room-operator groups
+netcore-control-room-operator calls
+netcore-control-room-operator locations
+netcore-control-room-operator sds --limit 20
+netcore-control-room-operator commands --limit 20
 ```
 
-Send commands:
+## Commands
 
 ```bash
-netcore-control-room-operator --api http://10.10.40.20:9010 kick --node tbs-04010001 --issi 2010002
-netcore-control-room-operator --api http://10.10.40.20:9010 dgna --node tbs-04010001 --issi 2020004 --gssi 15205
-netcore-control-room-operator --api http://10.10.40.20:9010 dgna --node tbs-04010001 --issi 2020004 --gssi 15205 --detach
-netcore-control-room-operator --api http://10.10.40.20:9010 clear-emergency --node tbs-04010001
+netcore-control-room-operator kick --node SRV-M_TBS-01 --issi 2010002 --operator jan
+netcore-control-room-operator dgna --node SRV-M_TBS-01 --issi 2020004 --gssi 15205 --operator jan
+netcore-control-room-operator dgna --node SRV-M_TBS-01 --issi 2020004 --gssi 15205 --detach --operator jan
+netcore-control-room-operator clear-emergency --node SRV-M_TBS-01 --operator jan
 ```
 
+## Tokenverwaltung / RBAC
 
-## Auth
-
-Wenn der Control-Room-Core Auth aktiviert hat, nutze entweder `--token` oder die Umgebungvariable `NETCORE_CONTROL_ROOM_OPERATOR_TOKEN`:
+Tokenliste:
 
 ```bash
-./target/release/netcore-control-room-operator --api http://10.0.1.25:9010 --token <operator-token> dashboard
+netcore-control-room-operator tokens list
 ```
 
+Token erstellen, Klartext wird nur einmal angezeigt:
+
 ```bash
-export NETCORE_CONTROL_ROOM_OPERATOR_TOKEN=<operator-token>
-./target/release/netcore-control-room-operator --api http://10.0.1.25:9010 dashboard
+netcore-control-room-operator tokens create --label "ELW Display" --role viewer --created-by jan
+netcore-control-room-operator tokens create --label "Jan Operator" --role operator --created-by jan
+netcore-control-room-operator tokens create --label "Jan Admin" --role admin --created-by jan
+netcore-control-room-operator tokens create --label "TBS Event" --role node --created-by jan
+```
+
+Token deaktivieren/aktivieren/löschen:
+
+```bash
+netcore-control-room-operator tokens disable --id tok_...
+netcore-control-room-operator tokens enable --id tok_...
+netcore-control-room-operator tokens delete --id tok_...
+```
+
+## Rollen
+
+```text
+node      nur TBS /node WebSocket
+viewer    nur lesen
+operator  lesen + normale Funkbefehle
+admin     alles + Tokenverwaltung + Service Restart/Shutdown
 ```

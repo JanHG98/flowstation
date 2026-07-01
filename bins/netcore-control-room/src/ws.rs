@@ -31,11 +31,13 @@ pub fn handle_websocket_stream(stream: TcpStream, state: SharedControlRoom, node
         let role = if path == node_path_cb {
             Some(AuthRole::Node)
         } else if path == ui_path_cb {
-            Some(AuthRole::Operator)
+            Some(AuthRole::Viewer)
         } else {
             None
         };
-        let ok = role.map(|role| auth_cb.authorize_ws_request(role, req)).unwrap_or(true);
+        let ok = role
+            .map(|role| auth_cb.authorize_ws_request(role, req).is_ok())
+            .unwrap_or(true);
         *authorized_cb.lock().expect("ws auth mutex poisoned") = ok;
 
         // The BS requests a subprotocol. Echo it when it is the expected one so

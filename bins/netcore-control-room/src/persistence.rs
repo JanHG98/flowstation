@@ -6,6 +6,7 @@ use rusqlite::{Connection, params};
 use serde_json::{Value, json};
 use tetra_core::tetra_entities::TetraEntity;
 
+use crate::auth::{AuthRole, AuthTokenRecord};
 use crate::config::PersistenceConfig;
 use crate::state::{CommandAuditEntry, EmergencyState, EventLogEntry, LocationState, SdsLogEntry};
 
@@ -253,6 +254,87 @@ impl PersistenceHandle {
         });
     }
 
+
+    pub fn list_auth_tokens(&self) -> rusqlite::Result<Vec<AuthTokenRecord>> {
+        let inner = self.inner.lock().expect("persistence mutex poisoned");
+        let mut stmt = inner.conn.prepare(
+            "SELECT id, label, role, enabled, created_at, updated_at, last_used_at, expires_at, created_by \
+             FROM auth_tokens ORDER BY created_at DESC",
+        )?;
+        stmt.query_map([], row_to_auth_token)?.collect()
+    }
+
+    pub fn find_auth_token_by_hash(&self, token_hash: &str) -> rusqlite::Result<Option<AuthTokenRecord>> {
+        let inner = self.inner.lock().expect("persistence mutex poisoned");
+        let mut stmt = inner.conn.prepare(
+            "SELECT id, label, role, enabled, created_at, updated_at, last_used_at, expires_at, created_by \
+             FROM auth_tokens WHERE token_hash = ?1 AND enabled = 1 LIMIT 1",
+        )?;
+        let mut rows = stmt.query(params![token_hash])?;
+        if let Some(row) = rows.next()? {
+            Ok(Some(row_to_auth_token(row)?))
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub fn insert_auth_token(
+        &self,
+        id: &str,
+        label: &str,
+        role: AuthRole,
+        token_hash: &str,
+        now: &str,
+        expires_at: Option<&str>,
+        created_by: Option<&str>,
+    ) -> rusqlite::Result<AuthTokenRecord> {
+        let inner = self.inner.lock().expect("persistence mutex poisoned");
+        inner.conn.execute(
+            "INSERT INTO auth_tokens \
+             (id, label, role, token_hash, enabled, created_at, updated_at, last_used_at, expires_at, created_by) \
+             VALUES (?1, ?2, ?3, ?4, 1, ?5, ?5, NULL, ?6, ?7)",
+            params![id, label, role.as_str(), token_hash, now, expires_at, created_by],
+        )?;
+        load_auth_token_by_id(&inner.conn, id)?.ok_or(rusqlite::Error::QueryReturnedNoRows)
+    }
+
+    pub fn update_auth_token(
+        &self,
+        id: &str,
+        enabled: Option<bool>,
+        label: Option<&str>,
+        expires_at: Option<&str>,
+        now: &str,
+    ) -> rusqlite::Result<Option<AuthTokenRecord>> {
+        let inner = self.inner.lock().expect("persistence mutex poisoned");
+        inner.conn.execute(
+            "UPDATE auth_tokens SET \
+               enabled = COALESCE(?2, enabled), \
+               label = COALESCE(NULLIF(?3, ''), label), \
+               expires_at = CASE WHEN ?4 IS NULL THEN expires_at ELSE NULLIF(?4, '') END, \
+               updated_at = ?5 \
+             WHERE id = ?1",
+            params![id, enabled.map(|v| if v { 1_i64 } else { 0_i64 }), label, expires_at, now],
+        )?;
+        load_auth_token_by_id(&inner.conn, id)
+    }
+
+    pub fn delete_auth_token(&self, id: &str) -> rusqlite::Result<bool> {
+        let inner = self.inner.lock().expect("persistence mutex poisoned");
+        let affected = inner.conn.execute("DELETE FROM auth_tokens WHERE id = ?1", params![id])?;
+        Ok(affected > 0)
+    }
+
+    pub fn update_auth_token_last_used(&self, id: &str, now: &str) {
+        self.with_conn("update auth token last used", |conn| {
+            conn.execute(
+                "UPDATE auth_tokens SET last_used_at = ?2, updated_at = ?2 WHERE id = ?1",
+                params![id, now],
+            )?;
+            Ok(())
+        });
+    }
+
     fn with_conn<F>(&self, label: &str, f: F)
     where
         F: FnOnce(&Connection) -> rusqlite::Result<()>,
@@ -354,7 +436,23 @@ fn migrate(conn: &Connection) -> rusqlite::Result<()> {
         );
         CREATE INDEX IF NOT EXISTS idx_emergencies_active_time ON emergencies(active, raised_at DESC);
 
+        CREATE TABLE IF NOT EXISTS auth_tokens (
+            id TEXT PRIMARY KEY,
+            label TEXT NOT NULL,
+            role TEXT NOT NULL,
+            token_hash TEXT NOT NULL UNIQUE,
+            enabled INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            last_used_at TEXT,
+            expires_at TEXT,
+            created_by TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_auth_tokens_role ON auth_tokens(role, enabled);
+        CREATE INDEX IF NOT EXISTS idx_auth_tokens_created ON auth_tokens(created_at DESC);
+
         INSERT OR IGNORE INTO schema_migrations(version) VALUES (1);
+        INSERT OR IGNORE INTO schema_migrations(version) VALUES (2);
         "#,
     )
 }
@@ -485,6 +583,36 @@ fn load_emergencies(conn: &Connection, limit: usize) -> rusqlite::Result<Vec<Per
         .collect::<rusqlite::Result<Vec<_>>>()?;
     rows.reverse();
     Ok(rows)
+}
+
+
+fn load_auth_token_by_id(conn: &Connection, id: &str) -> rusqlite::Result<Option<AuthTokenRecord>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, label, role, enabled, created_at, updated_at, last_used_at, expires_at, created_by \
+         FROM auth_tokens WHERE id = ?1 LIMIT 1",
+    )?;
+    let mut rows = stmt.query(params![id])?;
+    if let Some(row) = rows.next()? {
+        Ok(Some(row_to_auth_token(row)?))
+    } else {
+        Ok(None)
+    }
+}
+
+fn row_to_auth_token(row: &rusqlite::Row<'_>) -> rusqlite::Result<AuthTokenRecord> {
+    let role_raw: String = row.get(2)?;
+    let enabled: i64 = row.get(3)?;
+    Ok(AuthTokenRecord {
+        id: row.get(0)?,
+        label: row.get(1)?,
+        role: AuthRole::from_str(&role_raw).unwrap_or(AuthRole::Viewer),
+        enabled: enabled != 0,
+        created_at: row.get(4)?,
+        updated_at: row.get(5)?,
+        last_used_at: row.get(6)?,
+        expires_at: row.get(7)?,
+        created_by: row.get(8)?,
+    })
 }
 
 fn is_noisy_event_type(event_type: &str) -> bool {

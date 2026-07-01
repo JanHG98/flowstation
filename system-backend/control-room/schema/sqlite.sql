@@ -1,4 +1,4 @@
--- NetCore Control Room SQLite schema v1.
+-- NetCore Control Room SQLite schema v2.
 -- The service auto-applies this schema on startup; this file is documentation/reference.
 
 CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -85,4 +85,20 @@ CREATE TABLE IF NOT EXISTS emergencies (
 );
 CREATE INDEX IF NOT EXISTS idx_emergencies_active_time ON emergencies(active, raised_at DESC);
 
+CREATE TABLE IF NOT EXISTS auth_tokens (
+    id TEXT PRIMARY KEY,
+    label TEXT NOT NULL,
+    role TEXT NOT NULL,
+    token_hash TEXT NOT NULL UNIQUE,
+    enabled INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    last_used_at TEXT,
+    expires_at TEXT,
+    created_by TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_auth_tokens_role ON auth_tokens(role, enabled);
+CREATE INDEX IF NOT EXISTS idx_auth_tokens_created ON auth_tokens(created_at DESC);
+
 INSERT OR IGNORE INTO schema_migrations(version) VALUES (1);
+INSERT OR IGNORE INTO schema_migrations(version) VALUES (2);
