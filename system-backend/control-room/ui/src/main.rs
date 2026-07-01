@@ -13,7 +13,7 @@ const DEFAULT_API: &str = "http://127.0.0.1:9010";
 const DEFAULT_PROFILE: &str = "default";
 const DEFAULT_NODE: &str = "SRV-M_TBS-01";
 const DEFAULT_OPERATOR: &str = "jan";
-const UI_VERSION_LABEL: &str = "Native UI v5.11 · Status-Tableau";
+const UI_VERSION_LABEL: &str = "Native UI v5.11.2 · Status-Tableau · Buildfix";
 const DEFAULT_TILE_URL: &str = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
 const DEFAULT_TILE_ATTRIBUTION: &str = "© OpenStreetMap contributors";
 const TILE_SIZE: f64 = 256.0;
@@ -450,7 +450,7 @@ enum Tab {
 }
 
 impl Tab {
-    const ALL: [Tab; 10] = [
+    const ALL: [Tab; 11] = [
         Tab::Overview,
         Tab::Subscribers,
         Tab::Groups,
@@ -727,7 +727,6 @@ impl ControlRoomApp {
     fn can_access_tab(&self, tab: Tab) -> bool {
         match tab {
             Tab::AdminUsers | Tab::Raw => self.is_admin(),
-            Tab::StatusTableau => self.can_read(),
             Tab::Commands => self.can_operate(),
             _ => true,
         }
@@ -1695,23 +1694,16 @@ impl ControlRoomApp {
     }
 
 
-    fn group_label(&self, gssi: u64) -> String {
-        self.local_directory
-            .group(gssi)
-            .and_then(directory_label_text)
-            .map(|name| format!("{name} ({gssi})"))
-            .unwrap_or_else(|| gssi.to_string())
-    }
-
     fn render_status_tableau(&mut self, ui: &mut egui::Ui) {
         ui.heading("Status-Tableau");
-        ui.small("Statusgruppen und Namen kommen aus dem NetCore Directory. Geräte ohne Statusgruppe erscheinen als Einzelgeräte.");
+        ui.small("Statusgruppen, Namen, Statuslabels und Gruppen kommen aus dem zentralen NetCore Directory-Server (/api/directory). Lokale operator.toml-Einträge wirken nur als Override.");
         ui.separator();
 
         let cards = self.build_status_tableau_cards();
 
         if cards.is_empty() {
-            ui.label("Keine Statusdaten vorhanden. Lege im Directory status_group/status/groups für Teilnehmer an oder warte auf Live-Statusdaten.");
+            ui.label("Keine Statusdaten vorhanden.");
+            ui.small("Lege im LXC-Directory z. B. directory.subscribers.<ISSI>.status_group und directory.status_groups an oder warte auf Live-Teilnehmerdaten.");
             return;
         }
 
@@ -1729,15 +1721,16 @@ impl ControlRoomApp {
         ui.separator();
 
         let available_width = ui.available_width().max(480.0);
-        let column_width = if available_width > 1500.0 {
-            (available_width - 32.0) / 4.0
+        let column_count = if available_width > 1500.0 {
+            4.0
         } else if available_width > 1120.0 {
-            (available_width - 24.0) / 3.0
+            3.0
         } else if available_width > 760.0 {
-            (available_width - 16.0) / 2.0
+            2.0
         } else {
-            available_width
+            1.0
         };
+        let column_width = ((available_width - ((column_count - 1.0) * 8.0)) / column_count).max(320.0);
 
         egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
             ui.horizontal_wrapped(|ui| {
@@ -1753,23 +1746,36 @@ impl ControlRoomApp {
     }
 
     fn build_status_tableau_cards(&self) -> Vec<StatusTableauCard> {
+        let mut ids = self.settings.directory.subscriber_issis();
+
+        if let Some(value) = &self.subscribers {
+            let live_rows = array_at(value, &["subscribers"]);
+            for row in live_rows {
+                if let Some(issi) = u64_at(row, &["issi"]).or_else(|| u64_at(row, &["individual_issi"])) {
+                    ids.push(issi);
+                }
+            }
+        }
+
+        ids.sort();
+        ids.dedup();
+
         let mut by_group: std::collections::BTreeMap<String, Vec<StatusTableauDevice>> = std::collections::BTreeMap::new();
         let mut singles: Vec<StatusTableauDevice> = Vec::new();
 
-        for issi in self.directory_subscriber_candidates() {
-            if should_hide_subscriber(issi, self.local_directory.subscriber(issi), &self.local_directory) {
+        for issi in ids {
+            let pseudo = json!({ "issi": issi, "directory_only": true });
+            let live_row = self.find_live_subscriber_row(issi);
+            let hide_probe = live_row.unwrap_or(&pseudo);
+            if self.subscriber_is_hidden(hide_probe, issi) {
                 continue;
             }
 
-            let directory_entry = self.local_directory.subscriber(issi);
-            let device = self.status_tableau_device(issi, directory_entry);
+            let device = self.status_tableau_device(issi, live_row);
+            let raw_group = self.status_group_key_for_issi_or_row(issi, live_row);
 
-            let group_id = directory_entry
-                .and_then(|entry| entry.status_group.clone())
-                .filter(|value| !value.trim().is_empty());
-
-            if let Some(group_id) = group_id {
-                by_group.entry(group_id).or_default().push(device);
+            if let Some(group_key) = raw_group.filter(|value| !value.trim().is_empty()) {
+                by_group.entry(group_key).or_default().push(device);
             } else {
                 singles.push(device);
             }
@@ -1778,25 +1784,20 @@ impl ControlRoomApp {
         let mut cards = Vec::new();
 
         for (group_id, mut devices) in by_group {
-            devices.sort_by(|a, b| a.name.cmp(&b.name).then(a.issi.cmp(&b.issi)));
-            let title = self.local_directory
-                .status_group(&group_id)
-                .and_then(directory_label_text)
-                .unwrap_or_else(|| group_id.clone());
-
+            devices.sort_by(|left, right| left.name.cmp(&right.name).then(left.issi.cmp(&right.issi)));
+            let title = self.status_group_display_name(&group_id);
+            let subtitle = format!("{} Gerät(e)", devices.len());
             cards.push(StatusTableauCard {
-                id: group_id,
                 title,
-                subtitle: format!("{} Gerät(e)", devices.len()),
+                subtitle,
                 devices,
                 is_single_bucket: false,
             });
         }
 
-        singles.sort_by(|a, b| a.name.cmp(&b.name).then(a.issi.cmp(&b.issi)));
+        singles.sort_by(|left, right| left.name.cmp(&right.name).then(left.issi.cmp(&right.issi)));
         if !singles.is_empty() {
             cards.push(StatusTableauCard {
-                id: "_single".to_string(),
                 title: "Einzelgeräte".to_string(),
                 subtitle: format!("{} Gerät(e) ohne Statusgruppe", singles.len()),
                 devices: singles,
@@ -1804,86 +1805,76 @@ impl ControlRoomApp {
             });
         }
 
-        cards.sort_by(|a, b| a.title.cmp(&b.title));
+        cards.sort_by(|left, right| left.title.cmp(&right.title));
         cards
     }
 
-    fn directory_subscriber_candidates(&self) -> Vec<u64> {
-        let mut ids = self.local_directory.subscriber_issis();
-
-        if let Some(value) = &self.subscribers {
-            for row in array_at(value, &["subscribers"]) {
-                if let Some(issi) = u64_at(row, &["issi"]).or_else(|| u64_at(row, &["id"])) {
-                    ids.push(issi);
-                }
+    fn find_live_subscriber_row(&self, issi: u64) -> Option<&Value> {
+        let value = self.subscribers.as_ref()?;
+        let live_rows = array_at(value, &["subscribers"]);
+        let clean_rows = self.clean_subscriber_rows(live_rows);
+        for row in clean_rows {
+            if u64_at(row, &["issi"]).or_else(|| u64_at(row, &["individual_issi"])) == Some(issi) {
+                return Some(row);
             }
         }
-
-        if let Some(value) = &self.locations {
-            for row in latest_location_rows(&array_at(value, &["locations"])) {
-                if let Some(issi) = u64_at(row, &["issi"]) {
-                    ids.push(issi);
-                }
-            }
-        }
-
-        ids.sort();
-        ids.dedup();
-        ids
+        None
     }
 
-    fn status_tableau_device(&self, issi: u64, directory_entry: Option<&DirectorySubscriberConfig>) -> StatusTableauDevice {
-        let subscriber_live = self.find_live_subscriber(issi);
-        let location_live = self.find_latest_location_for_issi(issi);
+    fn status_group_key_for_issi_or_row(&self, issi: u64, row: Option<&Value>) -> Option<String> {
+        self.settings.directory
+            .subscriber(issi)
+            .and_then(|entry| entry.status_group.clone())
+            .or_else(|| row.and_then(|row| first_string(row, &["status_group", "status_group_id", "statusgroup"])))
+            .or_else(|| {
+                let code = self.status_code_for_issi_or_row(issi, row)?;
+                self.settings.directory.status(code).and_then(|entry| entry.group.clone())
+            })
+    }
 
-        let name = directory_entry
-            .and_then(directory_subscriber_name)
-            .unwrap_or_else(|| {
-                subscriber_live
-                    .as_ref()
-                    .and_then(|row| str_at(row, &["name"]).or_else(|| str_at(row, &["label"])).or_else(|| str_at(row, &["display_name"])))
-                    .unwrap_or("-")
-                    .to_string()
-            });
+    fn status_group_display_name(&self, raw: &str) -> String {
+        if let Some(entry) = self.settings.directory.status_group(raw) {
+            if let Some(label) = first_config_text(&[entry.label.as_ref(), entry.name.as_ref()]) {
+                return label;
+            }
+        }
+        raw.to_string()
+    }
 
-        let device_class = directory_entry
-            .and_then(|entry| entry.device_class.clone().or_else(|| entry.class.clone()).or_else(|| entry.kind.clone()))
-            .unwrap_or_else(|| str_from_optional_live(&subscriber_live, &["device_class"]).unwrap_or_else(|| "Gerät".to_string()));
+    fn status_code_for_issi_or_row(&self, issi: u64, row: Option<&Value>) -> Option<u64> {
+        row.and_then(|row| u64_at(row, &["status"]).or_else(|| u64_at(row, &["status_code"])))
+            .or_else(|| {
+                self.settings.directory
+                    .subscriber(issi)
+                    .and_then(|entry| entry.status.as_deref())
+                    .and_then(parse_status_code)
+            })
+    }
 
-        let raw_status_code = subscriber_live
-            .as_ref()
-            .and_then(|row| u64_at(row, &["status"]).or_else(|| u64_at(row, &["status_code"])))
-            .or_else(|| directory_entry.and_then(|entry| entry.status.as_deref()).and_then(parse_status_code));
+    fn status_tableau_device(&self, issi: u64, live_row: Option<&Value>) -> StatusTableauDevice {
+        let pseudo = json!({ "issi": issi, "directory_only": true });
+        let row = live_row.unwrap_or(&pseudo);
 
-        let status_code = raw_status_code.unwrap_or(0);
-
+        let name = self.subscriber_display_name(row);
+        let device_class = self.subscriber_type_label(row);
+        let status_code = self.status_code_for_issi_or_row(issi, live_row).unwrap_or(0);
         let status_text = if status_code > 0 {
-            self.local_directory
+            self.settings.directory
                 .status(status_code)
-                .and_then(directory_status_text)
+                .and_then(|entry| first_config_text(&[entry.label.as_ref(), entry.name.as_ref()]))
                 .unwrap_or_else(|| status_label_default(status_code).to_string())
         } else {
-            directory_entry
-                .and_then(|entry| entry.status.clone())
-                .filter(|value| !value.trim().is_empty())
-                .unwrap_or_else(|| "Status unbekannt".to_string())
+            self.subscriber_status_label(row)
         };
+        let status_group = self.status_group_key_for_issi_or_row(issi, live_row)
+            .map(|raw| self.status_group_display_name(&raw))
+            .unwrap_or_else(|| "-".to_string());
 
-        let status_group = directory_entry
-            .and_then(|entry| entry.status_group.clone())
-            .unwrap_or_default();
-
-        let last_seen = subscriber_live
-            .as_ref()
-            .and_then(|row| str_at(row, &["last_seen"]).or_else(|| str_at(row, &["updated_at"])))
-            .or_else(|| location_live.as_ref().and_then(|row| str_at(row, &["updated_at"])))
-            .unwrap_or("-")
-            .to_string();
-
-        let mut groups = directory_entry.map(|entry| entry.groups.clone()).unwrap_or_default();
+        let mut groups = group_ids_from_row(row);
         if groups.is_empty() {
-            if let Some(entry) = directory_entry {
-                groups = entry.static_groups.clone();
+            if let Some(entry) = self.settings.directory.subscriber(issi) {
+                groups.extend(entry.groups.iter().copied());
+                groups.extend(entry.static_groups.iter().copied());
             }
         }
         groups.sort();
@@ -1896,49 +1887,23 @@ impl ControlRoomApp {
             status_code,
             status_text,
             status_group,
-            last_seen,
             groups,
-            online: subscriber_live.as_ref().map(|row| bool_at(row, &["online"]).unwrap_or(true)).unwrap_or(false),
+            last_seen: str_at(row, &["last_seen"]).or_else(|| str_at(row, &["updated_at"])).unwrap_or("-").to_string(),
+            online: subscriber_online(row),
         }
-    }
-
-    fn find_live_subscriber(&self, issi: u64) -> Option<&Value> {
-        let value = self.subscribers.as_ref()?;
-        let rows = clean_subscriber_rows(&array_at(value, &["subscribers"]), &self.local_directory);
-        for row in rows {
-            if u64_at(row, &["issi"]).or_else(|| u64_at(row, &["id"])) == Some(issi) {
-                return Some(row);
-            }
-        }
-        None
-    }
-
-    fn find_latest_location_for_issi(&self, issi: u64) -> Option<&Value> {
-        let value = self.locations.as_ref()?;
-        let all_rows = array_at(value, &["locations"]);
-        let rows = latest_location_rows(&all_rows);
-        for row in rows {
-            if u64_at(row, &["issi"]) == Some(issi) {
-                return Some(row);
-            }
-        }
-        None
     }
 
     fn render_status_card(&self, ui: &mut egui::Ui, card: &StatusTableauCard, width: f32) {
-        let frame_fill = egui::Color32::from_rgb(166, 166, 158);
-        let header_fill = egui::Color32::from_rgb(54, 60, 64);
-
         egui::Frame::none()
-            .fill(frame_fill)
-            .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(60, 60, 60)))
+            .fill(egui::Color32::from_rgb(166, 166, 158))
+            .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(64, 64, 64)))
             .rounding(egui::Rounding::same(5.0))
             .inner_margin(egui::Margin::same(5.0))
             .show(ui, |ui| {
-                ui.set_width(width - 8.0);
+                ui.set_width((width - 8.0).max(280.0));
 
                 egui::Frame::none()
-                    .fill(header_fill)
+                    .fill(egui::Color32::from_rgb(54, 60, 64))
                     .rounding(egui::Rounding::same(3.0))
                     .inner_margin(egui::Margin::symmetric(6.0, 4.0))
                     .show(ui, |ui| {
@@ -1951,14 +1916,9 @@ impl ControlRoomApp {
                     });
 
                 ui.add_space(5.0);
-
-                if card.devices.is_empty() {
-                    ui.label("Keine Geräte");
-                } else {
-                    for device in &card.devices {
-                        self.render_status_device_row(ui, device, width - 18.0, card.is_single_bucket);
-                        ui.add_space(3.0);
-                    }
+                for device in &card.devices {
+                    self.render_status_device_row(ui, device, width - 18.0, card.is_single_bucket);
+                    ui.add_space(3.0);
                 }
             });
     }
@@ -1966,7 +1926,7 @@ impl ControlRoomApp {
     fn render_status_device_row(&self, ui: &mut egui::Ui, device: &StatusTableauDevice, width: f32, single_bucket: bool) {
         let row_height = 46.0;
         let status_width = 52.0;
-        let (rect, response) = ui.allocate_exact_size(egui::vec2(width.max(250.0), row_height), egui::Sense::click());
+        let (rect, response) = ui.allocate_exact_size(egui::vec2(width.max(260.0), row_height), egui::Sense::click());
         let painter = ui.painter();
 
         let status_colour = status_colour_for_code(device.status_code);
@@ -1978,23 +1938,17 @@ impl ControlRoomApp {
         } else {
             egui::Color32::from_rgb(42, 157, 202)
         };
+
         painter.rect_filled(name_rect, egui::Rounding::same(4.0), base_colour);
         painter.rect_filled(status_rect, egui::Rounding::same(4.0), status_colour);
         painter.rect_stroke(rect, egui::Rounding::same(4.0), egui::Stroke::new(1.0, egui::Color32::from_rgb(55, 55, 55)));
 
-        let title = if device.name.trim().is_empty() || device.name == "-" {
-            format!("{} {}", device.device_class, device.issi)
-        } else {
-            format!("{} {}", device.name, device.issi)
-        };
-        let title_colour = if single_bucket { egui::Color32::BLACK } else { egui::Color32::BLACK };
-
         painter.text(
-            name_rect.center_top() + egui::vec2(0.0, 7.0),
+            name_rect.center_top() + egui::vec2(0.0, 6.0),
             egui::Align2::CENTER_TOP,
-            title,
+            format!("{} {}", device.name, device.issi),
             egui::FontId::proportional(15.0),
-            title_colour,
+            egui::Color32::BLACK,
         );
 
         painter.text(
@@ -2013,14 +1967,20 @@ impl ControlRoomApp {
             egui::Color32::BLACK,
         );
 
+        let groups = if device.groups.is_empty() {
+            "-".to_string()
+        } else {
+            device.groups.iter().map(|gssi| self.format_group(*gssi)).collect::<Vec<_>>().join(", ")
+        };
+
         response.on_hover_text(format!(
             "{}\nISSI: {}\nTyp: {}\nStatus: {}\nStatusgruppe: {}\nGruppen: {}\nOnline: {}\nLetzte Meldung: {}",
-            if device.name.trim().is_empty() { "-" } else { &device.name },
+            device.name,
             device.issi,
             device.device_class,
             device.status_text,
-            if device.status_group.trim().is_empty() { "-" } else { &device.status_group },
-            if device.groups.is_empty() { "-".to_string() } else { device.groups.iter().map(|g| self.group_label(*g)).collect::<Vec<_>>().join(", ") },
+            device.status_group,
+            groups,
             if device.online { "ja" } else { "nein/unbekannt" },
             device.last_seen,
         ));
@@ -3047,6 +3007,26 @@ Klick = Gerätedetails",
 }
 
 #[derive(Debug, Clone)]
+struct StatusTableauCard {
+    title: String,
+    subtitle: String,
+    devices: Vec<StatusTableauDevice>,
+    is_single_bucket: bool,
+}
+
+#[derive(Debug, Clone)]
+struct StatusTableauDevice {
+    issi: u64,
+    name: String,
+    device_class: String,
+    status_code: u64,
+    status_text: String,
+    status_group: String,
+    groups: Vec<u64>,
+    last_seen: String,
+    online: bool,
+}
+
 struct LocationPoint {
     issi: u64,
     lat: f64,
@@ -3631,41 +3611,15 @@ fn parse_status_code(value: &str) -> Option<u64> {
     trimmed.parse::<u64>().ok()
 }
 
-fn str_from_optional_live(live: &Option<&Value>, keys: &[&str]) -> Option<String> {
-    live.as_ref()
-        .and_then(|row| str_at(row, keys))
-        .map(|value| value.to_string())
-}
-
-fn directory_subscriber_name(entry: &DirectorySubscriberConfig) -> Option<String> {
-    entry.name.clone()
-        .or_else(|| entry.display_name.clone())
-        .or_else(|| entry.label.clone())
-        .or_else(|| entry.alias.clone())
-        .filter(|value| !value.trim().is_empty())
-}
-
-fn directory_label_text(entry: &DirectoryLabelConfig) -> Option<String> {
-    entry.name.clone()
-        .or_else(|| entry.label.clone())
-        .filter(|value| !value.trim().is_empty())
-}
-
-fn directory_status_text(entry: &DirectoryStatusConfig) -> Option<String> {
-    entry.label.clone()
-        .or_else(|| entry.name.clone())
-        .filter(|value| !value.trim().is_empty())
-}
-
 fn status_label_default(code: u64) -> &'static str {
     match code {
-        1 => "Frei / bereit",
-        2 => "Einsatzbereit",
+        1 => "Frei",
+        2 => "Bereit",
         3 => "Sprechwunsch",
         4 => "Im Einsatz",
         5 => "Am Ziel",
         6 => "Nicht bereit",
-        7 => "Transport / Ziel",
+        7 => "Transport",
         8 => "Sonderstatus",
         _ => "Status",
     }
@@ -3676,7 +3630,7 @@ fn status_colour_for_code(code: u64) -> egui::Color32 {
         1 => egui::Color32::from_rgb(0, 230, 0),
         2 => egui::Color32::from_rgb(170, 235, 30),
         3 => egui::Color32::from_rgb(80, 210, 245),
-        4 => egui::Color32::from_rgb(255, 110, 30),
+        4 => egui::Color32::from_rgb(255, 130, 35),
         5 => egui::Color32::from_rgb(0, 230, 0),
         6 => egui::Color32::from_rgb(255, 0, 0),
         7 => egui::Color32::from_rgb(235, 95, 230),
@@ -3829,4 +3783,3 @@ fn truncate(value: &str, max_chars: usize) -> String {
     out.push('…');
     out
 }
-
