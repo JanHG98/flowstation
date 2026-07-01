@@ -1,0 +1,11 @@
+[profiles.default]
+api = "http://10.0.1.25:9010"
+default_node = "SRV-M_TBS-01"
+operator_id = "jan"
+token_file = "/home/jan/.config/netcore/control-room/operator.token"
+
+[profiles.admin]
+api = "http://10.0.1.25:9010"
+default_node = "SRV-M_TBS-01"
+operator_id = "jan"
+token_file = "/home/jan/.config/netcore/control-room/admin.token"
