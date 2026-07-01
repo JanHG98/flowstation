@@ -212,3 +212,8 @@ viewer    Lesen/Dashboard
 operator  Lesen + normale Funkbefehle
 admin     Alles + Tokenverwaltung + Service-Restart/Shutdown
 ```
+
+
+## Buildfix-Hinweis
+
+Dieser ZIP-Stand entfernt Debug-Derives an AuthState/PersistenceHandle, damit der Build nicht versucht, rusqlite-Interna als Debug auszugeben. Bitte diesen ZIP-Stand komplett entpacken und den vorherigen RBAC-ZIP ignorieren.

@@ -119,7 +119,7 @@ pub enum AuthError {
     Insufficient,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct AuthState {
     enabled: bool,
     allow_health_unauthenticated: bool,
