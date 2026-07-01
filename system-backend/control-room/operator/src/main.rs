@@ -1,14 +1,19 @@
 use clap::{Parser, Subcommand};
 use serde::Serialize;
 use serde_json::{json, Value};
+use std::collections::HashMap;
 use std::env;
 use std::error::Error;
+use std::fmt;
+use std::fs;
+use std::path::{Path, PathBuf};
 use std::thread;
 use std::time::Duration;
 
 const DEFAULT_API: &str = "http://127.0.0.1:9010";
 const DEFAULT_NODE: &str = "tbs-04010001";
 const DEFAULT_OPERATOR: &str = "operator";
+const DEFAULT_PROFILE: &str = "default";
 
 type AppResult<T> = Result<T, Box<dyn Error + Send + Sync>>;
 
@@ -16,14 +21,27 @@ type AppResult<T> = Result<T, Box<dyn Error + Send + Sync>>;
 #[command(name = "netcore-control-room-operator")]
 #[command(about = "Native NetCore Control Room operator console", long_about = None)]
 struct Cli {
-    /// Control Room Core base URL, for example http://10.10.40.20:9010.
-    /// Can also be set with NETCORE_CONTROL_ROOM_API.
-    #[arg(long, default_value = DEFAULT_API)]
-    api: String,
+    /// Control Room Core base URL, for example http://10.0.1.25:9010.
+    /// Resolution order: CLI > NETCORE_CONTROL_ROOM_API > profile config > default.
+    #[arg(long)]
+    api: Option<String>,
 
-    /// Operator/API bearer token. Can also be set with NETCORE_CONTROL_ROOM_OPERATOR_TOKEN or NETCORE_CONTROL_ROOM_TOKEN.
+    /// Operator/API bearer token. Prefer profile config or NETCORE_CONTROL_ROOM_TOKEN for daily use.
+    /// Resolution order: CLI > CLI token file > env > profile token > profile token file.
     #[arg(long)]
     token: Option<String>,
+
+    /// Read the API token from a file. Useful for shell history hygiene.
+    #[arg(long)]
+    token_file: Option<PathBuf>,
+
+    /// Operator profile name from operator.toml.
+    #[arg(long, default_value = DEFAULT_PROFILE)]
+    profile: String,
+
+    /// Operator config path. Can also be set with NETCORE_CONTROL_ROOM_OPERATOR_CONFIG.
+    #[arg(long)]
+    config: Option<PathBuf>,
 
     #[command(subcommand)]
     command: Option<Command>,
@@ -71,18 +89,18 @@ enum Command {
 
     /// Kick a subscriber from the TBS.
     Kick {
-        #[arg(long, default_value = DEFAULT_NODE)]
-        node: String,
+        #[arg(long)]
+        node: Option<String>,
         #[arg(long)]
         issi: u32,
-        #[arg(long, default_value = DEFAULT_OPERATOR)]
-        operator: String,
+        #[arg(long)]
+        operator: Option<String>,
     },
 
     /// Attach or detach a subscriber to/from a group by DGNA.
     Dgna {
-        #[arg(long, default_value = DEFAULT_NODE)]
-        node: String,
+        #[arg(long)]
+        node: Option<String>,
         #[arg(long)]
         issi: u32,
         #[arg(long)]
@@ -90,24 +108,30 @@ enum Command {
         /// Detach instead of attach.
         #[arg(long)]
         detach: bool,
-        #[arg(long, default_value = DEFAULT_OPERATOR)]
-        operator: String,
+        #[arg(long)]
+        operator: Option<String>,
     },
 
     /// Clear emergency state. Omit ISSI or pass 0 to clear all.
     ClearEmergency {
-        #[arg(long, default_value = DEFAULT_NODE)]
-        node: String,
+        #[arg(long)]
+        node: Option<String>,
         #[arg(long, default_value_t = 0)]
         issi: u32,
-        #[arg(long, default_value = DEFAULT_OPERATOR)]
-        operator: String,
+        #[arg(long)]
+        operator: Option<String>,
     },
 
     /// Manage RBAC/API tokens. Requires admin role.
     Tokens {
         #[command(subcommand)]
         command: TokenCommand,
+    },
+
+    /// Manage local operator profiles. This never contacts the Control Room, except when another command is used.
+    Profiles {
+        #[command(subcommand)]
+        command: ProfileCommand,
     },
 
     /// Check /health.
@@ -150,11 +174,104 @@ enum TokenCommand {
     },
 }
 
+#[derive(Debug, Subcommand)]
+enum ProfileCommand {
+    /// Show resolved local operator settings without printing the token.
+    Show,
+
+    /// Create an operator profile config file.
+    Init {
+        /// Profile name to write.
+        #[arg(long, default_value = DEFAULT_PROFILE)]
+        profile: String,
+        /// Write /etc/netcore-control-room/operator.toml.
+        #[arg(long)]
+        system: bool,
+        /// Explicit config path to write.
+        #[arg(long)]
+        path: Option<PathBuf>,
+        /// Control Room API URL.
+        #[arg(long)]
+        api: Option<String>,
+        /// Token to store in the config file. For less shell history exposure, use --token-file.
+        #[arg(long)]
+        token: Option<String>,
+        /// Token file path to store in the config file.
+        #[arg(long)]
+        token_file: Option<PathBuf>,
+        /// Default node ID for commands like kick/dgna/clear-emergency.
+        #[arg(long)]
+        default_node: Option<String>,
+        /// Default operator ID for audit log entries.
+        #[arg(long)]
+        operator_id: Option<String>,
+        /// Overwrite an existing config file.
+        #[arg(long)]
+        force: bool,
+    },
+}
+
+#[derive(Debug, Default, Clone)]
+struct OperatorConfig {
+    profiles: HashMap<String, ProfileConfig>,
+}
+
+#[derive(Debug, Default, Clone)]
+struct ProfileConfig {
+    api: Option<String>,
+    token: Option<String>,
+    token_file: Option<PathBuf>,
+    default_node: Option<String>,
+    operator_id: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct ResolvedSettingsView {
+    config_path: Option<String>,
+    profile: String,
+    api: String,
+    token_present: bool,
+    token_source: Option<String>,
+    default_node: String,
+    operator_id: String,
+}
+
+#[derive(Debug, Clone)]
+struct ResolvedSettings {
+    config_path: Option<PathBuf>,
+    profile: String,
+    api: String,
+    token: Option<String>,
+    token_source: Option<String>,
+    default_node: String,
+    operator_id: String,
+}
+
 struct ApiClient {
     base: String,
     token: Option<String>,
     http: reqwest::blocking::Client,
 }
+
+#[derive(Debug)]
+struct ApiStatusError {
+    status: reqwest::StatusCode,
+    url: String,
+    body: String,
+}
+
+impl fmt::Display for ApiStatusError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let body = self.body.trim();
+        if body.is_empty() {
+            write!(formatter, "Control Room API returned {} for {}", self.status, self.url)
+        } else {
+            write!(formatter, "Control Room API returned {} for {}: {}", self.status, self.url, body)
+        }
+    }
+}
+
+impl Error for ApiStatusError {}
 
 impl ApiClient {
     fn new(base: &str, token: Option<String>) -> Self {
@@ -167,42 +284,53 @@ impl ApiClient {
 
     fn get_json(&self, path: &str) -> AppResult<Value> {
         let url = self.url(path);
-        let mut request = self.http.get(url);
+        let mut request = self.http.get(&url);
         if let Some(token) = &self.token {
             request = request.bearer_auth(token);
         }
-        let response = request.send()?.error_for_status()?;
-        Ok(response.json()?)
+        self.read_response(url, request.send()?)
     }
 
     fn post_json<T: Serialize + ?Sized>(&self, path: &str, body: &T) -> AppResult<Value> {
         let url = self.url(path);
-        let mut request = self.http.post(url).json(body);
+        let mut request = self.http.post(&url).json(body);
         if let Some(token) = &self.token {
             request = request.bearer_auth(token);
         }
-        let response = request.send()?.error_for_status()?;
-        Ok(response.json()?)
+        self.read_response(url, request.send()?)
     }
 
     fn patch_json<T: Serialize + ?Sized>(&self, path: &str, body: &T) -> AppResult<Value> {
         let url = self.url(path);
-        let mut request = self.http.patch(url).json(body);
+        let mut request = self.http.patch(&url).json(body);
         if let Some(token) = &self.token {
             request = request.bearer_auth(token);
         }
-        let response = request.send()?.error_for_status()?;
-        Ok(response.json()?)
+        self.read_response(url, request.send()?)
     }
 
     fn delete_json(&self, path: &str) -> AppResult<Value> {
         let url = self.url(path);
-        let mut request = self.http.delete(url);
+        let mut request = self.http.delete(&url);
         if let Some(token) = &self.token {
             request = request.bearer_auth(token);
         }
-        let response = request.send()?.error_for_status()?;
-        Ok(response.json()?)
+        self.read_response(url, request.send()?)
+    }
+
+    fn read_response(&self, url: String, response: reqwest::blocking::Response) -> AppResult<Value> {
+        let status = response.status();
+        let body = response.text()?;
+        if !status.is_success() {
+            return Err(Box::new(ApiStatusError { status, url, body }));
+        }
+        if body.trim().is_empty() {
+            return Ok(json!({}));
+        }
+        match serde_json::from_str(&body) {
+            Ok(value) => Ok(value),
+            Err(_) => Ok(json!({ "raw": body })),
+        }
     }
 
     fn url(&self, path: &str) -> String {
@@ -216,19 +344,33 @@ impl ApiClient {
 
 fn main() -> AppResult<()> {
     let mut cli = Cli::parse();
+    let command = cli.command.take().unwrap_or(Command::Dashboard { refresh: 2 });
 
-    if cli.api == DEFAULT_API {
-        if let Ok(api) = env::var("NETCORE_CONTROL_ROOM_API") {
-            if !api.trim().is_empty() {
-                cli.api = api;
-            }
-        }
+    if let Command::Profiles { command: ProfileCommand::Init { profile, system, path, api, token, token_file, default_node, operator_id, force } } = &command {
+        return init_profile_config(
+            &cli,
+            profile,
+            *system,
+            path.as_ref(),
+            api.as_deref(),
+            token.as_deref(),
+            token_file.as_ref(),
+            default_node.as_deref(),
+            operator_id.as_deref(),
+            *force,
+        );
     }
 
-    let token = cli.token.take().or_else(|| env::var("NETCORE_CONTROL_ROOM_OPERATOR_TOKEN").ok()).or_else(|| env::var("NETCORE_CONTROL_ROOM_TOKEN").ok());
-    let api = ApiClient::new(&cli.api, token);
+    let (config_path, config) = load_operator_config(cli.config.as_deref())?;
+    let settings = resolve_settings(&cli, config_path, &config)?;
 
-    match cli.command.unwrap_or(Command::Dashboard { refresh: 2 }) {
+    if matches!(&command, Command::Profiles { command: ProfileCommand::Show }) {
+        return print_json(serde_json::to_value(settings.view())?);
+    }
+
+    let api = ApiClient::new(&settings.api, settings.token.clone());
+
+    match command {
         Command::Dashboard { refresh } => run_dashboard(&api, refresh),
         Command::Overview => print_json(api.get_json("/api/overview")?),
         Command::Subscribers { online } => {
@@ -241,22 +383,92 @@ fn main() -> AppResult<()> {
         Command::Sds { limit } => print_json(api.get_json(&format!("/api/sds?limit={limit}"))?),
         Command::Commands { limit } => print_json(api.get_json(&format!("/api/commands?limit={limit}"))?),
         Command::Kick { node, issi, operator } => {
+            let node = node.unwrap_or_else(|| settings.default_node.clone());
+            let operator = operator.unwrap_or_else(|| settings.operator_id.clone());
             let body = json!({ "operator_id": operator, "issi": issi });
             print_json(api.post_json(&format!("/api/nodes/{node}/commands/kick"), &body)?)
         }
         Command::Dgna { node, issi, gssi, detach, operator } => {
+            let node = node.unwrap_or_else(|| settings.default_node.clone());
+            let operator = operator.unwrap_or_else(|| settings.operator_id.clone());
             let body = json!({ "operator_id": operator, "issi": issi, "gssi": gssi, "attach": !detach });
             print_json(api.post_json(&format!("/api/nodes/{node}/commands/dgna"), &body)?)
         }
         Command::ClearEmergency { node, issi, operator } => {
+            let node = node.unwrap_or_else(|| settings.default_node.clone());
+            let operator = operator.unwrap_or_else(|| settings.operator_id.clone());
             let body = json!({ "operator_id": operator, "issi": issi });
             print_json(api.post_json(&format!("/api/nodes/{node}/commands/clear-emergency"), &body)?)
         }
         Command::Tokens { command } => handle_token_command(&api, command),
+        Command::Profiles { .. } => Ok(()),
         Command::Health => print_json(api.get_json("/health")?),
     }
 }
 
+impl ResolvedSettings {
+    fn view(&self) -> ResolvedSettingsView {
+        ResolvedSettingsView {
+            config_path: self.config_path.as_ref().map(|path| path.display().to_string()),
+            profile: self.profile.clone(),
+            api: self.api.clone(),
+            token_present: self.token.as_ref().map(|token| !token.trim().is_empty()).unwrap_or(false),
+            token_source: self.token_source.clone(),
+            default_node: self.default_node.clone(),
+            operator_id: self.operator_id.clone(),
+        }
+    }
+}
+
+fn resolve_settings(cli: &Cli, config_path: Option<PathBuf>, config: &OperatorConfig) -> AppResult<ResolvedSettings> {
+    let profile = config.profiles.get(&cli.profile).or_else(|| config.profiles.get(DEFAULT_PROFILE));
+
+    let api = cli.api.clone()
+        .or_else(|| env_nonempty("NETCORE_CONTROL_ROOM_API"))
+        .or_else(|| profile.and_then(|profile| profile.api.clone()))
+        .unwrap_or_else(|| DEFAULT_API.to_string());
+
+    let mut token_source = None;
+    let token = if let Some(token) = cli.token.clone().filter(|token| !token.trim().is_empty()) {
+        token_source = Some("cli --token".to_string());
+        Some(token)
+    } else if let Some(path) = cli.token_file.as_ref() {
+        token_source = Some(format!("cli --token-file {}", path.display()));
+        read_token_file(path)?
+    } else if let Some(token) = env_nonempty("NETCORE_CONTROL_ROOM_TOKEN") {
+        token_source = Some("env NETCORE_CONTROL_ROOM_TOKEN".to_string());
+        Some(token)
+    } else if let Some(token) = env_nonempty("NETCORE_CONTROL_ROOM_OPERATOR_TOKEN") {
+        token_source = Some("env NETCORE_CONTROL_ROOM_OPERATOR_TOKEN".to_string());
+        Some(token)
+    } else if let Some(token) = profile.and_then(|profile| profile.token.clone()).filter(|token| !token.trim().is_empty()) {
+        token_source = Some(format!("profile {} token", cli.profile));
+        Some(token)
+    } else if let Some(path) = profile.and_then(|profile| profile.token_file.as_ref()) {
+        token_source = Some(format!("profile {} token_file {}", cli.profile, path.display()));
+        read_token_file(path)?
+    } else {
+        None
+    };
+
+    let default_node = env_nonempty("NETCORE_CONTROL_ROOM_NODE_ID")
+        .or_else(|| profile.and_then(|profile| profile.default_node.clone()))
+        .unwrap_or_else(|| DEFAULT_NODE.to_string());
+
+    let operator_id = env_nonempty("NETCORE_CONTROL_ROOM_OPERATOR_ID")
+        .or_else(|| profile.and_then(|profile| profile.operator_id.clone()))
+        .unwrap_or_else(|| DEFAULT_OPERATOR.to_string());
+
+    Ok(ResolvedSettings {
+        config_path,
+        profile: cli.profile.clone(),
+        api,
+        token,
+        token_source,
+        default_node,
+        operator_id,
+    })
+}
 
 fn handle_token_command(api: &ApiClient, command: TokenCommand) -> AppResult<()> {
     match command {
@@ -279,6 +491,215 @@ fn handle_token_command(api: &ApiClient, command: TokenCommand) -> AppResult<()>
             print_json(api.patch_json(&format!("/api/admin/tokens/{id}"), &body)?)
         }
         TokenCommand::Delete { id } => print_json(api.delete_json(&format!("/api/admin/tokens/{id}"))?),
+    }
+}
+
+fn init_profile_config(
+    cli: &Cli,
+    profile: &str,
+    system: bool,
+    explicit_path: Option<&PathBuf>,
+    api: Option<&str>,
+    token: Option<&str>,
+    token_file: Option<&PathBuf>,
+    default_node: Option<&str>,
+    operator_id: Option<&str>,
+    force: bool,
+) -> AppResult<()> {
+    let path = explicit_path
+        .cloned()
+        .or_else(|| cli.config.clone())
+        .unwrap_or_else(|| if system { system_config_path() } else { default_user_config_path() });
+
+    if path.exists() && !force {
+        return Err(format!("config already exists: {}. Re-run with --force to overwrite.", path.display()).into());
+    }
+
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+
+    let api = api
+        .map(ToOwned::to_owned)
+        .or_else(|| cli.api.clone())
+        .or_else(|| env_nonempty("NETCORE_CONTROL_ROOM_API"))
+        .unwrap_or_else(|| "http://10.0.1.25:9010".to_string());
+
+    let default_node = default_node.unwrap_or("SRV-M_TBS-01");
+    let operator_id = operator_id.unwrap_or("jan");
+
+    let mut content = String::new();
+    content.push_str("# NetCore Control Room Operator profile config\n");
+    content.push_str("# Keep this file private if it contains token = ...\n\n");
+    content.push_str(&format!("[profiles.{}]\n", toml_bare_key(profile)));
+    content.push_str(&format!("api = \"{}\"\n", escape_toml_string(&api)));
+    content.push_str(&format!("default_node = \"{}\"\n", escape_toml_string(default_node)));
+    content.push_str(&format!("operator_id = \"{}\"\n", escape_toml_string(operator_id)));
+
+    if let Some(token) = token.filter(|token| !token.trim().is_empty()) {
+        content.push_str(&format!("token = \"{}\"\n", escape_toml_string(token.trim())));
+    } else if let Some(token_file) = token_file {
+        content.push_str(&format!("token_file = \"{}\"\n", escape_toml_string(&token_file.display().to_string())));
+    } else {
+        content.push_str("# token = \"paste-token-here\"\n");
+        content.push_str("# token_file = \"/etc/netcore-control-room/operator.token\"\n");
+    }
+
+    fs::write(&path, content)?;
+    set_private_permissions(&path)?;
+
+    println!("created operator profile config: {}", path.display());
+    println!("profile: {profile}");
+    println!("api: {api}");
+    println!("default_node: {default_node}");
+    println!("operator_id: {operator_id}");
+    if token.is_none() && token_file.is_none() {
+        println!("token: not configured yet — edit the file or add token_file before using protected API commands");
+    }
+    Ok(())
+}
+
+fn load_operator_config(explicit_path: Option<&Path>) -> AppResult<(Option<PathBuf>, OperatorConfig)> {
+    let mut candidates = Vec::new();
+
+    if let Some(path) = explicit_path {
+        candidates.push(path.to_path_buf());
+    } else if let Some(path) = env_nonempty("NETCORE_CONTROL_ROOM_OPERATOR_CONFIG") {
+        candidates.push(PathBuf::from(path));
+    } else {
+        candidates.push(default_user_config_path());
+        candidates.push(system_config_path());
+    }
+
+    for path in candidates {
+        if path.exists() {
+            let text = fs::read_to_string(&path)?;
+            return Ok((Some(path), parse_operator_config(&text)));
+        }
+    }
+
+    Ok((None, OperatorConfig::default()))
+}
+
+fn parse_operator_config(text: &str) -> OperatorConfig {
+    let mut config = OperatorConfig::default();
+    let mut current_profile = DEFAULT_PROFILE.to_string();
+    config.profiles.entry(current_profile.clone()).or_default();
+
+    for raw_line in text.lines() {
+        let line = strip_comment(raw_line).trim();
+        if line.is_empty() {
+            continue;
+        }
+
+        if line.starts_with('[') && line.ends_with(']') {
+            let section = line.trim_start_matches('[').trim_end_matches(']').trim();
+            current_profile = match section.strip_prefix("profiles.") {
+                Some(name) => parse_section_name(name),
+                None if section == "default" => DEFAULT_PROFILE.to_string(),
+                None => section.to_string(),
+            };
+            config.profiles.entry(current_profile.clone()).or_default();
+            continue;
+        }
+
+        let Some((key, value)) = line.split_once('=') else {
+            continue;
+        };
+        let key = key.trim();
+        let value = parse_toml_string(value.trim());
+        let profile = config.profiles.entry(current_profile.clone()).or_default();
+        match key {
+            "api" => profile.api = value,
+            "token" => profile.token = value,
+            "token_file" => profile.token_file = value.map(PathBuf::from),
+            "default_node" | "node" | "node_id" => profile.default_node = value,
+            "operator_id" | "operator" => profile.operator_id = value,
+            _ => {}
+        }
+    }
+
+    config
+}
+
+fn strip_comment(line: &str) -> &str {
+    let mut in_string = false;
+    let mut escaped = false;
+    for (idx, ch) in line.char_indices() {
+        match ch {
+            '\\' if in_string => escaped = !escaped,
+            '"' if !escaped => in_string = !in_string,
+            '#' if !in_string => return &line[..idx],
+            _ => escaped = false,
+        }
+    }
+    line
+}
+
+fn parse_section_name(value: &str) -> String {
+    parse_toml_string(value.trim()).unwrap_or_else(|| value.trim().to_string())
+}
+
+fn parse_toml_string(value: &str) -> Option<String> {
+    let value = value.trim();
+    if value.is_empty() {
+        return None;
+    }
+    if value.starts_with('"') && value.ends_with('"') && value.len() >= 2 {
+        let inner = &value[1..value.len() - 1];
+        Some(inner.replace("\\\"", "\"").replace("\\\\", "\\"))
+    } else {
+        Some(value.to_string())
+    }
+}
+
+fn env_nonempty(name: &str) -> Option<String> {
+    env::var(name).ok().map(|value| value.trim().to_string()).filter(|value| !value.is_empty())
+}
+
+fn read_token_file(path: &Path) -> AppResult<Option<String>> {
+    let token = fs::read_to_string(path)?.trim().to_string();
+    if token.is_empty() {
+        Ok(None)
+    } else {
+        Ok(Some(token))
+    }
+}
+
+fn default_user_config_path() -> PathBuf {
+    if let Some(xdg) = env_nonempty("XDG_CONFIG_HOME") {
+        return PathBuf::from(xdg).join("netcore/control-room/operator.toml");
+    }
+    if let Some(home) = env_nonempty("HOME") {
+        return PathBuf::from(home).join(".config/netcore/control-room/operator.toml");
+    }
+    system_config_path()
+}
+
+fn system_config_path() -> PathBuf {
+    PathBuf::from("/etc/netcore-control-room/operator.toml")
+}
+
+fn set_private_permissions(path: &Path) -> AppResult<()> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut permissions = fs::metadata(path)?.permissions();
+        permissions.set_mode(0o600);
+        fs::set_permissions(path, permissions)?;
+    }
+    Ok(())
+}
+
+fn escape_toml_string(value: &str) -> String {
+    value.replace('\\', "\\\\").replace('"', "\\\"")
+}
+
+fn toml_bare_key(value: &str) -> String {
+    if value.chars().all(|ch| ch.is_ascii_alphanumeric() || ch == '_' || ch == '-') {
+        value.to_string()
+    } else {
+        format!("\"{}\"", escape_toml_string(value))
     }
 }
 
@@ -342,7 +763,7 @@ fn render_dashboard(frame: &DashboardFrame) {
     render_commands(&frame.commands);
 
     println!();
-    println!("Ctrl+C beendet die Operator-Konsole. Commands aktuell per CLI: kick, dgna, clear-emergency.");
+    println!("Ctrl+C beendet die Operator-Konsole. Commands: kick, dgna, clear-emergency. Profile: profiles show/init.");
 }
 
 fn render_nodes(overview: &Value) {
@@ -478,7 +899,8 @@ fn render_commands(commands: &Value) {
     println!("{}", "-".repeat(96));
 
     let mut any = false;
-    for cmd in commands.as_array().into_iter().flatten().take(5) {
+    let command_values = commands.as_array().or_else(|| arr_at(commands, &["commands"]));
+    for cmd in command_values.into_iter().flatten().take(5) {
         any = true;
         println!(
             "{:<36} {:<12} {:<10} {}",
