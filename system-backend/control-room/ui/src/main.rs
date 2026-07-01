@@ -13,7 +13,7 @@ const DEFAULT_API: &str = "http://127.0.0.1:9010";
 const DEFAULT_PROFILE: &str = "default";
 const DEFAULT_NODE: &str = "SRV-M_TBS-01";
 const DEFAULT_OPERATOR: &str = "jan";
-const UI_VERSION_LABEL: &str = "Native UI v5.9.3 · Clean Leitstellenarbeitsplatz · Nav-Fix";
+const UI_VERSION_LABEL: &str = "Native UI v5.10 · Kartencluster · Spiderfy";
 const DEFAULT_TILE_URL: &str = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
 const DEFAULT_TILE_ATTRIBUTION: &str = "© OpenStreetMap contributors";
 const TILE_SIZE: f64 = 256.0;
@@ -1776,20 +1776,8 @@ impl ControlRoomApp {
             ui.ctx().set_cursor_icon(if response.dragged() { egui::CursorIcon::Grabbing } else { egui::CursorIcon::Grab });
             if let Some(pos) = ui.input(|input| input.pointer.hover_pos()) {
                 if map_rect.contains(pos) {
-                    if let Some(point) = nearest_marker(pos, &points, map_rect, &viewport, 16.0) {
-                        response.on_hover_text(format!(
-                            "ISSI {}
-Lat {:.6}
-Lon {:.6}
-Quelle {}
-Update {}
-Klick = Gerätedetails",
-                            point.issi,
-                            point.lat,
-                            point.lon,
-                            point.source,
-                            point.updated_at,
-                        ));
+                    if let Some(text) = self.map_hover_text(pos, &points, map_rect, &viewport) {
+                        response.on_hover_text(text);
                     } else {
                         let (lat, lon) = viewport.screen_to_lat_lon(pos, map_rect);
                         response.on_hover_text(format!(
@@ -1798,7 +1786,7 @@ Lon {:.6}
 Zoom {}
 Ziehen = verschieben
 Mausrad = fein dosiert zoomen
-Klick auf GPS-Punkt = Details",
+Cluster anklicken = auffächern",
                             lat,
                             lon,
                             viewport.zoom
@@ -1887,7 +1875,36 @@ Klick auf GPS-Punkt = Details",
         if !map_rect.contains(pos) {
             return;
         }
-        self.selected_location_issi = nearest_marker(pos, points, map_rect, viewport, 18.0).map(|point| point.issi);
+
+        let clusters = build_map_clusters(points, map_rect, viewport, 32.0);
+
+        if let Some(selected_issi) = self.selected_location_issi {
+            for cluster in &clusters {
+                if cluster.members.len() > 1 && cluster_contains_issi(cluster, points, selected_issi) {
+                    for (member_index, point_index) in cluster.members.iter().enumerate() {
+                        let spider_pos = spider_position(cluster.center, member_index, cluster.members.len());
+                        if (spider_pos - pos).length_sq() <= 18.0 * 18.0 {
+                            self.selected_location_issi = Some(points[*point_index].issi);
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+
+        let mut best: Option<(f32, u64)> = None;
+        for cluster in &clusters {
+            let distance_sq = (cluster.center - pos).length_sq();
+            let radius = if cluster.members.len() > 1 { cluster_radius(cluster.members.len()) + 8.0 } else { 18.0 };
+            if distance_sq <= radius * radius {
+                let issi = points[cluster.members[0]].issi;
+                if best.map(|(best_distance, _)| distance_sq < best_distance).unwrap_or(true) {
+                    best = Some((distance_sq, issi));
+                }
+            }
+        }
+
+        self.selected_location_issi = best.map(|(_, issi)| issi);
     }
 
     fn draw_tiles(&mut self, ui: &egui::Ui, painter: &egui::Painter, map_rect: egui::Rect, viewport: &MapViewport) {
@@ -1986,45 +2003,65 @@ Klick auf GPS-Punkt = Details",
     fn draw_map_overlay(&self, painter: &egui::Painter, rect: egui::Rect, map_rect: egui::Rect, viewport: &MapViewport, points: &[LocationPoint], selected_issi: Option<u64>) {
         painter.rect_stroke(map_rect, egui::Rounding::same(6.0), egui::Stroke::new(1.0, egui::Color32::from_black_alpha(140)));
 
+        let clusters = build_map_clusters(points, map_rect, viewport, 32.0);
         let selected_point = selected_issi.and_then(|issi| points.iter().find(|point| point.issi == issi));
+        let selected_cluster = selected_issi.and_then(|issi| clusters.iter().find(|cluster| cluster.members.len() > 1 && cluster_contains_issi(cluster, points, issi)));
 
-        for point in points {
-            let pos = viewport.lat_lon_to_screen(point.lat, point.lon, map_rect);
-            if !map_rect.expand(14.0).contains(pos) {
+        for cluster in &clusters {
+            if cluster.members.len() <= 1 {
+                let point = &points[cluster.members[0]];
+                if !map_rect.expand(16.0).contains(cluster.center) {
+                    continue;
+                }
+                let selected = selected_issi == Some(point.issi);
+                self.draw_device_marker(painter, cluster.center, point, selected, true);
                 continue;
             }
-            let selected = selected_issi == Some(point.issi);
-            let fill = if selected { egui::Color32::from_rgb(255, 191, 0) } else { egui::Color32::from_rgb(0, 210, 80) };
-            let radius = if selected { 9.0 } else { 7.0 };
-            painter.circle_filled(pos, radius, fill);
-            painter.circle_stroke(pos, if selected { 13.0 } else { 10.0 }, egui::Stroke::new(2.0, egui::Color32::WHITE));
-            painter.text(
-                pos + egui::vec2(12.0, -10.0),
-                egui::Align2::LEFT_BOTTOM,
-                format!("{}", point.issi),
-                egui::FontId::monospace(13.0),
-                egui::Color32::BLACK,
-            );
-            painter.text(
-                pos + egui::vec2(13.0, -9.0),
-                egui::Align2::LEFT_BOTTOM,
-                format!("{}", point.issi),
-                egui::FontId::monospace(13.0),
-                egui::Color32::WHITE,
-            );
+
+            if !map_rect.expand(42.0).contains(cluster.center) {
+                continue;
+            }
+
+            let expanded = selected_issi.map(|issi| cluster_contains_issi(cluster, points, issi)).unwrap_or(false);
+            if expanded {
+                painter.circle_filled(cluster.center, 12.0, egui::Color32::from_rgb(35, 82, 122));
+                painter.circle_stroke(cluster.center, 15.0, egui::Stroke::new(2.0, egui::Color32::WHITE));
+                painter.text(
+                    cluster.center,
+                    egui::Align2::CENTER_CENTER,
+                    cluster.members.len().to_string(),
+                    egui::FontId::monospace(13.0),
+                    egui::Color32::WHITE,
+                );
+
+                for (member_index, point_index) in cluster.members.iter().enumerate() {
+                    let point = &points[*point_index];
+                    let pos = spider_position(cluster.center, member_index, cluster.members.len());
+                    painter.line_segment([cluster.center, pos], egui::Stroke::new(1.0, egui::Color32::from_white_alpha(170)));
+                    let selected = selected_issi == Some(point.issi);
+                    self.draw_device_marker(painter, pos, point, selected, true);
+                }
+            } else {
+                self.draw_cluster_marker(painter, cluster.center, cluster.members.len());
+            }
         }
 
-        if let Some(point) = selected_point {
+        if let Some(cluster) = selected_cluster {
+            self.draw_cluster_device_card(painter, map_rect, cluster, points, selected_issi);
+        } else if let Some(point) = selected_point {
             self.draw_selected_location_card(painter, map_rect, point);
         }
 
+        let clustered_count = clusters.iter().filter(|cluster| cluster.members.len() > 1).count();
         let title = if points.is_empty() {
             "Live-Karte · keine Positionen".to_string()
+        } else if clustered_count > 0 {
+            format!("Live-Karte · {} Geräte · {} Cluster · Zoom {}", points.len(), clustered_count, viewport.zoom)
         } else {
             format!("Live-Karte · {} Position(en) · Zoom {}", points.len(), viewport.zoom)
         };
         painter.rect_filled(
-            egui::Rect::from_min_size(rect.left_top() + egui::vec2(16.0, 14.0), egui::vec2(310.0, 52.0)),
+            egui::Rect::from_min_size(rect.left_top() + egui::vec2(16.0, 14.0), egui::vec2(360.0, 52.0)),
             egui::Rounding::same(6.0),
             egui::Color32::from_black_alpha(145),
         );
@@ -2038,7 +2075,7 @@ Klick auf GPS-Punkt = Details",
         painter.text(
             rect.left_top() + egui::vec2(24.0, 39.0),
             egui::Align2::LEFT_TOP,
-            format!("Zentrum {:.5}, {:.5}", viewport.center_lat, viewport.center_lon),
+            format!("Zentrum {:.5}, {:.5} · Cluster anklicken = auffächern", viewport.center_lat, viewport.center_lon),
             egui::FontId::monospace(11.0),
             egui::Color32::LIGHT_GRAY,
         );
@@ -2055,6 +2092,163 @@ Klick auf GPS-Punkt = Details",
             egui::FontId::proportional(11.0),
             egui::Color32::WHITE,
         );
+    }
+
+    fn draw_device_marker(&self, painter: &egui::Painter, pos: egui::Pos2, point: &LocationPoint, selected: bool, show_label: bool) {
+        let fill = if selected { egui::Color32::from_rgb(255, 191, 0) } else { egui::Color32::from_rgb(0, 210, 80) };
+        let radius = if selected { 9.0 } else { 7.0 };
+        painter.circle_filled(pos, radius, fill);
+        painter.circle_stroke(pos, if selected { 13.0 } else { 10.0 }, egui::Stroke::new(2.0, egui::Color32::WHITE));
+        if show_label {
+            let label = self.directory_name_for_issi(point.issi).unwrap_or_else(|| point.issi.to_string());
+            let short_label = compact_marker_label(&label);
+            painter.text(
+                pos + egui::vec2(12.0, -10.0),
+                egui::Align2::LEFT_BOTTOM,
+                &short_label,
+                egui::FontId::monospace(13.0),
+                egui::Color32::BLACK,
+            );
+            painter.text(
+                pos + egui::vec2(13.0, -9.0),
+                egui::Align2::LEFT_BOTTOM,
+                short_label,
+                egui::FontId::monospace(13.0),
+                egui::Color32::WHITE,
+            );
+        }
+    }
+
+    fn draw_cluster_marker(&self, painter: &egui::Painter, pos: egui::Pos2, count: usize) {
+        let radius = cluster_radius(count);
+        painter.circle_filled(pos, radius + 4.0, egui::Color32::from_white_alpha(215));
+        painter.circle_filled(pos, radius, egui::Color32::from_rgb(0, 118, 214));
+        painter.circle_stroke(pos, radius + 4.0, egui::Stroke::new(2.0, egui::Color32::from_rgb(20, 52, 84)));
+        painter.text(
+            pos,
+            egui::Align2::CENTER_CENTER,
+            count.to_string(),
+            egui::FontId::proportional(17.0),
+            egui::Color32::WHITE,
+        );
+    }
+
+    fn map_hover_text(&self, pos: egui::Pos2, points: &[LocationPoint], map_rect: egui::Rect, viewport: &MapViewport) -> Option<String> {
+        let clusters = build_map_clusters(points, map_rect, viewport, 32.0);
+
+        if let Some(selected_issi) = self.selected_location_issi {
+            for cluster in &clusters {
+                if cluster.members.len() > 1 && cluster_contains_issi(cluster, points, selected_issi) {
+                    for (member_index, point_index) in cluster.members.iter().enumerate() {
+                        let spider_pos = spider_position(cluster.center, member_index, cluster.members.len());
+                        if (spider_pos - pos).length_sq() <= 18.0 * 18.0 {
+                            let point = &points[*point_index];
+                            return Some(self.device_hover_text(point));
+                        }
+                    }
+                }
+            }
+        }
+
+        let mut best_cluster: Option<(f32, &MapCluster)> = None;
+        for cluster in &clusters {
+            let distance_sq = (cluster.center - pos).length_sq();
+            let radius = if cluster.members.len() > 1 { cluster_radius(cluster.members.len()) + 8.0 } else { 18.0 };
+            if distance_sq <= radius * radius && best_cluster.map(|(best, _)| distance_sq < best).unwrap_or(true) {
+                best_cluster = Some((distance_sq, cluster));
+            }
+        }
+
+        let (_, cluster) = best_cluster?;
+        if cluster.members.len() > 1 {
+            let mut lines = vec![format!("{} Geräte an diesem Punkt", cluster.members.len()), "Klick = auffächern".to_string()];
+            for point_index in cluster.members.iter().take(8) {
+                let point = &points[*point_index];
+                let name = self.directory_name_for_issi(point.issi).unwrap_or_else(|| point.issi.to_string());
+                lines.push(format!("• {} ({})", compact_marker_label(&name), point.issi));
+            }
+            if cluster.members.len() > 8 {
+                lines.push(format!("… und {} weitere", cluster.members.len() - 8));
+            }
+            Some(lines.join("
+"))
+        } else {
+            Some(self.device_hover_text(&points[cluster.members[0]]))
+        }
+    }
+
+    fn device_hover_text(&self, point: &LocationPoint) -> String {
+        let name = self.directory_name_for_issi(point.issi).unwrap_or_else(|| point.issi.to_string());
+        format!(
+            "{}
+ISSI {}
+Lat {:.6}
+Lon {:.6}
+Quelle {}
+Update {}
+Klick = Gerätedetails",
+            name,
+            point.issi,
+            point.lat,
+            point.lon,
+            point.source,
+            point.updated_at,
+        )
+    }
+
+    fn draw_cluster_device_card(&self, painter: &egui::Painter, map_rect: egui::Rect, cluster: &MapCluster, points: &[LocationPoint], selected_issi: Option<u64>) {
+        let width = 380.0;
+        let max_rows = cluster.members.len().min(9);
+        let height = 96.0 + max_rows as f32 * 20.0;
+        let card = egui::Rect::from_min_size(
+            map_rect.right_top() + egui::vec2(-width - 14.0, 14.0),
+            egui::vec2(width, height),
+        );
+        painter.rect_filled(card, egui::Rounding::same(8.0), egui::Color32::from_black_alpha(210));
+        painter.rect_stroke(card, egui::Rounding::same(8.0), egui::Stroke::new(1.0, egui::Color32::WHITE));
+
+        let mut y = card.top() + 12.0;
+        let x = card.left() + 14.0;
+        painter.text(
+            egui::pos2(x, y),
+            egui::Align2::LEFT_TOP,
+            format!("Gerätecluster · {} Geräte", cluster.members.len()),
+            egui::FontId::proportional(17.0),
+            egui::Color32::WHITE,
+        );
+        y += 24.0;
+        painter.text(
+            egui::pos2(x, y),
+            egui::Align2::LEFT_TOP,
+            "Klick auf aufgefächerten Punkt wählt Gerät",
+            egui::FontId::proportional(12.0),
+            egui::Color32::LIGHT_GRAY,
+        );
+        y += 24.0;
+
+        for point_index in cluster.members.iter().take(max_rows) {
+            let point = &points[*point_index];
+            let selected = selected_issi == Some(point.issi);
+            let name = self.directory_name_for_issi(point.issi).unwrap_or_else(|| point.issi.to_string());
+            let color = if selected { egui::Color32::from_rgb(255, 220, 80) } else { egui::Color32::from_rgb(230, 235, 240) };
+            painter.text(
+                egui::pos2(x, y),
+                egui::Align2::LEFT_TOP,
+                format!("{}{} · ISSI {} · {}", if selected { "➤ " } else { "• " }, compact_marker_label(&name), point.issi, point.updated_at),
+                egui::FontId::monospace(12.0),
+                color,
+            );
+            y += 20.0;
+        }
+        if cluster.members.len() > max_rows {
+            painter.text(
+                egui::pos2(x, y),
+                egui::Align2::LEFT_TOP,
+                format!("… {} weitere Geräte", cluster.members.len() - max_rows),
+                egui::FontId::monospace(12.0),
+                egui::Color32::LIGHT_GRAY,
+            );
+        }
     }
 
     fn draw_selected_location_card(&self, painter: &egui::Painter, map_rect: egui::Rect, point: &LocationPoint) {
@@ -2529,6 +2723,12 @@ struct LocationPoint {
     updated_at: String,
 }
 
+#[derive(Debug, Clone)]
+struct MapCluster {
+    center: egui::Pos2,
+    members: Vec<usize>,
+}
+
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 struct TileKey {
     z: u8,
@@ -2867,6 +3067,68 @@ fn location_timestamp(row: &Value) -> &str {
         .unwrap_or("")
 }
 
+
+
+fn build_map_clusters(points: &[LocationPoint], map_rect: egui::Rect, viewport: &MapViewport, threshold: f32) -> Vec<MapCluster> {
+    let mut clusters: Vec<MapCluster> = Vec::new();
+    let threshold_sq = threshold * threshold;
+
+    for (index, point) in points.iter().enumerate() {
+        let pos = viewport.lat_lon_to_screen(point.lat, point.lon, map_rect);
+        if !map_rect.expand(48.0).contains(pos) {
+            continue;
+        }
+
+        if let Some(cluster) = clusters.iter_mut().find(|cluster| (cluster.center - pos).length_sq() <= threshold_sq) {
+            let old_len = cluster.members.len() as f32;
+            cluster.center = egui::pos2(
+                (cluster.center.x * old_len + pos.x) / (old_len + 1.0),
+                (cluster.center.y * old_len + pos.y) / (old_len + 1.0),
+            );
+            cluster.members.push(index);
+        } else {
+            clusters.push(MapCluster { center: pos, members: vec![index] });
+        }
+    }
+
+    clusters.sort_by(|left, right| right.members.len().cmp(&left.members.len()));
+    clusters
+}
+
+fn cluster_contains_issi(cluster: &MapCluster, points: &[LocationPoint], issi: u64) -> bool {
+    cluster.members.iter().any(|index| points[*index].issi == issi)
+}
+
+fn cluster_radius(count: usize) -> f32 {
+    (15.0 + (count as f32).sqrt() * 3.5).clamp(18.0, 34.0)
+}
+
+fn spider_position(center: egui::Pos2, index: usize, total: usize) -> egui::Pos2 {
+    if total <= 1 {
+        return center;
+    }
+    let radius = (30.0 + total as f32 * 3.0).clamp(34.0, 76.0);
+    let angle = std::f32::consts::TAU * index as f32 / total as f32 - std::f32::consts::FRAC_PI_2;
+    center + egui::vec2(angle.cos() * radius, angle.sin() * radius)
+}
+
+fn compact_marker_label(label: &str) -> String {
+    let label = label.trim();
+    if label.is_empty() {
+        return "?".to_string();
+    }
+    let mut chars = label.chars();
+    let mut out = String::new();
+    for _ in 0..18 {
+        if let Some(ch) = chars.next() {
+            out.push(ch);
+        } else {
+            return out;
+        }
+    }
+    out.push('…');
+    out
+}
 
 fn nearest_marker<'a>(pos: egui::Pos2, points: &'a [LocationPoint], map_rect: egui::Rect, viewport: &MapViewport, radius: f32) -> Option<&'a LocationPoint> {
     let max_distance_sq = radius * radius;
