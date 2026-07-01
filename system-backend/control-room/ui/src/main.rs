@@ -13,7 +13,7 @@ const DEFAULT_API: &str = "http://127.0.0.1:9010";
 const DEFAULT_PROFILE: &str = "default";
 const DEFAULT_NODE: &str = "SRV-M_TBS-01";
 const DEFAULT_OPERATOR: &str = "jan";
-const UI_VERSION_LABEL: &str = "Native UI v5.8 · kompakter Leitstellenkopf · RBAC";
+const UI_VERSION_LABEL: &str = "Native UI v5.9.1 · Clean Leitstellenarbeitsplatz · Buildfix";
 const DEFAULT_TILE_URL: &str = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
 const DEFAULT_TILE_ATTRIBUTION: &str = "© OpenStreetMap contributors";
 const TILE_SIZE: f64 = 256.0;
@@ -671,7 +671,7 @@ impl ControlRoomApp {
             api,
             tab: Tab::Overview,
             auto_refresh: true,
-            refresh_seconds: 2.0,
+            refresh_seconds: 1.0,
             last_refresh: None,
             last_ok: None,
             last_error: None,
@@ -1039,6 +1039,9 @@ impl eframe::App for ControlRoomApp {
         if self.overview.is_none() {
             self.refresh_all();
         }
+        self.auto_refresh = true;
+        self.refresh_seconds = 1.0;
+
         if self.auto_refresh {
             let due = self
                 .last_refresh
@@ -1053,11 +1056,11 @@ impl eframe::App for ControlRoomApp {
         let screen_width = ctx.input(|input| input.screen_rect().width());
         let compact_layout = screen_width < 1280.0;
         let side_width = if screen_width < 1180.0 {
-            190.0
+            185.0
         } else if screen_width < 1450.0 {
-            220.0
+            205.0
         } else {
-            250.0
+            225.0
         };
 
         egui::TopBottomPanel::top("top_bar")
@@ -1117,17 +1120,17 @@ impl eframe::App for ControlRoomApp {
 
 impl ControlRoomApp {
     fn render_elz_header(&mut self, ui: &mut egui::Ui, screen_width: f32, compact_layout: bool) {
-        let dense = screen_width < 1450.0;
+        let compact = compact_layout || screen_width < 1350.0;
 
-        // Row 1: title/login/actions. Keep this compact and predictable.
         egui::Frame::none()
             .fill(egui::Color32::from_rgb(0, 72, 128))
+            .inner_margin(egui::Margin::symmetric(8.0, 5.0))
             .show(ui, |ui| {
                 ui.set_width(ui.available_width());
                 ui.horizontal(|ui| {
                     ui.colored_label(
                         egui::Color32::WHITE,
-                        egui::RichText::new("NetCore Control Room").strong().size(if compact_layout { 18.0 } else { 20.0 }),
+                        egui::RichText::new("NetCore Control Room").strong().size(if compact { 18.0 } else { 20.0 }),
                     );
                     ui.separator();
                     ui.colored_label(egui::Color32::from_rgb(220, 238, 255), UI_VERSION_LABEL);
@@ -1135,52 +1138,58 @@ impl ControlRoomApp {
                     ui.colored_label(egui::Color32::WHITE, format!("{} · {}", self.login_username, self.role_label()));
 
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if ui.add_sized([82.0, 26.0], egui::Button::new("Logout")).clicked() { self.logout(); }
-                        if ui.add_sized([82.0, 26.0], egui::Button::new("Refresh")).clicked() { self.refresh_all(); }
-                        ui.checkbox(&mut self.auto_refresh, "Auto");
+                        if ui.add_sized([82.0, 26.0], egui::Button::new("Logout")).clicked() {
+                            self.logout();
+                        }
+                        ui.small("Live · 1s");
                     });
                 });
             });
 
-        // Row 2: compact toolbar. No giant empty ribbon area.
         egui::Frame::none()
             .fill(egui::Color32::from_rgb(232, 238, 246))
-            .inner_margin(egui::Margin::symmetric(8.0, 5.0))
+            .inner_margin(egui::Margin::symmetric(8.0, 4.0))
             .show(ui, |ui| {
                 ui.set_width(ui.available_width());
-
                 ui.horizontal_wrapped(|ui| {
-                    small_toolbar_button(ui, "Maske leer", "F2");
-                    small_toolbar_button(ui, "Speichern", "F11");
-                    small_toolbar_button(ui, "Vorschlag", "F12");
+                    if ui.add_sized([92.0, 28.0], egui::Button::new("Übersicht")).clicked() {
+                        self.tab = Tab::Overview;
+                    }
+                    if ui.add_sized([100.0, 28.0], egui::Button::new("Teilnehmer")).clicked() {
+                        self.tab = Tab::Subscribers;
+                    }
+                    if ui.add_sized([84.0, 28.0], egui::Button::new("Gruppen")).clicked() {
+                        self.tab = Tab::Groups;
+                    }
+                    if ui.add_sized([72.0, 28.0], egui::Button::new("Rufe")).clicked() {
+                        self.tab = Tab::Calls;
+                    }
+                    if ui.add_sized([64.0, 28.0], egui::Button::new("SDS")).clicked() {
+                        self.tab = Tab::Sds;
+                    }
+                    if ui.add_sized([72.0, 28.0], egui::Button::new("Karte")).clicked() {
+                        self.tab = Tab::Map;
+                    }
                     if self.can_operate() {
-                        small_toolbar_button(ui, "Alarm/Befehl", "F6");
+                        if ui.add_sized([92.0, 28.0], egui::Button::new("Befehle")).clicked() {
+                            self.tab = Tab::Commands;
+                        }
                     }
-                    small_toolbar_button(ui, "Karte", "Live");
-                    small_toolbar_button(ui, "Teilnehmer", "Funk");
-                    small_toolbar_button(ui, "Gruppen", "GSSI");
                     if self.is_admin() {
-                        small_toolbar_button(ui, "Benutzer", "RBAC");
+                        if ui.add_sized([96.0, 28.0], egui::Button::new("Benutzer")).clicked() {
+                            self.tab = Tab::AdminUsers;
+                        }
                     }
-
                     ui.separator();
-
-                    if !dense {
-                        ui.small(format!("API: {}", self.settings.api));
-                        ui.separator();
-                        ui.small(format!("Profil: {} · Node: {}", self.settings.profile, self.settings.default_node));
-                        ui.separator();
-                    } else {
-                        ui.small(format!("{} · {}", self.settings.profile, self.settings.default_node));
-                        ui.separator();
+                    if ui.add_sized([96.0, 28.0], egui::Button::new("Maske leer")).clicked() {
+                        self.clear_command_inputs();
                     }
-
-                    ui.label("Refresh");
-                    ui.add_sized([140.0, 18.0], egui::Slider::new(&mut self.refresh_seconds, 1.0..=15.0).text("s"));
+                    if ui.add_sized([92.0, 28.0], egui::Button::new("Aktualisieren")).clicked() {
+                        self.refresh_all();
+                    }
                 });
             });
 
-        // Row 3: compact status line.
         egui::Frame::none()
             .fill(egui::Color32::from_rgb(248, 250, 252))
             .inner_margin(egui::Margin::symmetric(8.0, 4.0))
@@ -1203,28 +1212,70 @@ impl ControlRoomApp {
                     if let Some(error) = &self.last_error {
                         ui.colored_label(egui::Color32::RED, error);
                     } else if let Some(ok) = &self.last_ok {
-                        ui.small(format!("Refresh: {ok}"));
+                        ui.small(format!("Stand: {ok}"));
+                    } else {
+                        ui.small("Live-Aktualisierung aktiv");
                     }
-
-                    ui.separator();
-                    ui.small(format!("Directory: {}", self.directory_source));
                 });
             });
     }
 
     fn render_nav_button(&mut self, ui: &mut egui::Ui, tab: Tab) {
         let selected = self.tab == tab;
-        let label = format!("{}  {}", tab.icon(), tab.label());
+        let row_height = 32.0;
+        let full_width = ui.available_width();
+        let button_width = 28.0;
+        let label_width = (full_width - button_width - 8.0).max(80.0);
+
         ui.horizontal(|ui| {
-            let response = ui.add_sized([ui.available_width() - 34.0, 30.0], egui::SelectableLabel::new(selected, label));
-            if response.clicked() { self.tab = tab; }
+            let (rect, response) = ui.allocate_exact_size(egui::vec2(label_width, row_height), egui::Sense::click());
+            if response.clicked() {
+                self.tab = tab;
+            }
+
+            let fill = if selected {
+                egui::Color32::from_rgb(0, 118, 214)
+            } else if response.hovered() {
+                egui::Color32::from_rgb(220, 232, 246)
+            } else {
+                egui::Color32::TRANSPARENT
+            };
+
+            if selected || response.hovered() {
+                ui.painter().rect_filled(rect, egui::Rounding::same(4.0), fill);
+            }
+
+            let text_color = if selected {
+                egui::Color32::WHITE
+            } else {
+                ui.visuals().text_color()
+            };
+
+            ui.painter().text(
+                rect.left_center() + egui::vec2(10.0, 0.0),
+                egui::Align2::LEFT_CENTER,
+                format!("{}  {}", tab.icon(), tab.label()),
+                egui::FontId::proportional(14.0),
+                text_color,
+            );
+
             let is_open = *self.detached_windows.get(&tab).unwrap_or(&false);
             let button_label = if is_open { "▣" } else { "↗" };
-            if ui.small_button(button_label).on_hover_text("als OS-Fenster öffnen/schließen").clicked() {
+            if ui.add_sized([button_width, 24.0], egui::Button::new(button_label)).on_hover_text("als OS-Fenster öffnen/schließen").clicked() {
                 self.detached_windows.insert(tab, !is_open);
                 self.window_mode = true;
             }
         });
+    }
+
+    fn clear_command_inputs(&mut self) {
+        self.kick_issi.clear();
+        self.dgna_issi.clear();
+        self.dgna_gssi.clear();
+        self.emergency_clear_issi.clear();
+        self.dgna_detach = false;
+        self.command_result = None;
+        self.last_ok = Some("Maske geleert".to_string());
     }
 
     fn render_module_content(&mut self, ui: &mut egui::Ui, tab: Tab) {
