@@ -281,16 +281,14 @@ impl AuthState {
         }
 
         if required == AuthRole::Node {
-            let presented = request_header_token(request, &["authorization"])
-                .or_else(|| request_header_token(request, &["x-control-room-token", "x-netcore-token", "x-node-token"]))
-                .or_else(|| request.uri().query().and_then(|q| query_token_from_str(q, &["token", "node_token"])));
+            let presented = request_node_token(request);
             let Some(presented) = presented else { return Err(AuthError::Missing); };
             if let Some(expected) = self.node_token.as_deref() {
                 if secret_eq(presented.as_bytes(), expected.as_bytes()) {
                     return Ok(AuthIdentity {
                         user_id: None,
                         username: "node".to_string(),
-                        display_name: "Bootstrap Node".to_string(),
+                        display_name: "TBS Node".to_string(),
                         role: AuthRole::Node,
                         source: "node-token".to_string(),
                     });
@@ -432,6 +430,34 @@ fn header_basic_credentials(headers: &HashMap<String, String>) -> Option<(String
 
 fn request_basic_credentials(request: &Request) -> Option<(String, String)> {
     request.headers().get("authorization").and_then(|v| v.to_str().ok()).and_then(decode_basic_credentials)
+}
+
+fn request_node_token(request: &Request) -> Option<String> {
+    // TBS/node authentication is intentionally separate from human User+Password RBAC.
+    // Supported formats, in compatibility order:
+    //   Authorization: Bearer <node-token>
+    //   X-Control-Room-Token / X-NetCore-Token / X-Node-Token: <node-token>
+    //   ?token=<node-token> or ?node_token=<node-token>
+    //   Authorization: Basic node:<node-token>
+    //
+    // The existing BS WebSocket transport already supports HTTP Basic auth. Earlier
+    // configs map `[control_room] token = "..."` to Basic username "node" with the
+    // token as password, so accepting that here prevents the v5 human-login change
+    // from breaking the machine link.
+    if let Some(token) = request_header_token(request, &["authorization"])
+        .or_else(|| request_header_token(request, &["x-control-room-token", "x-netcore-token", "x-node-token"]))
+        .or_else(|| request.uri().query().and_then(|q| query_token_from_str(q, &["token", "node_token"])))
+    {
+        return Some(token);
+    }
+
+    let (username, password) = request_basic_credentials(request)?;
+    let user = username.trim().to_ascii_lowercase();
+    if matches!(user.as_str(), "node" | "tbs" | "basisstation" | "control-room-node") {
+        non_empty(&password).map(ToString::to_string)
+    } else {
+        None
+    }
 }
 
 fn decode_basic_credentials(value: &str) -> Option<(String, String)> {

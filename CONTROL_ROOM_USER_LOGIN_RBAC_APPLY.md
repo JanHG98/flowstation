@@ -1,3 +1,7 @@
+# NetCore Control Room v5.3 – User+Passwort RBAC + Node-Basic-Fix
+
+Dieser Stand behebt den v5/v5.2-Fehler, bei dem die TBS auf `/node` mit `websocket rejected: unauthorized` abgewiesen wurde. Menschen nutzen weiterhin Benutzername+Passwort. Die TBS nutzt weiter den Node-Token. Zusätzlich akzeptiert der Core jetzt den vorhandenen BS-Transport-Modus `Authorization: Basic node:<NODE_TOKEN>`.
+
 # NetCore Control Room v5.2 – User/Passwort Login + RBAC
 
 Dieser Stand ersetzt Operator-/Admin-Tokens durch klassischen Login:
