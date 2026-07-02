@@ -1,0 +1,24 @@
+[Unit]
+Description=NetCore Control Room Core
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=netcore
+Group=netcore
+WorkingDirectory=/opt/netcore/flowstation
+EnvironmentFile=-/etc/netcore-control-room/control-room.env
+ExecStart=/opt/netcore/flowstation/target/release/netcore-control-room --config /etc/netcore-control-room/control-room.toml
+Restart=always
+RestartSec=5
+
+# Basic hardening. Keep this practical for an LXC.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/var/lib/netcore-control-room
+
+[Install]
+WantedBy=multi-user.target

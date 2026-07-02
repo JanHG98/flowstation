@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=NetCore Control Room
+Comment=Native NetCore Control Room Operator UI
+Exec=netcore-control-room-ui
+Terminal=false
+Categories=Network;Utility;

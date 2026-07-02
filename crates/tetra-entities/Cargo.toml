@@ -4,43 +4,70 @@ version.workspace = true
 edition.workspace = true
 
 [features]
-# Default build excludes the Asterisk SIP/RTP bridge so it needs no native
-# libtetra-codec. Enable with `--features asterisk` to compile net_asterisk and
-# link the TETRA codec.
-default = []
-asterisk = []
+# Full base-station/entity runtime. This remains the default for bluestation-bs
+# and all existing FlowStation builds.
+default = ["runtime"]
+
+# Protocol-only consumers (notably netcore-control-room) can depend on
+# tetra-entities with `default-features = false` and then get only the shared
+# JSON/serde protocol enums: net_control commands, net_telemetry events and the
+# net_control_room envelopes. No SDR, voice codec, QUIC/Brew or UI bridge code
+# is compiled in that mode.
+runtime = [
+    "dep:tetra-saps",
+    "dep:tetra-pdus",
+    "dep:as-any",
+    "dep:num",
+    "dep:num-complex",
+    "dep:rustfft",
+    "dep:rand",
+    "dep:crossbeam-channel",
+    "dep:soapysdr",
+    "dep:quinn",
+    "dep:rustls",
+    "dep:rustls-native-certs",
+    "dep:tokio",
+    "dep:tungstenite",
+    "dep:reqwest",
+    "dep:md5",
+    "dep:base64",
+    "dep:uuid",
+]
+
+# Compile the Asterisk SIP/RTP bridge and link the native TETRA codec.
+asterisk = ["runtime"]
 
 [dependencies]
 tetra-core = { workspace = true }
 tetra-config = { workspace = true }
-tetra-saps = { workspace = true }
-tetra-pdus = { workspace = true }
-as-any = { workspace = true }
-num = { workspace = true }
-num-complex = { workspace = true }
-rustfft = { workspace = true }
-rand = { workspace = true }
+tetra-saps = { workspace = true, optional = true }
+tetra-pdus = { workspace = true, optional = true }
+as-any = { workspace = true, optional = true }
+num = { workspace = true, optional = true }
+num-complex = { workspace = true, optional = true }
+rustfft = { workspace = true, optional = true }
+rand = { workspace = true, optional = true }
 tracing = { workspace = true }
-crossbeam-channel = { workspace = true }
-soapysdr = { workspace = true }
+crossbeam-channel = { workspace = true, optional = true }
+soapysdr = { workspace = true, optional = true }
 
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 bitcode = { workspace = true }
-quinn = "0.11"
-rustls = { version = "0.23", default-features = false, features = ["ring"] }
-rustls-native-certs = "0.7"
-tokio = { version = "1", features = ["rt", "rt-multi-thread", "time"] }
-tungstenite = { workspace = true }
-uuid = { workspace = true }
-md5 = "0.7"
-base64 = "0.22"
+quinn = { version = "0.11", optional = true }
+rustls = { version = "0.23", default-features = false, features = ["ring"], optional = true }
+rustls-native-certs = { version = "0.7", optional = true }
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "time"], optional = true }
+tungstenite = { workspace = true, optional = true }
+uuid = { workspace = true, optional = true }
+md5 = { version = "0.7", optional = true }
+base64 = { version = "0.22", optional = true }
 chrono = { workspace = true }
 chrono-tz = { workspace = true }
 # HTTP client for the dashboard's GitHub update-check and the built-in WX/METAR service.
 # rustls-tls (no OpenSSL) keeps cross-compilation to the Pi simple; blocking is fine since
 # both uses run on their own short-lived threads.
-reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls", "json"] }
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls", "json"], optional = true }
 
 [lints]
 workspace = true

@@ -1,0 +1,67 @@
+[profiles.default]
+api = "http://10.0.1.25:9010"
+default_node = "SRV-M_TBS-01"
+operator_id = "jan"
+username = "jan"
+
+[profiles.event]
+api = "http://10.0.1.25:9010"
+default_node = "SRV-M_TBS-01"
+operator_id = "event-lst"
+username = "event"
+
+[ui.map]
+online_tiles = true
+tile_url = "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+tile_attribution = "© OpenStreetMap contributors"
+default_lat = 52.3759
+default_lon = 9.7320
+default_zoom = 13
+min_zoom = 3
+max_zoom = 18
+# Optional. Wenn leer, nutzt die UI den normalen Windows-Cacheordner.
+# cache_dir = "C:\\Users\\Jan\\AppData\\Local\\netcore\\control-room\\tiles"
+
+# Optionales lokales Directory für die UI.
+# Ab v5 zieht die UI zuerst das zentrale Directory vom LXC und nutzt lokale Einträge nur als Override.
+[directory]
+hide_infrastructure = true
+
+[directory.subscribers."2010002"]
+name = "Jan HRT"
+device_class = "HRT"
+status = "Einsatzbereit"
+status_group = "crew"
+groups = [15201, 15205]
+
+[directory.subscribers."2020004"]
+name = "Event Operator"
+device_class = "HRT"
+status_group = "crew"
+groups = [15201]
+
+# Infrastruktur bleibt normalerweise ausgeblendet.
+# Falls ein Infrastrukturgerät bewusst sichtbar bleiben soll:
+[directory.subscribers."4010001"]
+name = "SRV-M_TBS-01"
+device_class = "Basisstation"
+hide_in_subscribers = true
+
+[directory.groups."15201"]
+name = "NetCore Crew"
+kind = "Sprechgruppe"
+
+[directory.groups."15205"]
+name = "Tactical"
+kind = "Sprechgruppe"
+
+[directory.status_groups."crew"]
+name = "Crew-Status"
+
+[directory.statuses."1"]
+label = "Frei / bereit"
+group = "crew"
+
+[directory.statuses."2"]
+label = "Beschäftigt"
+group = "crew"

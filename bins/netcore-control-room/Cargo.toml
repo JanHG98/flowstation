@@ -1,0 +1,37 @@
+[package]
+name = "netcore-control-room"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "netcore-control-room"
+path = "src/main.rs"
+
+
+[features]
+# Keep this no-op feature so habitual workspace commands such as
+# `cargo build -p netcore-control-room --features asterisk` do not accidentally
+# pull voice-codec/native base-station dependencies into the Control Room LXC.
+default = []
+asterisk = []
+
+[dependencies]
+tetra-core = { workspace = true }
+tetra-entities = { path = "../../crates/tetra-entities", default-features = false }
+
+clap = { workspace = true }
+chrono = { workspace = true }
+serde = { workspace = true }
+serde_json = "1.0"
+base64 = "0.22"
+sha2 = "0.10"
+toml = { workspace = true }
+rusqlite = { version = "0.32", features = ["bundled"] }
+tungstenite = { workspace = true }
+uuid = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+[lints]
+workspace = true

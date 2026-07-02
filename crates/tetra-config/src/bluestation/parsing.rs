@@ -7,7 +7,7 @@ use serde::Deserialize;
 use toml::Value;
 
 use crate::bluestation::sec_cell::{CfgNeighborCellCa, SdsCommandControlDto};
-use crate::bluestation::{CellInfoDto, CfgControlDto, NetInfoDto, apply_control_patch, cell_dto_to_cfg, net_dto_to_cfg};
+use crate::bluestation::{CellInfoDto, CfgControlDto, CfgControlRoomDto, NetInfoDto, apply_control_patch, apply_control_room_patch, cell_dto_to_cfg, net_dto_to_cfg};
 
 use super::config::{StackConfig, StackMode};
 use super::sec_asterisk::{CfgAsteriskDto, apply_asterisk_patch};
@@ -191,6 +191,13 @@ pub fn from_toml_str(toml_str: &str) -> Result<StackConfig, Box<dyn std::error::
         return Err(format!("Unrecognized fields in telemetry config: {:?}", sorted_keys(&telemetry.extra)).into());
     }
 
+    // Optional control_room section
+    if let Some(ref control_room) = root.control_room
+        && !control_room.extra.is_empty()
+    {
+        return Err(format!("Unrecognized fields in control_room config: {:?}", sorted_keys(&control_room.extra)).into());
+    }
+
     // Optional telegram_alerts section
     if let Some(ref telegram) = root.telegram_alerts
         && !telegram.extra.is_empty()
@@ -267,6 +274,7 @@ pub fn from_toml_str(toml_str: &str) -> Result<StackConfig, Box<dyn std::error::
         dashboard: None,
         telemetry: None,
         control: None,
+        control_room: None,
         security: apply_security_patch(root.security.unwrap_or_default()),
         wx_service: apply_wx_service_patch(root.wx_service.unwrap_or_default()),
         recovery: apply_recovery_patch(root.recovery.unwrap_or_default()),
@@ -292,6 +300,10 @@ pub fn from_toml_str(toml_str: &str) -> Result<StackConfig, Box<dyn std::error::
 
     if let Some(command) = root.command {
         cfg.control = Some(apply_control_patch(command)?);
+    }
+
+    if let Some(control_room) = root.control_room {
+        cfg.control_room = Some(apply_control_room_patch(control_room)?);
     }
 
     if let Some(telegram) = root.telegram_alerts {
@@ -349,6 +361,7 @@ struct TomlConfigRoot {
     dashboard: Option<CfgDashboardDto>,
     telemetry: Option<CfgTelemetryDto>,
     command: Option<CfgControlDto>,
+    control_room: Option<CfgControlRoomDto>,
     security: Option<CfgSecurityDto>,
     #[serde(rename = "wx_service")]
     wx_service: Option<CfgWxServiceDto>,

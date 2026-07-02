@@ -1,0 +1,14 @@
+# NetCore Control Room Operator profile config
+# Username only. Passwords are entered in the UI or supplied to the CLI via env/--password-file.
+
+[profiles.default]
+api = "http://10.0.1.25:9010"
+default_node = "SRV-M_TBS-01"
+operator_id = "jan"
+username = "jan"
+
+[profiles.event]
+api = "http://10.0.1.25:9010"
+default_node = "SRV-M_TBS-01"
+operator_id = "event-lst"
+username = "event"

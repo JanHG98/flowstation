@@ -1,1 +1,59 @@
-/target/
+# Rust build artifacts
+target/
+**/target/
+
+# Rust incremental/cache leftovers
+**/*.rs.bk
+
+# Windows build/editor noise
+Thumbs.db
+Desktop.ini
+*.lnk
+
+# macOS/editor noise
+.DS_Store
+
+# IDE/editor folders
+.vscode/
+.idea/
+
+# Logs
+*.log
+logs/
+
+# Local runtime/config/secrets
+.env
+*.env
+*.token
+operator.token
+admin.token
+node.token
+
+# NetCore local configs/secrets
+/etc/netcore-control-room/
+control-room.env
+operator.toml
+operator.local.toml
+control-room.local.toml
+
+# Keep examples/templates
+!*.env.example
+!*.example.toml
+
+# Local SQLite/runtime DBs
+*.sqlite
+*.sqlite3
+*.db
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+*.swo
+
+# Visual Studio local state
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates

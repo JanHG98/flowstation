@@ -8,6 +8,10 @@ use tetra_entities::net_control::channel::build_all_control_links;
 use tetra_entities::net_control::{
     CONTROL_HEARTBEAT_INTERVAL, CONTROL_HEARTBEAT_TIMEOUT, CONTROL_PROTOCOL_VERSION, CommandDispatcher, ControlWorker,
 };
+use tetra_entities::net_control_room::{
+    CONTROL_ROOM_HEARTBEAT_INTERVAL, CONTROL_ROOM_HEARTBEAT_TIMEOUT, CONTROL_ROOM_PROTOCOL_VERSION, ControlRoomNodeCapabilities,
+    ControlRoomNodeIdentity, ControlRoomWorker,
+};
 
 use tetra_config::bluestation::{PhyBackend, SharedConfig, StackConfig, parsing};
 use tetra_core::{TdmaTime, debug};
@@ -153,6 +157,54 @@ fn start_control_worker(cfg: SharedConfig, command_dispatchers: HashMap<TetraEnt
     })
 }
 
+fn start_control_room_worker(
+    cfg: SharedConfig,
+    telemetry_source: TelemetrySource,
+    command_dispatchers: HashMap<TetraEntity, CommandDispatcher>,
+) -> thread::JoinHandle<()> {
+    let config = cfg.config();
+    let rcfg = config.control_room.as_ref().unwrap();
+
+    let custom_root_certs = rcfg.ca_cert.as_ref().map(|path| {
+        let der_bytes = std::fs::read(path).unwrap_or_else(|e| {
+            eprintln!("Failed to read Control-Room CA certificate from '{}': {}", path, e);
+            std::process::exit(1);
+        });
+        vec![rustls::pki_types::CertificateDer::from(der_bytes)]
+    });
+
+    let identity = ControlRoomNodeIdentity::from_stack_config(
+        config.as_ref(),
+        rcfg.node_id.clone(),
+        rcfg.station_name.clone(),
+        rcfg.site.clone(),
+    );
+    let capabilities = ControlRoomNodeCapabilities::from_stack_config(config.as_ref());
+
+    let ws_config = WebSocketTransportConfig {
+        host: rcfg.host.clone(),
+        port: rcfg.port,
+        use_tls: rcfg.use_tls,
+        digest_auth_credentials: None,
+        basic_auth_credentials: rcfg.credentials.clone(),
+        endpoint_path: rcfg.endpoint_path.clone(),
+        subprotocol: Some(CONTROL_ROOM_PROTOCOL_VERSION.to_string()),
+        user_agent: format!("NetCore-Tetra/{} ({})", tetra_core::STACK_VERSION, identity.node_id),
+        heartbeat_interval: CONTROL_ROOM_HEARTBEAT_INTERVAL,
+        heartbeat_timeout: CONTROL_ROOM_HEARTBEAT_TIMEOUT,
+        custom_root_certs,
+    };
+
+    thread::Builder::new()
+        .name("control-room-node".into())
+        .spawn(move || {
+            let transport = WebSocketTransport::new(ws_config);
+            let mut worker = ControlRoomWorker::new(identity, capabilities, telemetry_source, command_dispatchers, transport);
+            worker.run();
+        })
+        .expect("failed to spawn control-room-node thread")
+}
+
 /// Start base station stack
 fn build_bs_stack(
     cfg: &mut SharedConfig,
@@ -167,7 +219,9 @@ fn build_bs_stack(
     let mut router = MessageRouter::new(cfg.clone());
 
     // Build telemetry sink/source — always create if either telemetry or dashboard is enabled
+    let has_control_room = cfg.config().control_room.as_ref().is_some_and(|c| c.enabled);
     let needs_telemetry = cfg.config().telemetry.is_some()
+        || has_control_room
         || cfg.config().dashboard.is_some()
         || cfg.config().telegram.is_some()
         || cfg.config().geoalarm.enabled
@@ -416,6 +470,7 @@ fn main() {
     // If dashboard is also enabled, tee the telemetry events to both.
     if let Some(telemetry_source) = tsource {
         let has_telemetry_server = cfg.config().telemetry.is_some();
+        let has_control_room = cfg.config().control_room.as_ref().is_some_and(|c| c.enabled);
         let has_dashboard = cfg.config().dashboard.is_some();
         let has_telegram = cfg.config().telegram.is_some();
 
@@ -533,11 +588,18 @@ fn main() {
         } else {
             (None, None)
         };
+        let (control_room_sink, control_room_source) = if has_control_room {
+            let (a, b) = telemetry_channel();
+            (Some(a), Some(b))
+        } else {
+            (None, None)
+        };
         {
             let dash = dashboard.clone();
             let alert = alert_sink.clone();
             let snom = snom_notify_sink.clone();
             let geoalarm = geoalarm_sink.clone();
+            let control_room = control_room_sink.clone();
             thread::Builder::new()
                 .name("telemetry-fanout".into())
                 .spawn(move || {
@@ -588,7 +650,10 @@ fn main() {
                                     s.send_event(event.clone());
                                 }
                                 if let Some(t) = &tee_sink {
-                                    t.send(event);
+                                    t.send(event.clone());
+                                }
+                                if let Some(cr) = &control_room {
+                                    cr.send(event);
                                 }
                             }
                             None => break,
@@ -600,9 +665,15 @@ fn main() {
         if let Some(tee_source) = tee_source {
             start_telemetry_worker(cfg.clone(), tee_source);
         }
+        if let Some(control_room_source) = control_room_source {
+            start_control_room_worker(cfg.clone(), control_room_source, cdispatchers.clone());
+            eprintln!(" -> NetCore Control-Room node enabled");
+        }
     };
 
-    if cfg.config().control.is_some() {
+    if cfg.config().control_room.as_ref().is_some_and(|c| c.enabled) && cfg.config().control.is_some() {
+        tracing::warn!("Both [control_room] and legacy [command] are configured; legacy [command] worker is disabled to avoid split command responses");
+    } else if cfg.config().control.is_some() {
         start_control_worker(cfg.clone(), cdispatchers);
     };
 

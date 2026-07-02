@@ -572,21 +572,30 @@ timeout_ms = 2000
 
 ###############################################################################
 
-# OPTIONAL: Control endpoint — outbound control/management connection. When present,
-# FlowStation connects to an external control server over WebSocket. Omit this whole
-# section to disable it (off by default).
-#
-# host and port are REQUIRED if the section is present.
-#
-# [command]
-# host = "control.example.com"        # control server address (required when present)
-# port = 443                          # control server port (required when present)
-# use_tls = true                      # OPTIONAL: wss:// (default false; required if ca_cert set)
-# ca_cert = "/etc/tetra-bluestation/control-ca.der"  # OPTIONAL: DER CA cert for private-CA TLS; needs use_tls
-# OPTIONAL: HTTP Basic Auth — set both username and password, or neither.
-# Basic Auth is base64 (not encrypted); use use_tls = true for anything off-host.
-# username = "station"
-# password = "changeme"
+# Add this optional block to config.toml on a base station that should connect
+# to the future NetCore Control-Room Core / Leitstelle.
+# Do not enable legacy [command] at the same time unless you intentionally want
+# the old command worker instead. This patch disables legacy [command] while
+# [control_room] is enabled to avoid split command responses.
+
+[control_room]
+enabled = true
+host = "10.0.1.25"
+port = 9010
+use_tls = false
+endpoint_path = "/node"
+
+# Optional, but recommended: stable and human-readable.
+node_id = "SRV-M_TBS-01"
+station_name = "SRV-M_TBS-01"
+site = "Main"
+
+# Optional HTTP Basic Auth:
+# username = "tbs-04010001"
+# password = "change-me"
+
+# Optional self-signed TLS root certificate; requires use_tls = true:
+# ca_cert = "/etc/netcore/control-room-ca.der"
 
 ###############################################################################
 
