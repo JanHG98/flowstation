@@ -556,7 +556,7 @@ mode = "all"                    # all | selected_groups
 selected_groups = []             # used only with mode = "selected_groups"
 minimum_free_space_mb = 2048
 retention_days = 30              # 0 disables automatic cleanup
-max_recording_minutes = 120
+max_recording_minutes = 480
 idle_finalize_secs = 15
 max_list_entries = 2000
 
@@ -576,7 +576,7 @@ archive_retry_seconds = 60
 enabled = true
 directory = "/var/lib/netcore/audio"
 cache_directory = "/var/cache/netcore/audio"
-source_issi = 4010099
+source_issi = 4010001
 default_priority = 5
 max_file_size_mb = 100
 max_duration_seconds = 1800
@@ -625,7 +625,7 @@ timeout_ms = 2000
 # [control_room] is enabled to avoid split command responses.
 
 [control_room]
-enabled = true
+enabled = false
 host = "10.0.1.25"
 port = 9010
 use_tls = false
