@@ -32,6 +32,7 @@ pub struct AudioPlayerStatus {
     pub state: AudioPlayerState,
     pub directory: String,
     pub cache_directory: String,
+    pub startup_warning: Option<String>,
     pub job_id: Option<String>,
     pub file_name: Option<String>,
     pub source_type: Option<AudioSourceType>,

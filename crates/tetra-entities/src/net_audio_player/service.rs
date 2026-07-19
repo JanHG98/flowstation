@@ -65,6 +65,7 @@ struct AudioPlayerShared {
     config: CfgAudioPlayer,
     local_root: PathBuf,
     cache_root: PathBuf,
+    startup_warning: Option<String>,
     media_roots: Vec<MediaRoot>,
     command_tx: crossbeam_channel::Sender<AudioPlayerCommand>,
     live: Mutex<LiveStatus>,
@@ -78,7 +79,7 @@ pub struct AudioPlayerHandle {
 
 impl AudioPlayerHandle {
     pub(crate) fn new(
-        config: CfgAudioPlayer,
+        mut config: CfgAudioPlayer,
         command_tx: crossbeam_channel::Sender<AudioPlayerCommand>,
         ffmpeg_available: bool,
     ) -> Result<Self, String> {
@@ -88,11 +89,42 @@ impl AudioPlayerHandle {
             .canonicalize()
             .map_err(|e| format!("cannot canonicalize {}: {e}", local_root.display()))?;
 
-        let cache_root = PathBuf::from(&config.cache_directory);
-        fs::create_dir_all(&cache_root).map_err(|e| format!("cannot create {}: {e}", cache_root.display()))?;
-        let cache_root = cache_root
-            .canonicalize()
-            .map_err(|e| format!("cannot canonicalize {}: {e}", cache_root.display()))?;
+        let configured_cache = PathBuf::from(&config.cache_directory);
+        let (cache_root, startup_warning) = match prepare_writable_cache(&configured_cache) {
+            Ok(path) => (path, None),
+            Err(primary_error) => {
+                let candidates = [
+                    std::env::temp_dir().join("netcore-audio"),
+                    local_root.join(".netcore-audio-cache"),
+                ];
+                let mut failures = Vec::new();
+                let mut selected = None;
+                for candidate in candidates {
+                    match prepare_writable_cache(&candidate) {
+                        Ok(path) => {
+                            selected = Some(path);
+                            break;
+                        }
+                        Err(error) => failures.push(format!("{}: {error}", candidate.display())),
+                    }
+                }
+                let Some(path) = selected else {
+                    return Err(format!(
+                        "audio cache unavailable at {} ({primary_error}); fallback cache attempts failed: {}",
+                        configured_cache.display(),
+                        failures.join("; ")
+                    ));
+                };
+                let warning = format!(
+                    "configured audio cache {} is unavailable ({primary_error}); using fallback {}",
+                    configured_cache.display(),
+                    path.display()
+                );
+                tracing::warn!("AudioPlayer: {warning}");
+                config.cache_directory = path.display().to_string();
+                (path, Some(warning))
+            }
+        };
         cleanup_stale_cache(&cache_root);
 
         let mut media_roots = Vec::with_capacity(config.shares.len() + 1);
@@ -118,6 +150,7 @@ impl AudioPlayerHandle {
                 config,
                 local_root,
                 cache_root,
+                startup_warning,
                 media_roots,
                 command_tx,
                 live: Mutex::new(LiveStatus::default()),
@@ -134,6 +167,14 @@ impl AudioPlayerHandle {
         &self.inner.local_root
     }
 
+    pub fn cache_root(&self) -> &Path {
+        &self.inner.cache_root
+    }
+
+    pub fn startup_warning(&self) -> Option<&str> {
+        self.inner.startup_warning.as_deref()
+    }
+
     pub fn status(&self) -> AudioPlayerStatus {
         let live = self.inner.live.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
         AudioPlayerStatus {
@@ -141,6 +182,7 @@ impl AudioPlayerHandle {
             state: live.state,
             directory: self.inner.local_root.display().to_string(),
             cache_directory: self.inner.cache_root.display().to_string(),
+            startup_warning: self.inner.startup_warning.clone(),
             job_id: live.job_id.clone(),
             file_name: live.file_name.clone(),
             source_type: live.source_type,
@@ -422,6 +464,21 @@ impl AudioPlayerHandle {
     }
 }
 
+
+fn prepare_writable_cache(path: &Path) -> Result<PathBuf, String> {
+    fs::create_dir_all(path).map_err(|e| format!("cannot create {}: {e}", path.display()))?;
+    let canonical = path
+        .canonicalize()
+        .map_err(|e| format!("cannot canonicalize {}: {e}", path.display()))?;
+    if !canonical.is_dir() {
+        return Err(format!("{} is not a directory", canonical.display()));
+    }
+    let probe = canonical.join(format!(".write-probe-{}", Uuid::new_v4()));
+    fs::write(&probe, b"netcore-audio-cache-probe")
+        .map_err(|e| format!("{} is not writable: {e}", canonical.display()))?;
+    fs::remove_file(&probe).map_err(|e| format!("cannot remove cache write probe {}: {e}", probe.display()))?;
+    Ok(canonical)
+}
 
 fn cleanup_stale_cache(root: &Path) {
     let Ok(entries) = fs::read_dir(root) else {
