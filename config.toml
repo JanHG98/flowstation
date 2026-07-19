@@ -607,9 +607,14 @@ node_id = "SRV-M_TBS-01"
 station_name = "SRV-M_TBS-01"
 site = "Main"
 
-# Optional HTTP Basic Auth:
-# username = "tbs-04010001"
-# password = "change-me"
+# REQUIRED when the Control Room runs with [auth] enabled:
+# Use exactly the same node token as NETCORE_CONTROL_ROOM_NODE_TOKEN on the
+# Control Room host. The token is sent as Basic auth user "node".
+# token = "replace-with-the-control-room-node-token"
+#
+# Alternative explicit HTTP Basic Auth:
+# username = "node"
+# password = "replace-with-the-control-room-node-token"
 
 # Optional self-signed TLS root certificate; requires use_tls = true:
 # ca_cert = "/etc/netcore/control-room-ca.der"

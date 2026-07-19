@@ -172,6 +172,12 @@ fn start_control_room_worker(
     let config = cfg.config();
     let rcfg = config.control_room.as_ref().unwrap();
 
+    if rcfg.credentials.is_none() {
+        tracing::warn!(
+            "Control Room node connection has no credentials configured; it will only connect when Control Room auth is disabled. Set [control_room] token when auth is enabled"
+        );
+    }
+
     let custom_root_certs = rcfg.ca_cert.as_ref().map(|path| {
         let der_bytes = std::fs::read(path).unwrap_or_else(|e| {
             eprintln!("Failed to read Control-Room CA certificate from '{}': {}", path, e);

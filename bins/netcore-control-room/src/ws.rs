@@ -5,8 +5,9 @@ use std::time::Duration;
 use tetra_entities::net_control_room::{
     CONTROL_ROOM_PROTOCOL_VERSION, ControlRoomCodecJson, ControlRoomToNodeMessage, NodeToControlRoomMessage,
 };
-use tungstenite::handshake::server::{Request, Response};
+use tungstenite::handshake::server::{ErrorResponse, Request, Response};
 use tungstenite::{Message, WebSocket, accept_hdr};
+use tungstenite::http::StatusCode;
 
 use crate::auth::{AuthRole, AuthState};
 use crate::state::{SharedControlRoom, UiMessage, now_iso};
@@ -14,12 +15,20 @@ use crate::state::{SharedControlRoom, UiMessage, now_iso};
 const WS_READ_TIMEOUT: Duration = Duration::from_millis(100);
 const NODE_PING_INTERVAL: Duration = Duration::from_secs(15);
 
+fn reject_websocket(status: StatusCode, message: &str) -> ErrorResponse {
+    tungstenite::http::Response::builder()
+        .status(status)
+        .header("Content-Type", "text/plain; charset=utf-8")
+        .header("Content-Length", message.len().to_string())
+        .header("Connection", "close")
+        .body(Some(message.to_string()))
+        .expect("valid websocket rejection response")
+}
+
 pub fn handle_websocket_stream(stream: TcpStream, state: SharedControlRoom, node_path: String, ui_path: String, auth: AuthState) {
     let peer = stream.peer_addr().ok();
     let selected_path = Arc::new(Mutex::new(String::new()));
     let selected_path_cb = selected_path.clone();
-    let authorized = Arc::new(Mutex::new(false));
-    let authorized_cb = authorized.clone();
     let node_path_cb = node_path.clone();
     let ui_path_cb = ui_path.clone();
     let auth_cb = auth.clone();
@@ -29,16 +38,21 @@ pub fn handle_websocket_stream(stream: TcpStream, state: SharedControlRoom, node
         *selected_path_cb.lock().expect("ws path mutex poisoned") = path.clone();
 
         let role = if path == node_path_cb {
-            Some(AuthRole::Node)
+            AuthRole::Node
         } else if path == ui_path_cb {
-            Some(AuthRole::Viewer)
+            AuthRole::Viewer
         } else {
-            None
+            tracing::warn!(?peer, path = %path, "websocket handshake rejected: unknown endpoint");
+            return Err(reject_websocket(StatusCode::NOT_FOUND, "unknown websocket endpoint"));
         };
-        let ok = role
-            .map(|role| auth_cb.authorize_ws_request(role, req).is_ok())
-            .unwrap_or(true);
-        *authorized_cb.lock().expect("ws auth mutex poisoned") = ok;
+
+        if auth_cb.authorize_ws_request(role, req).is_err() {
+            // Reject during the HTTP upgrade instead of accepting with 101 and
+            // immediately closing. The latter looks like a successful connection
+            // to the node and only fails on its first Hello with EPIPE/Broken pipe.
+            tracing::warn!(?peer, path = %path, role = %role, "websocket handshake rejected: unauthorized");
+            return Err(reject_websocket(StatusCode::UNAUTHORIZED, "unauthorized websocket request"));
+        }
 
         // The BS requests a subprotocol. Echo it when it is the expected one so
         // strict clients and future tooling can see the negotiated protocol.
@@ -67,14 +81,6 @@ pub fn handle_websocket_stream(stream: TcpStream, state: SharedControlRoom, node
 
     let path = selected_path.lock().expect("ws path mutex poisoned").clone();
     tracing::info!(?peer, path = %path, "websocket connected");
-
-    let auth_ok = *authorized.lock().expect("ws auth mutex poisoned");
-    if (path == node_path || path == ui_path) && !auth_ok {
-        tracing::warn!(?peer, path = %path, "websocket rejected: unauthorized");
-        let mut ws = ws;
-        let _ = ws.close(None);
-        return;
-    }
 
     if path == node_path {
         handle_node_websocket(ws, state);
