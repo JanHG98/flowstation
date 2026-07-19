@@ -68,6 +68,14 @@ pub fn handle_websocket_stream(stream: TcpStream, state: SharedControlRoom, node
                 );
             }
         }
+
+        // A strict marker lets nodes distinguish this Control Room implementation
+        // from an older binary or an unrelated reverse-proxy WebSocket endpoint.
+        // The node verifies it before declaring the transport connected.
+        response.headers_mut().insert(
+            "x-netcore-control-room",
+            "1".parse().expect("valid control-room marker header"),
+        );
         Ok(response)
     };
 
