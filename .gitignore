@@ -14,7 +14,7 @@ Desktop.ini
 .DS_Store
 
 # IDE/editor folders
-./vs
+.vs/
 .vscode/
 .idea/
 
