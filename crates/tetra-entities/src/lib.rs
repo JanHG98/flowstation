@@ -54,6 +54,8 @@ pub mod net_meshcom;
 pub mod net_recorder;
 #[cfg(feature = "audio-player")]
 pub mod net_audio_player;
+#[cfg(feature = "audio-player")]
+pub mod net_tts;
 #[cfg(feature = "runtime")]
 pub mod net_snom;
 #[cfg(feature = "runtime")]

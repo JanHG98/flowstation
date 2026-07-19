@@ -27,6 +27,8 @@ use tetra_entities::net_recorder::{RecorderEntity, RecorderHandle};
 
 #[cfg(feature = "audio-player")]
 use tetra_entities::net_audio_player::{AudioPlayerEntity, AudioPlayerHandle};
+#[cfg(feature = "audio-player")]
+use tetra_entities::net_tts::TtsHandle;
 
 #[cfg(feature = "recording")]
 type OptionalRecorderHandle = Option<RecorderHandle>;
@@ -540,6 +542,41 @@ fn main() {
     let (echolink_cmd_tx, echolink_cmd_rx) = echolink_channel();
     let (mut router, tsource, cdispatchers, dapnet_telemetry_sink, recorder_handle, audio_player_handle) =
         build_bs_stack(&mut cfg, &args.config, echolink_cmd_rx);
+    #[cfg(feature = "audio-player")]
+    let tts_handle = if cfg.config().tts.enabled {
+        match audio_player_handle.clone() {
+            Some(player) => match TtsHandle::new(cfg.config().tts.clone(), player) {
+                Ok(handle) => {
+                    eprintln!(
+                        " -> Local Piper TTS enabled (endpoint: {}, cache: {}, voices: {})",
+                        handle.config().endpoint,
+                        handle.cache_root().display(),
+                        handle.config().voices.len()
+                    );
+                    if let Some(warning) = handle.startup_warning() {
+                        eprintln!("    TTS cache warning: {warning}");
+                    }
+                    Some(handle)
+                }
+                Err(error) => {
+                    tracing::error!("TTS disabled: {}", error);
+                    eprintln!(" -> Local Piper TTS unavailable: {error}");
+                    None
+                }
+            },
+            None => {
+                tracing::error!("TTS requires the audio-player service");
+                eprintln!(" -> Local Piper TTS unavailable: audio-player service is not available");
+                None
+            }
+        }
+    } else {
+        None
+    };
+    #[cfg(not(feature = "audio-player"))]
+    if cfg.config().tts.enabled {
+        eprintln!(" -> Local Piper TTS configured but audio-player support is not compiled in");
+    }
     let dapnet_cmd_tx = cdispatchers.get(&TetraEntity::Cmce).map(|dispatcher| dispatcher.clone_sender());
     let mut dapnet_telegram_sink: Option<TelegramAlertSink> = None;
     let mut geoalarm_sink: Option<GeoAlarmSink> = None;
@@ -616,6 +653,10 @@ fn main() {
             #[cfg(feature = "audio-player")]
             if let Some(handle) = audio_player_handle.clone() {
                 dashboard.set_audio_player_handle(handle);
+            }
+            #[cfg(feature = "audio-player")]
+            if let Some(handle) = tts_handle.clone() {
+                dashboard.set_tts_handle(handle);
             }
 
             // Create a control link so dashboard can send commands to CMCE

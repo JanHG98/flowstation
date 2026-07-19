@@ -3931,6 +3931,53 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
         <div class="stat-card is-idle"><div class="stat-label">Verkehrskanal</div><div class="stat-value is-text" id="audio-channel">—</div><div class="stat-sub" id="audio-call">Kein aktiver Ruf</div></div>
         <div class="stat-card is-idle"><div class="stat-label">MP3-Decoder</div><div class="stat-value is-text" id="audio-ffmpeg">—</div><div class="stat-sub" id="audio-error">Kein Fehler</div></div>
       </div>
+      <div class="card" id="tts-card">
+        <div class="card-head">
+          <div>
+            <div class="card-title">Textdurchsage</div>
+            <div class="card-sub" id="tts-provider-detail">Lokale Piper-Sprachsynthese</div>
+          </div>
+          <div class="card-actions" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <span class="badge" id="tts-provider-state">PRÜFE …</span>
+            <button class="btn btn-sm btn-danger" id="tts-stop" onclick="stopTtsJob()" disabled>Abbrechen</button>
+          </div>
+        </div>
+        <div class="card-body">
+          <label>
+            <span class="mesh-msg-filter-label">Sprechtext</span>
+            <textarea class="form-input" id="tts-text" rows="6" placeholder="Text der Durchsage eingeben …" oninput="updateTtsCharacterCount()"></textarea>
+          </label>
+          <div class="stat-sub" id="tts-character-count" style="text-align:right;margin-top:5px">0 Zeichen</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-top:12px">
+            <label><span class="mesh-msg-filter-label">Stimme</span><select class="form-input" id="tts-voice"><option value="">Lade Stimmen …</option></select></label>
+            <label><span class="mesh-msg-filter-label">Sprechtempo</span><div style="display:flex;gap:10px;align-items:center"><input id="tts-speed" type="range" min="50" max="150" step="5" value="95" oninput="updateTtsSpeedLabel()" style="width:100%"><strong id="tts-speed-label" style="min-width:52px;text-align:right">95 %</strong></div></label>
+            <label><span class="mesh-msg-filter-label">Zielart</span><select class="form-input" id="tts-target-type" onchange="refreshTtsTargetOptions()"><option value="group">Gruppe</option><option value="individual">Einzelgerät</option></select></label>
+            <label><span class="mesh-msg-filter-label">Telefon-/Gruppenbuch</span><select class="form-input" id="tts-target-select" onchange="ttsSelectTarget()"><option value="">Bitte wählen …</option></select></label>
+            <label><span class="mesh-msg-filter-label">ISSI/GSSI manuell</span><input class="form-input" id="tts-target-manual" inputmode="numeric" placeholder="z. B. 1001"></label>
+            <label><span class="mesh-msg-filter-label">Priorität 0–15</span><input class="form-input" id="tts-priority" type="number" min="0" max="15" value="5"></label>
+          </div>
+          <div id="tts-job-state" class="stat-sub" style="margin-top:12px">Bereit für eine Textdurchsage.</div>
+          <div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:14px">
+            <button class="btn" id="tts-generate" onclick="generateTtsPreview()">▶ Vorschau erzeugen</button>
+            <button class="btn btn-primary" id="tts-dispatch" onclick="dispatchTtsNow()">📡 Erzeugen und senden</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" id="tts-preview-card" style="display:none">
+        <div class="card-head">
+          <div><div class="card-title">Erzeugte TTS-Vorschau</div><div class="card-sub" id="tts-preview-title">—</div></div>
+          <div class="card-actions"><button class="btn btn-sm" onclick="closeTtsPreview()">Schließen</button></div>
+        </div>
+        <div class="card-body">
+          <audio id="tts-preview-player" controls preload="metadata" style="width:100%"></audio>
+          <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;margin-top:10px">
+            <div class="stat-sub" id="tts-preview-state">Bereit</div>
+            <button class="btn btn-primary" id="tts-send-preview" onclick="sendGeneratedTts()">📡 Diese Vorschau senden</button>
+          </div>
+        </div>
+      </div>
+
       <div class="card">
         <div class="card-head">
           <div><div class="card-title">WAV-/MP3-Medienbibliothek</div><div class="card-sub" id="audio-root">—</div></div>
@@ -10119,6 +10166,23 @@ window.addEventListener('resize', () => {
 
 // ── Local/server WAV/MP3 audio dispatch ──────────────────────────────────
 let audioCurrentPath='',audioCurrentSource='local',audioSources=[],audioEntries=[],audioStatus=null,audioPendingSource=null,audioGroups={},audioDevices={};
+let ttsStatus=null,ttsVoices=[],ttsDefaultsApplied=false,ttsPreviewLoadedJob=null;
+function ttsStateLabel(state){return ({idle:'BEREIT',synthesizing:'ERZEUGT SPRACHE',ready:'VORSCHAU BEREIT',dispatching:'SENDET',failed:'FEHLER',cancelled:'ABGEBROCHEN'})[state]||String(state||'—').toUpperCase();}
+function updateTtsCharacterCount(){const input=document.getElementById('tts-text'),label=document.getElementById('tts-character-count');if(!input||!label)return;const count=[...input.value].length,max=ttsStatus?.max_text_characters||2000;input.maxLength=max;label.textContent=count+' / '+max+' Zeichen';}
+function updateTtsSpeedLabel(){const slider=document.getElementById('tts-speed'),label=document.getElementById('tts-speed-label');if(slider&&label)label.textContent=slider.value+' %';}
+function refreshTtsTargetOptions(){const type=document.getElementById('tts-target-type')?.value||'group',map=type==='group'?audioGroups:audioDevices,sel=document.getElementById('tts-target-select');if(!sel)return;const rows=Object.entries(map||{}).map(([id,v])=>[id,typeof v==='string'?v:(v?.name||v?.label||v?.callsign||'')]);rows.sort((a,b)=>(a[1]||a[0]).localeCompare(b[1]||b[0]));sel.innerHTML='<option value="">Bitte wählen …</option>'+rows.map(([id,name])=>'<option value="'+escAttr(id)+'">'+escHtml((name?name+' · ':'')+(type==='group'?'GSSI ':'ISSI ')+id)+'</option>').join('');}
+function ttsSelectTarget(){const value=document.getElementById('tts-target-select')?.value;if(value)document.getElementById('tts-target-manual').value=value;}
+async function loadTtsVoices(){const select=document.getElementById('tts-voice');if(!select)return;try{const r=await fetch('/api/audio/tts/voices',{cache:'no-store'}),j=await r.json().catch(()=>({error:'HTTP '+r.status}));if(!r.ok)throw new Error(j.error||('HTTP '+r.status));ttsVoices=Array.isArray(j.voices)?j.voices:[];const current=select.value||ttsStatus?.default_voice||'';select.innerHTML=ttsVoices.map(v=>'<option value="'+escAttr(v.id)+'"'+(v.id===current?' selected':'')+'>'+escHtml(v.name+(v.available?'':' · OFFLINE'))+'</option>').join('')||'<option value="">Keine Stimme konfiguriert</option>';}catch(error){ttsVoices=[];select.innerHTML='<option value="">TTS nicht verfügbar</option>';select.title=String(error);}}
+function ttsTargetPayload(){const targetId=Number(document.getElementById('tts-target-manual').value),priority=Number(document.getElementById('tts-priority').value);if(!Number.isInteger(targetId)||targetId<=0||targetId>0xFFFFFF)throw new Error('Bitte gültige 24-Bit-ISSI/GSSI eingeben.');if(!Number.isInteger(priority)||priority<0||priority>15)throw new Error('Priorität muss zwischen 0 und 15 liegen.');return {target_type:document.getElementById('tts-target-type').value,target_id:targetId,priority};}
+function ttsGenerationPayload(){const text=document.getElementById('tts-text').value.trim();if(!text)throw new Error('Bitte zuerst einen Sprechtext eingeben.');return {text,voice_id:document.getElementById('tts-voice').value,speed:Number(document.getElementById('tts-speed').value)/100};}
+async function postTts(url,body){const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})}),j=await r.json().catch(()=>({error:'HTTP '+r.status}));if(!r.ok)throw new Error(j.error||('HTTP '+r.status));return j;}
+async function generateTtsPreview(){try{await postTts('/api/audio/tts/generate',ttsGenerationPayload());await loadTtsStatus();}catch(error){alert(error.message||String(error));}}
+async function dispatchTtsNow(){try{await postTts('/api/audio/tts/dispatch',{...ttsGenerationPayload(),...ttsTargetPayload()});await Promise.all([loadTtsStatus(),loadAudioStatus()]);}catch(error){alert(error.message||String(error));}}
+async function sendGeneratedTts(){try{if(!ttsStatus?.job_id)throw new Error('Es ist keine TTS-Vorschau bereit.');await postTts('/api/audio/tts/send',{job_id:ttsStatus.job_id,...ttsTargetPayload()});await Promise.all([loadTtsStatus(),loadAudioStatus()]);}catch(error){alert(error.message||String(error));}}
+async function stopTtsJob(){try{await postTts('/api/audio/tts/stop',{});closeTtsPreview();await Promise.all([loadTtsStatus(),loadAudioStatus()]);}catch(error){alert(error.message||String(error));}}
+function closeTtsPreview(){const card=document.getElementById('tts-preview-card'),player=document.getElementById('tts-preview-player');if(player){player.pause();player.removeAttribute('src');player.load();}if(card)card.style.display='none';ttsPreviewLoadedJob=null;}
+function renderTtsStatus(){const s=ttsStatus||{},provider=document.getElementById('tts-provider-state'),detail=document.getElementById('tts-provider-detail'),job=document.getElementById('tts-job-state');if(!provider||!job)return;provider.textContent=s.provider_available?'PIPER ONLINE':'PIPER OFFLINE';provider.style.color=s.provider_available?'var(--success)':'var(--danger)';detail.textContent=s.provider_endpoint||'Lokale Piper-Sprachsynthese';provider.title=s.provider_error||s.startup_warning||'';if(!ttsDefaultsApplied&&s.available){document.getElementById('tts-speed').value=Math.round(Number(s.default_speed||0.95)*100);document.getElementById('tts-priority').value=s.default_priority??5;ttsDefaultsApplied=true;updateTtsSpeedLabel();updateTtsCharacterCount();}const busy=['synthesizing','dispatching'].includes(s.state),ready=s.state==='ready'&&s.generated_audio_available;document.getElementById('tts-generate').disabled=busy||!s.provider_available;document.getElementById('tts-dispatch').disabled=busy||!s.provider_available;document.getElementById('tts-stop').disabled=!busy&&!ready&&s.state!=='failed'&&s.state!=='cancelled';document.getElementById('tts-send-preview').disabled=!ready;let status=ttsStateLabel(s.state);if(s.text_preview)status+=' · '+s.text_preview;if(s.target_id)status+=' → '+(s.target_type==='group'?'GSSI ':'ISSI ')+s.target_id;if(s.last_error)status+=' · '+s.last_error;job.textContent=status;job.style.color=s.state==='failed'?'var(--danger)':s.state==='ready'?'var(--success)':'';const card=document.getElementById('tts-preview-card'),player=document.getElementById('tts-preview-player');if(s.generated_audio_available&&s.job_id){card.style.display='block';document.getElementById('tts-preview-title').textContent=s.file_name||'TTS-Durchsage';document.getElementById('tts-preview-state').textContent=s.state==='dispatching'?'Wird über TETRA ausgesendet.':'Bereit zum Vorhören und Senden.';if(ttsPreviewLoadedJob!==s.job_id){player.pause();player.src='/api/audio/tts/preview?job_id='+encodeURIComponent(s.job_id)+'&_='+Date.now();player.load();ttsPreviewLoadedJob=s.job_id;}}else if(!busy){closeTtsPreview();}}
+async function loadTtsStatus(){try{const r=await fetch('/api/audio/tts/status',{cache:'no-store'}),j=await r.json().catch(()=>({error:'HTTP '+r.status}));if(!r.ok)throw new Error(j.error||('HTTP '+r.status));ttsStatus=j;renderTtsStatus();}catch(error){ttsStatus={available:false,provider_available:false,state:'failed',last_error:String(error)};renderTtsStatus();}}
 function audioStateLabel(s){return ({idle:'BEREIT',preparing:'VORBEREITUNG',calling:'RUFBAU',waiting_for_answer:'WARTE AUF ANNAHME',playing:'SENDET',finishing:'BEENDET RUF',failed:'FEHLER'})[s]||String(s||'—').toUpperCase();}
 async function loadAudioRegistries(){
   if(!deviceRegistryLoaded&&!deviceRegistryInflight)await loadDeviceRegistry(); audioDevices=deviceRegistry||{};
@@ -10185,7 +10249,8 @@ function closeAudioPreview(){const card=document.getElementById('audio-preview-c
 function audioContextPreview(){const source=audioPendingSource;if(!source)return;hideAudioContext();if(source.type==='recording'){playRecording(source.id);const box=document.getElementById('rec-player-box');if(box)box.scrollIntoView({behavior:'smooth',block:'nearest'});return;}previewAudioFile(source.id,source.label,source.sourceId);}
 function audioUp(){if(!audioCurrentPath)return;const p=audioCurrentPath.split('/');p.pop();browseAudio(p.join('/'));}
 async function loadAudioPage(force){
-  await Promise.all([loadAudioStatus(),loadAudioRegistries()]);
+  await Promise.all([loadAudioStatus(),loadAudioRegistries(),loadTtsStatus()]);
+  await loadTtsVoices();refreshTtsTargetOptions();
   try{await loadAudioSources();await browseAudio(audioCurrentPath);}catch(e){document.getElementById('audio-tbody').innerHTML='<tr><td colspan="4" class="sds-empty">'+escHtml(e)+'</td></tr>';}
   refreshAudioTargetOptions();
 }
@@ -10235,7 +10300,7 @@ function refreshAudioTargetOptions(){const type=document.getElementById('audio-t
 function audioSelectTarget(){const v=document.getElementById('audio-target-select').value;if(v)document.getElementById('audio-target-manual').value=v;}
 async function submitAudioTransmission(){if(!audioPendingSource)return;const targetId=Number(document.getElementById('audio-target-manual').value),priority=Number(document.getElementById('audio-priority').value);if(!Number.isInteger(targetId)||targetId<=0||targetId>0xFFFFFF){alert('Bitte gültige 24-Bit-ISSI/GSSI eingeben.');return;}if(!Number.isInteger(priority)||priority<0||priority>15){alert('Priorität muss zwischen 0 und 15 liegen.');return;}const body={source_type:audioPendingSource.type,target_type:document.getElementById('audio-target-type').value,target_id:targetId,priority};if(audioPendingSource.type==='recording')body.recording_id=audioPendingSource.id;else{body.path=audioPendingSource.id;body.source_id=audioPendingSource.sourceId||audioCurrentSource||'local';}const r=await fetch('/api/audio/play',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}),j=await r.json().catch(()=>({error:'HTTP '+r.status}));if(!r.ok){alert(j.error||'Aussendung konnte nicht gestartet werden');return;}closeAudioSend();await loadAudioStatus();}
 async function stopAudioTransmission(){const r=await fetch('/api/audio/stop',{method:'POST'}),j=await r.json().catch(()=>({error:'HTTP '+r.status}));if(!r.ok)alert(j.error||'Stop fehlgeschlagen');await loadAudioStatus();}
-setInterval(()=>{const page=document.getElementById('page-audio');if(page&&page.classList.contains('active'))loadAudioStatus();},1000);
+setInterval(()=>{const page=document.getElementById('page-audio');if(page&&page.classList.contains('active'))Promise.all([loadAudioStatus(),loadTtsStatus()]);},1000);
 
 // ── Local call recordings ────────────────────────────────────────────────
 let recordingRows=[];

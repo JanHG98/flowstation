@@ -591,6 +591,30 @@ path = "/mnt/nfs-share"
 
 ###############################################################################
 
+# LOCAL PIPER TEXT TO SPEECH (NetCore TTS Phase 1)
+# Piper runs as a separate localhost HTTP service. FlowStation creates the complete
+# WAV locally before handing it to the existing TETRA audio dispatcher.
+[tts]
+enabled = true
+endpoint = "http://127.0.0.1:5000"
+cache_directory = "/var/cache/netcore/tts"
+default_voice = "de-thorsten"
+default_speed = 0.95
+default_priority = 5
+max_text_characters = 2000
+synthesis_timeout_seconds = 90
+max_output_file_mb = 25
+cache_retention_minutes = 1440
+keep_generated_audio = false
+
+[[tts.voices]]
+id = "de-thorsten"
+name = "Deutsch – Thorsten"
+provider_voice = "de_DE-thorsten-medium"
+# speaker_id = 0
+
+###############################################################################
+
 [netcore_directory]
 # Local/LAN NetCore Directory Server for device, base-station, group and status labels.
 # Set base_url to the LXC/host running NetCore Directory.

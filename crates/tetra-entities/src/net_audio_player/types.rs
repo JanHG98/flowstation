@@ -12,6 +12,7 @@ pub enum AudioTargetType {
 pub enum AudioSourceType {
     Media,
     Recording,
+    Tts,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

@@ -17,6 +17,8 @@ use crate::net_echolink::{EcholinkCmdSender, EcholinkCommand};
 use crate::net_recorder::RecorderHandle;
 #[cfg(feature = "audio-player")]
 use crate::net_audio_player::{AudioPlayerHandle, AudioTargetType};
+#[cfg(feature = "audio-player")]
+use crate::net_tts::TtsHandle;
 use crate::net_telemetry::TelemetryEvent;
 use crate::tpg2200::{build_sds_text_payload, build_tpg2200_callout_payload, format_hex_bytes, parse_hex_payload, tpg2200_incident_byte};
 use tetra_config::bluestation::CfgBrew;
@@ -33,6 +35,11 @@ type DashboardRecorderHandle = ();
 type DashboardAudioPlayerHandle = Option<AudioPlayerHandle>;
 #[cfg(not(feature = "audio-player"))]
 type DashboardAudioPlayerHandle = ();
+
+#[cfg(feature = "audio-player")]
+type DashboardTtsHandle = Option<TtsHandle>;
+#[cfg(not(feature = "audio-player"))]
+type DashboardTtsHandle = ();
 
 // Each WS connection registers a Sender here.
 // broadcast() sends to all of them; dead connections are pruned automatically.
@@ -585,6 +592,7 @@ pub struct DashboardServer {
     echolink_cmd_tx: Option<EcholinkCmdSender>,
     recorder: DashboardRecorderHandle,
     audio_player: DashboardAudioPlayerHandle,
+    tts: DashboardTtsHandle,
     update_state: SharedUpdateState,
     /// Optional override for the OTA update source directory.
     /// If None, the update routine auto-detects.
@@ -612,6 +620,7 @@ impl DashboardServer {
             echolink_cmd_tx: None,
             recorder: Default::default(),
             audio_player: Default::default(),
+            tts: Default::default(),
             update_state: Arc::new(Mutex::new(UpdateState::new())),
             source_dir_override: None,
             auth: None,
@@ -637,6 +646,11 @@ impl DashboardServer {
     #[cfg(feature = "audio-player")]
     pub fn set_audio_player_handle(&mut self, handle: AudioPlayerHandle) {
         self.audio_player = Some(handle);
+    }
+
+    #[cfg(feature = "audio-player")]
+    pub fn set_tts_handle(&mut self, handle: TtsHandle) {
+        self.tts = Some(handle);
     }
 
     /// Provide the SharedConfig so the dashboard can read live SDS queue state.
@@ -677,6 +691,7 @@ impl DashboardServer {
         let echolink_cmd_tx: Arc<Mutex<Option<EcholinkCmdSender>>> = Arc::new(Mutex::new(self.echolink_cmd_tx.take()));
         let recorder = self.recorder.clone();
         let audio_player = self.audio_player.clone();
+        let tts = self.tts.clone();
         let update_state = Arc::clone(&self.update_state);
         let source_dir_override = self.source_dir_override.clone();
         let auth = self.auth.clone();
@@ -720,6 +735,7 @@ impl DashboardServer {
                     let echolink_cmd_tx = Arc::clone(&echolink_cmd_tx);
                     let recorder = recorder.clone();
                     let audio_player = audio_player.clone();
+                    let tts = tts.clone();
                     let update_state = Arc::clone(&update_state);
                     let source_dir_override = source_dir_override.clone();
                     let auth = auth.clone();
@@ -737,6 +753,7 @@ impl DashboardServer {
                                 echolink_cmd_tx,
                                 recorder,
                                 audio_player,
+                                tts,
                                 update_state,
                                 source_dir_override,
                                 auth,
@@ -2180,6 +2197,152 @@ fn serve_audio_preview(
 }
 
 #[cfg(feature = "audio-player")]
+fn parse_tts_target(request: &serde_json::Value) -> Result<(AudioTargetType, u32, Option<u8>), String> {
+    let target_type = match request.get("target_type").and_then(|value| value.as_str()) {
+        Some("group") => AudioTargetType::Group,
+        Some("individual") => AudioTargetType::Individual,
+        _ => return Err("target_type must be group or individual".to_string()),
+    };
+    let target_id = request
+        .get("target_id")
+        .and_then(|value| value.as_u64())
+        .and_then(|value| u32::try_from(value).ok())
+        .ok_or_else(|| "target_id must be an integer".to_string())?;
+    let priority = request
+        .get("priority")
+        .and_then(|value| value.as_u64())
+        .and_then(|value| u8::try_from(value).ok());
+    Ok((target_type, target_id, priority))
+}
+
+#[cfg(feature = "audio-player")]
+fn serve_tts_request(
+    mut stream: TcpStream,
+    req_line: &str,
+    request_headers: &str,
+    tts: &DashboardTtsHandle,
+) {
+    let route = request_route(req_line).trim_end_matches('/');
+    let method = req_line.split_whitespace().next().unwrap_or("");
+    let Some(handle) = tts.as_ref() else {
+        drain_http_headers(&mut stream);
+        http_json_response(
+            stream,
+            503,
+            &serde_json::json!({"available":false,"error":"TTS service unavailable"}).to_string(),
+        );
+        return;
+    };
+
+    if method == "GET" && route == "/api/audio/tts/status" {
+        drain_http_headers(&mut stream);
+        let body = serde_json::to_string(&handle.status()).unwrap_or_else(|_| "{}".to_string());
+        http_json_response(stream, 200, &body);
+        return;
+    }
+
+    if method == "GET" && route == "/api/audio/tts/voices" {
+        drain_http_headers(&mut stream);
+        let body = serde_json::json!({"voices": handle.voices()}).to_string();
+        http_json_response(stream, 200, &body);
+        return;
+    }
+
+    if matches!(method, "GET" | "HEAD") && route == "/api/audio/tts/preview" {
+        let path = request_path(req_line).unwrap_or("/api/audio/tts/preview");
+        let params = query_params(path);
+        let Some(job_id) = params.get("job_id").map(String::as_str) else {
+            drain_http_headers(&mut stream);
+            http_json_response(stream, 400, &serde_json::json!({"error":"preview requires job_id"}).to_string());
+            return;
+        };
+        drain_http_headers(&mut stream);
+        match handle.preview_path(job_id) {
+            Ok(path) => serve_audio_preview(stream, &path, request_headers, method == "HEAD"),
+            Err(error) => http_json_response(stream, 404, &serde_json::json!({"error":error}).to_string()),
+        }
+        return;
+    }
+
+    if method == "POST" && route == "/api/audio/tts/stop" {
+        drain_http_headers(&mut stream);
+        match handle.stop() {
+            Ok(()) => http_json_response(stream, 200, &serde_json::json!({"ok":true}).to_string()),
+            Err(error) => http_json_response(stream, 503, &serde_json::json!({"ok":false,"error":error}).to_string()),
+        }
+        return;
+    }
+
+    if method == "POST" && matches!(route, "/api/audio/tts/generate" | "/api/audio/tts/dispatch" | "/api/audio/tts/send") {
+        let body = read_http_body(&mut stream);
+        let request: serde_json::Value = match serde_json::from_slice(&body) {
+            Ok(value) => value,
+            Err(error) => {
+                http_json_response(stream, 400, &serde_json::json!({"ok":false,"error":format!("invalid JSON: {error}")}).to_string());
+                return;
+            }
+        };
+
+        let result = match route {
+            "/api/audio/tts/generate" => {
+                let text = request.get("text").and_then(|value| value.as_str()).unwrap_or("");
+                let voice_id = request.get("voice_id").and_then(|value| value.as_str());
+                let speed = request.get("speed").and_then(|value| value.as_f64()).map(|value| value as f32);
+                handle.generate_preview(text, voice_id, speed)
+            }
+            "/api/audio/tts/dispatch" => {
+                let text = request.get("text").and_then(|value| value.as_str()).unwrap_or("");
+                let voice_id = request.get("voice_id").and_then(|value| value.as_str());
+                let speed = request.get("speed").and_then(|value| value.as_f64()).map(|value| value as f32);
+                match parse_tts_target(&request) {
+                    Ok((target_type, target_id, priority)) => {
+                        handle.generate_and_dispatch(text, voice_id, speed, target_type, target_id, priority)
+                    }
+                    Err(error) => Err(error),
+                }
+            }
+            "/api/audio/tts/send" => {
+                let job_id = request.get("job_id").and_then(|value| value.as_str()).unwrap_or("");
+                if job_id.is_empty() {
+                    Err("job_id is required".to_string())
+                } else {
+                    match parse_tts_target(&request) {
+                        Ok((target_type, target_id, priority)) => {
+                            handle.dispatch_ready(job_id, target_type, target_id, priority)
+                        }
+                        Err(error) => Err(error),
+                    }
+                }
+            }
+            _ => unreachable!(),
+        };
+        match result {
+            Ok(job_id) => http_json_response(stream, 202, &serde_json::json!({"ok":true,"job_id":job_id}).to_string()),
+            Err(error) => http_json_response(stream, 409, &serde_json::json!({"ok":false,"error":error}).to_string()),
+        }
+        return;
+    }
+
+    drain_http_headers(&mut stream);
+    http_response(stream, 404, "not found");
+}
+
+#[cfg(not(feature = "audio-player"))]
+fn serve_tts_request(
+    mut stream: TcpStream,
+    _req_line: &str,
+    _request_headers: &str,
+    _tts: &DashboardTtsHandle,
+) {
+    drain_http_headers(&mut stream);
+    http_json_response(
+        stream,
+        503,
+        &serde_json::json!({"available":false,"error":"TTS support not compiled in"}).to_string(),
+    );
+}
+
+#[cfg(feature = "audio-player")]
 fn serve_audio_player_request(
     mut stream: TcpStream,
     req_line: &str,
@@ -2355,6 +2518,7 @@ fn handle_connection(
     echolink_cmd_tx: Arc<Mutex<Option<EcholinkCmdSender>>>,
     recorder: DashboardRecorderHandle,
     audio_player: DashboardAudioPlayerHandle,
+    tts: DashboardTtsHandle,
     update_state: SharedUpdateState,
     source_dir_override: Option<String>,
     auth: Option<(String, String)>,
@@ -2537,6 +2701,8 @@ fn handle_connection(
         handle_ws(stream, state, clients, cmd_tx, update_state, auth);
     } else if request_route(&req_line).starts_with("/api/recordings") {
         serve_recording_request(stream, &req_line, &recorder);
+    } else if request_route(&req_line).starts_with("/api/audio/tts") {
+        serve_tts_request(stream, &req_line, &header_str, &tts);
     } else if request_route(&req_line).starts_with("/api/audio") {
         serve_audio_player_request(stream, &req_line, &header_str, &audio_player, &recorder);
     } else if req_line.contains("GET /api/system/brightness") {

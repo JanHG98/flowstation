@@ -1,6 +1,6 @@
 use tetra_config::bluestation::{
     CfgAsterisk, CfgAudioPlayer, CfgCellInfo, CfgDapnet, CfgEcholink, CfgEmergency, CfgGeoalarm, CfgHealth, CfgMeshcom, CfgNetInfo, CfgPhyIo, CfgRecording, CfgRecovery,
-    CfgSecurity, CfgSnomNotify, CfgTpg2200Action, CfgWxService, PhyBackend, StackConfig, StackMode,
+    CfgSecurity, CfgSnomNotify, CfgTpg2200Action, CfgTts, CfgWxService, PhyBackend, StackConfig, StackMode,
 };
 use tetra_core::{freqs::FreqInfo, ranges::SortedDisjointSsiRanges};
 
@@ -32,6 +32,7 @@ pub fn default_test_config_bs() -> StackConfig {
         dashboard: None,
         recording: CfgRecording::default(),
         audio_player: CfgAudioPlayer::default(),
+        tts: CfgTts::default(),
         telemetry: None,
         control: None,
         control_room: None,
