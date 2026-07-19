@@ -596,7 +596,7 @@ path = "/mnt/nfs-share"
 # WAV locally before handing it to the existing TETRA audio dispatcher.
 [tts]
 enabled = true
-endpoint = "http://127.0.0.1:5000"
+endpoint = "http://127.0.0.1:5005"
 cache_directory = "/var/cache/netcore/tts"
 default_voice = "de-thorsten"
 default_speed = 0.95
