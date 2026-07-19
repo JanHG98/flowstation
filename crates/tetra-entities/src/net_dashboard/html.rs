@@ -3934,7 +3934,19 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
         </div>
       </div>
 
+      <div class="card" id="audio-preview-card" style="display:none">
+        <div class="card-head">
+          <div><div class="card-title">Vorschau</div><div class="card-sub" id="audio-preview-title">—</div></div>
+          <div class="card-actions"><button class="btn btn-sm" onclick="closeAudioPreview()">Schließen</button></div>
+        </div>
+        <div class="card-body">
+          <audio id="audio-preview-player" controls preload="metadata" style="width:100%"></audio>
+          <div class="stat-sub" id="audio-preview-state" style="margin-top:8px">Bereit</div>
+        </div>
+      </div>
+
       <div class="audio-context-menu" id="audio-context-menu" role="menu" aria-label="Audiodatei senden">
+        <button type="button" role="menuitem" onclick="audioContextPreview()">▶ Vorschau</button>
         <button type="button" role="menuitem" onclick="audioContextSend('group')">Senden an → Gruppe …</button>
         <button type="button" role="menuitem" onclick="audioContextSend('individual')">Senden an → Einzelgerät …</button>
       </div>
@@ -10110,7 +10122,7 @@ async function loadAudioSources(){
   select.disabled=audioSources.length<2;
   updateAudioSourceHeader();
 }
-function changeAudioSource(){audioCurrentSource=document.getElementById('audio-source-select').value||'local';audioCurrentPath='';updateAudioSourceHeader();browseAudio('');}
+function changeAudioSource(){closeAudioPreview();audioCurrentSource=document.getElementById('audio-source-select').value||'local';audioCurrentPath='';updateAudioSourceHeader();browseAudio('');}
 async function loadAudioStatus(){
   try{const r=await fetch('/api/audio/status',{cache:'no-store'}),j=await r.json();if(!r.ok)throw new Error(j.error||('HTTP '+r.status));audioStatus=j;const active=!['idle','failed'].includes(j.state);
     const card=document.getElementById('audio-state-card');card.classList.remove('is-ok','is-danger','is-idle','is-warn');card.classList.add(j.state==='failed'?'is-danger':active?'is-ok':'is-idle');
@@ -10128,8 +10140,23 @@ function audioJsArg(value){return escAttr(JSON.stringify(String(value)));}
 function renderAudioEntries(){
   const tb=document.getElementById('audio-tbody');if(!audioEntries.length){tb.innerHTML='<tr><td colspan="4" class="sds-empty">Keine WAV-/MP3-Dateien vorhanden.</td></tr>';return;}
   const sourceArg=audioJsArg(audioCurrentSource);
-  tb.innerHTML=audioEntries.map(e=>{const pathArg=audioJsArg(e.path),nameArg=audioJsArg(e.name);const rowCtx=e.entry_type==='file'?' class="audio-context-row" oncontextmenu="return openAudioContext(event,\'media\','+pathArg+','+nameArg+','+sourceArg+')"':'';return '<tr'+rowCtx+'><td>'+escHtml(e.name)+'</td><td>'+escHtml(e.entry_type==='directory'?'Ordner':String(e.extension||'').toUpperCase())+'</td><td>'+escHtml(e.size_bytes==null?'—':recFmtBytes(e.size_bytes))+'</td><td>'+(e.entry_type==='directory'?'<button class="btn btn-sm" onclick="browseAudio('+pathArg+')">Öffnen</button>':'<button class="btn btn-sm btn-primary" onclick="openAudioSend(\'media\','+pathArg+','+nameArg+','+sourceArg+')">Senden an…</button>')+'</td></tr>';}).join('');
+  tb.innerHTML=audioEntries.map(e=>{const pathArg=audioJsArg(e.path),nameArg=audioJsArg(e.name);const rowCtx=e.entry_type==='file'?' class="audio-context-row" oncontextmenu="return openAudioContext(event,\'media\','+pathArg+','+nameArg+','+sourceArg+')"':'';return '<tr'+rowCtx+'><td>'+escHtml(e.name)+'</td><td>'+escHtml(e.entry_type==='directory'?'Ordner':String(e.extension||'').toUpperCase())+'</td><td>'+escHtml(e.size_bytes==null?'—':recFmtBytes(e.size_bytes))+'</td><td>'+(e.entry_type==='directory'?'<button class="btn btn-sm" onclick="browseAudio('+pathArg+')">Öffnen</button>':'<button class="btn btn-sm" onclick="previewAudioFile('+pathArg+','+nameArg+','+sourceArg+')">▶ Vorschau</button> <button class="btn btn-sm btn-primary" onclick="openAudioSend(\'media\','+pathArg+','+nameArg+','+sourceArg+')">Senden an…</button>')+'</td></tr>';}).join('');
 }
+function previewAudioFile(path,label,sourceId){
+  const sourceKey=sourceId||audioCurrentSource||'local',source=audioSources.find(item=>item.id===sourceKey);
+  const player=document.getElementById('audio-preview-player'),card=document.getElementById('audio-preview-card'),state=document.getElementById('audio-preview-state');
+  if(!player||!card)return;
+  player.pause();player.removeAttribute('src');player.load();
+  document.getElementById('audio-preview-title').textContent=label+(source?' · '+source.name:'');
+  state.textContent='Lade Vorschau…';state.style.color='';
+  player.onerror=()=>{state.textContent='Vorschau konnte nicht geladen werden.';state.style.color='var(--danger)';};
+  player.onloadedmetadata=()=>{state.textContent='Bereit · '+recFmtDuration(Math.round((player.duration||0)*1000));state.style.color='var(--success)';};
+  player.src='/api/audio/preview?source='+encodeURIComponent(sourceKey)+'&path='+encodeURIComponent(path)+'&_='+Date.now();
+  card.style.display='block';player.load();card.scrollIntoView({behavior:'smooth',block:'nearest'});
+  player.play().catch(()=>{state.textContent='Bereit – Wiedergabe mit Play starten.';});
+}
+function closeAudioPreview(){const card=document.getElementById('audio-preview-card'),player=document.getElementById('audio-preview-player');if(player){player.pause();player.removeAttribute('src');player.load();player.onerror=null;player.onloadedmetadata=null;}if(card)card.style.display='none';}
+function audioContextPreview(){const source=audioPendingSource;if(!source)return;hideAudioContext();if(source.type==='recording'){playRecording(source.id);const box=document.getElementById('rec-player-box');if(box)box.scrollIntoView({behavior:'smooth',block:'nearest'});return;}previewAudioFile(source.id,source.label,source.sourceId);}
 function audioUp(){if(!audioCurrentPath)return;const p=audioCurrentPath.split('/');p.pop();browseAudio(p.join('/'));}
 async function loadAudioPage(force){
   await Promise.all([loadAudioStatus(),loadAudioRegistries()]);

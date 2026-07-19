@@ -277,6 +277,30 @@ impl AudioPlayerHandle {
         Ok(entries)
     }
 
+    /// Resolve a WAV/MP3 file for authenticated browser preview.
+    ///
+    /// The returned path is guaranteed to stay below the configured media root,
+    /// to reference a regular WAV/MP3 file, and to respect the same maximum
+    /// source-file size used by radio dispatch.
+    pub fn preview_media_path(&self, source_id: &str, relative_path: &str) -> Result<PathBuf, String> {
+        let root = self.find_media_root(source_id)?;
+        let canonical_root = canonical_media_root(root)?;
+        let path = resolve_media_file(&canonical_root, relative_path)?;
+        let size = path
+            .metadata()
+            .map_err(|e| format!("cannot read media metadata: {e}"))?
+            .len();
+        let max_bytes = self.inner.config.max_file_size_mb.saturating_mul(1024 * 1024);
+        if size > max_bytes {
+            return Err(format!(
+                "file is too large for preview: {:.1} MiB (limit {} MiB)",
+                size as f64 / 1_048_576.0,
+                self.inner.config.max_file_size_mb
+            ));
+        }
+        Ok(path)
+    }
+
     pub fn play_media(
         &self,
         source_id: &str,

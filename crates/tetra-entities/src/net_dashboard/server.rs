@@ -2057,9 +2057,133 @@ fn serve_recording_audio(mut stream: TcpStream, path: &std::path::Path, id: &str
 }
 
 #[cfg(feature = "audio-player")]
+fn audio_preview_header_value<'a>(headers: &'a str, name: &str) -> Option<&'a str> {
+    headers.lines().skip(1).find_map(|line| {
+        let (key, value) = line.split_once(':')?;
+        key.trim().eq_ignore_ascii_case(name).then(|| value.trim())
+    })
+}
+
+#[cfg(feature = "audio-player")]
+fn audio_preview_range(headers: &str, length: u64) -> Result<Option<(u64, u64)>, String> {
+    let Some(value) = audio_preview_header_value(headers, "Range") else {
+        return Ok(None);
+    };
+    let Some(spec) = value.strip_prefix("bytes=") else {
+        return Err("unsupported range unit".to_string());
+    };
+    if spec.contains(',') {
+        return Err("multiple byte ranges are not supported".to_string());
+    }
+    if length == 0 {
+        return Err("empty file has no satisfiable byte range".to_string());
+    }
+    let (start_raw, end_raw) = spec
+        .split_once('-')
+        .ok_or_else(|| "invalid byte range".to_string())?;
+    if start_raw.is_empty() {
+        let suffix = end_raw.parse::<u64>().map_err(|_| "invalid suffix byte range".to_string())?;
+        if suffix == 0 {
+            return Err("invalid zero-length suffix byte range".to_string());
+        }
+        let start = length.saturating_sub(suffix);
+        return Ok(Some((start, length - 1)));
+    }
+    let start = start_raw.parse::<u64>().map_err(|_| "invalid byte-range start".to_string())?;
+    if start >= length {
+        return Err("byte-range start is beyond end of file".to_string());
+    }
+    let end = if end_raw.is_empty() {
+        length - 1
+    } else {
+        end_raw
+            .parse::<u64>()
+            .map_err(|_| "invalid byte-range end".to_string())?
+            .min(length - 1)
+    };
+    if end < start {
+        return Err("byte-range end precedes start".to_string());
+    }
+    Ok(Some((start, end)))
+}
+
+#[cfg(feature = "audio-player")]
+fn serve_audio_preview(
+    mut stream: TcpStream,
+    path: &std::path::Path,
+    request_headers: &str,
+    head_only: bool,
+) {
+    use std::io::{Seek, SeekFrom};
+    let mut file = match std::fs::File::open(path) {
+        Ok(file) => file,
+        Err(error) => {
+            http_json_response(stream, 404, &serde_json::json!({"error": error.to_string()}).to_string());
+            return;
+        }
+    };
+    let length = match file.metadata() {
+        Ok(metadata) => metadata.len(),
+        Err(error) => {
+            http_json_response(stream, 500, &serde_json::json!({"error": error.to_string()}).to_string());
+            return;
+        }
+    };
+    let content_type = match path.extension().and_then(|ext| ext.to_str()).map(str::to_ascii_lowercase).as_deref() {
+        Some("mp3") => "audio/mpeg",
+        Some("wav") => "audio/wav",
+        _ => "application/octet-stream",
+    };
+    let filename = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("preview-audio")
+        .chars()
+        .map(|ch| if ch.is_ascii_alphanumeric() || matches!(ch, '.' | '-' | '_') { ch } else { '_' })
+        .collect::<String>();
+
+    let range = match audio_preview_range(request_headers, length) {
+        Ok(range) => range,
+        Err(error) => {
+            let body = serde_json::json!({"error": error}).to_string();
+            let response = format!(
+                "HTTP/1.1 416 Range Not Satisfiable\r\nContent-Type: application/json\r\nContent-Range: bytes */{length}\r\nContent-Length: {}\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n{}",
+                body.len(),
+                body
+            );
+            let _ = stream.write_all(response.as_bytes());
+            let _ = stream.flush();
+            return;
+        }
+    };
+
+    let (status, start, end) = match range {
+        Some((start, end)) => ("206 Partial Content", start, end),
+        None if length > 0 => ("200 OK", 0, length - 1),
+        None => ("200 OK", 0, 0),
+    };
+    let content_length = if length == 0 { 0 } else { end - start + 1 };
+    let content_range = range.map(|_| format!("Content-Range: bytes {start}-{end}/{length}\r\n")).unwrap_or_default();
+    let header = format!(
+        "HTTP/1.1 {status}\r\nContent-Type: {content_type}\r\nContent-Length: {content_length}\r\n{content_range}Accept-Ranges: bytes\r\nContent-Disposition: inline; filename=\"{filename}\"\r\nCache-Control: private, no-store\r\nX-Content-Type-Options: nosniff\r\nConnection: close\r\n\r\n"
+    );
+    if stream.write_all(header.as_bytes()).is_err() || head_only || content_length == 0 {
+        let _ = stream.flush();
+        return;
+    }
+    if file.seek(SeekFrom::Start(start)).is_err() {
+        return;
+    }
+    let mut limited = file.take(content_length);
+    let _ = std::io::copy(&mut limited, &mut stream);
+    let _ = stream.flush();
+}
+
+#[cfg(feature = "audio-player")]
 fn serve_audio_player_request(
     mut stream: TcpStream,
     req_line: &str,
+    request_headers: &str,
     audio_player: &DashboardAudioPlayerHandle,
     recorder: &DashboardRecorderHandle,
 ) {
@@ -2100,6 +2224,23 @@ fn serve_audio_player_request(
                 let body = serde_json::json!({"source": source_id, "path": relative, "entries": entries}).to_string();
                 http_json_response(stream, 200, &body);
             }
+            Err(error) => http_json_response(stream, 400, &serde_json::json!({"error":error}).to_string()),
+        }
+        return;
+    }
+
+    if matches!(method, "GET" | "HEAD") && route == "/api/audio/preview" {
+        let path = request_path(req_line).unwrap_or("/api/audio/preview");
+        let params = query_params(path);
+        let source_id = params.get("source").map(String::as_str).unwrap_or("local");
+        let Some(relative) = params.get("path").map(String::as_str) else {
+            drain_http_headers(&mut stream);
+            http_json_response(stream, 400, &serde_json::json!({"error":"preview requires path"}).to_string());
+            return;
+        };
+        drain_http_headers(&mut stream);
+        match handle.preview_media_path(source_id, relative) {
+            Ok(path) => serve_audio_preview(stream, &path, request_headers, method == "HEAD"),
             Err(error) => http_json_response(stream, 400, &serde_json::json!({"error":error}).to_string()),
         }
         return;
@@ -2193,6 +2334,7 @@ fn serve_audio_player_request(
 fn serve_audio_player_request(
     mut stream: TcpStream,
     _req_line: &str,
+    _request_headers: &str,
     _audio_player: &DashboardAudioPlayerHandle,
     _recorder: &DashboardRecorderHandle,
 ) {
@@ -2396,7 +2538,7 @@ fn handle_connection(
     } else if request_route(&req_line).starts_with("/api/recordings") {
         serve_recording_request(stream, &req_line, &recorder);
     } else if request_route(&req_line).starts_with("/api/audio") {
-        serve_audio_player_request(stream, &req_line, &audio_player, &recorder);
+        serve_audio_player_request(stream, &req_line, &header_str, &audio_player, &recorder);
     } else if req_line.contains("GET /api/system/brightness") {
         // Backlight status probe (FH-FEAT-008) — lets the UI hide the slider on a panel-less host.
         drain_http_headers(&mut stream);
