@@ -2392,6 +2392,10 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
       <span class="nav-icon" data-icon="asterisk"></span>
       <span class="nav-label" data-i18n="asterisk">Asterisk SIP</span>
     </div>
+    <div class="nav-item" onclick="showPage('audio',this)" id="nav-audio">
+      <span class="nav-icon" data-icon="audio"></span>
+      <span class="nav-label" data-i18n="audio">AUDIO-ZENTRALE</span>
+    </div>
     <div class="nav-item" onclick="showPage('dapnet',this)" id="nav-dapnet">
       <span class="nav-icon" data-icon="dapnet"></span>
       <span class="nav-label" data-i18n="dapnet">DAPNET</span>
@@ -2422,14 +2426,6 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
 
     <!-- SYSTEM — configure / operate the station. -->
     <div class="nav-section-label" data-i18n-section="system_sec">SYSTEM</div>
-    <div class="nav-item" onclick="showPage('recordings',this)" id="nav-recordings">
-      <span class="nav-icon" data-icon="recordings"></span>
-      <span class="nav-label" data-i18n="recordings">AUFZEICHNUNGEN</span>
-    </div>
-    <div class="nav-item" onclick="showPage('audio',this)" id="nav-audio">
-      <span class="nav-icon" data-icon="audio"></span>
-      <span class="nav-label" data-i18n="audio">AUSSENDEN</span>
-    </div>
     <div class="nav-item" onclick="showPage('config',this)" id="nav-config">
       <span class="nav-icon" data-icon="config"></span>
       <span class="nav-label" data-i18n="config">CONFIG</span>
@@ -3913,8 +3909,9 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
       </div>
     </div>
 
-    <!-- ── LOCAL AUDIO DISPATCH ── -->
+    <!-- ── AUDIO CENTRE: DISPATCH + RECORDINGS ── -->
     <div class="page" id="page-audio">
+      <div class="section-label">AUSSENDUNG</div>
       <div class="stat-grid" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">
         <div class="stat-card is-idle" id="audio-state-card"><div class="stat-label">Aussendung</div><div class="stat-value is-text" id="audio-state">—</div><div class="stat-sub" id="audio-target">Bereit</div></div>
         <div class="stat-card is-idle"><div class="stat-label">Fortschritt</div><div class="stat-value is-text" id="audio-progress">00:00 / 00:00</div><div class="stat-sub" id="audio-blocks">0 / 0 Blöcke</div></div>
@@ -3945,11 +3942,9 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
           <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn" onclick="closeAudioSend()">Abbrechen</button><button class="btn btn-primary" onclick="submitAudioTransmission()">Jetzt senden</button></div>
         </div>
       </div>
-    </div>
 
-    <!-- ── CONFIG ── -->
-    <!-- ── LOCAL RECORDINGS ── -->
-    <div class="page" id="page-recordings">
+      <!-- ── LOCAL RECORDINGS ── -->
+      <div class="section-label" style="margin-top:24px">AUFZEICHNUNGEN</div>
       <div class="stat-grid" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">
         <div class="stat-card is-idle" id="rec-state-card">
           <div class="stat-label">Aufzeichnung</div>
@@ -4015,6 +4010,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
       </div>
     </div>
 
+    <!-- ── CONFIG ── -->
     <div class="page" id="page-config">
       <div class="section-label" data-i18n="cfg_sec_configuration">Configuration</div>
       <div class="card">
@@ -4707,7 +4703,7 @@ const LANGS={
   en:{
     bts_ip:'BTS IP',offline:'OFFLINE',online:'ONLINE',
     brew_online:'ONLINE',brew_offline:'OFFLINE',
-    stations:'Radios',calls:'Calls',recordings:'Recordings',audio:'Audio Dispatch',lastheard:'Last Heard',log:'Log',rf:'RF',health:'Health',asterisk:'Asterisk SIP',dapnet:'DAPNET',echolink:'EchoLink',echolink_title:'EchoLink',meshcom:'MeshCom',meshcom_title:'MeshCom',maps:'Maps',maps_title:'Maps',geoalarm:'GeoAlarm',geoalarm_title:'GeoAlarm',config:'Config',
+    stations:'Radios',calls:'Calls',recordings:'Recordings',audio:'Audio Centre',lastheard:'Last Heard',log:'Log',rf:'RF',health:'Health',asterisk:'Asterisk SIP',dapnet:'DAPNET',echolink:'EchoLink',echolink_title:'EchoLink',meshcom:'MeshCom',meshcom_title:'MeshCom',maps:'Maps',maps_title:'Maps',geoalarm:'GeoAlarm',geoalarm_title:'GeoAlarm',config:'Config',
     sdslog:'SDS Log',th_dir:'Dir',th_from:'From',th_to:'To',th_message:'Message',no_sds:'No SDS messages yet',sds_refresh:'Refresh',
     rf_freq:'Center freq',rf_rate:'Sample rate',rf_rms:'RMS',rf_peak:'Peak',rf_age:'Snapshot',
     rf_waiting:'waiting…',rf_live:'live',rf_stale:'stale',
@@ -4924,7 +4920,7 @@ const LANGS={
   de:{
     bts_ip:'BTS-IP',offline:'OFFLINE',online:'ONLINE',
     brew_online:'ONLINE',brew_offline:'OFFLINE',
-    stations:'Radios',calls:'Anrufe',recordings:'Aufzeichnungen',audio:'Aussenden',lastheard:'Zuletzt Gehört',log:'Log',rf:'RF',health:'Health',asterisk:'Asterisk SIP',dapnet:'DAPNET',echolink:'EchoLink',echolink_title:'EchoLink',meshcom:'MeshCom',meshcom_title:'MeshCom',maps:'Maps',maps_title:'Maps',geoalarm:'GeoAlarm',geoalarm_title:'GeoAlarm',config:'Config',
+    stations:'Radios',calls:'Anrufe',recordings:'Aufzeichnungen',audio:'Audio-Zentrale',lastheard:'Zuletzt Gehört',log:'Log',rf:'RF',health:'Health',asterisk:'Asterisk SIP',dapnet:'DAPNET',echolink:'EchoLink',echolink_title:'EchoLink',meshcom:'MeshCom',meshcom_title:'MeshCom',maps:'Maps',maps_title:'Maps',geoalarm:'GeoAlarm',geoalarm_title:'GeoAlarm',config:'Config',
     sdslog:'SDS-Log',th_dir:'Ri.',th_from:'Von',th_to:'An',th_message:'Nachricht',no_sds:'Noch keine SDS-Nachrichten',sds_refresh:'Aktualisieren',
     rf_freq:'Mittenfrequenz',rf_rate:'Abtastrate',rf_rms:'RMS',rf_peak:'Spitze',rf_age:'Aufnahme',
     rf_waiting:'wartet…',rf_live:'live',rf_stale:'veraltet',
@@ -5314,7 +5310,7 @@ function closeMobileSidebar(){
 }
 
 // ── Page navigation ───────────────────────────────────────────────────────
-const PAGE_TITLES={stations:'stations',calls:'calls',lastheard:'lastheard',log:'log',sdslog:'sdslog',rf:'rf',health:'health',asterisk:'asterisk',dapnet:'dapnet',echolink:'echolink',meshcom:'meshcom',maps:'maps',geoalarm:'geoalarm',recordings:'recordings',audio:'audio',config:'config',system:'system'};
+const PAGE_TITLES={stations:'stations',calls:'calls',lastheard:'lastheard',log:'log',sdslog:'sdslog',rf:'rf',health:'health',asterisk:'asterisk',dapnet:'dapnet',echolink:'echolink',meshcom:'meshcom',maps:'maps',geoalarm:'geoalarm',audio:'audio',config:'config',system:'system'};
 function showPage(name,el){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
@@ -5331,8 +5327,7 @@ function showPage(name,el){
   if(name==='meshcom'){loadMeshcom();}
   if(name==='maps'){bindMapsControls();refreshMapsData();}
   if(name==='geoalarm'){loadGeoalarm();}
-  if(name==='recordings'){loadRecordings(true);}
-  if(name==='audio'){loadAudioPage(true);}
+  if(name==='audio'){loadAudioPage(true);loadRecordings(true);}
   if(name==='config'){loadConfig();loadWhitelist();loadWx();}
   if(name==='telegram'){loadTelegram();}
   if(name==='system'){loadSystemInfo();loadConfigProfiles();loadLiveSds();loadBrightness();}
@@ -10270,7 +10265,7 @@ async function toggleRecordingState(){
   await loadRecordingStatus();
 }
 setInterval(()=>{
-  const page=document.getElementById('page-recordings');
+  const page=document.getElementById('page-audio');
   if(page&&page.classList.contains('active'))loadRecordings(false);
 },5000);
 
