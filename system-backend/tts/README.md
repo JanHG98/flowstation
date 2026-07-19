@@ -32,7 +32,7 @@ Synthesis test:
 curl -fsS \
   -H 'Content-Type: application/json' \
   -d '{"text":"Achtung. Dies ist eine Testdurchsage.","voice":"de_DE-thorsten-medium","length_scale":1.0526}' \
-  http://127.0.0.1:5000/ \
+  http://127.0.0.1:5000/synthesize \
   -o /tmp/netcore-tts-test.wav
 file /tmp/netcore-tts-test.wav
 ```

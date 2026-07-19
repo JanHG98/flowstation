@@ -516,10 +516,11 @@ impl TtsHandle {
             speed,
             text.chars().count()
         );
+        let synthesis_url = piper_synthesis_url(&self.inner.config.endpoint);
         let mut response = self
             .inner
             .client
-            .post(&self.inner.config.endpoint)
+            .post(&synthesis_url)
             .json(&payload)
             .send()
             .map_err(|error| format!("Piper HTTP request failed: {error}"))?;
@@ -667,7 +668,7 @@ impl TtsHandle {
     }
 
     fn probe_provider(&self) {
-        let url = format!("{}/voices", self.inner.config.endpoint.trim_end_matches('/'));
+        let url = piper_voices_url(&self.inner.config.endpoint);
         let result = self.inner.client.get(url).send().and_then(|response| response.error_for_status());
         let mut provider = self.inner.provider.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
         provider.last_probe = Some(Instant::now());
@@ -682,6 +683,24 @@ impl TtsHandle {
             }
         }
     }
+}
+
+
+fn piper_base_url(endpoint: &str) -> String {
+    let endpoint = endpoint.trim().trim_end_matches('/');
+    endpoint
+        .strip_suffix("/synthesize")
+        .unwrap_or(endpoint)
+        .trim_end_matches('/')
+        .to_string()
+}
+
+fn piper_synthesis_url(endpoint: &str) -> String {
+    format!("{}/synthesize", piper_base_url(endpoint))
+}
+
+fn piper_voices_url(endpoint: &str) -> String {
+    format!("{}/voices", piper_base_url(endpoint))
 }
 
 fn normalize_text(text: &str, max_characters: usize) -> Result<String, String> {
