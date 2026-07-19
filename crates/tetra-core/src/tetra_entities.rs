@@ -38,4 +38,7 @@ pub enum TetraEntity {
 
     /// Local TETRA speech recorder
     Recorder,
+
+    /// Local WAV/MP3 TETRA audio dispatcher
+    AudioPlayer,
 }

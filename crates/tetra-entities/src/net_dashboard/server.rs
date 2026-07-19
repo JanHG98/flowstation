@@ -15,6 +15,8 @@ use crate::net_dashboard::state::{CallEntry, DashboardState, DashboardStateInner
 use crate::net_echolink::{EcholinkCmdSender, EcholinkCommand};
 #[cfg(feature = "recording")]
 use crate::net_recorder::RecorderHandle;
+#[cfg(feature = "audio-player")]
+use crate::net_audio_player::{AudioPlayerHandle, AudioTargetType};
 use crate::net_telemetry::TelemetryEvent;
 use crate::tpg2200::{build_sds_text_payload, build_tpg2200_callout_payload, format_hex_bytes, parse_hex_payload, tpg2200_incident_byte};
 use tetra_config::bluestation::CfgBrew;
@@ -26,6 +28,11 @@ type CmdSender = crossbeam_channel::Sender<ControlCommand>;
 type DashboardRecorderHandle = Option<RecorderHandle>;
 #[cfg(not(feature = "recording"))]
 type DashboardRecorderHandle = ();
+
+#[cfg(feature = "audio-player")]
+type DashboardAudioPlayerHandle = Option<AudioPlayerHandle>;
+#[cfg(not(feature = "audio-player"))]
+type DashboardAudioPlayerHandle = ();
 
 // Each WS connection registers a Sender here.
 // broadcast() sends to all of them; dead connections are pruned automatically.
@@ -577,6 +584,7 @@ pub struct DashboardServer {
     cmd_tx: Option<CmdSender>,
     echolink_cmd_tx: Option<EcholinkCmdSender>,
     recorder: DashboardRecorderHandle,
+    audio_player: DashboardAudioPlayerHandle,
     update_state: SharedUpdateState,
     /// Optional override for the OTA update source directory.
     /// If None, the update routine auto-detects.
@@ -603,6 +611,7 @@ impl DashboardServer {
             cmd_tx: None,
             echolink_cmd_tx: None,
             recorder: Default::default(),
+            audio_player: Default::default(),
             update_state: Arc::new(Mutex::new(UpdateState::new())),
             source_dir_override: None,
             auth: None,
@@ -623,6 +632,11 @@ impl DashboardServer {
     #[cfg(feature = "recording")]
     pub fn set_recorder_handle(&mut self, handle: RecorderHandle) {
         self.recorder = Some(handle);
+    }
+
+    #[cfg(feature = "audio-player")]
+    pub fn set_audio_player_handle(&mut self, handle: AudioPlayerHandle) {
+        self.audio_player = Some(handle);
     }
 
     /// Provide the SharedConfig so the dashboard can read live SDS queue state.
@@ -662,6 +676,7 @@ impl DashboardServer {
         let cmd_tx: Arc<Mutex<Option<CmdSender>>> = Arc::new(Mutex::new(self.cmd_tx.take()));
         let echolink_cmd_tx: Arc<Mutex<Option<EcholinkCmdSender>>> = Arc::new(Mutex::new(self.echolink_cmd_tx.take()));
         let recorder = self.recorder.clone();
+        let audio_player = self.audio_player.clone();
         let update_state = Arc::clone(&self.update_state);
         let source_dir_override = self.source_dir_override.clone();
         let auth = self.auth.clone();
@@ -704,6 +719,7 @@ impl DashboardServer {
                     let cmd_tx = Arc::clone(&cmd_tx);
                     let echolink_cmd_tx = Arc::clone(&echolink_cmd_tx);
                     let recorder = recorder.clone();
+                    let audio_player = audio_player.clone();
                     let update_state = Arc::clone(&update_state);
                     let source_dir_override = source_dir_override.clone();
                     let auth = auth.clone();
@@ -720,6 +736,7 @@ impl DashboardServer {
                                 cmd_tx,
                                 echolink_cmd_tx,
                                 recorder,
+                                audio_player,
                                 update_state,
                                 source_dir_override,
                                 auth,
@@ -2039,6 +2056,145 @@ fn serve_recording_audio(mut stream: TcpStream, path: &std::path::Path, id: &str
     }
 }
 
+#[cfg(feature = "audio-player")]
+fn serve_audio_player_request(
+    mut stream: TcpStream,
+    req_line: &str,
+    audio_player: &DashboardAudioPlayerHandle,
+    recorder: &DashboardRecorderHandle,
+) {
+    let route = request_route(req_line).trim_end_matches('/');
+    let method = req_line.split_whitespace().next().unwrap_or("");
+    let Some(handle) = audio_player.as_ref() else {
+        drain_http_headers(&mut stream);
+        http_json_response(
+            stream,
+            503,
+            &serde_json::json!({"available":false,"error":"audio-player service unavailable"}).to_string(),
+        );
+        return;
+    };
+
+    if method == "GET" && route == "/api/audio/status" {
+        drain_http_headers(&mut stream);
+        let body = serde_json::to_string(&handle.status()).unwrap_or_else(|_| "{}".to_string());
+        http_json_response(stream, 200, &body);
+        return;
+    }
+
+    if method == "GET" && route == "/api/audio/browse" {
+        let path = request_path(req_line).unwrap_or("/api/audio/browse");
+        let params = query_params(path);
+        let relative = params.get("path").map(String::as_str).unwrap_or("");
+        drain_http_headers(&mut stream);
+        match handle.list_media(relative) {
+            Ok(entries) => {
+                let body = serde_json::json!({"path": relative, "entries": entries}).to_string();
+                http_json_response(stream, 200, &body);
+            }
+            Err(error) => http_json_response(stream, 400, &serde_json::json!({"error":error}).to_string()),
+        }
+        return;
+    }
+
+    if method == "POST" && route == "/api/audio/stop" {
+        drain_http_headers(&mut stream);
+        match handle.stop() {
+            Ok(()) => http_json_response(stream, 200, &serde_json::json!({"ok":true}).to_string()),
+            Err(error) => http_json_response(stream, 503, &serde_json::json!({"ok":false,"error":error}).to_string()),
+        }
+        return;
+    }
+
+    if method == "POST" && route == "/api/audio/play" {
+        let body = read_http_body(&mut stream);
+        let request: serde_json::Value = match serde_json::from_slice(&body) {
+            Ok(value) => value,
+            Err(error) => {
+                http_json_response(stream, 400, &serde_json::json!({"ok":false,"error":format!("invalid JSON: {error}")}).to_string());
+                return;
+            }
+        };
+        let target_type = match request.get("target_type").and_then(|value| value.as_str()) {
+            Some("group") => AudioTargetType::Group,
+            Some("individual") => AudioTargetType::Individual,
+            _ => {
+                http_json_response(stream, 400, &serde_json::json!({"ok":false,"error":"target_type must be group or individual"}).to_string());
+                return;
+            }
+        };
+        let Some(target_id) = request.get("target_id").and_then(|value| value.as_u64()).and_then(|value| u32::try_from(value).ok()) else {
+            http_json_response(stream, 400, &serde_json::json!({"ok":false,"error":"target_id must be an integer"}).to_string());
+            return;
+        };
+        let priority = request.get("priority").and_then(|value| value.as_u64()).and_then(|value| u8::try_from(value).ok());
+        let source_type = request.get("source_type").and_then(|value| value.as_str()).unwrap_or("media");
+        let result = match source_type {
+            "media" => {
+                let Some(path) = request.get("path").and_then(|value| value.as_str()) else {
+                    http_json_response(stream, 400, &serde_json::json!({"ok":false,"error":"media source requires path"}).to_string());
+                    return;
+                };
+                handle.play_media(path, target_type, target_id, priority)
+            }
+            "recording" => {
+                let Some(id) = request.get("recording_id").and_then(|value| value.as_str()) else {
+                    http_json_response(stream, 400, &serde_json::json!({"ok":false,"error":"recording source requires recording_id"}).to_string());
+                    return;
+                };
+                #[cfg(feature = "recording")]
+                {
+                    let Some(recorder) = recorder.as_ref() else {
+                        http_json_response(stream, 503, &serde_json::json!({"ok":false,"error":"recording service unavailable"}).to_string());
+                        return;
+                    };
+                    let path = match recorder.audio_path(id) {
+                        Ok(path) => path,
+                        Err(error) => {
+                            http_json_response(stream, 404, &serde_json::json!({"ok":false,"error":error}).to_string());
+                            return;
+                        }
+                    };
+                    let display_name = recorder
+                        .find_recording(id)
+                        .map(|item| format!("Aufzeichnung {} · Call {}", item.started_at, item.call_id))
+                        .unwrap_or_else(|| format!("Aufzeichnung {id}"));
+                    handle.play_recording(path, display_name, target_type, target_id, priority)
+                }
+                #[cfg(not(feature = "recording"))]
+                {
+                    let _ = recorder;
+                    Err("recording support not compiled in".to_string())
+                }
+            }
+            _ => Err("source_type must be media or recording".to_string()),
+        };
+        match result {
+            Ok(job_id) => http_json_response(stream, 202, &serde_json::json!({"ok":true,"job_id":job_id}).to_string()),
+            Err(error) => http_json_response(stream, 409, &serde_json::json!({"ok":false,"error":error}).to_string()),
+        }
+        return;
+    }
+
+    drain_http_headers(&mut stream);
+    http_response(stream, 404, "not found");
+}
+
+#[cfg(not(feature = "audio-player"))]
+fn serve_audio_player_request(
+    mut stream: TcpStream,
+    _req_line: &str,
+    _audio_player: &DashboardAudioPlayerHandle,
+    _recorder: &DashboardRecorderHandle,
+) {
+    drain_http_headers(&mut stream);
+    http_json_response(
+        stream,
+        503,
+        &serde_json::json!({"available":false,"error":"audio-player support not compiled in"}).to_string(),
+    );
+}
+
 fn handle_connection(
     mut stream: TcpStream,
     state: DashboardState,
@@ -2047,6 +2203,7 @@ fn handle_connection(
     cmd_tx: Arc<Mutex<Option<CmdSender>>>,
     echolink_cmd_tx: Arc<Mutex<Option<EcholinkCmdSender>>>,
     recorder: DashboardRecorderHandle,
+    audio_player: DashboardAudioPlayerHandle,
     update_state: SharedUpdateState,
     source_dir_override: Option<String>,
     auth: Option<(String, String)>,
@@ -2229,6 +2386,8 @@ fn handle_connection(
         handle_ws(stream, state, clients, cmd_tx, update_state, auth);
     } else if request_route(&req_line).starts_with("/api/recordings") {
         serve_recording_request(stream, &req_line, &recorder);
+    } else if request_route(&req_line).starts_with("/api/audio") {
+        serve_audio_player_request(stream, &req_line, &audio_player, &recorder);
     } else if req_line.contains("GET /api/system/brightness") {
         // Backlight status probe (FH-FEAT-008) — lets the UI hide the slider on a panel-less host.
         drain_http_headers(&mut stream);

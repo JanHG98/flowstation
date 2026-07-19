@@ -52,6 +52,8 @@ pub mod net_geoalarm;
 pub mod net_meshcom;
 #[cfg(feature = "recording")]
 pub mod net_recorder;
+#[cfg(feature = "audio-player")]
+pub mod net_audio_player;
 #[cfg(feature = "runtime")]
 pub mod net_snom;
 #[cfg(feature = "runtime")]

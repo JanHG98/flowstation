@@ -562,6 +562,22 @@ max_list_entries = 2000
 
 ###############################################################################
 
+# LOCAL WAV/MP3 AUDIO DISPATCH (NetCore Phase 2)
+# Files below `directory` appear in Dashboard -> AUSSENDEN. Native 8-kHz PCM WAV
+# is decoded internally; MP3 and other WAV layouts use ffmpeg when installed.
+[audio_player]
+enabled = true
+directory = "/var/lib/netcore/audio"
+source_issi = 4010099
+default_priority = 5
+max_file_size_mb = 100
+max_duration_seconds = 1800
+tail_silence_blocks = 3
+individual_answer_timeout_seconds = 30
+ffmpeg_path = "ffmpeg"
+
+###############################################################################
+
 [netcore_directory]
 # Local/LAN NetCore Directory Server for device, base-station, group and status labels.
 # Set base_url to the LXC/host running NetCore Directory.
