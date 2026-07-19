@@ -69,7 +69,7 @@ fn verify_control_room_ready(ws: &mut WebSocket<MaybeTlsStream<TcpStream>>) -> R
     let deadline = Instant::now() + CONTROL_ROOM_READY_TIMEOUT;
     loop {
         match ws.read() {
-            Ok(Message::Pong(payload)) if payload.as_ref() == CONTROL_ROOM_READY_PROBE => return Ok(()),
+            Ok(Message::Pong(payload)) if payload.as_slice() == CONTROL_ROOM_READY_PROBE => return Ok(()),
             Ok(Message::Ping(payload)) => {
                 ws.send(Message::Pong(payload)).map_err(|error| {
                     NetworkError::ConnectionFailed(format!("Control Room readiness pong failed: {}", error))
