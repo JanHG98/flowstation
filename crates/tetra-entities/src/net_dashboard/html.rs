@@ -2408,6 +2408,10 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
 
     <!-- SYSTEM — configure / operate the station. -->
     <div class="nav-section-label" data-i18n-section="system_sec">SYSTEM</div>
+    <div class="nav-item" onclick="showPage('recordings',this)" id="nav-recordings">
+      <span class="nav-icon" data-icon="recordings"></span>
+      <span class="nav-label" data-i18n="recordings">AUFZEICHNUNGEN</span>
+    </div>
     <div class="nav-item" onclick="showPage('config',this)" id="nav-config">
       <span class="nav-icon" data-icon="config"></span>
       <span class="nav-label" data-i18n="config">CONFIG</span>
@@ -3892,6 +3896,73 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
     </div>
 
     <!-- ── CONFIG ── -->
+    <!-- ── LOCAL RECORDINGS ── -->
+    <div class="page" id="page-recordings">
+      <div class="stat-grid" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">
+        <div class="stat-card is-idle" id="rec-state-card">
+          <div class="stat-label">Aufzeichnung</div>
+          <div class="stat-value is-text" id="rec-state">—</div>
+          <div class="stat-sub" id="rec-mode">—</div>
+        </div>
+        <div class="stat-card is-idle">
+          <div class="stat-label">Aufnahmen</div>
+          <div class="stat-value" id="rec-count">0</div>
+          <div class="stat-sub" id="rec-active-calls">Keine aktive Aufnahme</div>
+        </div>
+        <div class="stat-card is-idle">
+          <div class="stat-label">Speicher frei</div>
+          <div class="stat-value is-text" id="rec-free">—</div>
+          <div class="stat-sub" id="rec-used">— belegt</div>
+        </div>
+        <div class="stat-card is-idle">
+          <div class="stat-label">Letzter Status</div>
+          <div class="stat-value is-text" id="rec-last">—</div>
+          <div class="stat-sub" id="rec-error">Kein Fehler</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <div class="card-title">Lokale Gesprächsaufzeichnungen</div>
+            <div class="card-sub">8 kHz · Mono · 16 Bit PCM WAV mit JSON-Metadaten</div>
+          </div>
+          <div class="card-actions" style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-sm" id="rec-toggle" onclick="toggleRecordingState()">Aufzeichnung umschalten</button>
+            <button class="btn btn-sm" onclick="loadRecordings(true)">Aktualisieren</button>
+          </div>
+        </div>
+        <div class="card-body">
+          <div style="display:flex;gap:12px;align-items:end;flex-wrap:wrap;margin-bottom:12px">
+            <label style="flex:1;min-width:220px">
+              <span class="mesh-msg-filter-label">Suche</span>
+              <input class="form-input" id="rec-filter" type="search" placeholder="Datum, Call-ID, ISSI oder GSSI" oninput="renderRecordings()">
+            </label>
+            <div id="rec-dir" class="stat-sub" style="max-width:100%;word-break:break-all">—</div>
+          </div>
+          <div id="rec-unavailable" class="sds-empty" style="display:none;padding:18px 0">Aufzeichnungsdienst nicht verfügbar.</div>
+          <div class="table-wrap" id="rec-table-wrap">
+            <table>
+              <thead><tr>
+                <th>Zeitpunkt</th>
+                <th>Quelle</th>
+                <th>Ziel</th>
+                <th>Call</th>
+                <th>Dauer</th>
+                <th>Größe</th>
+                <th>Aktionen</th>
+              </tr></thead>
+              <tbody id="rec-tbody"><tr><td colspan="7" class="sds-empty">Lade Aufzeichnungen…</td></tr></tbody>
+            </table>
+          </div>
+          <div id="rec-player-box" style="display:none;margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
+            <div class="card-title" id="rec-player-title" style="margin-bottom:8px">Wiedergabe</div>
+            <audio id="rec-player" controls preload="metadata" style="width:100%"></audio>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="page" id="page-config">
       <div class="section-label" data-i18n="cfg_sec_configuration">Configuration</div>
       <div class="card">
@@ -4512,6 +4583,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
 // <svg> string; status is conveyed by the dot, never the icon. The Tabs phase
 // reuses ICONS / svgIcon verbatim for every emoji site.
 const ICONS = {
+  recordings:'<path d="M4 7h3l2-3h6l2 3h3v13H4Z"/><circle cx="12" cy="13" r="4"/><path d="M12 11v4M10 13h4"/>',
   // nav — monitor
   radios:'<path d="M5 14a9 9 0 0 1 9-9"/><path d="M5 14a5.5 5.5 0 0 1 5.5-5.5"/><circle cx="6.5" cy="12.5" r="1.6"/><path d="M7.5 13.5 13 19"/>',
   calls:'<path d="M6.5 4.5h3l1.2 3.2-1.7 1.3a11 11 0 0 0 4.7 4.7l1.3-1.7 3.2 1.2v3a1.5 1.5 0 0 1-1.6 1.5A13.5 13.5 0 0 1 5 6.1 1.5 1.5 0 0 1 6.5 4.5Z"/>',
@@ -4582,7 +4654,7 @@ const LANGS={
   en:{
     bts_ip:'BTS IP',offline:'OFFLINE',online:'ONLINE',
     brew_online:'ONLINE',brew_offline:'OFFLINE',
-    stations:'Radios',calls:'Calls',lastheard:'Last Heard',log:'Log',rf:'RF',health:'Health',asterisk:'Asterisk SIP',dapnet:'DAPNET',echolink:'EchoLink',echolink_title:'EchoLink',meshcom:'MeshCom',meshcom_title:'MeshCom',maps:'Maps',maps_title:'Maps',geoalarm:'GeoAlarm',geoalarm_title:'GeoAlarm',config:'Config',
+    stations:'Radios',calls:'Calls',recordings:'Recordings',lastheard:'Last Heard',log:'Log',rf:'RF',health:'Health',asterisk:'Asterisk SIP',dapnet:'DAPNET',echolink:'EchoLink',echolink_title:'EchoLink',meshcom:'MeshCom',meshcom_title:'MeshCom',maps:'Maps',maps_title:'Maps',geoalarm:'GeoAlarm',geoalarm_title:'GeoAlarm',config:'Config',
     sdslog:'SDS Log',th_dir:'Dir',th_from:'From',th_to:'To',th_message:'Message',no_sds:'No SDS messages yet',sds_refresh:'Refresh',
     rf_freq:'Center freq',rf_rate:'Sample rate',rf_rms:'RMS',rf_peak:'Peak',rf_age:'Snapshot',
     rf_waiting:'waiting…',rf_live:'live',rf_stale:'stale',
@@ -4799,7 +4871,7 @@ const LANGS={
   de:{
     bts_ip:'BTS-IP',offline:'OFFLINE',online:'ONLINE',
     brew_online:'ONLINE',brew_offline:'OFFLINE',
-    stations:'Radios',calls:'Anrufe',lastheard:'Zuletzt Gehört',log:'Log',rf:'RF',health:'Health',asterisk:'Asterisk SIP',dapnet:'DAPNET',echolink:'EchoLink',echolink_title:'EchoLink',meshcom:'MeshCom',meshcom_title:'MeshCom',maps:'Maps',maps_title:'Maps',geoalarm:'GeoAlarm',geoalarm_title:'GeoAlarm',config:'Config',
+    stations:'Radios',calls:'Anrufe',recordings:'Aufzeichnungen',lastheard:'Zuletzt Gehört',log:'Log',rf:'RF',health:'Health',asterisk:'Asterisk SIP',dapnet:'DAPNET',echolink:'EchoLink',echolink_title:'EchoLink',meshcom:'MeshCom',meshcom_title:'MeshCom',maps:'Maps',maps_title:'Maps',geoalarm:'GeoAlarm',geoalarm_title:'GeoAlarm',config:'Config',
     sdslog:'SDS-Log',th_dir:'Ri.',th_from:'Von',th_to:'An',th_message:'Nachricht',no_sds:'Noch keine SDS-Nachrichten',sds_refresh:'Aktualisieren',
     rf_freq:'Mittenfrequenz',rf_rate:'Abtastrate',rf_rms:'RMS',rf_peak:'Spitze',rf_age:'Aufnahme',
     rf_waiting:'wartet…',rf_live:'live',rf_stale:'veraltet',
@@ -5189,7 +5261,7 @@ function closeMobileSidebar(){
 }
 
 // ── Page navigation ───────────────────────────────────────────────────────
-const PAGE_TITLES={stations:'stations',calls:'calls',lastheard:'lastheard',log:'log',sdslog:'sdslog',rf:'rf',health:'health',asterisk:'asterisk',dapnet:'dapnet',echolink:'echolink',meshcom:'meshcom',maps:'maps',geoalarm:'geoalarm',config:'config',system:'system'};
+const PAGE_TITLES={stations:'stations',calls:'calls',lastheard:'lastheard',log:'log',sdslog:'sdslog',rf:'rf',health:'health',asterisk:'asterisk',dapnet:'dapnet',echolink:'echolink',meshcom:'meshcom',maps:'maps',geoalarm:'geoalarm',recordings:'recordings',config:'config',system:'system'};
 function showPage(name,el){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
@@ -5206,6 +5278,7 @@ function showPage(name,el){
   if(name==='meshcom'){loadMeshcom();}
   if(name==='maps'){bindMapsControls();refreshMapsData();}
   if(name==='geoalarm'){loadGeoalarm();}
+  if(name==='recordings'){loadRecordings(true);}
   if(name==='config'){loadConfig();loadWhitelist();loadWx();}
   if(name==='telegram'){loadTelegram();}
   if(name==='system'){loadSystemInfo();loadConfigProfiles();loadLiveSds();loadBrightness();}
@@ -9954,6 +10027,164 @@ window.addEventListener('resize', () => {
   rfResizeCanvas('rf-waterfall');
   drawRfWaterfall();
 });
+
+
+// ── Local call recordings ────────────────────────────────────────────────
+let recordingRows=[];
+let recordingStatus=null;
+let recordingBusy=false;
+let recordingGroupRegistry={};
+
+function normalizeRecordingGroups(raw){
+  const out={};
+  const put=(id,entry)=>{
+    const key=String(id??'').trim(); if(!key)return;
+    if(typeof entry==='string'){if(entry.trim())out[key]=entry.trim();return;}
+    if(entry&&typeof entry==='object'){
+      const name=String(entry.name||entry.label||entry.title||entry.callsign||'').trim();
+      if(name)out[key]=name;
+    }
+  };
+  if(Array.isArray(raw)){raw.forEach(e=>put(e&&(e.gssi??e.id??e.ssi),e));return out;}
+  if(raw&&Array.isArray(raw.groups)){raw.groups.forEach(e=>put(e&&(e.gssi??e.id??e.ssi),e));return out;}
+  if(raw&&Array.isArray(raw.results)){raw.results.forEach(e=>put(e&&(e.gssi??e.id??e.ssi),e));return out;}
+  if(raw&&typeof raw==='object')Object.entries(raw).forEach(([id,e])=>put(id,e));
+  return out;
+}
+async function loadRecordingDirectoryLabels(){
+  if(!deviceRegistryLoaded&&!deviceRegistryInflight)await loadDeviceRegistry();
+  try{
+    const r=await fetch('/api/groups',{cache:'no-store',credentials:'same-origin'});
+    recordingGroupRegistry=r.ok?normalizeRecordingGroups(await r.json()):{};
+  }catch(_){recordingGroupRegistry={};}
+}
+function recFmtBytes(n){
+  if(n===null||n===undefined||!Number.isFinite(Number(n)))return '—';
+  let v=Number(n),u=['B','KiB','MiB','GiB','TiB'],i=0;
+  while(v>=1024&&i<u.length-1){v/=1024;i++;}
+  return (i===0?v.toFixed(0):v.toFixed(v>=10?1:2))+' '+u[i];
+}
+function recFmtDuration(ms){
+  let total=Math.max(0,Math.round(Number(ms||0)/1000));
+  let h=Math.floor(total/3600),m=Math.floor((total%3600)/60),sec=total%60;
+  return (h?String(h).padStart(2,'0')+':':'')+String(m).padStart(2,'0')+':'+String(sec).padStart(2,'0');
+}
+function recFmtTime(value){
+  const d=new Date(value); return Number.isNaN(d.getTime())?String(value||'—'):d.toLocaleString();
+}
+function recSourceLabel(row){
+  const sources=[...new Set((row.segments||[]).map(s=>s.source_issi).filter(Boolean))];
+  const ids=sources.length?sources:(row.source_issi?[row.source_issi]:[]);
+  if(!ids.length)return '—';
+  return ids.map(id=>{
+    const name=deviceInlineName(id);
+    return name?`${name} · ISSI ${id}`:`ISSI ${id}`;
+  }).join(', ');
+}
+function recDestinationLabel(row){
+  const id=row.destination_id??'—';
+  if(row.destination_type==='group'){
+    const name=recordingGroupRegistry[String(id)]||'';
+    return name?`${name} · GSSI ${id}`:`GSSI ${id}`;
+  }
+  const name=deviceInlineName(id);
+  return name?`${name} · ISSI ${id}`:`ISSI ${id}`;
+}
+async function loadRecordingStatus(){
+  try{
+    const r=await fetch('/api/recordings/status',{cache:'no-store'});
+    const j=await r.json().catch(()=>({available:false,error:'Ungültige Serverantwort'}));
+    recordingStatus=j;
+    const available=r.ok&&j.available!==false;
+    document.getElementById('rec-unavailable').style.display=available?'none':'block';
+    document.getElementById('rec-table-wrap').style.display=available?'block':'none';
+    const card=document.getElementById('rec-state-card');
+    card.classList.remove('is-ok','is-danger','is-idle','is-warn');
+    card.classList.add(!available?'is-danger':j.active?'is-ok':'is-idle');
+    document.getElementById('rec-state').textContent=!available?'NICHT VERFÜGBAR':j.active?'AKTIV':'PAUSIERT';
+    document.getElementById('rec-mode').textContent=j.mode==='selected_groups'?'Ausgewählte Gruppen':'Alle lokalen Gespräche';
+    document.getElementById('rec-count').textContent=j.recording_count??recordingRows.length;
+    document.getElementById('rec-active-calls').textContent=j.active_sessions?`${j.active_sessions} aktive Session(s): ${(j.active_call_ids||[]).join(', ')}`:'Keine aktive Aufnahme';
+    document.getElementById('rec-free').textContent=recFmtBytes(j.free_space_bytes);
+    document.getElementById('rec-used').textContent=recFmtBytes(j.used_bytes)+' belegt';
+    document.getElementById('rec-dir').textContent=j.directory||'—';
+    document.getElementById('rec-last').textContent=j.last_recording_id?'Gespeichert':'Bereit';
+    document.getElementById('rec-error').textContent=j.last_error||'Kein Fehler';
+    document.getElementById('rec-toggle').textContent=j.active?'Aufzeichnung pausieren':'Aufzeichnung aktivieren';
+    document.getElementById('rec-toggle').disabled=!available;
+    return available;
+  }catch(e){
+    recordingStatus={available:false};
+    const u=document.getElementById('rec-unavailable'); if(u){u.style.display='block';u.textContent='Aufzeichnungsdienst nicht erreichbar: '+e;}
+    return false;
+  }
+}
+async function loadRecordings(force){
+  if(recordingBusy&&!force)return;
+  recordingBusy=true;
+  try{
+    const [available]=await Promise.all([loadRecordingStatus(),loadRecordingDirectoryLabels()]);
+    if(!available){recordingRows=[];renderRecordings();return;}
+    const r=await fetch('/api/recordings',{cache:'no-store'});
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    recordingRows=await r.json();
+    renderRecordings();
+  }catch(e){
+    const tb=document.getElementById('rec-tbody'); if(tb)tb.innerHTML='<tr><td colspan="7" class="sds-empty">Fehler beim Laden: '+escHtml(e)+'</td></tr>';
+  }finally{recordingBusy=false;}
+}
+function renderRecordings(){
+  const tb=document.getElementById('rec-tbody'); if(!tb)return;
+  const q=(document.getElementById('rec-filter')?.value||'').trim().toLowerCase();
+  const rows=recordingRows.filter(r=>{
+    const hay=[r.started_at,r.call_id,r.source_issi,r.destination_id,r.destination_type,recSourceLabel(r),recDestinationLabel(r)].join(' ').toLowerCase();
+    return !q||hay.includes(q);
+  });
+  if(!rows.length){tb.innerHTML='<tr><td colspan="7" class="sds-empty">Keine passenden Aufzeichnungen vorhanden.</td></tr>';return;}
+  tb.innerHTML=rows.map(r=>{
+    const dest=recDestinationLabel(r);
+    const recovered=r.recovered_after_unclean_shutdown?' <span class="pill pill-warn">Wiederhergestellt</span>':'';
+    return '<tr>'+
+      '<td>'+escHtml(recFmtTime(r.started_at))+recovered+'</td>'+
+      '<td>'+escHtml(recSourceLabel(r))+'</td>'+
+      '<td>'+escHtml(dest)+'</td>'+
+      '<td>'+escHtml(r.call_id)+'</td>'+
+      '<td>'+escHtml(recFmtDuration(r.duration_ms))+'</td>'+
+      '<td>'+escHtml(recFmtBytes(r.audio_bytes))+'</td>'+
+      '<td style="white-space:nowrap">'+
+        '<button class="btn btn-sm btn-primary" onclick="playRecording(\''+escAttr(r.id)+'\')">▶</button> '+
+        '<a class="btn btn-sm" href="/api/recordings/'+encodeURIComponent(r.id)+'/audio" download="recording-'+escAttr(r.id)+'.wav">Download</a> '+
+        '<button class="btn btn-sm btn-danger" onclick="deleteRecording(\''+escAttr(r.id)+'\')">Löschen</button>'+
+      '</td></tr>';
+  }).join('');
+}
+function playRecording(id){
+  const row=recordingRows.find(r=>r.id===id);
+  const box=document.getElementById('rec-player-box'),player=document.getElementById('rec-player');
+  document.getElementById('rec-player-title').textContent=row?`${recFmtTime(row.started_at)} · Call ${row.call_id}`:'Wiedergabe';
+  player.src='/api/recordings/'+encodeURIComponent(id)+'/audio';
+  box.style.display='block';
+  player.play().catch(()=>{});
+}
+async function deleteRecording(id){
+  if(!confirm('Diese Aufzeichnung endgültig löschen?'))return;
+  const r=await fetch('/api/recordings/'+encodeURIComponent(id),{method:'DELETE'});
+  if(!r.ok){const j=await r.json().catch(()=>({error:'HTTP '+r.status}));alert(j.error||'Löschen fehlgeschlagen');return;}
+  const player=document.getElementById('rec-player');
+  if(player.src.includes(id)){player.pause();player.removeAttribute('src');document.getElementById('rec-player-box').style.display='none';}
+  await loadRecordings(true);
+}
+async function toggleRecordingState(){
+  if(!recordingStatus||recordingStatus.available===false)return;
+  const active=!recordingStatus.active;
+  const r=await fetch('/api/recordings/state',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({active})});
+  if(!r.ok){const j=await r.json().catch(()=>({error:'HTTP '+r.status}));alert(j.error||'Umschalten fehlgeschlagen');return;}
+  await loadRecordingStatus();
+}
+setInterval(()=>{
+  const page=document.getElementById('page-recordings');
+  if(page&&page.classList.contains('active'))loadRecordings(false);
+},5000);
 
 // ── NetCore OTA indicator ───────────────────────────────────────────────────
 // NetCore runs as a system service from the operator-owned JanHG98 repository.

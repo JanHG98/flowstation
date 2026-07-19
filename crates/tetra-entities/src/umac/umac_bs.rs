@@ -1590,6 +1590,22 @@ impl UmacBs {
 
                 let ul_active = self.scheduler_for(carrier_num).circuit_is_active(Direction::Ul, air_ts);
 
+                // Passive local recorder tap. The recorder receives only valid UL media on an
+                // active circuit and correlates the logical timeslot with CMCE lifecycle events.
+                #[cfg(feature = "recording")]
+                if self.config.config().recording.enabled && ul_active {
+                    queue.push_back(SapMsg {
+                        sap: Sap::TmdSap,
+                        src: TetraEntity::Umac,
+                        dest: TetraEntity::Recorder,
+                        msg: SapMsgInner::TmdCircuitDataInd(tetra_saps::tmd::TmdCircuitDataInd {
+                            carrier_num,
+                            ts: logical_ts,
+                            data: data.clone(),
+                        }),
+                    });
+                }
+
                 // Forward UL voice to Brew (User plane) if loaded. Each Brew entity only accepts
                 // frames for timeslots it explicitly claimed from CMCE.
                 if self.config.config().brew.is_some() || self.config.config().brew2.is_some() {

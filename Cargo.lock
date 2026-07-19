@@ -1976,6 +1976,7 @@ dependencies = [
  "chrono",
  "chrono-tz",
  "crossbeam-channel",
+ "libc",
  "md5",
  "num",
  "num-complex",

@@ -141,6 +141,7 @@ impl CcBsSubentity {
                 call_id,
                 source_issi: speaker.addr.ssi,
                 dest_gssi: listener.addr.ssi,
+                dest_is_group: false,
                 ts: speaker.ts,
             },
             true,

@@ -34,8 +34,14 @@ runtime = [
     "dep:uuid",
 ]
 
-# Compile the Asterisk SIP/RTP bridge and link the native TETRA codec.
-asterisk = ["runtime"]
+# Link the native TETRA speech codec for any media feature.
+tetra-codec = ["runtime"]
+
+# Compile the Asterisk SIP/RTP bridge.
+asterisk = ["tetra-codec"]
+
+# Compile the local WAV recorder and dashboard API.
+recording = ["tetra-codec", "dep:libc"]
 
 [dependencies]
 tetra-core = { workspace = true }
@@ -62,6 +68,7 @@ tungstenite = { workspace = true, optional = true }
 uuid = { workspace = true, optional = true }
 md5 = { version = "0.7", optional = true }
 base64 = { version = "0.22", optional = true }
+libc = { version = "0.2", optional = true }
 chrono = { workspace = true }
 chrono-tz = { workspace = true }
 # HTTP client for the dashboard's GitHub update-check and the built-in WX/METAR service.

@@ -679,9 +679,37 @@ impl CcBsSubentity {
                     call_id,
                     source_issi: speaker_addr.ssi,
                     dest_gssi: listener_addr.ssi,
+                    dest_is_group: false,
                     ts: speaker_ts,
                 },
                 true,
+                BrewNotification::Never,
+            );
+        } else if activated {
+            // Full-duplex calls have no floor changes. Tell only the passive recorder that both
+            // local RF bearers are active; UMAC already owns both circuit legs.
+            self.notify_floor_granted(
+                queue,
+                GroupFloorGrant {
+                    call_id,
+                    source_issi: calling_addr.ssi,
+                    dest_gssi: called_addr.ssi,
+                    dest_is_group: false,
+                    ts: calling_ts,
+                },
+                false,
+                BrewNotification::Never,
+            );
+            self.notify_floor_granted(
+                queue,
+                GroupFloorGrant {
+                    call_id,
+                    source_issi: called_addr.ssi,
+                    dest_gssi: calling_addr.ssi,
+                    dest_is_group: false,
+                    ts: called_ts,
+                },
+                false,
                 BrewNotification::Never,
             );
         }

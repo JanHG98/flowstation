@@ -5,7 +5,7 @@ fn main() {
     println!("cargo:rerun-if-env-changed=PKG_CONFIG");
     println!("cargo:rerun-if-env-changed=PKG_CONFIG_PATH");
 
-    if std::env::var("CARGO_FEATURE_ASTERISK").is_ok()
+    if std::env::var("CARGO_FEATURE_TETRA_CODEC").is_ok()
         && let Ok(output) = Command::new("pkg-config").args(["--libs", "tetra-codec"]).output()
         && output.status.success()
     {

@@ -34,6 +34,8 @@ pub mod umac;
 #[cfg(feature = "runtime")]
 pub mod network;
 
+#[cfg(feature = "tetra-codec")]
+pub mod net_audio;
 #[cfg(feature = "asterisk")]
 pub mod net_asterisk;
 #[cfg(feature = "runtime")]
@@ -48,6 +50,8 @@ pub mod net_echolink;
 pub mod net_geoalarm;
 #[cfg(feature = "runtime")]
 pub mod net_meshcom;
+#[cfg(feature = "recording")]
+pub mod net_recorder;
 #[cfg(feature = "runtime")]
 pub mod net_snom;
 #[cfg(feature = "runtime")]

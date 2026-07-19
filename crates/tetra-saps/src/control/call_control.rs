@@ -88,7 +88,10 @@ pub enum CallControl {
     FloorGranted {
         call_id: u16,
         source_issi: u32,
+        /// Destination SSI. For group calls this is the GSSI; for individual calls it is the peer ISSI.
         dest_gssi: u32,
+        /// True when `dest_gssi` represents a group address.
+        dest_is_group: bool,
         ts: u8,
     },
     /// Remote floor granted: a network/Brew speaker has been given transmission permission.

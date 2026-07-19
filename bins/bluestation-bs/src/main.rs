@@ -22,6 +22,13 @@ use tetra_entities::net_brew::entity::BrewEntity;
 use tetra_entities::net_brew::new_websocket_transport;
 use tetra_entities::net_dapnet::spawn_dapnet_worker;
 use tetra_entities::net_dashboard::DashboardServer;
+#[cfg(feature = "recording")]
+use tetra_entities::net_recorder::{RecorderEntity, RecorderHandle};
+
+#[cfg(feature = "recording")]
+type OptionalRecorderHandle = Option<RecorderHandle>;
+#[cfg(not(feature = "recording"))]
+type OptionalRecorderHandle = ();
 use tetra_entities::net_echolink::{EcholinkEntity, echolink_channel};
 use tetra_entities::net_geoalarm::{GeoAlarmSink, spawn_geoalarm_worker};
 use tetra_entities::net_meshcom::spawn_meshcom_worker;
@@ -215,8 +222,13 @@ fn build_bs_stack(
     Option<TelemetrySource>,
     HashMap<TetraEntity, CommandDispatcher>,
     Option<TelemetrySink>,
+    OptionalRecorderHandle,
 ) {
     let mut router = MessageRouter::new(cfg.clone());
+    #[cfg(feature = "recording")]
+    let mut recorder_handle: OptionalRecorderHandle = None;
+    #[cfg(not(feature = "recording"))]
+    let recorder_handle: OptionalRecorderHandle = ();
 
     // Build telemetry sink/source — always create if either telemetry or dashboard is enabled
     let has_control_room = cfg.config().control_room.as_ref().is_some_and(|c| c.enabled);
@@ -324,6 +336,27 @@ fn build_bs_stack(
     router.register_entity(Box::new(sndcp));
     router.register_entity(Box::new(cmce));
 
+    // Register the passive local call recorder. Initialization failures do not stop RF service;
+    // they are logged and exposed as unavailable in the dashboard.
+    #[cfg(feature = "recording")]
+    if cfg.config().recording.enabled {
+        match RecorderEntity::new(cfg.clone()) {
+            Ok((recorder, handle)) => {
+                router.register_entity(Box::new(recorder));
+                recorder_handle = Some(handle);
+                eprintln!(" -> Local WAV recording enabled ({})", cfg.config().recording.directory);
+            }
+            Err(err) => {
+                tracing::error!("Recorder disabled: {}", err);
+                eprintln!(" -> Local WAV recording unavailable: {}", err);
+            }
+        }
+    }
+    #[cfg(not(feature = "recording"))]
+    if cfg.config().recording.enabled {
+        eprintln!(" -> Local recording configured but not compiled in");
+    }
+
     // Drop all command links that were not given to a TetraEntity
     for (entity, dispatcher) in c_e.into_iter() {
         drop(dispatcher);
@@ -376,7 +409,7 @@ fn build_bs_stack(
     // Init network time
     router.set_dl_time(TdmaTime::default());
 
-    (router, tsource, c_d, tsink)
+    (router, tsource, c_d, tsink, recorder_handle)
 }
 
 #[derive(Parser, Debug)]
@@ -448,7 +481,8 @@ fn main() {
     }
 
     let (echolink_cmd_tx, echolink_cmd_rx) = echolink_channel();
-    let (mut router, tsource, cdispatchers, dapnet_telemetry_sink) = build_bs_stack(&mut cfg, &args.config, echolink_cmd_rx);
+    let (mut router, tsource, cdispatchers, dapnet_telemetry_sink, recorder_handle) =
+        build_bs_stack(&mut cfg, &args.config, echolink_cmd_rx);
     let dapnet_cmd_tx = cdispatchers.get(&TetraEntity::Cmce).map(|dispatcher| dispatcher.clone_sender());
     let mut dapnet_telegram_sink: Option<TelegramAlertSink> = None;
     let mut geoalarm_sink: Option<GeoAlarmSink> = None;
@@ -518,6 +552,10 @@ fn main() {
             // Propagate SharedConfig so the dashboard can read live SDS queue state.
             dashboard.set_shared_config(cfg.clone());
             dashboard.set_echolink_cmd_sender(echolink_cmd_tx.clone());
+            #[cfg(feature = "recording")]
+            if let Some(handle) = recorder_handle.clone() {
+                dashboard.set_recorder_handle(handle);
+            }
 
             // Create a control link so dashboard can send commands to CMCE
             let dash_cmd_tx = {
