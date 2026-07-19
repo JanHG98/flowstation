@@ -547,7 +547,7 @@ password = "DagurUranus2014#"
 
 # LOCAL TETRA SPEECH RECORDING (NetCore Phase 1)
 # Records locally received TETRA speech as 8-kHz mono PCM WAV plus a JSON sidecar.
-# Runtime recording can be paused/resumed from Dashboard -> AUFZEICHNUNGEN.
+# Runtime recording can be paused/resumed from INTEGRATIONEN -> AUDIO-ZENTRALE.
 [recording]
 enabled = true
 active = true
@@ -559,6 +559,35 @@ retention_days = 30              # 0 disables automatic cleanup
 max_recording_minutes = 120
 idle_finalize_secs = 15
 max_list_entries = 2000
+
+# Copy every finalized WAV + JSON sidecar to the already mounted NFS archive.
+# The destination root must already exist and be writable by the service user.
+archive_enabled = true
+archive_directory = "/mnt/nfs-share/Recordings"
+archive_retry_seconds = 60
+
+###############################################################################
+
+# WAV/MP3 AUDIO DISPATCH + SERVER BROWSER (NetCore Phase 3)
+# `directory` is the writable local media library. Additional OS-mounted shares
+# are exposed read-only through `[[audio_player.shares]]`. Files from a share are
+# copied into `cache_directory` and fully ACELP-encoded before a radio call starts.
+[audio_player]
+enabled = true
+directory = "/var/lib/netcore/audio"
+cache_directory = "/var/cache/netcore/audio"
+source_issi = 4010099
+default_priority = 5
+max_file_size_mb = 100
+max_duration_seconds = 1800
+tail_silence_blocks = 3
+individual_answer_timeout_seconds = 30
+ffmpeg_path = "ffmpeg"
+
+[[audio_player.shares]]
+id = "server"
+name = "NFS-Server"
+path = "/mnt/nfs-share"
 
 ###############################################################################
 

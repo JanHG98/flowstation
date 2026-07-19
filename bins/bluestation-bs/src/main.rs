@@ -25,10 +25,17 @@ use tetra_entities::net_dashboard::DashboardServer;
 #[cfg(feature = "recording")]
 use tetra_entities::net_recorder::{RecorderEntity, RecorderHandle};
 
+#[cfg(feature = "audio-player")]
+use tetra_entities::net_audio_player::{AudioPlayerEntity, AudioPlayerHandle};
+
 #[cfg(feature = "recording")]
 type OptionalRecorderHandle = Option<RecorderHandle>;
 #[cfg(not(feature = "recording"))]
 type OptionalRecorderHandle = ();
+#[cfg(feature = "audio-player")]
+type OptionalAudioPlayerHandle = Option<AudioPlayerHandle>;
+#[cfg(not(feature = "audio-player"))]
+type OptionalAudioPlayerHandle = ();
 use tetra_entities::net_echolink::{EcholinkEntity, echolink_channel};
 use tetra_entities::net_geoalarm::{GeoAlarmSink, spawn_geoalarm_worker};
 use tetra_entities::net_meshcom::spawn_meshcom_worker;
@@ -229,12 +236,17 @@ fn build_bs_stack(
     HashMap<TetraEntity, CommandDispatcher>,
     Option<TelemetrySink>,
     OptionalRecorderHandle,
+    OptionalAudioPlayerHandle,
 ) {
     let mut router = MessageRouter::new(cfg.clone());
     #[cfg(feature = "recording")]
     let mut recorder_handle: OptionalRecorderHandle = None;
     #[cfg(not(feature = "recording"))]
     let recorder_handle: OptionalRecorderHandle = ();
+    #[cfg(feature = "audio-player")]
+    let mut audio_player_handle: OptionalAudioPlayerHandle = None;
+    #[cfg(not(feature = "audio-player"))]
+    let audio_player_handle: OptionalAudioPlayerHandle = ();
 
     // Build telemetry sink/source — always create if either telemetry or dashboard is enabled
     let has_control_room = cfg.config().control_room.as_ref().is_some_and(|c| c.enabled);
@@ -351,6 +363,13 @@ fn build_bs_stack(
                 router.register_entity(Box::new(recorder));
                 recorder_handle = Some(handle);
                 eprintln!(" -> Local WAV recording enabled ({})", cfg.config().recording.directory);
+                if cfg.config().recording.archive_enabled {
+                    eprintln!(
+                        "    Recording archive: {} (retry every {}s)",
+                        cfg.config().recording.archive_directory,
+                        cfg.config().recording.archive_retry_seconds
+                    );
+                }
             }
             Err(err) => {
                 tracing::error!("Recorder disabled: {}", err);
@@ -361,6 +380,38 @@ fn build_bs_stack(
     #[cfg(not(feature = "recording"))]
     if cfg.config().recording.enabled {
         eprintln!(" -> Local recording configured but not compiled in");
+    }
+
+    // Register the local WAV/MP3 dispatcher. Audio is prepared off the RF core and
+    // only pre-encoded TETRA blocks are injected during TDMA playout.
+    #[cfg(feature = "audio-player")]
+    if cfg.config().audio_player.enabled {
+        match AudioPlayerEntity::new(cfg.clone()) {
+            Ok((player, handle)) => {
+                router.register_entity(Box::new(player));
+                eprintln!(
+                    " -> WAV/MP3 audio dispatch enabled (local: {}, cache: {}, shares: {})",
+                    cfg.config().audio_player.directory,
+                    handle.cache_root().display(),
+                    cfg.config().audio_player.shares.len()
+                );
+                if let Some(warning) = handle.startup_warning() {
+                    eprintln!("    Audio cache warning: {warning}");
+                }
+                for share in &cfg.config().audio_player.shares {
+                    eprintln!("    Media source '{}' [{}]: {}", share.name, share.id, share.path);
+                }
+                audio_player_handle = Some(handle);
+            }
+            Err(err) => {
+                tracing::error!("Audio player disabled: {}", err);
+                eprintln!(" -> Local audio dispatch unavailable: {}", err);
+            }
+        }
+    }
+    #[cfg(not(feature = "audio-player"))]
+    if cfg.config().audio_player.enabled {
+        eprintln!(" -> Local audio dispatch configured but not compiled in");
     }
 
     // Drop all command links that were not given to a TetraEntity
@@ -415,7 +466,7 @@ fn build_bs_stack(
     // Init network time
     router.set_dl_time(TdmaTime::default());
 
-    (router, tsource, c_d, tsink, recorder_handle)
+    (router, tsource, c_d, tsink, recorder_handle, audio_player_handle)
 }
 
 #[derive(Parser, Debug)]
@@ -487,7 +538,7 @@ fn main() {
     }
 
     let (echolink_cmd_tx, echolink_cmd_rx) = echolink_channel();
-    let (mut router, tsource, cdispatchers, dapnet_telemetry_sink, recorder_handle) =
+    let (mut router, tsource, cdispatchers, dapnet_telemetry_sink, recorder_handle, audio_player_handle) =
         build_bs_stack(&mut cfg, &args.config, echolink_cmd_rx);
     let dapnet_cmd_tx = cdispatchers.get(&TetraEntity::Cmce).map(|dispatcher| dispatcher.clone_sender());
     let mut dapnet_telegram_sink: Option<TelegramAlertSink> = None;
@@ -561,6 +612,10 @@ fn main() {
             #[cfg(feature = "recording")]
             if let Some(handle) = recorder_handle.clone() {
                 dashboard.set_recorder_handle(handle);
+            }
+            #[cfg(feature = "audio-player")]
+            if let Some(handle) = audio_player_handle.clone() {
+                dashboard.set_audio_player_handle(handle);
             }
 
             // Create a control link so dashboard can send commands to CMCE

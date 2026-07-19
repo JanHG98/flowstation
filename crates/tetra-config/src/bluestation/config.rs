@@ -4,7 +4,7 @@ use tetra_core::freqs::FreqInfo;
 
 use crate::bluestation::{
     CfgAsterisk, CfgCellInfo, CfgControl, CfgControlRoom, CfgDapnet, CfgEcholink, CfgEmergency, CfgGeoalarm, CfgHealth, CfgMeshcom, CfgNetInfo, CfgPhyIo,
-    CfgRecording, CfgRecovery, CfgSecurity, CfgSnomNotify, CfgTpg2200Action, CfgWxService, PhyBackend, StackState,
+    CfgAudioPlayer, CfgRecording, CfgRecovery, CfgSecurity, CfgSnomNotify, CfgTpg2200Action, CfgWxService, PhyBackend, StackState,
 };
 
 use super::sec_brew::CfgBrew;
@@ -104,6 +104,9 @@ pub struct StackConfig {
 
     /// Local TETRA speech recording configuration.
     pub recording: CfgRecording,
+
+    /// Local WAV/MP3 TETRA audio dispatch configuration.
+    pub audio_player: CfgAudioPlayer,
 
     /// Telemetry endpoint configuration
     pub telemetry: Option<CfgTelemetry>,

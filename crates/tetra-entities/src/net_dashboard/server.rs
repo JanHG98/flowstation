@@ -15,6 +15,8 @@ use crate::net_dashboard::state::{CallEntry, DashboardState, DashboardStateInner
 use crate::net_echolink::{EcholinkCmdSender, EcholinkCommand};
 #[cfg(feature = "recording")]
 use crate::net_recorder::RecorderHandle;
+#[cfg(feature = "audio-player")]
+use crate::net_audio_player::{AudioPlayerHandle, AudioTargetType};
 use crate::net_telemetry::TelemetryEvent;
 use crate::tpg2200::{build_sds_text_payload, build_tpg2200_callout_payload, format_hex_bytes, parse_hex_payload, tpg2200_incident_byte};
 use tetra_config::bluestation::CfgBrew;
@@ -26,6 +28,11 @@ type CmdSender = crossbeam_channel::Sender<ControlCommand>;
 type DashboardRecorderHandle = Option<RecorderHandle>;
 #[cfg(not(feature = "recording"))]
 type DashboardRecorderHandle = ();
+
+#[cfg(feature = "audio-player")]
+type DashboardAudioPlayerHandle = Option<AudioPlayerHandle>;
+#[cfg(not(feature = "audio-player"))]
+type DashboardAudioPlayerHandle = ();
 
 // Each WS connection registers a Sender here.
 // broadcast() sends to all of them; dead connections are pruned automatically.
@@ -577,6 +584,7 @@ pub struct DashboardServer {
     cmd_tx: Option<CmdSender>,
     echolink_cmd_tx: Option<EcholinkCmdSender>,
     recorder: DashboardRecorderHandle,
+    audio_player: DashboardAudioPlayerHandle,
     update_state: SharedUpdateState,
     /// Optional override for the OTA update source directory.
     /// If None, the update routine auto-detects.
@@ -603,6 +611,7 @@ impl DashboardServer {
             cmd_tx: None,
             echolink_cmd_tx: None,
             recorder: Default::default(),
+            audio_player: Default::default(),
             update_state: Arc::new(Mutex::new(UpdateState::new())),
             source_dir_override: None,
             auth: None,
@@ -623,6 +632,11 @@ impl DashboardServer {
     #[cfg(feature = "recording")]
     pub fn set_recorder_handle(&mut self, handle: RecorderHandle) {
         self.recorder = Some(handle);
+    }
+
+    #[cfg(feature = "audio-player")]
+    pub fn set_audio_player_handle(&mut self, handle: AudioPlayerHandle) {
+        self.audio_player = Some(handle);
     }
 
     /// Provide the SharedConfig so the dashboard can read live SDS queue state.
@@ -662,6 +676,7 @@ impl DashboardServer {
         let cmd_tx: Arc<Mutex<Option<CmdSender>>> = Arc::new(Mutex::new(self.cmd_tx.take()));
         let echolink_cmd_tx: Arc<Mutex<Option<EcholinkCmdSender>>> = Arc::new(Mutex::new(self.echolink_cmd_tx.take()));
         let recorder = self.recorder.clone();
+        let audio_player = self.audio_player.clone();
         let update_state = Arc::clone(&self.update_state);
         let source_dir_override = self.source_dir_override.clone();
         let auth = self.auth.clone();
@@ -704,6 +719,7 @@ impl DashboardServer {
                     let cmd_tx = Arc::clone(&cmd_tx);
                     let echolink_cmd_tx = Arc::clone(&echolink_cmd_tx);
                     let recorder = recorder.clone();
+                    let audio_player = audio_player.clone();
                     let update_state = Arc::clone(&update_state);
                     let source_dir_override = source_dir_override.clone();
                     let auth = auth.clone();
@@ -720,6 +736,7 @@ impl DashboardServer {
                                 cmd_tx,
                                 echolink_cmd_tx,
                                 recorder,
+                                audio_player,
                                 update_state,
                                 source_dir_override,
                                 auth,
@@ -2039,6 +2056,296 @@ fn serve_recording_audio(mut stream: TcpStream, path: &std::path::Path, id: &str
     }
 }
 
+#[cfg(feature = "audio-player")]
+fn audio_preview_header_value<'a>(headers: &'a str, name: &str) -> Option<&'a str> {
+    headers.lines().skip(1).find_map(|line| {
+        let (key, value) = line.split_once(':')?;
+        key.trim().eq_ignore_ascii_case(name).then(|| value.trim())
+    })
+}
+
+#[cfg(feature = "audio-player")]
+fn audio_preview_range(headers: &str, length: u64) -> Result<Option<(u64, u64)>, String> {
+    let Some(value) = audio_preview_header_value(headers, "Range") else {
+        return Ok(None);
+    };
+    let Some(spec) = value.strip_prefix("bytes=") else {
+        return Err("unsupported range unit".to_string());
+    };
+    if spec.contains(',') {
+        return Err("multiple byte ranges are not supported".to_string());
+    }
+    if length == 0 {
+        return Err("empty file has no satisfiable byte range".to_string());
+    }
+    let (start_raw, end_raw) = spec
+        .split_once('-')
+        .ok_or_else(|| "invalid byte range".to_string())?;
+    if start_raw.is_empty() {
+        let suffix = end_raw.parse::<u64>().map_err(|_| "invalid suffix byte range".to_string())?;
+        if suffix == 0 {
+            return Err("invalid zero-length suffix byte range".to_string());
+        }
+        let start = length.saturating_sub(suffix);
+        return Ok(Some((start, length - 1)));
+    }
+    let start = start_raw.parse::<u64>().map_err(|_| "invalid byte-range start".to_string())?;
+    if start >= length {
+        return Err("byte-range start is beyond end of file".to_string());
+    }
+    let end = if end_raw.is_empty() {
+        length - 1
+    } else {
+        end_raw
+            .parse::<u64>()
+            .map_err(|_| "invalid byte-range end".to_string())?
+            .min(length - 1)
+    };
+    if end < start {
+        return Err("byte-range end precedes start".to_string());
+    }
+    Ok(Some((start, end)))
+}
+
+#[cfg(feature = "audio-player")]
+fn serve_audio_preview(
+    mut stream: TcpStream,
+    path: &std::path::Path,
+    request_headers: &str,
+    head_only: bool,
+) {
+    use std::io::{Seek, SeekFrom};
+    let mut file = match std::fs::File::open(path) {
+        Ok(file) => file,
+        Err(error) => {
+            http_json_response(stream, 404, &serde_json::json!({"error": error.to_string()}).to_string());
+            return;
+        }
+    };
+    let length = match file.metadata() {
+        Ok(metadata) => metadata.len(),
+        Err(error) => {
+            http_json_response(stream, 500, &serde_json::json!({"error": error.to_string()}).to_string());
+            return;
+        }
+    };
+    let content_type = match path.extension().and_then(|ext| ext.to_str()).map(str::to_ascii_lowercase).as_deref() {
+        Some("mp3") => "audio/mpeg",
+        Some("wav") => "audio/wav",
+        _ => "application/octet-stream",
+    };
+    let filename = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("preview-audio")
+        .chars()
+        .map(|ch| if ch.is_ascii_alphanumeric() || matches!(ch, '.' | '-' | '_') { ch } else { '_' })
+        .collect::<String>();
+
+    let range = match audio_preview_range(request_headers, length) {
+        Ok(range) => range,
+        Err(error) => {
+            let body = serde_json::json!({"error": error}).to_string();
+            let response = format!(
+                "HTTP/1.1 416 Range Not Satisfiable\r\nContent-Type: application/json\r\nContent-Range: bytes */{length}\r\nContent-Length: {}\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n{}",
+                body.len(),
+                body
+            );
+            let _ = stream.write_all(response.as_bytes());
+            let _ = stream.flush();
+            return;
+        }
+    };
+
+    let (status, start, end) = match range {
+        Some((start, end)) => ("206 Partial Content", start, end),
+        None if length > 0 => ("200 OK", 0, length - 1),
+        None => ("200 OK", 0, 0),
+    };
+    let content_length = if length == 0 { 0 } else { end - start + 1 };
+    let content_range = range.map(|_| format!("Content-Range: bytes {start}-{end}/{length}\r\n")).unwrap_or_default();
+    let header = format!(
+        "HTTP/1.1 {status}\r\nContent-Type: {content_type}\r\nContent-Length: {content_length}\r\n{content_range}Accept-Ranges: bytes\r\nContent-Disposition: inline; filename=\"{filename}\"\r\nCache-Control: private, no-store\r\nX-Content-Type-Options: nosniff\r\nConnection: close\r\n\r\n"
+    );
+    if stream.write_all(header.as_bytes()).is_err() || head_only || content_length == 0 {
+        let _ = stream.flush();
+        return;
+    }
+    if file.seek(SeekFrom::Start(start)).is_err() {
+        return;
+    }
+    let mut limited = file.take(content_length);
+    let _ = std::io::copy(&mut limited, &mut stream);
+    let _ = stream.flush();
+}
+
+#[cfg(feature = "audio-player")]
+fn serve_audio_player_request(
+    mut stream: TcpStream,
+    req_line: &str,
+    request_headers: &str,
+    audio_player: &DashboardAudioPlayerHandle,
+    recorder: &DashboardRecorderHandle,
+) {
+    let route = request_route(req_line).trim_end_matches('/');
+    let method = req_line.split_whitespace().next().unwrap_or("");
+    let Some(handle) = audio_player.as_ref() else {
+        drain_http_headers(&mut stream);
+        http_json_response(
+            stream,
+            503,
+            &serde_json::json!({"available":false,"error":"audio-player service unavailable"}).to_string(),
+        );
+        return;
+    };
+
+    if method == "GET" && route == "/api/audio/status" {
+        drain_http_headers(&mut stream);
+        let body = serde_json::to_string(&handle.status()).unwrap_or_else(|_| "{}".to_string());
+        http_json_response(stream, 200, &body);
+        return;
+    }
+
+    if method == "GET" && route == "/api/audio/sources" {
+        drain_http_headers(&mut stream);
+        let body = serde_json::json!({"sources": handle.media_sources()}).to_string();
+        http_json_response(stream, 200, &body);
+        return;
+    }
+
+    if method == "GET" && route == "/api/audio/browse" {
+        let path = request_path(req_line).unwrap_or("/api/audio/browse");
+        let params = query_params(path);
+        let source_id = params.get("source").map(String::as_str).unwrap_or("local");
+        let relative = params.get("path").map(String::as_str).unwrap_or("");
+        drain_http_headers(&mut stream);
+        match handle.list_media(source_id, relative) {
+            Ok(entries) => {
+                let body = serde_json::json!({"source": source_id, "path": relative, "entries": entries}).to_string();
+                http_json_response(stream, 200, &body);
+            }
+            Err(error) => http_json_response(stream, 400, &serde_json::json!({"error":error}).to_string()),
+        }
+        return;
+    }
+
+    if matches!(method, "GET" | "HEAD") && route == "/api/audio/preview" {
+        let path = request_path(req_line).unwrap_or("/api/audio/preview");
+        let params = query_params(path);
+        let source_id = params.get("source").map(String::as_str).unwrap_or("local");
+        let Some(relative) = params.get("path").map(String::as_str) else {
+            drain_http_headers(&mut stream);
+            http_json_response(stream, 400, &serde_json::json!({"error":"preview requires path"}).to_string());
+            return;
+        };
+        drain_http_headers(&mut stream);
+        match handle.preview_media_path(source_id, relative) {
+            Ok(path) => serve_audio_preview(stream, &path, request_headers, method == "HEAD"),
+            Err(error) => http_json_response(stream, 400, &serde_json::json!({"error":error}).to_string()),
+        }
+        return;
+    }
+
+    if method == "POST" && route == "/api/audio/stop" {
+        drain_http_headers(&mut stream);
+        match handle.stop() {
+            Ok(()) => http_json_response(stream, 200, &serde_json::json!({"ok":true}).to_string()),
+            Err(error) => http_json_response(stream, 503, &serde_json::json!({"ok":false,"error":error}).to_string()),
+        }
+        return;
+    }
+
+    if method == "POST" && route == "/api/audio/play" {
+        let body = read_http_body(&mut stream);
+        let request: serde_json::Value = match serde_json::from_slice(&body) {
+            Ok(value) => value,
+            Err(error) => {
+                http_json_response(stream, 400, &serde_json::json!({"ok":false,"error":format!("invalid JSON: {error}")}).to_string());
+                return;
+            }
+        };
+        let target_type = match request.get("target_type").and_then(|value| value.as_str()) {
+            Some("group") => AudioTargetType::Group,
+            Some("individual") => AudioTargetType::Individual,
+            _ => {
+                http_json_response(stream, 400, &serde_json::json!({"ok":false,"error":"target_type must be group or individual"}).to_string());
+                return;
+            }
+        };
+        let Some(target_id) = request.get("target_id").and_then(|value| value.as_u64()).and_then(|value| u32::try_from(value).ok()) else {
+            http_json_response(stream, 400, &serde_json::json!({"ok":false,"error":"target_id must be an integer"}).to_string());
+            return;
+        };
+        let priority = request.get("priority").and_then(|value| value.as_u64()).and_then(|value| u8::try_from(value).ok());
+        let source_type = request.get("source_type").and_then(|value| value.as_str()).unwrap_or("media");
+        let result = match source_type {
+            "media" => {
+                let Some(path) = request.get("path").and_then(|value| value.as_str()) else {
+                    http_json_response(stream, 400, &serde_json::json!({"ok":false,"error":"media source requires path"}).to_string());
+                    return;
+                };
+                let source_id = request.get("source_id").and_then(|value| value.as_str()).unwrap_or("local");
+                handle.play_media(source_id, path, target_type, target_id, priority)
+            }
+            "recording" => {
+                let Some(id) = request.get("recording_id").and_then(|value| value.as_str()) else {
+                    http_json_response(stream, 400, &serde_json::json!({"ok":false,"error":"recording source requires recording_id"}).to_string());
+                    return;
+                };
+                #[cfg(feature = "recording")]
+                {
+                    let Some(recorder) = recorder.as_ref() else {
+                        http_json_response(stream, 503, &serde_json::json!({"ok":false,"error":"recording service unavailable"}).to_string());
+                        return;
+                    };
+                    let path = match recorder.audio_path(id) {
+                        Ok(path) => path,
+                        Err(error) => {
+                            http_json_response(stream, 404, &serde_json::json!({"ok":false,"error":error}).to_string());
+                            return;
+                        }
+                    };
+                    let display_name = recorder
+                        .find_recording(id)
+                        .map(|item| format!("Aufzeichnung {} · Call {}", item.started_at, item.call_id))
+                        .unwrap_or_else(|| format!("Aufzeichnung {id}"));
+                    handle.play_recording(path, display_name, target_type, target_id, priority)
+                }
+                #[cfg(not(feature = "recording"))]
+                {
+                    let _ = recorder;
+                    Err("recording support not compiled in".to_string())
+                }
+            }
+            _ => Err("source_type must be media or recording".to_string()),
+        };
+        match result {
+            Ok(job_id) => http_json_response(stream, 202, &serde_json::json!({"ok":true,"job_id":job_id}).to_string()),
+            Err(error) => http_json_response(stream, 409, &serde_json::json!({"ok":false,"error":error}).to_string()),
+        }
+        return;
+    }
+
+    drain_http_headers(&mut stream);
+    http_response(stream, 404, "not found");
+}
+
+#[cfg(not(feature = "audio-player"))]
+fn serve_audio_player_request(
+    mut stream: TcpStream,
+    _req_line: &str,
+    _request_headers: &str,
+    _audio_player: &DashboardAudioPlayerHandle,
+    _recorder: &DashboardRecorderHandle,
+) {
+    drain_http_headers(&mut stream);
+    http_json_response(
+        stream,
+        503,
+        &serde_json::json!({"available":false,"error":"audio-player support not compiled in"}).to_string(),
+    );
+}
+
 fn handle_connection(
     mut stream: TcpStream,
     state: DashboardState,
@@ -2047,6 +2354,7 @@ fn handle_connection(
     cmd_tx: Arc<Mutex<Option<CmdSender>>>,
     echolink_cmd_tx: Arc<Mutex<Option<EcholinkCmdSender>>>,
     recorder: DashboardRecorderHandle,
+    audio_player: DashboardAudioPlayerHandle,
     update_state: SharedUpdateState,
     source_dir_override: Option<String>,
     auth: Option<(String, String)>,
@@ -2229,6 +2537,8 @@ fn handle_connection(
         handle_ws(stream, state, clients, cmd_tx, update_state, auth);
     } else if request_route(&req_line).starts_with("/api/recordings") {
         serve_recording_request(stream, &req_line, &recorder);
+    } else if request_route(&req_line).starts_with("/api/audio") {
+        serve_audio_player_request(stream, &req_line, &header_str, &audio_player, &recorder);
     } else if req_line.contains("GET /api/system/brightness") {
         // Backlight status probe (FH-FEAT-008) — lets the UI hide the slider on a panel-less host.
         drain_http_headers(&mut stream);

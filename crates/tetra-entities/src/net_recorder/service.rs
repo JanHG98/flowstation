@@ -4,26 +4,35 @@ use std::io;
 use std::os::unix::ffi::OsStrExt;
 use std::path::{Component, Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc::{SyncSender, sync_channel};
 use std::sync::{Arc, Mutex};
 
 use tetra_config::bluestation::{CfgRecording, RecordingMode};
 
+use super::archive::{recording_is_archived, spawn_archive_worker};
 use super::types::{RecorderStatus, RecordingMetadata};
 use super::wav::recover_part;
 
 #[derive(Default)]
-struct LiveStatus {
+pub(super) struct LiveStatus {
     active_sessions: usize,
     active_call_ids: Vec<u16>,
     last_recording_id: Option<String>,
     last_error: Option<String>,
+    pub(super) archive_available: bool,
+    pub(super) archive_active: bool,
+    pub(super) archive_pending: usize,
+    pub(super) archive_completed: usize,
+    pub(super) archive_last_success_at: Option<String>,
+    pub(super) archive_last_error: Option<String>,
 }
 
-struct RecorderShared {
-    config: CfgRecording,
-    root: PathBuf,
+pub(super) struct RecorderShared {
+    pub(super) config: CfgRecording,
+    pub(super) root: PathBuf,
     active: AtomicBool,
     live: Mutex<LiveStatus>,
+    archive_tx: Option<SyncSender<()>>,
 }
 
 #[derive(Clone)]
@@ -35,17 +44,27 @@ impl RecorderHandle {
     pub(crate) fn new(config: CfgRecording) -> io::Result<Self> {
         let root = PathBuf::from(&config.directory);
         fs::create_dir_all(&root)?;
+        let (archive_tx, archive_rx) = if config.archive_enabled {
+            let (tx, rx) = sync_channel(1);
+            (Some(tx), Some(rx))
+        } else {
+            (None, None)
+        };
         let handle = Self {
             inner: Arc::new(RecorderShared {
                 active: AtomicBool::new(config.active),
                 config,
                 root,
                 live: Mutex::new(LiveStatus::default()),
+                archive_tx,
             }),
         };
         handle.recover_partials();
         handle.recover_metadata_partials();
         handle.cleanup_retention();
+        if let Some(rx) = archive_rx {
+            spawn_archive_worker(&handle.inner, rx);
+        }
         Ok(handle)
     }
 
@@ -80,6 +99,9 @@ impl RecorderHandle {
             live.last_recording_id = Some(id);
             live.last_error = None;
         }
+        if let Some(tx) = &self.inner.archive_tx {
+            let _ = tx.try_send(());
+        }
     }
 
     pub(crate) fn note_error(&self, error: impl Into<String>) {
@@ -107,7 +129,18 @@ impl RecorderHandle {
 
     pub fn status(&self) -> RecorderStatus {
         let recordings = self.scan_recordings();
-        let (active_sessions, active_call_ids, last_recording_id, last_error) = self
+        let (
+            active_sessions,
+            active_call_ids,
+            last_recording_id,
+            last_error,
+            archive_available,
+            archive_active,
+            archive_pending,
+            archive_completed,
+            archive_last_success_at,
+            archive_last_error,
+        ) = self
             .inner
             .live
             .lock()
@@ -117,6 +150,12 @@ impl RecorderHandle {
                     live.active_call_ids.clone(),
                     live.last_recording_id.clone(),
                     live.last_error.clone(),
+                    live.archive_available,
+                    live.archive_active,
+                    live.archive_pending,
+                    live.archive_completed,
+                    live.archive_last_success_at.clone(),
+                    live.archive_last_error.clone(),
                 )
             })
             .unwrap_or_default();
@@ -138,6 +177,14 @@ impl RecorderHandle {
             active_call_ids,
             last_recording_id,
             last_error,
+            archive_enabled: self.inner.config.archive_enabled,
+            archive_directory: self.inner.config.archive_directory.clone(),
+            archive_available,
+            archive_active,
+            archive_pending,
+            archive_completed,
+            archive_last_success_at,
+            archive_last_error,
         }
     }
 
@@ -147,7 +194,7 @@ impl RecorderHandle {
         metadata
     }
 
-    fn scan_recordings(&self) -> Vec<RecordingMetadata> {
+    pub(super) fn scan_recordings(&self) -> Vec<RecordingMetadata> {
         let mut metadata = Vec::new();
         let mut files = Vec::new();
         collect_files_with_suffix(&self.inner.root, ".json", &mut files);
@@ -190,6 +237,7 @@ impl RecorderHandle {
         let metadata = self.find_recording(id).ok_or_else(|| "recording not found".to_string())?;
         let audio = self.audio_path(id)?;
         let json = audio.with_extension("json");
+        let archived = audio.with_extension("archived");
         if audio.exists() {
             fs::remove_file(&audio).map_err(|e| format!("failed to delete {}: {e}", audio.display()))?;
         }
@@ -209,6 +257,9 @@ impl RecorderHandle {
                     break;
                 }
             }
+        }
+        if archived.exists() {
+            fs::remove_file(&archived).map_err(|e| format!("failed to delete {}: {e}", archived.display()))?;
         }
         Ok(())
     }
@@ -294,6 +345,13 @@ impl RecorderHandle {
             let Ok(audio) = self.audio_path(&item.id) else { continue };
             let modified = audio.metadata().and_then(|m| m.modified()).unwrap_or(std::time::SystemTime::now());
             if modified < cutoff {
+                if self.inner.config.archive_enabled && !recording_is_archived(&self.inner, &item) {
+                    tracing::warn!(
+                        "Recorder: retention kept unarchived recording id={} because archive copy is not confirmed",
+                        item.id
+                    );
+                    continue;
+                }
                 if let Err(e) = self.delete_recording(&item.id) {
                     self.note_error(format!("retention cleanup failed for {}: {e}", item.id));
                 }
@@ -302,11 +360,37 @@ impl RecorderHandle {
     }
 }
 
+
+impl RecorderShared {
+    pub(super) fn update_archive_status(&self, update: impl FnOnce(&mut LiveStatus)) {
+        if let Ok(mut live) = self.live.lock() {
+            update(&mut live);
+        }
+    }
+
+    pub(super) fn scan_recordings(&self) -> Vec<RecordingMetadata> {
+        let mut metadata = Vec::new();
+        let mut files = Vec::new();
+        collect_files_with_suffix(&self.root, ".json", &mut files);
+        for path in files {
+            match fs::read_to_string(&path)
+                .ok()
+                .and_then(|body| serde_json::from_str::<RecordingMetadata>(&body).ok())
+            {
+                Some(item) => metadata.push(item),
+                None => tracing::warn!("Recorder: ignoring invalid metadata {}", path.display()),
+            }
+        }
+        metadata.sort_by(|a, b| b.started_at.cmp(&a.started_at));
+        metadata
+    }
+}
+
 fn valid_id(id: &str) -> bool {
     id.len() == 36 && id.chars().all(|c| c.is_ascii_hexdigit() || c == '-')
 }
 
-fn safe_relative_path(path: &str) -> Result<PathBuf, String> {
+pub(super) fn safe_relative_path(path: &str) -> Result<PathBuf, String> {
     let path = Path::new(path);
     if path.is_absolute() {
         return Err("absolute recording path rejected".to_string());

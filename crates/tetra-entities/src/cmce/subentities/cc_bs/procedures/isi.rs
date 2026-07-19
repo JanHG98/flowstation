@@ -778,7 +778,9 @@ impl CcBsSubentity {
         // per-entity inbound predicate which — unlike is_brew_gssi_routable — must NOT
         // apply the outbound whitelist. A GSSI that is not admissible is dropped
         // gracefully instead of crashing the base station.
-        if !brew::is_brew_inbound_allowed_for_entity(&self.config, network_entity, dest_gssi) {
+        if network_entity != TetraEntity::AudioPlayer
+            && !brew::is_brew_inbound_allowed_for_entity(&self.config, network_entity, dest_gssi)
+        {
             tracing::info!(
                 "CMCE: ignoring network call start uuid={} gssi={} (inbound not allowed)",
                 brew_uuid,
