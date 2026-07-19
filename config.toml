@@ -568,7 +568,7 @@ max_list_entries = 2000
 # copied into `cache_directory` and fully ACELP-encoded before a radio call starts.
 [audio_player]
 enabled = true
-directory = "/var/lib/netcore/audio"
+directory = "/var/lib/netcore/tx-playback"
 cache_directory = "/var/cache/netcore/audio"
 source_issi = 4010099
 default_priority = 5
