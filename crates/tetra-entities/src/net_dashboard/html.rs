@@ -2271,19 +2271,32 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
 .maps-source-msg{display:block;margin-top:5px;color:var(--text3);font-size:12px;}
 @media(max-width:1100px){.maps-layout{grid-template-columns:1fr}.maps-stage{min-height:430px}.maps-list{max-height:360px;}}
 
-/* Local audio file context menu (desktop right click; touch keeps explicit buttons). */
+/* Audio actions: desktop uses explicit buttons + right click; touch/small screens use ⋮. */
 .audio-context-menu{
-  position:fixed;z-index:10000;display:none;min-width:210px;padding:6px;
+  position:fixed;z-index:10000;display:none;visibility:hidden;
+  min-width:210px;max-width:calc(100vw - 16px);padding:6px;
   background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r-ctrl);
-  box-shadow:var(--elev-1);
+  box-shadow:var(--elev-1);overscroll-behavior:contain;
 }
 .audio-context-menu button{
   width:100%;display:block;text-align:left;border:0;border-radius:6px;
   padding:9px 10px;background:transparent;color:var(--text);cursor:pointer;font:inherit;
 }
-.audio-context-menu button:hover{background:var(--bg3);color:var(--accent);}
+.audio-context-menu button:hover,.audio-context-menu button:focus-visible{background:var(--bg3);color:var(--accent);outline:none;}
 .audio-context-row{cursor:context-menu;}
 .audio-context-row:hover td{background:color-mix(in srgb,var(--accent) 6%,transparent);}
+.audio-row-actions{display:flex;align-items:center;justify-content:flex-end;gap:6px;white-space:nowrap;}
+.audio-desktop-actions{display:inline-flex;align-items:center;gap:6px;}
+.audio-more-btn{
+  display:none;align-items:center;justify-content:center;width:36px;min-width:36px;height:32px;
+  padding:0;font-size:22px;line-height:1;letter-spacing:0;touch-action:manipulation;
+}
+@media (max-width:760px), (hover:none) and (pointer:coarse){
+  .audio-desktop-actions{display:none;}
+  .audio-more-btn{display:inline-flex;}
+  .audio-context-row{cursor:default;}
+  .audio-context-row:hover td{background:transparent;}
+}
 </style>
 </head>
 <body>
@@ -10140,7 +10153,14 @@ function audioJsArg(value){return escAttr(JSON.stringify(String(value)));}
 function renderAudioEntries(){
   const tb=document.getElementById('audio-tbody');if(!audioEntries.length){tb.innerHTML='<tr><td colspan="4" class="sds-empty">Keine WAV-/MP3-Dateien vorhanden.</td></tr>';return;}
   const sourceArg=audioJsArg(audioCurrentSource);
-  tb.innerHTML=audioEntries.map(e=>{const pathArg=audioJsArg(e.path),nameArg=audioJsArg(e.name);const rowCtx=e.entry_type==='file'?' class="audio-context-row" oncontextmenu="return openAudioContext(event,\'media\','+pathArg+','+nameArg+','+sourceArg+')"':'';return '<tr'+rowCtx+'><td>'+escHtml(e.name)+'</td><td>'+escHtml(e.entry_type==='directory'?'Ordner':String(e.extension||'').toUpperCase())+'</td><td>'+escHtml(e.size_bytes==null?'—':recFmtBytes(e.size_bytes))+'</td><td>'+(e.entry_type==='directory'?'<button class="btn btn-sm" onclick="browseAudio('+pathArg+')">Öffnen</button>':'<button class="btn btn-sm" onclick="previewAudioFile('+pathArg+','+nameArg+','+sourceArg+')">▶ Vorschau</button> <button class="btn btn-sm btn-primary" onclick="openAudioSend(\'media\','+pathArg+','+nameArg+','+sourceArg+')">Senden an…</button>')+'</td></tr>';}).join('');
+  tb.innerHTML=audioEntries.map(e=>{
+    const pathArg=audioJsArg(e.path),nameArg=audioJsArg(e.name);
+    const rowCtx=e.entry_type==='file'?' class="audio-context-row" oncontextmenu="return openAudioContext(event,\'media\','+pathArg+','+nameArg+','+sourceArg+')"':'';
+    const actions=e.entry_type==='directory'
+      ? '<div class="audio-row-actions"><button class="btn btn-sm" onclick="browseAudio('+pathArg+')">Öffnen</button></div>'
+      : '<div class="audio-row-actions"><span class="audio-desktop-actions"><button class="btn btn-sm" onclick="previewAudioFile('+pathArg+','+nameArg+','+sourceArg+')">▶ Vorschau</button><button class="btn btn-sm btn-primary" onclick="openAudioSend(\'media\','+pathArg+','+nameArg+','+sourceArg+')">Senden an…</button></span><button type="button" class="btn btn-sm audio-more-btn" aria-label="Weitere Aktionen" aria-haspopup="menu" onclick="return openAudioContextFromButton(event,\'media\','+pathArg+','+nameArg+','+sourceArg+')">⋮</button></div>';
+    return '<tr'+rowCtx+'><td>'+escHtml(e.name)+'</td><td>'+escHtml(e.entry_type==='directory'?'Ordner':String(e.extension||'').toUpperCase())+'</td><td>'+escHtml(e.size_bytes==null?'—':recFmtBytes(e.size_bytes))+'</td><td>'+actions+'</td></tr>';
+  }).join('');
 }
 function previewAudioFile(path,label,sourceId){
   const sourceKey=sourceId||audioCurrentSource||'local',source=audioSources.find(item=>item.id===sourceKey);
@@ -10163,11 +10183,46 @@ async function loadAudioPage(force){
   try{await loadAudioSources();await browseAudio(audioCurrentPath);}catch(e){document.getElementById('audio-tbody').innerHTML='<tr><td colspan="4" class="sds-empty">'+escHtml(e)+'</td></tr>';}
   refreshAudioTargetOptions();
 }
-function hideAudioContext(){const menu=document.getElementById('audio-context-menu');if(menu)menu.style.display='none';}
-function openAudioContext(event,type,id,label,sourceId){event.preventDefault();audioPendingSource={type,id,label,sourceId:sourceId||null};const menu=document.getElementById('audio-context-menu');if(!menu)return false;menu.style.display='block';const pad=8,w=menu.offsetWidth||220,h=menu.offsetHeight||90;menu.style.left=Math.max(pad,Math.min(event.clientX,window.innerWidth-w-pad))+'px';menu.style.top=Math.max(pad,Math.min(event.clientY,window.innerHeight-h-pad))+'px';return false;}
+function hideAudioContext(){const menu=document.getElementById('audio-context-menu');if(menu){menu.style.display='none';menu.style.visibility='hidden';}}
+function prepareAudioContext(type,id,label,sourceId){
+  audioPendingSource={type,id,label,sourceId:sourceId||null};
+  const menu=document.getElementById('audio-context-menu');if(!menu)return null;
+  /* .page.active has an entry transform animation. A fixed child would therefore be positioned
+     relative to that transformed page instead of the viewport. Move the popover to <body>. */
+  if(menu.parentElement!==document.body)document.body.appendChild(menu);
+  menu.style.left='0px';menu.style.top='0px';menu.style.visibility='hidden';menu.style.display='block';
+  return menu;
+}
+function placeAudioContext(menu,x,y,anchor){
+  const pad=8,gap=6,rect=menu.getBoundingClientRect(),w=Math.ceil(rect.width||220),h=Math.ceil(rect.height||120);
+  let left=x,top=y;
+  if(anchor){
+    left=anchor.right-w;
+    top=anchor.bottom+gap;
+    if(top+h>window.innerHeight-pad)top=anchor.top-h-gap;
+  }
+  left=Math.max(pad,Math.min(left,window.innerWidth-w-pad));
+  top=Math.max(pad,Math.min(top,window.innerHeight-h-pad));
+  menu.style.left=Math.round(left)+'px';menu.style.top=Math.round(top)+'px';menu.style.visibility='visible';
+}
+function openAudioContext(event,type,id,label,sourceId){
+  event.preventDefault();event.stopPropagation();
+  const menu=prepareAudioContext(type,id,label,sourceId);if(!menu)return false;
+  placeAudioContext(menu,event.clientX,event.clientY,null);return false;
+}
+function openAudioContextFromButton(event,type,id,label,sourceId){
+  event.preventDefault();event.stopPropagation();
+  const menu=prepareAudioContext(type,id,label,sourceId);if(!menu)return false;
+  const anchor=event.currentTarget.getBoundingClientRect();placeAudioContext(menu,anchor.right,anchor.bottom,anchor);
+  const first=menu.querySelector('button');if(first)first.focus({preventScroll:true});
+  return false;
+}
 function audioContextSend(targetType){const source=audioPendingSource;if(!source)return;hideAudioContext();openAudioSend(source.type,source.id,source.label,source.sourceId);const target=document.getElementById('audio-target-type');target.value=targetType;refreshAudioTargetOptions();}
 document.addEventListener('click',event=>{const menu=document.getElementById('audio-context-menu');if(menu&&menu.style.display!=='none'&&!menu.contains(event.target))hideAudioContext();});
+document.addEventListener('keydown',event=>{if(event.key==='Escape')hideAudioContext();});
 window.addEventListener('blur',hideAudioContext);
+window.addEventListener('resize',hideAudioContext,{passive:true});
+document.getElementById('content')?.addEventListener('scroll',hideAudioContext,{passive:true});
 function openAudioSend(type,id,label,sourceId){audioPendingSource={type,id,label,sourceId:sourceId||null};const page=document.getElementById('page-audio');if(page&&!page.classList.contains('active'))showPage('audio',document.getElementById('nav-audio'));const source=sourceId?audioSources.find(item=>item.id===sourceId):null;document.getElementById('audio-send-source').textContent=label+(source?' · '+source.name:'');document.getElementById('audio-send-card').style.display='block';refreshAudioTargetOptions();document.getElementById('audio-send-card').scrollIntoView({behavior:'smooth',block:'nearest'});}
 function closeAudioSend(){audioPendingSource=null;document.getElementById('audio-send-card').style.display='none';}
 function refreshAudioTargetOptions(){const type=document.getElementById('audio-target-type').value,map=type==='group'?audioGroups:audioDevices,sel=document.getElementById('audio-target-select');const rows=Object.entries(map||{}).map(([id,v])=>[id,typeof v==='string'?v:(v?.name||v?.label||v?.callsign||'')]);rows.sort((a,b)=>(a[1]||a[0]).localeCompare(b[1]||b[0]));sel.innerHTML='<option value="">Bitte wählen…</option>'+rows.map(([id,name])=>'<option value="'+escAttr(id)+'">'+escHtml((name?name+' · ':'')+(type==='group'?'GSSI ':'ISSI ')+id)+'</option>').join('');}
