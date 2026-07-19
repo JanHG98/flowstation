@@ -1426,6 +1426,7 @@ impl TetraEntityTrait for BrewEntity {
                 source_issi,
                 dest_gssi,
                 ts,
+                ..
             }) => {
                 self.handle_local_call_start(call_id, source_issi, dest_gssi, ts);
             }

@@ -545,6 +545,23 @@ password = "DagurUranus2014#"
 
 ###############################################################################
 
+# LOCAL TETRA SPEECH RECORDING (NetCore Phase 1)
+# Records locally received TETRA speech as 8-kHz mono PCM WAV plus a JSON sidecar.
+# Runtime recording can be paused/resumed from Dashboard -> AUFZEICHNUNGEN.
+[recording]
+enabled = true
+active = true
+directory = "/var/lib/netcore/recordings"
+mode = "all"                    # all | selected_groups
+selected_groups = []             # used only with mode = "selected_groups"
+minimum_free_space_mb = 2048
+retention_days = 30              # 0 disables automatic cleanup
+max_recording_minutes = 120
+idle_finalize_secs = 15
+max_list_entries = 2000
+
+###############################################################################
+
 [netcore_directory]
 # Local/LAN NetCore Directory Server for device, base-station, group and status labels.
 # Set base_url to the LXC/host running NetCore Directory.
@@ -590,9 +607,14 @@ node_id = "SRV-M_TBS-01"
 station_name = "SRV-M_TBS-01"
 site = "Main"
 
-# Optional HTTP Basic Auth:
-# username = "tbs-04010001"
-# password = "change-me"
+# REQUIRED when the Control Room runs with [auth] enabled:
+# Use exactly the same node token as NETCORE_CONTROL_ROOM_NODE_TOKEN on the
+# Control Room host. The token is sent as Basic auth user "node".
+# token = "replace-with-the-control-room-node-token"
+#
+# Alternative explicit HTTP Basic Auth:
+# username = "node"
+# password = "replace-with-the-control-room-node-token"
 
 # Optional self-signed TLS root certificate; requires use_tls = true:
 # ca_cert = "/etc/netcore/control-room-ca.der"

@@ -169,18 +169,6 @@ impl AuthState {
         })
     }
 
-    pub fn disabled() -> Self {
-        Self {
-            enabled: false,
-            allow_health_unauthenticated: true,
-            node_token: None,
-            bootstrap_username: None,
-            bootstrap_password: None,
-            bootstrap_role: AuthRole::Admin,
-            persistence: None,
-        }
-    }
-
     pub fn enabled(&self) -> bool {
         self.enabled
     }
@@ -373,10 +361,6 @@ pub struct StoredUserRecord {
     pub enabled: bool,
     pub password_salt: String,
     pub password_hash: String,
-    pub created_at: String,
-    pub updated_at: String,
-    pub last_login_at: Option<String>,
-    pub created_by: Option<String>,
 }
 
 pub fn password_hash(salt: &str, password: &str) -> String {

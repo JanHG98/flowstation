@@ -19,6 +19,88 @@ use super::{NetworkAddress, NetworkError, NetworkMessage, NetworkTransport};
 
 const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 const DEFAULT_READ_TIMEOUT: Duration = Duration::from_secs(10);
+const CONTROL_ROOM_MARKER_HEADER: &str = "x-netcore-control-room";
+const CONTROL_ROOM_MARKER_VALUE: &str = "1";
+const CONTROL_ROOM_READY_TIMEOUT: Duration = Duration::from_secs(2);
+const CONTROL_ROOM_READY_PROBE: &[u8] = b"netcore-control-room-ready-v1";
+
+fn websocket_connect_error(error: tungstenite::Error) -> NetworkError {
+    match error {
+        tungstenite::Error::Http(response) => {
+            let status = response.status();
+            let detail = response
+                .body()
+                .as_ref()
+                .and_then(|body| std::str::from_utf8(body).ok())
+                .map(str::trim)
+                .filter(|body| !body.is_empty())
+                .map(|body| format!(": {}", body))
+                .unwrap_or_default();
+            NetworkError::ConnectionFailed(format!("WebSocket handshake rejected with HTTP {}{}", status, detail))
+        }
+        other => NetworkError::ConnectionFailed(format!("WebSocket connect failed: {}", other)),
+    }
+}
+
+fn configure_websocket_stream(ws: &WebSocket<MaybeTlsStream<TcpStream>>, read_timeout: Duration) {
+    match ws.get_ref() {
+        MaybeTlsStream::Plain(stream) => {
+            let _ = stream.set_read_timeout(Some(read_timeout));
+            let _ = stream.set_nodelay(true);
+        }
+        MaybeTlsStream::Rustls(tls_stream) => {
+            let tcp = tls_stream.get_ref();
+            let _ = tcp.set_read_timeout(Some(read_timeout));
+            let _ = tcp.set_nodelay(true);
+        }
+        _ => {}
+    }
+}
+
+fn verify_control_room_ready(ws: &mut WebSocket<MaybeTlsStream<TcpStream>>) -> Result<(), NetworkError> {
+    configure_websocket_stream(ws, Duration::from_millis(100));
+
+    ws.send(Message::Ping(CONTROL_ROOM_READY_PROBE.to_vec().into()))
+        .map_err(|error| NetworkError::ConnectionFailed(format!(
+            "Control Room closed immediately after WebSocket upgrade (readiness ping failed: {})",
+            error
+        )))?;
+
+    let deadline = Instant::now() + CONTROL_ROOM_READY_TIMEOUT;
+    loop {
+        match ws.read() {
+            Ok(Message::Pong(payload)) if payload.as_slice() == CONTROL_ROOM_READY_PROBE => return Ok(()),
+            Ok(Message::Ping(payload)) => {
+                ws.send(Message::Pong(payload)).map_err(|error| {
+                    NetworkError::ConnectionFailed(format!("Control Room readiness pong failed: {}", error))
+                })?;
+            }
+            Ok(Message::Close(frame)) => {
+                return Err(NetworkError::ConnectionFailed(format!(
+                    "Control Room closed during readiness probe: {:?}",
+                    frame
+                )));
+            }
+            Ok(_) => {}
+            Err(tungstenite::Error::Io(ref error))
+                if error.kind() == std::io::ErrorKind::WouldBlock
+                    || error.kind() == std::io::ErrorKind::TimedOut => {}
+            Err(error) => {
+                return Err(NetworkError::ConnectionFailed(format!(
+                    "Control Room readiness probe failed: {}",
+                    error
+                )));
+            }
+        }
+
+        if Instant::now() >= deadline {
+            return Err(NetworkError::ConnectionFailed(format!(
+                "Control Room readiness probe timed out after {:?}",
+                CONTROL_ROOM_READY_TIMEOUT
+            )));
+        }
+    }
+}
 
 // ─── Configuration ────────────────────────────────────────────────
 
@@ -518,48 +600,93 @@ impl NetworkTransport for WebSocketTransport {
             None
         };
 
-        let (ws, response) = tungstenite::client_tls_with_config(request, tcp, None, connector)
-            .map_err(|e| NetworkError::ConnectionFailed(format!("WebSocket connect failed: {}", e)))?;
+        let (mut ws, response) = tungstenite::client_tls_with_config(request, tcp, None, connector).map_err(|error| match error {
+            tungstenite::HandshakeError::Failure(error) => websocket_connect_error(error),
+            tungstenite::HandshakeError::Interrupted(_) => {
+                NetworkError::ConnectionFailed("WebSocket handshake interrupted (WouldBlock)".to_string())
+            }
+        })?;
 
-        // Brew version source. Preferred: an authoritative version the server advertises in the
-        // 101 upgrade response (we offer "X-Brew-Version: 1", which a conformant server may echo).
-        // If the server sends no such header — the TetraPack server is not known to — this stays
-        // None and the version is learned lazily from message content (a v1 group call carries a
-        // mnemonic; see worker.rs). We log the header (or its absence) so a single deploy's logs
-        // answer whether the server is a usable, deterministic version source.
-        // Monotonic: never downgrade a version already confirmed this run (e.g. across a reconnect).
-        let handshake_version: Option<u8> = response
+        let negotiated_subprotocol = response
             .headers()
-            .get("x-brew-version")
-            .and_then(|v| v.to_str().ok())
-            .and_then(|s| s.trim().parse::<u8>().ok());
-        self.server_brew_version = self.server_brew_version.max(handshake_version.unwrap_or(0));
-        match handshake_version {
-            Some(v) => tracing::info!(
-                "WebSocketTransport: connected, server advertised Brew v{v} in handshake (now v{})",
-                self.server_brew_version
-            ),
-            None => tracing::info!(
-                "WebSocketTransport: connected, no X-Brew-Version in handshake → version detected lazily from message content (currently v{})",
-                self.server_brew_version
-            ),
+            .get("sec-websocket-protocol")
+            .and_then(|value| value.to_str().ok())
+            .map(str::trim)
+            .filter(|value| !value.is_empty());
+
+        let is_control_room = self
+            .config
+            .subprotocol
+            .as_deref()
+            .is_some_and(|expected| expected.starts_with("netcore-control-room-"));
+
+        if let Some(expected) = self.config.subprotocol.as_deref() {
+            // Control Room is our own strict protocol endpoint. Requiring the echoed
+            // subprotocol prevents a reverse proxy or wrong path from masquerading as it.
+            if is_control_room && negotiated_subprotocol != Some(expected) {
+                return Err(NetworkError::InvalidServiceVersion(format!(
+                    "WebSocket server did not negotiate required subprotocol '{}' (received {:?})",
+                    expected, negotiated_subprotocol
+                )));
+            }
+        }
+
+        if is_control_room {
+            let marker = response
+                .headers()
+                .get(CONTROL_ROOM_MARKER_HEADER)
+                .and_then(|value| value.to_str().ok())
+                .map(str::trim);
+            if marker != Some(CONTROL_ROOM_MARKER_VALUE) {
+                return Err(NetworkError::InvalidServiceVersion(format!(
+                    "Control Room endpoint did not advertise {}={} (received {:?}); deploy/restart the matching netcore-control-room binary",
+                    CONTROL_ROOM_MARKER_HEADER,
+                    CONTROL_ROOM_MARKER_VALUE,
+                    marker
+                )));
+            }
+
+            // A HTTP 101 alone is not enough: older Control Room builds accepted an
+            // unauthorized upgrade and closed immediately afterwards. Confirm that the
+            // upgraded handler is alive before the worker sends its Hello frame.
+            verify_control_room_ready(&mut ws)?;
+        }
+
+        if self.config.subprotocol.as_deref() == Some("brew") {
+            // Brew version source. Preferred: an authoritative version the server advertises in
+            // the 101 upgrade response. Monotonic: never downgrade a version already confirmed
+            // this run (e.g. across a reconnect).
+            let handshake_version: Option<u8> = response
+                .headers()
+                .get("x-brew-version")
+                .and_then(|v| v.to_str().ok())
+                .and_then(|s| s.trim().parse::<u8>().ok());
+            self.server_brew_version = self.server_brew_version.max(handshake_version.unwrap_or(0));
+            match handshake_version {
+                Some(v) => tracing::info!(
+                    "WebSocketTransport: connected, server advertised Brew v{v} in handshake (now v{})",
+                    self.server_brew_version
+                ),
+                None => tracing::info!(
+                    "WebSocketTransport: connected, no X-Brew-Version in handshake → version detected lazily from message content (currently v{})",
+                    self.server_brew_version
+                ),
+            }
+        } else {
+            tracing::info!(
+                "WebSocketTransport: connected to {}://{}:{}{} (subprotocol={})",
+                scheme,
+                self.config.host,
+                self.config.port,
+                endpoint,
+                negotiated_subprotocol.unwrap_or("none")
+            );
         }
 
         tracing::debug!("WebSocketTransport: WebSocket connected");
 
-        // Set non-blocking for polling and TCP_NODELAY as recommended
-        match ws.get_ref() {
-            MaybeTlsStream::Plain(stream) => {
-                let _ = stream.set_read_timeout(Some(Duration::from_millis(10)));
-                let _ = stream.set_nodelay(true);
-            }
-            MaybeTlsStream::Rustls(tls_stream) => {
-                let tcp = tls_stream.get_ref();
-                let _ = tcp.set_read_timeout(Some(Duration::from_millis(10)));
-                let _ = tcp.set_nodelay(true);
-            }
-            _ => {}
-        }
+        // Short timeout for the regular polling loop; TCP_NODELAY is set by the helper.
+        configure_websocket_stream(&ws, Duration::from_millis(10));
 
         let now = Instant::now();
         self.ws = Some(ws);

@@ -481,9 +481,25 @@ impl CcBsSubentity {
                     call_id,
                     source_issi: call.calling_addr.ssi,
                     dest_gssi: call.called_addr.ssi,
+                    dest_is_group: false,
                     ts: call.calling_ts,
                 },
                 true,
+                BrewNotification::Never,
+            );
+        } else if activated {
+            // The network peer occupies the opposite side; only the local calling RF bearer is
+            // visible to this base station's recorder.
+            self.notify_floor_granted(
+                queue,
+                GroupFloorGrant {
+                    call_id,
+                    source_issi: call.calling_addr.ssi,
+                    dest_gssi: call.called_addr.ssi,
+                    dest_is_group: false,
+                    ts: call.calling_ts,
+                },
+                false,
                 BrewNotification::Never,
             );
         }
@@ -700,6 +716,7 @@ impl CcBsSubentity {
                             call_id,
                             source_issi: call.called_addr.ssi,
                             dest_gssi: call.calling_addr.ssi,
+                            dest_is_group: false,
                             ts: call.called_ts,
                         },
                         true,
@@ -718,6 +735,21 @@ impl CcBsSubentity {
                     }
                 }
             }
+        } else if activated {
+            // The network peer occupies the opposite side; only the local called RF bearer is
+            // visible to this base station's recorder.
+            self.notify_floor_granted(
+                queue,
+                GroupFloorGrant {
+                    call_id,
+                    source_issi: call.called_addr.ssi,
+                    dest_gssi: call.calling_addr.ssi,
+                    dest_is_group: false,
+                    ts: call.called_ts,
+                },
+                false,
+                BrewNotification::Never,
+            );
         }
 
         queue.push_back(SapMsg {

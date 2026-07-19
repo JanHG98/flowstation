@@ -100,14 +100,12 @@ impl<T: NetworkTransport> ControlRoomWorker<T> {
 
             if !self.transport.is_connected() && self.connected {
                 tracing::warn!("ControlRoom transport disconnected");
+                self.transport.disconnect();
                 self.connected = false;
             }
 
-            if !self.connected {
-                let should_retry = self.last_connect_attempt.map(|last| last.elapsed() >= RECONNECT_DELAY).unwrap_or(true);
-                if should_retry {
-                    self.try_connect();
-                }
+            if !self.connected && self.reconnect_due() {
+                self.try_connect();
             }
         }
 
@@ -115,31 +113,40 @@ impl<T: NetworkTransport> ControlRoomWorker<T> {
         tracing::info!("ControlRoom worker exiting");
     }
 
+    fn reconnect_due(&self) -> bool {
+        self.last_connect_attempt
+            .map(|last| last.elapsed() >= RECONNECT_DELAY)
+            .unwrap_or(true)
+    }
+
     fn try_connect(&mut self) {
         self.last_connect_attempt = Some(Instant::now());
+        self.transport.disconnect();
         match self.transport.connect() {
             Ok(()) => {
                 tracing::info!("ControlRoom transport connected");
                 self.connected = true;
                 self.last_heartbeat_at = Instant::now() - CONTROL_ROOM_HEARTBEAT_INTERVAL;
-                self.send_hello();
-                self.send_periodic_heartbeat();
+                if self.send_hello() {
+                    self.send_periodic_heartbeat();
+                }
             }
             Err(e) => {
                 tracing::warn!("ControlRoom transport connection failed: {}, will retry in {:?}", e, RECONNECT_DELAY);
+                self.transport.disconnect();
                 self.connected = false;
             }
         }
     }
 
-    fn send_hello(&mut self) {
+    fn send_hello(&mut self) -> bool {
         let hello = ControlRoomNodeHello {
             protocol_version: CONTROL_ROOM_PROTOCOL_VERSION.to_string(),
             node: self.identity.clone(),
             capabilities: self.capabilities.clone(),
             started_at: self.started_at.clone(),
         };
-        self.send_uplink(&NodeToControlRoomMessage::Hello { hello });
+        self.send_uplink(&NodeToControlRoomMessage::Hello { hello })
     }
 
     fn send_periodic_heartbeat(&mut self) {
@@ -153,8 +160,9 @@ impl<T: NetworkTransport> ControlRoomWorker<T> {
             timestamp: now_iso(),
             connected: true,
         };
-        self.send_uplink(&NodeToControlRoomMessage::Heartbeat { heartbeat });
-        self.last_heartbeat_at = Instant::now();
+        if self.send_uplink(&NodeToControlRoomMessage::Heartbeat { heartbeat }) {
+            self.last_heartbeat_at = Instant::now();
+        }
     }
 
     fn forward_telemetry(&mut self, event: TelemetryEvent) {
@@ -180,6 +188,9 @@ impl<T: NetworkTransport> ControlRoomWorker<T> {
                         tracing::info!("ControlRoom hello accepted: {}", message.unwrap_or_else(|| "ok".to_string()));
                     } else {
                         tracing::warn!("ControlRoom hello rejected: {}", message.unwrap_or_else(|| "no reason".to_string()));
+                        self.transport.disconnect();
+                        self.connected = false;
+                        break;
                     }
                 }
                 Ok(ControlRoomToNodeMessage::Ping { seq, .. }) => {
@@ -272,22 +283,38 @@ impl<T: NetworkTransport> ControlRoomWorker<T> {
     }
 
     fn ensure_connected(&mut self) -> bool {
-        if self.connected {
+        if self.connected && self.transport.is_connected() {
             return true;
         }
+
+        if self.connected {
+            tracing::warn!("ControlRoom transport no longer connected");
+            self.transport.disconnect();
+            self.connected = false;
+        }
+
+        if !self.reconnect_due() {
+            return false;
+        }
+
         self.try_connect();
         self.connected
     }
 
-    fn send_uplink(&mut self, message: &NodeToControlRoomMessage) {
+    fn send_uplink(&mut self, message: &NodeToControlRoomMessage) -> bool {
         if !self.connected {
-            return;
+            return false;
         }
         let codec = ControlRoomCodecJson;
         let payload = codec.encode_uplink(message);
-        if let Err(e) = self.transport.send_reliable(&payload) {
-            tracing::warn!("ControlRoom transport send failed: {}, will reconnect", e);
-            self.connected = false;
+        match self.transport.send_reliable(&payload) {
+            Ok(()) => true,
+            Err(e) => {
+                tracing::warn!("ControlRoom transport send failed: {}, will retry in {:?}", e, RECONNECT_DELAY);
+                self.transport.disconnect();
+                self.connected = false;
+                false
+            }
         }
     }
 }

@@ -267,7 +267,7 @@ impl PersistenceHandle {
     pub fn find_user_by_username(&self, username: &str) -> rusqlite::Result<Option<StoredUserRecord>> {
         let inner = self.inner.lock().expect("persistence mutex poisoned");
         let mut stmt = inner.conn.prepare(
-            "SELECT id, username, display_name, role, enabled, password_salt, password_hash, created_at, updated_at, last_login_at, created_by \
+            "SELECT id, username, display_name, role, enabled, password_salt, password_hash \
              FROM auth_users WHERE lower(username) = lower(?1) LIMIT 1",
         )?;
         let mut rows = stmt.query(params![username])?;
@@ -655,10 +655,6 @@ fn row_to_stored_user(row: &rusqlite::Row<'_>) -> rusqlite::Result<StoredUserRec
         enabled: enabled != 0,
         password_salt: row.get(5)?,
         password_hash: row.get(6)?,
-        created_at: row.get(7)?,
-        updated_at: row.get(8)?,
-        last_login_at: row.get(9)?,
-        created_by: row.get(10)?,
     })
 }
 

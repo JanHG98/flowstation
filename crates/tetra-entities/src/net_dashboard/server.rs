@@ -13,12 +13,19 @@ use crate::net_control::commands::ControlCommand;
 use crate::net_dashboard::html::DASHBOARD_HTML;
 use crate::net_dashboard::state::{CallEntry, DashboardState, DashboardStateInner, MeshcomMessageLogEntry, MeshcomNodeLogEntry, MsEntry};
 use crate::net_echolink::{EcholinkCmdSender, EcholinkCommand};
+#[cfg(feature = "recording")]
+use crate::net_recorder::RecorderHandle;
 use crate::net_telemetry::TelemetryEvent;
 use crate::tpg2200::{build_sds_text_payload, build_tpg2200_callout_payload, format_hex_bytes, parse_hex_payload, tpg2200_incident_byte};
 use tetra_config::bluestation::CfgBrew;
 use tetra_core::tetra_entities::TetraEntity;
 
 type CmdSender = crossbeam_channel::Sender<ControlCommand>;
+
+#[cfg(feature = "recording")]
+type DashboardRecorderHandle = Option<RecorderHandle>;
+#[cfg(not(feature = "recording"))]
+type DashboardRecorderHandle = ();
 
 // Each WS connection registers a Sender here.
 // broadcast() sends to all of them; dead connections are pruned automatically.
@@ -569,6 +576,7 @@ pub struct DashboardServer {
     shared_config: Option<tetra_config::bluestation::SharedConfig>,
     cmd_tx: Option<CmdSender>,
     echolink_cmd_tx: Option<EcholinkCmdSender>,
+    recorder: DashboardRecorderHandle,
     update_state: SharedUpdateState,
     /// Optional override for the OTA update source directory.
     /// If None, the update routine auto-detects.
@@ -594,6 +602,7 @@ impl DashboardServer {
             shared_config: None,
             cmd_tx: None,
             echolink_cmd_tx: None,
+            recorder: Default::default(),
             update_state: Arc::new(Mutex::new(UpdateState::new())),
             source_dir_override: None,
             auth: None,
@@ -609,6 +618,11 @@ impl DashboardServer {
 
     pub fn set_echolink_cmd_sender(&mut self, tx: EcholinkCmdSender) {
         self.echolink_cmd_tx = Some(tx);
+    }
+
+    #[cfg(feature = "recording")]
+    pub fn set_recorder_handle(&mut self, handle: RecorderHandle) {
+        self.recorder = Some(handle);
     }
 
     /// Provide the SharedConfig so the dashboard can read live SDS queue state.
@@ -647,6 +661,7 @@ impl DashboardServer {
         let config_path = self.config_path.clone();
         let cmd_tx: Arc<Mutex<Option<CmdSender>>> = Arc::new(Mutex::new(self.cmd_tx.take()));
         let echolink_cmd_tx: Arc<Mutex<Option<EcholinkCmdSender>>> = Arc::new(Mutex::new(self.echolink_cmd_tx.take()));
+        let recorder = self.recorder.clone();
         let update_state = Arc::clone(&self.update_state);
         let source_dir_override = self.source_dir_override.clone();
         let auth = self.auth.clone();
@@ -688,6 +703,7 @@ impl DashboardServer {
                     let config_path = config_path.clone();
                     let cmd_tx = Arc::clone(&cmd_tx);
                     let echolink_cmd_tx = Arc::clone(&echolink_cmd_tx);
+                    let recorder = recorder.clone();
                     let update_state = Arc::clone(&update_state);
                     let source_dir_override = source_dir_override.clone();
                     let auth = auth.clone();
@@ -703,6 +719,7 @@ impl DashboardServer {
                                 config_path,
                                 cmd_tx,
                                 echolink_cmd_tx,
+                                recorder,
                                 update_state,
                                 source_dir_override,
                                 auth,
@@ -1896,6 +1913,132 @@ fn serve_tpg2200_action_url(
     );
 }
 
+
+#[cfg(feature = "recording")]
+fn serve_recording_request(mut stream: TcpStream, req_line: &str, recorder: &DashboardRecorderHandle) {
+    let route = request_route(req_line).trim_end_matches('/');
+    let method = req_line.split_whitespace().next().unwrap_or("");
+    let Some(handle) = recorder.as_ref() else {
+        drain_http_headers(&mut stream);
+        http_json_response(
+            stream,
+            503,
+            &serde_json::json!({"available":false,"error":"recording service unavailable"}).to_string(),
+        );
+        return;
+    };
+
+    if method == "GET" && route == "/api/recordings/status" {
+        drain_http_headers(&mut stream);
+        let body = serde_json::to_string(&handle.status()).unwrap_or_else(|_| "{}".to_string());
+        http_json_response(stream, 200, &body);
+        return;
+    }
+
+    if method == "GET" && route == "/api/recordings" {
+        drain_http_headers(&mut stream);
+        let body = serde_json::to_string(&handle.list_recordings(None)).unwrap_or_else(|_| "[]".to_string());
+        http_json_response(stream, 200, &body);
+        return;
+    }
+
+    if method == "POST" && route == "/api/recordings/state" {
+        let body = read_http_body(&mut stream);
+        let active = serde_json::from_slice::<serde_json::Value>(&body)
+            .ok()
+            .and_then(|value| value.get("active").and_then(|value| value.as_bool()));
+        let Some(active) = active else {
+            http_json_response(stream, 400, &serde_json::json!({"ok":false,"error":"body must contain boolean active"}).to_string());
+            return;
+        };
+        handle.set_active(active);
+        tracing::info!("Dashboard: local recording {}", if active { "enabled" } else { "disabled" });
+        http_json_response(stream, 200, &serde_json::json!({"ok":true,"active":active}).to_string());
+        return;
+    }
+
+    let Some(rest) = route.strip_prefix("/api/recordings/") else {
+        drain_http_headers(&mut stream);
+        http_response(stream, 404, "not found");
+        return;
+    };
+    let mut parts = rest.split('/');
+    let id = parts.next().unwrap_or("");
+    let action = parts.next();
+    if parts.next().is_some() {
+        drain_http_headers(&mut stream);
+        http_response(stream, 404, "not found");
+        return;
+    }
+
+    match (method, action) {
+        ("GET", Some("audio")) => {
+            drain_http_headers(&mut stream);
+            match handle.audio_path(id) {
+                Ok(path) => serve_recording_audio(stream, &path, id),
+                Err(error) => http_json_response(stream, 404, &serde_json::json!({"error":error}).to_string()),
+            }
+        }
+        ("GET", Some("metadata")) | ("GET", None) => {
+            drain_http_headers(&mut stream);
+            match handle.find_recording(id) {
+                Some(item) => {
+                    let body = serde_json::to_string(&item).unwrap_or_else(|_| "{}".to_string());
+                    http_json_response(stream, 200, &body);
+                }
+                None => http_json_response(stream, 404, &serde_json::json!({"error":"recording not found"}).to_string()),
+            }
+        }
+        ("DELETE", None) => {
+            drain_http_headers(&mut stream);
+            match handle.delete_recording(id) {
+                Ok(()) => http_json_response(stream, 200, &serde_json::json!({"ok":true}).to_string()),
+                Err(error) => http_json_response(stream, 404, &serde_json::json!({"ok":false,"error":error}).to_string()),
+            }
+        }
+        _ => {
+            drain_http_headers(&mut stream);
+            http_response(stream, 404, "not found");
+        }
+    }
+}
+
+#[cfg(not(feature = "recording"))]
+fn serve_recording_request(mut stream: TcpStream, _req_line: &str, _recorder: &DashboardRecorderHandle) {
+    drain_http_headers(&mut stream);
+    http_json_response(
+        stream,
+        503,
+        &serde_json::json!({"available":false,"error":"recording support not compiled in"}).to_string(),
+    );
+}
+
+#[cfg(feature = "recording")]
+fn serve_recording_audio(mut stream: TcpStream, path: &std::path::Path, id: &str) {
+    let mut file = match std::fs::File::open(path) {
+        Ok(file) => file,
+        Err(error) => {
+            http_json_response(stream, 404, &serde_json::json!({"error":error.to_string()}).to_string());
+            return;
+        }
+    };
+    let length = match file.metadata() {
+        Ok(metadata) => metadata.len(),
+        Err(error) => {
+            http_json_response(stream, 500, &serde_json::json!({"error":error.to_string()}).to_string());
+            return;
+        }
+    };
+    let filename = format!("recording-{id}.wav");
+    let header = format!(
+        "HTTP/1.1 200 OK\r\nContent-Type: audio/wav\r\nContent-Length: {length}\r\nContent-Disposition: inline; filename=\"{filename}\"\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n"
+    );
+    if stream.write_all(header.as_bytes()).is_ok() {
+        let _ = std::io::copy(&mut file, &mut stream);
+        let _ = stream.flush();
+    }
+}
+
 fn handle_connection(
     mut stream: TcpStream,
     state: DashboardState,
@@ -1903,6 +2046,7 @@ fn handle_connection(
     config_path: String,
     cmd_tx: Arc<Mutex<Option<CmdSender>>>,
     echolink_cmd_tx: Arc<Mutex<Option<EcholinkCmdSender>>>,
+    recorder: DashboardRecorderHandle,
     update_state: SharedUpdateState,
     source_dir_override: Option<String>,
     auth: Option<(String, String)>,
@@ -2083,6 +2227,8 @@ fn handle_connection(
 
     if req_line.contains("/ws") {
         handle_ws(stream, state, clients, cmd_tx, update_state, auth);
+    } else if request_route(&req_line).starts_with("/api/recordings") {
+        serve_recording_request(stream, &req_line, &recorder);
     } else if req_line.contains("GET /api/system/brightness") {
         // Backlight status probe (FH-FEAT-008) — lets the UI hide the slider on a panel-less host.
         drain_http_headers(&mut stream);

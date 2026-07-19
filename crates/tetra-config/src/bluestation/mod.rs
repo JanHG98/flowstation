@@ -43,6 +43,9 @@ pub use sec_snom_notify::*;
 pub mod sec_dashboard;
 pub use sec_dashboard::*;
 
+pub mod sec_recording;
+pub use sec_recording::*;
+
 pub mod sec_telemetry;
 pub use sec_telemetry::*;
 

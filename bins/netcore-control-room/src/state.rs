@@ -25,10 +25,6 @@ pub struct SharedControlRoom {
 }
 
 impl SharedControlRoom {
-    pub fn new(history_limit: usize) -> Self {
-        Self::new_with_persistence(history_limit, None)
-    }
-
     pub fn new_with_persistence(history_limit: usize, persistence: Option<PersistenceHandle>) -> Self {
         Self {
             inner: Arc::new(Mutex::new(ControlRoomState::new(history_limit, persistence))),
@@ -39,10 +35,6 @@ impl SharedControlRoom {
 
     pub fn snapshot(&self) -> ControlRoomSnapshot {
         self.inner.lock().expect("control room state poisoned").snapshot()
-    }
-
-    pub fn recent_events(&self, limit: usize) -> Vec<EventLogEntry> {
-        self.inner.lock().expect("control room state poisoned").recent_events(limit)
     }
 
     pub fn recent_events_filtered(&self, limit: usize, event_type: Option<&str>, quiet: bool) -> Vec<EventLogEntry> {
@@ -115,14 +107,6 @@ impl SharedControlRoom {
             .lock()
             .expect("control room state poisoned")
             .node_detail(node_id)
-    }
-
-    pub fn node_summary(&self, node_id: &str) -> Option<NodeOverview> {
-        self.inner.lock().expect("control room state poisoned").node_summary(node_id)
-    }
-
-    pub fn node_exists(&self, node_id: &str) -> bool {
-        self.inner.lock().expect("control room state poisoned").nodes.contains_key(node_id)
     }
 
     pub fn handle_node_message(&self, message: NodeToControlRoomMessage) -> Option<String> {
@@ -1273,10 +1257,6 @@ impl ControlRoomState {
         }
     }
 
-    fn recent_events(&self, limit: usize) -> Vec<EventLogEntry> {
-        self.recent_events.iter().rev().take(limit).cloned().collect()
-    }
-
     fn recent_events_filtered(&self, limit: usize, event_type: Option<&str>, quiet: bool) -> Vec<EventLogEntry> {
         self.recent_events
             .iter()
@@ -1490,10 +1470,6 @@ impl ControlRoomState {
         let mut nodes: Vec<&NodeState> = self.nodes.values().collect();
         nodes.sort_by(|a, b| a.node_id.cmp(&b.node_id));
         Some(nodes)
-    }
-
-    fn node_summary(&self, node_id: &str) -> Option<NodeOverview> {
-        self.nodes.get(node_id).map(NodeState::overview)
     }
 
     fn apply_node_message(&mut self, message: &NodeToControlRoomMessage) -> Option<String> {

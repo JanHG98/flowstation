@@ -20,6 +20,7 @@ use super::sec_geoalarm::{CfgGeoalarmDto, apply_geoalarm_patch};
 use super::sec_health::{CfgHealthDto, apply_health_patch};
 use super::sec_meshcom::{CfgMeshcomDto, apply_meshcom_patch};
 use super::sec_recovery::{CfgRecoveryDto, apply_recovery_patch};
+use super::sec_recording::{CfgRecordingDto, apply_recording_patch};
 use super::sec_security::{CfgSecurityDto, apply_security_patch};
 use super::sec_snom_notify::{CfgSnomNotifyDto, apply_snom_notify_patch};
 use super::sec_telegram::{CfgTelegramDto, apply_telegram_patch};
@@ -184,6 +185,13 @@ pub fn from_toml_str(toml_str: &str) -> Result<StackConfig, Box<dyn std::error::
         return Err(format!("Unrecognized fields in snom_notify config: {:?}", sorted_keys(&snom.extra)).into());
     }
 
+    // Optional recording section
+    if let Some(ref recording) = root.recording
+        && !recording.extra.is_empty()
+    {
+        return Err(format!("Unrecognized fields in recording config: {:?}", sorted_keys(&recording.extra)).into());
+    }
+
     // Optional telemetry section
     if let Some(ref telemetry) = root.telemetry
         && !telemetry.extra.is_empty()
@@ -272,6 +280,7 @@ pub fn from_toml_str(toml_str: &str) -> Result<StackConfig, Box<dyn std::error::
         tpg2200_action: apply_tpg2200_action_patch(root.tpg2200_action.unwrap_or_default())?,
         snom_notify: apply_snom_notify_patch(root.snom_notify.unwrap_or_default())?,
         dashboard: None,
+        recording: apply_recording_patch(root.recording.unwrap_or_default())?,
         telemetry: None,
         control: None,
         control_room: None,
@@ -359,6 +368,7 @@ struct TomlConfigRoot {
     tpg2200_action: Option<CfgTpg2200ActionDto>,
     snom_notify: Option<CfgSnomNotifyDto>,
     dashboard: Option<CfgDashboardDto>,
+    recording: Option<CfgRecordingDto>,
     telemetry: Option<CfgTelemetryDto>,
     command: Option<CfgControlDto>,
     control_room: Option<CfgControlRoomDto>,

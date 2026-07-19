@@ -545,6 +545,23 @@ password = "DagurUranus2014#"
 
 ###############################################################################
 
+# LOCAL TETRA SPEECH RECORDING (NetCore Phase 1)
+# Records locally received TETRA speech as 8-kHz mono PCM WAV plus a JSON sidecar.
+# Runtime recording can be paused/resumed from Dashboard -> AUFZEICHNUNGEN.
+[recording]
+enabled = true
+active = true
+directory = "/var/lib/netcore/recordings"
+mode = "all"                    # all | selected_groups
+selected_groups = []             # used only with mode = "selected_groups"
+minimum_free_space_mb = 2048
+retention_days = 30              # 0 disables automatic cleanup
+max_recording_minutes = 120
+idle_finalize_secs = 15
+max_list_entries = 2000
+
+###############################################################################
+
 [netcore_directory]
 # Local/LAN NetCore Directory Server for device, base-station, group and status labels.
 # Set base_url to the LXC/host running NetCore Directory.

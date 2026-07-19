@@ -108,6 +108,8 @@ fn route_http(request: HttpRequest, state: SharedControlRoom, node_path: &str, u
         ("GET", "/health") => HttpResponse::json(200, &json!({
             "ok": true,
             "service": "netcore-control-room",
+            "build_fix": V5_14_2_NO_RESOLVED_LEN_MARKER,
+            "control_room_ws": "marker-ping-v1",
             "timestamp": now_iso(),
         })),
         ("POST", "/api/login") => api_login(&request.body, auth),

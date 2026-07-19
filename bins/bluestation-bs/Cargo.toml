@@ -12,8 +12,9 @@ path = "src/main.rs"
 # Compile the Asterisk SIP/RTP bridge (and link the native TETRA codec) into the
 # Flow35 device binary. Enabled by default so `cargo build --release` preserves
 # the existing Asterisk integration; use `--no-default-features` to omit it.
-default = ["asterisk"]
+default = ["asterisk", "recording"]
 asterisk = ["tetra-entities/asterisk"]
+recording = ["tetra-entities/recording"]
 
 [dependencies]
 tetra-core = { workspace = true }

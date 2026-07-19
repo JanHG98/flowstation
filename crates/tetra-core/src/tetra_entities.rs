@@ -35,4 +35,7 @@ pub enum TetraEntity {
 
     /// Secondary Brew protocol bridge.
     Brew2,
+
+    /// Local TETRA speech recorder
+    Recorder,
 }

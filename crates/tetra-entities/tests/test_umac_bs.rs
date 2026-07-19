@@ -73,6 +73,7 @@ fn test_floor_grant_starts_ul_inactivity_timer() {
             call_id: 1,
             source_issi: 1000001,
             dest_gssi: 1000002,
+            dest_is_group: false,
             ts: 2,
         }),
     });
@@ -159,6 +160,7 @@ fn test_ul_mac_u_signal_uses_floor_owner_and_timeslot_link() {
             call_id: 1,
             source_issi: 2200769,
             dest_gssi: 2200699,
+            dest_is_group: false,
             ts: 2,
         }),
     });

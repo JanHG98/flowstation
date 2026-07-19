@@ -5,6 +5,7 @@ pub(super) struct GroupFloorGrant {
     pub(super) call_id: u16,
     pub(super) source_issi: u32,
     pub(super) dest_gssi: u32,
+    pub(super) dest_is_group: bool,
     pub(super) ts: u8,
 }
 
@@ -82,6 +83,22 @@ impl CcBsSubentity {
                     call_id: grant.call_id,
                     source_issi: grant.source_issi,
                     dest_gssi: grant.dest_gssi,
+                    dest_is_group: grant.dest_is_group,
+                    ts: grant.ts,
+                },
+            );
+        }
+
+        #[cfg(feature = "recording")]
+        if self.config.config().recording.enabled {
+            Self::push_control(
+                queue,
+                TetraEntity::Recorder,
+                CallControl::FloorGranted {
+                    call_id: grant.call_id,
+                    source_issi: grant.source_issi,
+                    dest_gssi: grant.dest_gssi,
+                    dest_is_group: grant.dest_is_group,
                     ts: grant.ts,
                 },
             );
@@ -95,6 +112,7 @@ impl CcBsSubentity {
                     call_id: grant.call_id,
                     source_issi: grant.source_issi,
                     dest_gssi: grant.dest_gssi,
+                    dest_is_group: grant.dest_is_group,
                     ts: grant.ts,
                 },
             );
@@ -130,6 +148,18 @@ impl CcBsSubentity {
             );
         }
 
+        #[cfg(feature = "recording")]
+        if self.config.config().recording.enabled {
+            Self::push_control(
+                queue,
+                TetraEntity::Recorder,
+                CallControl::FloorReleased {
+                    call_id: slot.call_id,
+                    ts: slot.ts,
+                },
+            );
+        }
+
         if let Some(brew_entity) = notify_brew.destination(&self.config) {
             Self::push_control(
                 queue,
@@ -147,6 +177,18 @@ impl CcBsSubentity {
             Self::push_control(
                 queue,
                 TetraEntity::Umac,
+                CallControl::CallEnded {
+                    call_id: slot.call_id,
+                    ts: slot.ts,
+                },
+            );
+        }
+
+        #[cfg(feature = "recording")]
+        if self.config.config().recording.enabled {
+            Self::push_control(
+                queue,
+                TetraEntity::Recorder,
                 CallControl::CallEnded {
                     call_id: slot.call_id,
                     ts: slot.ts,
