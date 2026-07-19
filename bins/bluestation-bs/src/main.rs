@@ -383,7 +383,15 @@ fn build_bs_stack(
             Ok((player, handle)) => {
                 router.register_entity(Box::new(player));
                 audio_player_handle = Some(handle);
-                eprintln!(" -> Local WAV/MP3 audio dispatch enabled ({})", cfg.config().audio_player.directory);
+                eprintln!(
+                    " -> WAV/MP3 audio dispatch enabled (local: {}, cache: {}, shares: {})",
+                    cfg.config().audio_player.directory,
+                    cfg.config().audio_player.cache_directory,
+                    cfg.config().audio_player.shares.len()
+                );
+                for share in &cfg.config().audio_player.shares {
+                    eprintln!("    Media source '{}' [{}]: {}", share.name, share.id, share.path);
+                }
             }
             Err(err) => {
                 tracing::error!("Audio player disabled: {}", err);

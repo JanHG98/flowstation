@@ -1,7 +1,19 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::path::Path;
 
 use serde::Deserialize;
 use toml::Value;
+
+/// Read-only external media source mounted by the operating system.
+#[derive(Debug, Clone)]
+pub struct CfgAudioShare {
+    /// Stable identifier used by the dashboard/API.
+    pub id: String,
+    /// Human-readable label shown in the media browser.
+    pub name: String,
+    /// Absolute local mount path, for example `/mnt/nfs-share`.
+    pub path: String,
+}
 
 /// Local audio dispatch configuration.
 #[derive(Debug, Clone)]
@@ -10,6 +22,10 @@ pub struct CfgAudioPlayer {
     pub enabled: bool,
     /// Root directory for locally managed WAV/MP3 files.
     pub directory: String,
+    /// Local staging directory used before decoding files from network shares.
+    pub cache_directory: String,
+    /// Additional read-only media roots mounted by the operating system.
+    pub shares: Vec<CfgAudioShare>,
     /// TETRA identity displayed as the network-side source of generated calls.
     pub source_issi: u32,
     /// Default TETRA call priority used when the UI does not override it.
@@ -33,11 +49,27 @@ impl Default for CfgAudioPlayer {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct CfgAudioShareDto {
+    #[serde(default)]
+    pub id: String,
+    #[serde(default)]
+    pub name: String,
+    #[serde(default)]
+    pub path: String,
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct CfgAudioPlayerDto {
     #[serde(default)]
     pub enabled: bool,
     #[serde(default = "default_directory")]
     pub directory: String,
+    #[serde(default = "default_cache_directory")]
+    pub cache_directory: String,
+    #[serde(default)]
+    pub shares: Vec<CfgAudioShareDto>,
     #[serde(default = "default_source_issi")]
     pub source_issi: u32,
     #[serde(default = "default_priority")]
@@ -61,6 +93,8 @@ impl Default for CfgAudioPlayerDto {
         Self {
             enabled: false,
             directory: default_directory(),
+            cache_directory: default_cache_directory(),
+            shares: Vec::new(),
             source_issi: default_source_issi(),
             default_priority: default_priority(),
             max_file_size_mb: default_max_file_size_mb(),
@@ -75,6 +109,9 @@ impl Default for CfgAudioPlayerDto {
 
 fn default_directory() -> String {
     "/var/lib/netcore/audio".to_string()
+}
+fn default_cache_directory() -> String {
+    "/var/cache/netcore/audio".to_string()
 }
 fn default_source_issi() -> u32 {
     4_010_099
@@ -98,12 +135,30 @@ fn default_ffmpeg_path() -> String {
     "ffmpeg".to_string()
 }
 
+fn validate_absolute_directory(value: &str, field: &str) -> Result<(), String> {
+    if value.is_empty() {
+        return Err(format!("audio_player: {field} cannot be empty"));
+    }
+    if !Path::new(value).is_absolute() {
+        return Err(format!("audio_player: {field} must be an absolute path"));
+    }
+    Ok(())
+}
+
+fn valid_source_id(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 48
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'))
+}
+
 pub fn apply_audio_player_patch(mut src: CfgAudioPlayerDto) -> Result<CfgAudioPlayer, String> {
     src.directory = src.directory.trim().to_string();
+    src.cache_directory = src.cache_directory.trim().to_string();
     src.ffmpeg_path = src.ffmpeg_path.trim().to_string();
-    if src.directory.is_empty() {
-        return Err("audio_player: directory cannot be empty".to_string());
-    }
+    validate_absolute_directory(&src.directory, "directory")?;
+    validate_absolute_directory(&src.cache_directory, "cache_directory")?;
     if src.source_issi == 0 || src.source_issi > 0x00ff_ffff {
         return Err("audio_player: source_issi must be a valid 24-bit ISSI".to_string());
     }
@@ -126,9 +181,44 @@ pub fn apply_audio_player_patch(mut src: CfgAudioPlayerDto) -> Result<CfgAudioPl
         return Err("audio_player: ffmpeg_path cannot be empty".to_string());
     }
 
+    let mut ids = HashSet::new();
+    ids.insert("local".to_string());
+    let mut shares = Vec::with_capacity(src.shares.len());
+    for (index, mut share) in src.shares.into_iter().enumerate() {
+        share.id = share.id.trim().to_ascii_lowercase();
+        share.name = share.name.trim().to_string();
+        share.path = share.path.trim().to_string();
+        if !share.extra.is_empty() {
+            let mut keys: Vec<_> = share.extra.keys().cloned().collect();
+            keys.sort();
+            return Err(format!(
+                "audio_player: unrecognized fields in shares[{index}]: {keys:?}"
+            ));
+        }
+        if !valid_source_id(&share.id) {
+            return Err(format!(
+                "audio_player: shares[{index}].id must contain only letters, numbers, '.', '-' or '_'"
+            ));
+        }
+        if !ids.insert(share.id.clone()) {
+            return Err(format!("audio_player: duplicate media-source id '{}'", share.id));
+        }
+        if share.name.is_empty() {
+            return Err(format!("audio_player: shares[{index}].name cannot be empty"));
+        }
+        validate_absolute_directory(&share.path, &format!("shares[{index}].path"))?;
+        shares.push(CfgAudioShare {
+            id: share.id,
+            name: share.name,
+            path: share.path,
+        });
+    }
+
     Ok(CfgAudioPlayer {
         enabled: src.enabled,
         directory: src.directory,
+        cache_directory: src.cache_directory,
+        shares,
         source_issi: src.source_issi,
         default_priority: src.default_priority,
         max_file_size_mb: src.max_file_size_mb,
@@ -149,6 +239,7 @@ mod tests {
         assert!(!cfg.enabled);
         assert_eq!(cfg.source_issi, 4_010_099);
         assert!(cfg.max_duration_seconds > 0);
+        assert!(cfg.shares.is_empty());
     }
 
     #[test]
@@ -156,6 +247,35 @@ mod tests {
         let dto = CfgAudioPlayerDto {
             source_issi: 0,
             default_priority: 16,
+            ..CfgAudioPlayerDto::default()
+        };
+        assert!(apply_audio_player_patch(dto).is_err());
+    }
+
+    #[test]
+    fn accepts_read_only_mounted_share() {
+        let dto = CfgAudioPlayerDto {
+            shares: vec![CfgAudioShareDto {
+                id: "server".to_string(),
+                name: "NFS Server".to_string(),
+                path: "/mnt/nfs-share".to_string(),
+                extra: HashMap::new(),
+            }],
+            ..CfgAudioPlayerDto::default()
+        };
+        let cfg = apply_audio_player_patch(dto).unwrap();
+        assert_eq!(cfg.shares[0].id, "server");
+    }
+
+    #[test]
+    fn rejects_duplicate_or_relative_share() {
+        let dto = CfgAudioPlayerDto {
+            shares: vec![CfgAudioShareDto {
+                id: "local".to_string(),
+                name: "Bad".to_string(),
+                path: "relative".to_string(),
+                extra: HashMap::new(),
+            }],
             ..CfgAudioPlayerDto::default()
         };
         assert!(apply_audio_player_patch(dto).is_err());

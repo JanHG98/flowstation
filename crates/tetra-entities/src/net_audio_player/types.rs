@@ -31,9 +31,11 @@ pub struct AudioPlayerStatus {
     pub available: bool,
     pub state: AudioPlayerState,
     pub directory: String,
+    pub cache_directory: String,
     pub job_id: Option<String>,
     pub file_name: Option<String>,
     pub source_type: Option<AudioSourceType>,
+    pub source_id: Option<String>,
     pub target_type: Option<AudioTargetType>,
     pub target_id: Option<u32>,
     pub priority: Option<u8>,
@@ -45,6 +47,16 @@ pub struct AudioPlayerStatus {
     pub timeslot: Option<u8>,
     pub ffmpeg_available: bool,
     pub last_error: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct MediaSourceInfo {
+    pub id: String,
+    pub name: String,
+    pub path: String,
+    pub source_type: String,
+    pub available: bool,
+    pub error: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -61,6 +73,8 @@ pub(crate) struct ResolvedAudioSource {
     pub path: std::path::PathBuf,
     pub display_name: String,
     pub source_type: AudioSourceType,
+    pub source_id: Option<String>,
+    pub cache_before_decode: bool,
 }
 
 #[derive(Debug, Clone)]

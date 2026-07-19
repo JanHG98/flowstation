@@ -1,5 +1,6 @@
 use std::fs;
-use std::path::Path;
+use std::io::{self, Read};
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use tetra_config::bluestation::CfgAudioPlayer;
@@ -16,7 +17,30 @@ pub(crate) fn prepare_audio(
     target_id: u32,
     priority: u8,
 ) -> Result<PreparedAudio, String> {
-    let metadata = fs::metadata(&source.path).map_err(|e| format!("cannot stat {}: {e}", source.path.display()))?;
+    let cached_path = if source.cache_before_decode {
+        Some(cache_network_source(config, &job_id, &source.path)?)
+    } else {
+        None
+    };
+    let decode_path = cached_path.as_deref().unwrap_or(&source.path);
+    let result = prepare_audio_from_path(config, job_id, decode_path, target_type, target_id, priority);
+    if let Some(path) = cached_path {
+        if let Err(error) = fs::remove_file(&path) {
+            tracing::warn!("AudioPlayer: cannot remove cached source {}: {}", path.display(), error);
+        }
+    }
+    result
+}
+
+fn prepare_audio_from_path(
+    config: &CfgAudioPlayer,
+    job_id: String,
+    source_path: &Path,
+    target_type: super::types::AudioTargetType,
+    target_id: u32,
+    priority: u8,
+) -> Result<PreparedAudio, String> {
+    let metadata = fs::metadata(source_path).map_err(|e| format!("cannot stat {}: {e}", source_path.display()))?;
     if !metadata.is_file() {
         return Err("selected path is not a regular file".to_string());
     }
@@ -28,22 +52,21 @@ pub(crate) fn prepare_audio(
         ));
     }
 
-    let extension = source
-        .path
+    let extension = source_path
         .extension()
         .and_then(|ext| ext.to_str())
         .unwrap_or("")
         .to_ascii_lowercase();
     let mut pcm = match extension.as_str() {
-        "wav" => decode_wav_native(&source.path).or_else(|native_err| {
+        "wav" => decode_wav_native(source_path).or_else(|native_err| {
             tracing::debug!(
                 "AudioPlayer: native WAV decode failed for {}: {}; trying ffmpeg",
-                source.path.display(),
+                source_path.display(),
                 native_err
             );
-            decode_with_ffmpeg(&config.ffmpeg_path, &source.path, config.max_duration_seconds)
+            decode_with_ffmpeg(&config.ffmpeg_path, source_path, config.max_duration_seconds)
         })?,
-        "mp3" => decode_with_ffmpeg(&config.ffmpeg_path, &source.path, config.max_duration_seconds)?,
+        "mp3" => decode_with_ffmpeg(&config.ffmpeg_path, source_path, config.max_duration_seconds)?,
         _ => return Err("only .wav and .mp3 files are supported".to_string()),
     };
 
@@ -88,6 +111,75 @@ pub(crate) fn prepare_audio(
         duration_ms,
         blocks,
     })
+}
+
+fn cache_network_source(config: &CfgAudioPlayer, job_id: &str, source_path: &Path) -> Result<PathBuf, String> {
+    let metadata = fs::metadata(source_path).map_err(|e| format!("cannot stat server file {}: {e}", source_path.display()))?;
+    if !metadata.is_file() {
+        return Err("selected server path is not a regular file".to_string());
+    }
+    let max_bytes = config.max_file_size_mb.saturating_mul(1024 * 1024);
+    if metadata.len() > max_bytes {
+        return Err(format!(
+            "server file is too large ({} bytes; limit {} MiB)",
+            metadata.len(), config.max_file_size_mb
+        ));
+    }
+    let extension = source_path
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    if !matches!(extension.as_str(), "wav" | "mp3") {
+        return Err("only .wav and .mp3 files are supported".to_string());
+    }
+
+    let configured_cache = PathBuf::from(&config.cache_directory);
+    fs::create_dir_all(&configured_cache)
+        .map_err(|e| format!("cannot create audio cache {}: {e}", configured_cache.display()))?;
+    let cache_root = configured_cache
+        .canonicalize()
+        .map_err(|e| format!("cannot canonicalize audio cache {}: {e}", configured_cache.display()))?;
+    let final_path = cache_root.join(format!("{job_id}.{extension}"));
+    let partial_path = cache_root.join(format!("{job_id}.{extension}.part"));
+
+    let copy_result = (|| -> Result<(), String> {
+        let source = fs::File::open(source_path)
+            .map_err(|e| format!("cannot open server file {}: {e}", source_path.display()))?;
+        let mut limited = source.take(max_bytes.saturating_add(1));
+        let mut target = fs::File::create(&partial_path)
+            .map_err(|e| format!("cannot create cache file {}: {e}", partial_path.display()))?;
+        let copied = io::copy(&mut limited, &mut target)
+            .map_err(|e| format!("cannot copy server file into local cache: {e}"))?;
+        if copied > max_bytes {
+            return Err(format!("server file exceeded the configured {} MiB limit while copying", config.max_file_size_mb));
+        }
+        target
+            .sync_all()
+            .map_err(|e| format!("cannot flush cache file {}: {e}", partial_path.display()))?;
+        fs::rename(&partial_path, &final_path)
+            .map_err(|e| format!("cannot finalize cache file {}: {e}", final_path.display()))?;
+        Ok(())
+    })();
+
+    if let Err(error) = copy_result {
+        let _ = fs::remove_file(&partial_path);
+        let _ = fs::remove_file(&final_path);
+        return Err(error);
+    }
+    let canonical = final_path
+        .canonicalize()
+        .map_err(|e| format!("cannot canonicalize cached audio {}: {e}", final_path.display()))?;
+    if !canonical.starts_with(&cache_root) || !canonical.is_file() {
+        let _ = fs::remove_file(&final_path);
+        return Err("cached audio escaped the configured cache directory".to_string());
+    }
+    tracing::info!(
+        "AudioPlayer: cached network source {} -> {}",
+        source_path.display(),
+        canonical.display()
+    );
+    Ok(canonical)
 }
 
 fn decode_with_ffmpeg(ffmpeg_path: &str, path: &Path, max_duration_seconds: u32) -> Result<Vec<i16>, String> {

@@ -85,6 +85,7 @@ impl AudioPlayerEntity {
                         job_id.clone(),
                         source.display_name.clone(),
                         source.source_type,
+                        source.source_id.clone(),
                         target_type,
                         target_id,
                         priority,

@@ -10,4 +10,4 @@ mod types;
 
 pub use entity::AudioPlayerEntity;
 pub use service::AudioPlayerHandle;
-pub use types::{AudioPlayerState, AudioPlayerStatus, AudioSourceType, AudioTargetType, MediaEntry};
+pub use types::{AudioPlayerState, AudioPlayerStatus, AudioSourceType, AudioTargetType, MediaEntry, MediaSourceInfo};

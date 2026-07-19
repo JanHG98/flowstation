@@ -3919,9 +3919,17 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
         <div class="stat-card is-idle"><div class="stat-label">MP3-Decoder</div><div class="stat-value is-text" id="audio-ffmpeg">—</div><div class="stat-sub" id="audio-error">Kein Fehler</div></div>
       </div>
       <div class="card">
-        <div class="card-head"><div><div class="card-title">Lokale WAV-/MP3-Dateien</div><div class="card-sub" id="audio-root">—</div></div><div class="card-actions" style="display:flex;gap:8px"><button class="btn btn-sm" onclick="audioUp()">↑ Hoch</button><button class="btn btn-sm" onclick="loadAudioPage(true)">Aktualisieren</button><button class="btn btn-sm btn-danger" id="audio-stop" onclick="stopAudioTransmission()">Aussendung stoppen</button></div></div>
+        <div class="card-head">
+          <div><div class="card-title">WAV-/MP3-Medienbibliothek</div><div class="card-sub" id="audio-root">—</div></div>
+          <div class="card-actions" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <select class="form-input" id="audio-source-select" onchange="changeAudioSource()" style="min-width:190px;max-width:280px"><option value="local">Lokale Dateien</option></select>
+            <button class="btn btn-sm" onclick="audioUp()">↑ Hoch</button>
+            <button class="btn btn-sm" onclick="loadAudioPage(true)">Aktualisieren</button>
+            <button class="btn btn-sm btn-danger" id="audio-stop" onclick="stopAudioTransmission()">Aussendung stoppen</button>
+          </div>
+        </div>
         <div class="card-body">
-          <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap"><span class="stat-sub">Pfad:</span><code id="audio-path">/</code></div>
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap"><span class="stat-sub">Quelle:</span><strong id="audio-source-state">—</strong><span class="stat-sub">Pfad:</span><code id="audio-path">/</code></div>
           <div class="table-wrap"><table><thead><tr><th>Name</th><th>Typ</th><th>Größe</th><th>Aktion</th></tr></thead><tbody id="audio-tbody"><tr><td colspan="4" class="sds-empty">Lade Dateien…</td></tr></tbody></table></div>
         </div>
       </div>
@@ -10078,36 +10086,66 @@ window.addEventListener('resize', () => {
 });
 
 
-// ── Local WAV/MP3 audio dispatch ─────────────────────────────────────────
-let audioCurrentPath='',audioEntries=[],audioStatus=null,audioPendingSource=null,audioGroups={},audioDevices={};
+// ── Local/server WAV/MP3 audio dispatch ──────────────────────────────────
+let audioCurrentPath='',audioCurrentSource='local',audioSources=[],audioEntries=[],audioStatus=null,audioPendingSource=null,audioGroups={},audioDevices={};
 function audioStateLabel(s){return ({idle:'BEREIT',preparing:'VORBEREITUNG',calling:'RUFBAU',waiting_for_answer:'WARTE AUF ANNAHME',playing:'SENDET',finishing:'BEENDET RUF',failed:'FEHLER'})[s]||String(s||'—').toUpperCase();}
 async function loadAudioRegistries(){
   if(!deviceRegistryLoaded&&!deviceRegistryInflight)await loadDeviceRegistry(); audioDevices=deviceRegistry||{};
   try{const r=await fetch('/api/groups',{cache:'no-store'});audioGroups=r.ok?normalizeRecordingGroups(await r.json()):{};}catch(_){audioGroups={};}
 }
+function currentAudioSource(){return audioSources.find(source=>source.id===audioCurrentSource)||null;}
+function updateAudioSourceHeader(){
+  const source=currentAudioSource(),root=document.getElementById('audio-root'),state=document.getElementById('audio-source-state');
+  if(!source){if(root)root.textContent='—';if(state)state.textContent='Quelle nicht gefunden';return;}
+  if(root)root.textContent=source.path||'—';
+  if(state){state.textContent=source.available?(source.source_type==='server'?'SERVER ONLINE':'LOKAL'):'NICHT VERFÜGBAR';state.style.color=source.available?'var(--success)':'var(--danger)';state.title=source.error||'';}
+}
+async function loadAudioSources(){
+  const r=await fetch('/api/audio/sources',{cache:'no-store'}),j=await r.json().catch(()=>({error:'HTTP '+r.status}));
+  if(!r.ok)throw new Error(j.error||('HTTP '+r.status));
+  audioSources=Array.isArray(j.sources)?j.sources:[];
+  const select=document.getElementById('audio-source-select');
+  if(!audioSources.some(source=>source.id===audioCurrentSource))audioCurrentSource=(audioSources.find(source=>source.id==='local')||audioSources.find(source=>source.available)||audioSources[0]||{id:'local'}).id;
+  select.innerHTML=audioSources.map(source=>'<option value="'+escAttr(source.id)+'"'+(source.id===audioCurrentSource?' selected':'')+'>'+escHtml(source.name+(source.available?'':' · OFFLINE'))+'</option>').join('');
+  select.disabled=audioSources.length<2;
+  updateAudioSourceHeader();
+}
+function changeAudioSource(){audioCurrentSource=document.getElementById('audio-source-select').value||'local';audioCurrentPath='';updateAudioSourceHeader();browseAudio('');}
 async function loadAudioStatus(){
   try{const r=await fetch('/api/audio/status',{cache:'no-store'}),j=await r.json();if(!r.ok)throw new Error(j.error||('HTTP '+r.status));audioStatus=j;const active=!['idle','failed'].includes(j.state);
     const card=document.getElementById('audio-state-card');card.classList.remove('is-ok','is-danger','is-idle','is-warn');card.classList.add(j.state==='failed'?'is-danger':active?'is-ok':'is-idle');
-    document.getElementById('audio-state').textContent=audioStateLabel(j.state);const targetText=j.target_id?((j.target_type==='group'?'GSSI ':'ISSI ')+j.target_id):'Bereit';document.getElementById('audio-target').textContent=(j.file_name?j.file_name+' → ':'')+targetText;
+    document.getElementById('audio-state').textContent=audioStateLabel(j.state);const targetText=j.target_id?((j.target_type==='group'?'GSSI ':'ISSI ')+j.target_id):'Bereit';const sourceText=j.source_id?(' ['+j.source_id+']'):'';document.getElementById('audio-target').textContent=(j.file_name?j.file_name+sourceText+' → ':'')+targetText;
     document.getElementById('audio-progress').textContent=recFmtDuration(j.position_ms)+' / '+recFmtDuration(j.duration_ms);document.getElementById('audio-blocks').textContent=(j.sent_blocks||0)+' / '+(j.total_blocks||0)+' Blöcke';
-    document.getElementById('audio-channel').textContent=j.timeslot?'TS '+j.timeslot:'—';document.getElementById('audio-call').textContent=j.call_id?'Call '+j.call_id:'Kein aktiver Ruf';document.getElementById('audio-ffmpeg').textContent=j.ffmpeg_available?'VERFÜGBAR':'NICHT GEFUNDEN';document.getElementById('audio-error').textContent=j.last_error||'Kein Fehler';document.getElementById('audio-root').textContent=j.directory||'—';document.getElementById('audio-stop').disabled=!active;
+    document.getElementById('audio-channel').textContent=j.timeslot?'TS '+j.timeslot:'—';document.getElementById('audio-call').textContent=j.call_id?'Call '+j.call_id:'Kein aktiver Ruf';document.getElementById('audio-ffmpeg').textContent=j.ffmpeg_available?'VERFÜGBAR':'NICHT GEFUNDEN';document.getElementById('audio-error').textContent=j.last_error||'Kein Fehler';document.getElementById('audio-stop').disabled=!active;updateAudioSourceHeader();
   }catch(e){document.getElementById('audio-state').textContent='NICHT VERFÜGBAR';document.getElementById('audio-error').textContent=String(e);}
 }
-async function browseAudio(path){audioCurrentPath=path||'';document.getElementById('audio-path').textContent='/'+audioCurrentPath;try{const r=await fetch('/api/audio/browse?path='+encodeURIComponent(audioCurrentPath),{cache:'no-store'}),j=await r.json();if(!r.ok)throw new Error(j.error||'HTTP '+r.status);audioEntries=j.entries||[];renderAudioEntries();}catch(e){document.getElementById('audio-tbody').innerHTML='<tr><td colspan="4" class="sds-empty">'+escHtml(e)+'</td></tr>';}}
+async function browseAudio(path){
+  audioCurrentPath=path||'';document.getElementById('audio-path').textContent='/'+audioCurrentPath;updateAudioSourceHeader();
+  try{const url='/api/audio/browse?source='+encodeURIComponent(audioCurrentSource)+'&path='+encodeURIComponent(audioCurrentPath),r=await fetch(url,{cache:'no-store'}),j=await r.json();if(!r.ok)throw new Error(j.error||'HTTP '+r.status);audioEntries=j.entries||[];renderAudioEntries();}
+  catch(e){audioEntries=[];document.getElementById('audio-tbody').innerHTML='<tr><td colspan="4" class="sds-empty">'+escHtml(e)+'</td></tr>';}
+}
 function audioJsArg(value){return escAttr(JSON.stringify(String(value)));}
-function renderAudioEntries(){const tb=document.getElementById('audio-tbody');if(!audioEntries.length){tb.innerHTML='<tr><td colspan="4" class="sds-empty">Keine WAV-/MP3-Dateien vorhanden.</td></tr>';return;}tb.innerHTML=audioEntries.map(e=>{const pathArg=audioJsArg(e.path),nameArg=audioJsArg(e.name);const rowCtx=e.entry_type==='file'?' class="audio-context-row" oncontextmenu="return openAudioContext(event,\'media\','+pathArg+','+nameArg+')"':'';return '<tr'+rowCtx+'><td>'+escHtml(e.name)+'</td><td>'+escHtml(e.entry_type==='directory'?'Ordner':String(e.extension||'').toUpperCase())+'</td><td>'+escHtml(e.size_bytes==null?'—':recFmtBytes(e.size_bytes))+'</td><td>'+(e.entry_type==='directory'?'<button class="btn btn-sm" onclick="browseAudio('+pathArg+')">Öffnen</button>':'<button class="btn btn-sm btn-primary" onclick="openAudioSend(\'media\','+pathArg+','+nameArg+')">Senden an…</button>')+'</td></tr>';}).join('');}
+function renderAudioEntries(){
+  const tb=document.getElementById('audio-tbody');if(!audioEntries.length){tb.innerHTML='<tr><td colspan="4" class="sds-empty">Keine WAV-/MP3-Dateien vorhanden.</td></tr>';return;}
+  const sourceArg=audioJsArg(audioCurrentSource);
+  tb.innerHTML=audioEntries.map(e=>{const pathArg=audioJsArg(e.path),nameArg=audioJsArg(e.name);const rowCtx=e.entry_type==='file'?' class="audio-context-row" oncontextmenu="return openAudioContext(event,\'media\','+pathArg+','+nameArg+','+sourceArg+')"':'';return '<tr'+rowCtx+'><td>'+escHtml(e.name)+'</td><td>'+escHtml(e.entry_type==='directory'?'Ordner':String(e.extension||'').toUpperCase())+'</td><td>'+escHtml(e.size_bytes==null?'—':recFmtBytes(e.size_bytes))+'</td><td>'+(e.entry_type==='directory'?'<button class="btn btn-sm" onclick="browseAudio('+pathArg+')">Öffnen</button>':'<button class="btn btn-sm btn-primary" onclick="openAudioSend(\'media\','+pathArg+','+nameArg+','+sourceArg+')">Senden an…</button>')+'</td></tr>';}).join('');
+}
 function audioUp(){if(!audioCurrentPath)return;const p=audioCurrentPath.split('/');p.pop();browseAudio(p.join('/'));}
-async function loadAudioPage(force){await Promise.all([loadAudioStatus(),loadAudioRegistries(),browseAudio(audioCurrentPath)]);refreshAudioTargetOptions();}
+async function loadAudioPage(force){
+  await Promise.all([loadAudioStatus(),loadAudioRegistries()]);
+  try{await loadAudioSources();await browseAudio(audioCurrentPath);}catch(e){document.getElementById('audio-tbody').innerHTML='<tr><td colspan="4" class="sds-empty">'+escHtml(e)+'</td></tr>';}
+  refreshAudioTargetOptions();
+}
 function hideAudioContext(){const menu=document.getElementById('audio-context-menu');if(menu)menu.style.display='none';}
-function openAudioContext(event,type,id,label){event.preventDefault();audioPendingSource={type,id,label};const menu=document.getElementById('audio-context-menu');if(!menu)return false;menu.style.display='block';const pad=8,w=menu.offsetWidth||220,h=menu.offsetHeight||90;menu.style.left=Math.max(pad,Math.min(event.clientX,window.innerWidth-w-pad))+'px';menu.style.top=Math.max(pad,Math.min(event.clientY,window.innerHeight-h-pad))+'px';return false;}
-function audioContextSend(targetType){const source=audioPendingSource;if(!source)return;hideAudioContext();openAudioSend(source.type,source.id,source.label);const target=document.getElementById('audio-target-type');target.value=targetType;refreshAudioTargetOptions();}
+function openAudioContext(event,type,id,label,sourceId){event.preventDefault();audioPendingSource={type,id,label,sourceId:sourceId||null};const menu=document.getElementById('audio-context-menu');if(!menu)return false;menu.style.display='block';const pad=8,w=menu.offsetWidth||220,h=menu.offsetHeight||90;menu.style.left=Math.max(pad,Math.min(event.clientX,window.innerWidth-w-pad))+'px';menu.style.top=Math.max(pad,Math.min(event.clientY,window.innerHeight-h-pad))+'px';return false;}
+function audioContextSend(targetType){const source=audioPendingSource;if(!source)return;hideAudioContext();openAudioSend(source.type,source.id,source.label,source.sourceId);const target=document.getElementById('audio-target-type');target.value=targetType;refreshAudioTargetOptions();}
 document.addEventListener('click',event=>{const menu=document.getElementById('audio-context-menu');if(menu&&menu.style.display!=='none'&&!menu.contains(event.target))hideAudioContext();});
 window.addEventListener('blur',hideAudioContext);
-function openAudioSend(type,id,label){audioPendingSource={type,id,label};const page=document.getElementById('page-audio');if(page&&!page.classList.contains('active'))showPage('audio',document.getElementById('nav-audio'));document.getElementById('audio-send-source').textContent=label;document.getElementById('audio-send-card').style.display='block';refreshAudioTargetOptions();document.getElementById('audio-send-card').scrollIntoView({behavior:'smooth',block:'nearest'});}
+function openAudioSend(type,id,label,sourceId){audioPendingSource={type,id,label,sourceId:sourceId||null};const page=document.getElementById('page-audio');if(page&&!page.classList.contains('active'))showPage('audio',document.getElementById('nav-audio'));const source=sourceId?audioSources.find(item=>item.id===sourceId):null;document.getElementById('audio-send-source').textContent=label+(source?' · '+source.name:'');document.getElementById('audio-send-card').style.display='block';refreshAudioTargetOptions();document.getElementById('audio-send-card').scrollIntoView({behavior:'smooth',block:'nearest'});}
 function closeAudioSend(){audioPendingSource=null;document.getElementById('audio-send-card').style.display='none';}
 function refreshAudioTargetOptions(){const type=document.getElementById('audio-target-type').value,map=type==='group'?audioGroups:audioDevices,sel=document.getElementById('audio-target-select');const rows=Object.entries(map||{}).map(([id,v])=>[id,typeof v==='string'?v:(v?.name||v?.label||v?.callsign||'')]);rows.sort((a,b)=>(a[1]||a[0]).localeCompare(b[1]||b[0]));sel.innerHTML='<option value="">Bitte wählen…</option>'+rows.map(([id,name])=>'<option value="'+escAttr(id)+'">'+escHtml((name?name+' · ':'')+(type==='group'?'GSSI ':'ISSI ')+id)+'</option>').join('');}
 function audioSelectTarget(){const v=document.getElementById('audio-target-select').value;if(v)document.getElementById('audio-target-manual').value=v;}
-async function submitAudioTransmission(){if(!audioPendingSource)return;const targetId=Number(document.getElementById('audio-target-manual').value),priority=Number(document.getElementById('audio-priority').value);if(!Number.isInteger(targetId)||targetId<=0||targetId>0xFFFFFF){alert('Bitte gültige 24-Bit-ISSI/GSSI eingeben.');return;}if(!Number.isInteger(priority)||priority<0||priority>15){alert('Priorität muss zwischen 0 und 15 liegen.');return;}const body={source_type:audioPendingSource.type,target_type:document.getElementById('audio-target-type').value,target_id:targetId,priority};if(audioPendingSource.type==='recording')body.recording_id=audioPendingSource.id;else body.path=audioPendingSource.id;const r=await fetch('/api/audio/play',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}),j=await r.json().catch(()=>({error:'HTTP '+r.status}));if(!r.ok){alert(j.error||'Aussendung konnte nicht gestartet werden');return;}closeAudioSend();await loadAudioStatus();}
+async function submitAudioTransmission(){if(!audioPendingSource)return;const targetId=Number(document.getElementById('audio-target-manual').value),priority=Number(document.getElementById('audio-priority').value);if(!Number.isInteger(targetId)||targetId<=0||targetId>0xFFFFFF){alert('Bitte gültige 24-Bit-ISSI/GSSI eingeben.');return;}if(!Number.isInteger(priority)||priority<0||priority>15){alert('Priorität muss zwischen 0 und 15 liegen.');return;}const body={source_type:audioPendingSource.type,target_type:document.getElementById('audio-target-type').value,target_id:targetId,priority};if(audioPendingSource.type==='recording')body.recording_id=audioPendingSource.id;else{body.path=audioPendingSource.id;body.source_id=audioPendingSource.sourceId||audioCurrentSource||'local';}const r=await fetch('/api/audio/play',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}),j=await r.json().catch(()=>({error:'HTTP '+r.status}));if(!r.ok){alert(j.error||'Aussendung konnte nicht gestartet werden');return;}closeAudioSend();await loadAudioStatus();}
 async function stopAudioTransmission(){const r=await fetch('/api/audio/stop',{method:'POST'}),j=await r.json().catch(()=>({error:'HTTP '+r.status}));if(!r.ok)alert(j.error||'Stop fehlgeschlagen');await loadAudioStatus();}
 setInterval(()=>{const page=document.getElementById('page-audio');if(page&&page.classList.contains('active'))loadAudioStatus();},1000);
 

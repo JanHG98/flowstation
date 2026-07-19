@@ -7,7 +7,8 @@ use tetra_config::bluestation::CfgAudioPlayer;
 use uuid::Uuid;
 
 use super::types::{
-    AudioPlayerCommand, AudioPlayerState, AudioPlayerStatus, AudioSourceType, AudioTargetType, MediaEntry, ResolvedAudioSource,
+    AudioPlayerCommand, AudioPlayerState, AudioPlayerStatus, AudioSourceType, AudioTargetType, MediaEntry, MediaSourceInfo,
+    ResolvedAudioSource,
 };
 
 #[derive(Debug)]
@@ -16,6 +17,7 @@ struct LiveStatus {
     job_id: Option<String>,
     file_name: Option<String>,
     source_type: Option<AudioSourceType>,
+    source_id: Option<String>,
     target_type: Option<AudioTargetType>,
     target_id: Option<u32>,
     priority: Option<u8>,
@@ -35,6 +37,7 @@ impl Default for LiveStatus {
             job_id: None,
             file_name: None,
             source_type: None,
+            source_id: None,
             target_type: None,
             target_id: None,
             priority: None,
@@ -49,9 +52,20 @@ impl Default for LiveStatus {
     }
 }
 
+#[derive(Debug, Clone)]
+struct MediaRoot {
+    id: String,
+    name: String,
+    configured_path: PathBuf,
+    source_type: &'static str,
+    cache_before_decode: bool,
+}
+
 struct AudioPlayerShared {
     config: CfgAudioPlayer,
-    root: PathBuf,
+    local_root: PathBuf,
+    cache_root: PathBuf,
+    media_roots: Vec<MediaRoot>,
     command_tx: crossbeam_channel::Sender<AudioPlayerCommand>,
     live: Mutex<LiveStatus>,
     ffmpeg_available: bool,
@@ -68,15 +82,43 @@ impl AudioPlayerHandle {
         command_tx: crossbeam_channel::Sender<AudioPlayerCommand>,
         ffmpeg_available: bool,
     ) -> Result<Self, String> {
-        let root = PathBuf::from(&config.directory);
-        fs::create_dir_all(&root).map_err(|e| format!("cannot create {}: {e}", root.display()))?;
-        let root = root
+        let local_root = PathBuf::from(&config.directory);
+        fs::create_dir_all(&local_root).map_err(|e| format!("cannot create {}: {e}", local_root.display()))?;
+        let local_root = local_root
             .canonicalize()
-            .map_err(|e| format!("cannot canonicalize {}: {e}", root.display()))?;
+            .map_err(|e| format!("cannot canonicalize {}: {e}", local_root.display()))?;
+
+        let cache_root = PathBuf::from(&config.cache_directory);
+        fs::create_dir_all(&cache_root).map_err(|e| format!("cannot create {}: {e}", cache_root.display()))?;
+        let cache_root = cache_root
+            .canonicalize()
+            .map_err(|e| format!("cannot canonicalize {}: {e}", cache_root.display()))?;
+        cleanup_stale_cache(&cache_root);
+
+        let mut media_roots = Vec::with_capacity(config.shares.len() + 1);
+        media_roots.push(MediaRoot {
+            id: "local".to_string(),
+            name: "Lokale Dateien".to_string(),
+            configured_path: local_root.clone(),
+            source_type: "local",
+            cache_before_decode: false,
+        });
+        for share in &config.shares {
+            media_roots.push(MediaRoot {
+                id: share.id.clone(),
+                name: share.name.clone(),
+                configured_path: PathBuf::from(&share.path),
+                source_type: "server",
+                cache_before_decode: true,
+            });
+        }
+
         Ok(Self {
             inner: Arc::new(AudioPlayerShared {
                 config,
-                root,
+                local_root,
+                cache_root,
+                media_roots,
                 command_tx,
                 live: Mutex::new(LiveStatus::default()),
                 ffmpeg_available,
@@ -89,7 +131,7 @@ impl AudioPlayerHandle {
     }
 
     pub fn root(&self) -> &Path {
-        &self.inner.root
+        &self.inner.local_root
     }
 
     pub fn status(&self) -> AudioPlayerStatus {
@@ -97,10 +139,12 @@ impl AudioPlayerHandle {
         AudioPlayerStatus {
             available: true,
             state: live.state,
-            directory: self.inner.root.display().to_string(),
+            directory: self.inner.local_root.display().to_string(),
+            cache_directory: self.inner.cache_root.display().to_string(),
             job_id: live.job_id.clone(),
             file_name: live.file_name.clone(),
             source_type: live.source_type,
+            source_id: live.source_id.clone(),
             target_type: live.target_type,
             target_id: live.target_id,
             priority: live.priority,
@@ -115,9 +159,36 @@ impl AudioPlayerHandle {
         }
     }
 
-    pub fn list_media(&self, relative: &str) -> Result<Vec<MediaEntry>, String> {
-        let directory = self.resolve_directory(relative)?;
-        let relative_base = directory.strip_prefix(&self.inner.root).map_err(|e| e.to_string())?;
+    pub fn media_sources(&self) -> Vec<MediaSourceInfo> {
+        self.inner
+            .media_roots
+            .iter()
+            .map(|root| match canonical_media_root(root) {
+                Ok(_) => MediaSourceInfo {
+                    id: root.id.clone(),
+                    name: root.name.clone(),
+                    path: root.configured_path.display().to_string(),
+                    source_type: root.source_type.to_string(),
+                    available: true,
+                    error: None,
+                },
+                Err(error) => MediaSourceInfo {
+                    id: root.id.clone(),
+                    name: root.name.clone(),
+                    path: root.configured_path.display().to_string(),
+                    source_type: root.source_type.to_string(),
+                    available: false,
+                    error: Some(error),
+                },
+            })
+            .collect()
+    }
+
+    pub fn list_media(&self, source_id: &str, relative: &str) -> Result<Vec<MediaEntry>, String> {
+        let root = self.find_media_root(source_id)?;
+        let canonical_root = canonical_media_root(root)?;
+        let directory = resolve_directory(&canonical_root, relative)?;
+        let relative_base = directory.strip_prefix(&canonical_root).map_err(|e| e.to_string())?;
         let mut entries = Vec::new();
         for entry in fs::read_dir(&directory).map_err(|e| format!("cannot read {}: {e}", directory.display()))? {
             let entry = entry.map_err(|e| e.to_string())?;
@@ -166,12 +237,15 @@ impl AudioPlayerHandle {
 
     pub fn play_media(
         &self,
+        source_id: &str,
         relative_path: &str,
         target_type: AudioTargetType,
         target_id: u32,
         priority: Option<u8>,
     ) -> Result<String, String> {
-        let path = self.resolve_media_file(relative_path)?;
+        let root = self.find_media_root(source_id)?;
+        let canonical_root = canonical_media_root(root)?;
+        let path = resolve_media_file(&canonical_root, relative_path)?;
         let display_name = path
             .file_name()
             .and_then(|name| name.to_str())
@@ -182,6 +256,8 @@ impl AudioPlayerHandle {
                 path,
                 display_name,
                 source_type: AudioSourceType::Media,
+                source_id: Some(root.id.clone()),
+                cache_before_decode: root.cache_before_decode,
             },
             target_type,
             target_id,
@@ -206,6 +282,8 @@ impl AudioPlayerHandle {
                 path: canonical,
                 display_name,
                 source_type: AudioSourceType::Recording,
+                source_id: None,
+                cache_before_decode: false,
             },
             target_type,
             target_id,
@@ -228,8 +306,6 @@ impl AudioPlayerHandle {
             return Err("priority must be 0-15".to_string());
         }
         let job_id = Uuid::new_v4().to_string();
-        // Reserve the player and enqueue the command while holding the same status lock.
-        // This prevents a concurrent Stop request from overtaking Play between those two steps.
         let mut live = self.inner.live.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
         if !matches!(live.state, AudioPlayerState::Idle | AudioPlayerState::Failed) {
             return Err("an audio transmission is already active".to_string());
@@ -239,6 +315,7 @@ impl AudioPlayerHandle {
             job_id: Some(job_id.clone()),
             file_name: Some(source.display_name.clone()),
             source_type: Some(source.source_type),
+            source_id: source.source_id.clone(),
             target_type: Some(target_type),
             target_id: Some(target_id),
             priority: Some(priority),
@@ -275,6 +352,7 @@ impl AudioPlayerHandle {
         job_id: String,
         file_name: String,
         source_type: AudioSourceType,
+        source_id: Option<String>,
         target_type: AudioTargetType,
         target_id: u32,
         priority: u8,
@@ -285,6 +363,7 @@ impl AudioPlayerHandle {
             job_id: Some(job_id),
             file_name: Some(file_name),
             source_type: Some(source_type),
+            source_id,
             target_type: Some(target_type),
             target_id: Some(target_id),
             priority: Some(priority),
@@ -333,33 +412,83 @@ impl AudioPlayerHandle {
         live.timeslot = None;
     }
 
-    fn resolve_directory(&self, relative: &str) -> Result<PathBuf, String> {
-        let relative = safe_relative_path(relative)?;
-        let path = self.inner.root.join(relative);
-        let canonical = path.canonicalize().map_err(|e| format!("directory not found: {e}"))?;
-        if !canonical.starts_with(&self.inner.root) || !canonical.is_dir() {
-            return Err("directory escapes the configured media root".to_string());
-        }
-        Ok(canonical)
+    fn find_media_root(&self, source_id: &str) -> Result<&MediaRoot, String> {
+        let source_id = source_id.trim();
+        self.inner
+            .media_roots
+            .iter()
+            .find(|root| root.id == source_id)
+            .ok_or_else(|| format!("unknown media source '{source_id}'"))
     }
+}
 
-    fn resolve_media_file(&self, relative: &str) -> Result<PathBuf, String> {
-        let relative = safe_relative_path(relative)?;
-        let path = self.inner.root.join(relative);
-        let canonical = path.canonicalize().map_err(|e| format!("file not found: {e}"))?;
-        if !canonical.starts_with(&self.inner.root) || !canonical.is_file() {
-            return Err("file escapes the configured media root".to_string());
+
+fn cleanup_stale_cache(root: &Path) {
+    let Ok(entries) = fs::read_dir(root) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let Ok(file_type) = entry.file_type() else {
+            continue;
+        };
+        if !file_type.is_file() {
+            continue;
         }
-        let extension = canonical
-            .extension()
-            .and_then(|ext| ext.to_str())
-            .unwrap_or("")
-            .to_ascii_lowercase();
-        if !matches!(extension.as_str(), "wav" | "mp3") {
-            return Err("only .wav and .mp3 files are supported".to_string());
+        let name = entry.file_name();
+        let name = name.to_string_lossy();
+        let Some((uuid, suffix)) = name.split_once('.') else {
+            continue;
+        };
+        if Uuid::parse_str(uuid).is_err() || !matches!(suffix, "wav" | "mp3" | "wav.part" | "mp3.part") {
+            continue;
         }
-        Ok(canonical)
+        if let Err(error) = fs::remove_file(entry.path()) {
+            tracing::warn!("AudioPlayer: cannot remove stale cache entry {}: {}", entry.path().display(), error);
+        }
     }
+}
+
+fn canonical_media_root(root: &MediaRoot) -> Result<PathBuf, String> {
+    let canonical = root
+        .configured_path
+        .canonicalize()
+        .map_err(|e| format!("media source '{}' unavailable at {}: {e}", root.name, root.configured_path.display()))?;
+    if !canonical.is_dir() {
+        return Err(format!(
+            "media source '{}' is not a directory: {}",
+            root.name,
+            canonical.display()
+        ));
+    }
+    Ok(canonical)
+}
+
+fn resolve_directory(root: &Path, relative: &str) -> Result<PathBuf, String> {
+    let relative = safe_relative_path(relative)?;
+    let path = root.join(relative);
+    let canonical = path.canonicalize().map_err(|e| format!("directory not found: {e}"))?;
+    if !canonical.starts_with(root) || !canonical.is_dir() {
+        return Err("directory escapes the configured media root".to_string());
+    }
+    Ok(canonical)
+}
+
+fn resolve_media_file(root: &Path, relative: &str) -> Result<PathBuf, String> {
+    let relative = safe_relative_path(relative)?;
+    let path = root.join(relative);
+    let canonical = path.canonicalize().map_err(|e| format!("file not found: {e}"))?;
+    if !canonical.starts_with(root) || !canonical.is_file() {
+        return Err("file escapes the configured media root".to_string());
+    }
+    let extension = canonical
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    if !matches!(extension.as_str(), "wav" | "mp3") {
+        return Err("only .wav and .mp3 files are supported".to_string());
+    }
+    Ok(canonical)
 }
 
 fn safe_relative_path(path: &str) -> Result<PathBuf, String> {

@@ -2082,14 +2082,22 @@ fn serve_audio_player_request(
         return;
     }
 
+    if method == "GET" && route == "/api/audio/sources" {
+        drain_http_headers(&mut stream);
+        let body = serde_json::json!({"sources": handle.media_sources()}).to_string();
+        http_json_response(stream, 200, &body);
+        return;
+    }
+
     if method == "GET" && route == "/api/audio/browse" {
         let path = request_path(req_line).unwrap_or("/api/audio/browse");
         let params = query_params(path);
+        let source_id = params.get("source").map(String::as_str).unwrap_or("local");
         let relative = params.get("path").map(String::as_str).unwrap_or("");
         drain_http_headers(&mut stream);
-        match handle.list_media(relative) {
+        match handle.list_media(source_id, relative) {
             Ok(entries) => {
-                let body = serde_json::json!({"path": relative, "entries": entries}).to_string();
+                let body = serde_json::json!({"source": source_id, "path": relative, "entries": entries}).to_string();
                 http_json_response(stream, 200, &body);
             }
             Err(error) => http_json_response(stream, 400, &serde_json::json!({"error":error}).to_string()),
@@ -2135,7 +2143,8 @@ fn serve_audio_player_request(
                     http_json_response(stream, 400, &serde_json::json!({"ok":false,"error":"media source requires path"}).to_string());
                     return;
                 };
-                handle.play_media(path, target_type, target_id, priority)
+                let source_id = request.get("source_id").and_then(|value| value.as_str()).unwrap_or("local");
+                handle.play_media(source_id, path, target_type, target_id, priority)
             }
             "recording" => {
                 let Some(id) = request.get("recording_id").and_then(|value| value.as_str()) else {
