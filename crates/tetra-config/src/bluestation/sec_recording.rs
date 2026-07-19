@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 use toml::Value;
@@ -42,6 +43,12 @@ pub struct CfgRecording {
     pub idle_finalize_secs: u32,
     /// Maximum number of entries returned by the recordings API.
     pub max_list_entries: usize,
+    /// Copy completed WAV/JSON pairs to the configured archive directory.
+    pub archive_enabled: bool,
+    /// Existing writable directory on an OS-mounted server share.
+    pub archive_directory: String,
+    /// Retry interval for pending copies while the share is unavailable.
+    pub archive_retry_seconds: u64,
 }
 
 impl Default for CfgRecording {
@@ -72,6 +79,12 @@ pub struct CfgRecordingDto {
     pub idle_finalize_secs: u32,
     #[serde(default = "default_max_list_entries")]
     pub max_list_entries: usize,
+    #[serde(default)]
+    pub archive_enabled: bool,
+    #[serde(default = "default_archive_directory")]
+    pub archive_directory: String,
+    #[serde(default = "default_archive_retry_seconds")]
+    pub archive_retry_seconds: u64,
     #[serde(flatten)]
     pub extra: HashMap<String, Value>,
 }
@@ -89,6 +102,9 @@ impl Default for CfgRecordingDto {
             max_recording_minutes: default_max_recording_minutes(),
             idle_finalize_secs: default_idle_finalize_secs(),
             max_list_entries: default_max_list_entries(),
+            archive_enabled: false,
+            archive_directory: default_archive_directory(),
+            archive_retry_seconds: default_archive_retry_seconds(),
             extra: HashMap::new(),
         }
     }
@@ -118,6 +134,14 @@ fn default_max_list_entries() -> usize {
     2_000
 }
 
+fn default_archive_directory() -> String {
+    "/mnt/nfs-share/Recordings".to_string()
+}
+
+fn default_archive_retry_seconds() -> u64 {
+    60
+}
+
 pub fn apply_recording_patch(mut src: CfgRecordingDto) -> Result<CfgRecording, String> {
     src.directory = src.directory.trim().to_string();
     if src.directory.is_empty() {
@@ -131,6 +155,21 @@ pub fn apply_recording_patch(mut src: CfgRecordingDto) -> Result<CfgRecording, S
     }
     if src.max_list_entries == 0 {
         return Err("recording: max_list_entries must be greater than zero".to_string());
+    }
+    src.archive_directory = src.archive_directory.trim().to_string();
+    if src.archive_enabled {
+        if src.archive_directory.is_empty() {
+            return Err("recording: archive_directory cannot be empty when archive_enabled = true".to_string());
+        }
+        if !Path::new(&src.archive_directory).is_absolute() {
+            return Err("recording: archive_directory must be an absolute path".to_string());
+        }
+        if src.archive_directory == src.directory {
+            return Err("recording: archive_directory must differ from directory".to_string());
+        }
+        if src.archive_retry_seconds == 0 {
+            return Err("recording: archive_retry_seconds must be greater than zero".to_string());
+        }
     }
     if src.selected_groups.iter().any(|gssi| *gssi == 0 || *gssi > 0x00ff_ffff) {
         return Err("recording: selected_groups entries must be valid 24-bit GSSIs".to_string());
@@ -149,6 +188,9 @@ pub fn apply_recording_patch(mut src: CfgRecordingDto) -> Result<CfgRecording, S
         max_recording_minutes: src.max_recording_minutes,
         idle_finalize_secs: src.idle_finalize_secs,
         max_list_entries: src.max_list_entries,
+        archive_enabled: src.archive_enabled,
+        archive_directory: src.archive_directory,
+        archive_retry_seconds: src.archive_retry_seconds,
     })
 }
 
@@ -169,6 +211,16 @@ mod tests {
     fn rejects_invalid_group_ids() {
         let dto = CfgRecordingDto {
             selected_groups: vec![0, 0x0100_0000],
+            ..CfgRecordingDto::default()
+        };
+        assert!(apply_recording_patch(dto).is_err());
+    }
+
+    #[test]
+    fn rejects_relative_archive_directory() {
+        let dto = CfgRecordingDto {
+            archive_enabled: true,
+            archive_directory: "relative/archive".to_string(),
             ..CfgRecordingDto::default()
         };
         assert!(apply_recording_patch(dto).is_err());

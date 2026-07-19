@@ -3999,6 +3999,12 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
           <div class="stat-value is-text" id="rec-last">—</div>
           <div class="stat-sub" id="rec-error">Kein Fehler</div>
         </div>
+        <div class="stat-card is-idle" id="rec-archive-card">
+          <div class="stat-label">Server-Archiv</div>
+          <div class="stat-value is-text" id="rec-archive-state">—</div>
+          <div class="stat-sub" id="rec-archive-progress">—</div>
+          <div class="stat-sub" id="rec-archive-detail" style="word-break:break-all">—</div>
+        </div>
       </div>
 
       <div class="card">
@@ -10312,6 +10318,20 @@ async function loadRecordingStatus(){
     document.getElementById('rec-dir').textContent=j.directory||'—';
     document.getElementById('rec-last').textContent=j.last_recording_id?'Gespeichert':'Bereit';
     document.getElementById('rec-error').textContent=j.last_error||'Kein Fehler';
+    const archiveCard=document.getElementById('rec-archive-card');
+    archiveCard.classList.remove('is-ok','is-danger','is-idle','is-warn');
+    let archiveState='DEAKTIVIERT',archiveClass='is-idle';
+    if(j.archive_enabled){
+      if(j.archive_active){archiveState='ÜBERTRÄGT';archiveClass='is-warn';}
+      else if(j.archive_available){archiveState=j.archive_pending?'WARTESCHLANGE':'ONLINE';archiveClass=j.archive_pending?'is-warn':'is-ok';}
+      else{archiveState='OFFLINE';archiveClass='is-danger';}
+    }
+    archiveCard.classList.add(archiveClass);
+    document.getElementById('rec-archive-state').textContent=archiveState;
+    document.getElementById('rec-archive-progress').textContent=j.archive_enabled?`${j.archive_completed||0} archiviert · ${j.archive_pending||0} ausstehend`:'Automatische Kopie aus';
+    const archiveDetail=j.archive_last_error||j.archive_directory||'—';
+    document.getElementById('rec-archive-detail').textContent=archiveDetail;
+    document.getElementById('rec-archive-detail').title=j.archive_last_success_at?`Letzte erfolgreiche Kopie: ${recFmtTime(j.archive_last_success_at)}`:archiveDetail;
     document.getElementById('rec-toggle').textContent=j.active?'Aufzeichnung pausieren':'Aufzeichnung aktivieren';
     document.getElementById('rec-toggle').disabled=!available;
     return available;

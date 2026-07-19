@@ -547,7 +547,7 @@ password = "DagurUranus2014#"
 
 # LOCAL TETRA SPEECH RECORDING (NetCore Phase 1)
 # Records locally received TETRA speech as 8-kHz mono PCM WAV plus a JSON sidecar.
-# Runtime recording can be paused/resumed from Dashboard -> AUFZEICHNUNGEN.
+# Runtime recording can be paused/resumed from INTEGRATIONEN -> AUDIO-ZENTRALE.
 [recording]
 enabled = true
 active = true
@@ -559,6 +559,12 @@ retention_days = 30              # 0 disables automatic cleanup
 max_recording_minutes = 120
 idle_finalize_secs = 15
 max_list_entries = 2000
+
+# Copy every finalized WAV + JSON sidecar to the already mounted NFS archive.
+# The destination root must already exist and be writable by the service user.
+archive_enabled = true
+archive_directory = "/mnt/nfs-share/Recordings"
+archive_retry_seconds = 60
 
 ###############################################################################
 

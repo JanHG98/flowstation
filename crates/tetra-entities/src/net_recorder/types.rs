@@ -41,4 +41,12 @@ pub struct RecorderStatus {
     pub active_call_ids: Vec<u16>,
     pub last_recording_id: Option<String>,
     pub last_error: Option<String>,
+    pub archive_enabled: bool,
+    pub archive_directory: String,
+    pub archive_available: bool,
+    pub archive_active: bool,
+    pub archive_pending: usize,
+    pub archive_completed: usize,
+    pub archive_last_success_at: Option<String>,
+    pub archive_last_error: Option<String>,
 }

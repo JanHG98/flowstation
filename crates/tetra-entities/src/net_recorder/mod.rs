@@ -4,6 +4,7 @@
 //! valid uplink TMD speech blocks from UMAC. Recordings are stored as 8-kHz mono 16-bit
 //! PCM WAV files with JSON metadata sidecars.
 
+mod archive;
 pub mod entity;
 pub mod service;
 pub mod types;

@@ -363,6 +363,13 @@ fn build_bs_stack(
                 router.register_entity(Box::new(recorder));
                 recorder_handle = Some(handle);
                 eprintln!(" -> Local WAV recording enabled ({})", cfg.config().recording.directory);
+                if cfg.config().recording.archive_enabled {
+                    eprintln!(
+                        "    Recording archive: {} (retry every {}s)",
+                        cfg.config().recording.archive_directory,
+                        cfg.config().recording.archive_retry_seconds
+                    );
+                }
             }
             Err(err) => {
                 tracing::error!("Recorder disabled: {}", err);
