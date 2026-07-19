@@ -1,4 +1,4 @@
-use crate::net_audio::{TETRA_PCM_SAMPLES_PER_BLOCK, TetraSpeechCodec};
+use crate::net_audio::TetraSpeechCodec;
 
 pub(crate) const PCMU_PAYLOAD_TYPE: u8 = 0;
 
@@ -102,6 +102,7 @@ fn linear_to_ulaw(sample: i16) -> u8 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::net_audio::TETRA_PCM_SAMPLES_PER_BLOCK;
 
     #[test]
     fn rtp_payload_skips_extension_and_padding() {

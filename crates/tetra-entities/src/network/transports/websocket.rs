@@ -536,7 +536,12 @@ impl NetworkTransport for WebSocketTransport {
             None
         };
 
-        let (ws, response) = tungstenite::client_tls_with_config(request, tcp, None, connector).map_err(websocket_connect_error)?;
+        let (ws, response) = tungstenite::client_tls_with_config(request, tcp, None, connector).map_err(|error| match error {
+            tungstenite::HandshakeError::Failure(error) => websocket_connect_error(error),
+            tungstenite::HandshakeError::Interrupted(_) => {
+                NetworkError::ConnectionFailed("WebSocket handshake interrupted (WouldBlock)".to_string())
+            }
+        })?;
 
         let negotiated_subprotocol = response
             .headers()

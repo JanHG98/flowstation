@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use tetra_config::bluestation::SharedConfig;
-use tetra_core::{Sap, TdmaTime, tetra_entities::TetraEntity};
+use tetra_core::{TdmaTime, tetra_entities::TetraEntity};
 use tetra_saps::{SapMsg, SapMsgInner, control::call_control::CallControl, tmd::TmdCircuitDataInd};
 use uuid::Uuid;
 
