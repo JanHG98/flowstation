@@ -162,6 +162,9 @@ pub(super) struct ActiveCall {
     /// D-SETUP announcements during the first 1.6 seconds (inside the configured AudioPlayer
     /// lead-in); local MS-originated calls start at the terminal stage and are unaffected.
     pub(super) network_setup_burst_stage: u8,
+    /// Number of network-originated D-SETUP pages explicitly queued for the primary-carrier
+    /// common SCCH in frame 18. Local MS-originated calls set this to `u8::MAX` and are unaffected.
+    pub(super) frame18_scch_pages_sent: u8,
     /// Energy-economy group-announce batching: set once every affiliated EE member has had a
     /// downlink wake frame covered by an announce re-send (or the bounded window elapsed).
     pub(super) ee_announce_done: bool,
@@ -202,6 +205,7 @@ impl ActiveCall {
             usage,
             tx_active: true,
             network_setup_burst_stage: u8::MAX,
+            frame18_scch_pages_sent: u8::MAX,
             ee_announce_done: false,
             ee_announce_covered: std::collections::HashSet::new(),
             formal_state: CcFormalState::Idle
@@ -236,6 +240,7 @@ impl ActiveCall {
             usage,
             tx_active: true,
             network_setup_burst_stage: 0,
+            frame18_scch_pages_sent: 0,
             ee_announce_done: false,
             ee_announce_covered: std::collections::HashSet::new(),
             formal_state: CcFormalState::Idle

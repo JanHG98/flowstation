@@ -14,6 +14,11 @@ pub(super) const EE_DSETUP_FALLBACK_TS: i32 = 423;
 pub(super) const NETWORK_SETUP_BURST_INTERVAL_TS: i32 = 28;
 pub(super) const NETWORK_SETUP_BURST_STAGES: u8 = 4;
 
+/// Keep explicit common-SCCH paging active for the young-call window. Six seconds covers several
+/// frame-18 opportunities even when TS1 is occupied by the rotating mandatory BSCH/BNCH mapping.
+pub(super) const NETWORK_FRAME18_SCCH_WINDOW_TS: i32 = 6 * 18 * 4;
+pub(super) const NETWORK_FRAME18_SCCH_MAX_PAGES: u8 = 3;
+
 impl CcBsSubentity {
     pub fn tick_start(&mut self, queue: &mut MessageQueue, dltime: TdmaTime) {
         self.dltime = dltime;
@@ -34,6 +39,11 @@ impl CcBsSubentity {
         // burst while the encoded lead-in is still silent. This closes the five-second hole
         // between the ETSI initial/backup pair and normal late-entry paging.
         self.drive_network_setup_burst(queue);
+
+        // Idle AIv2/common-SCCH terminals may only inspect their advertised frame-18 control slot.
+        // Queue a fresh group D-SETUP just before each usable TS1 common-SCCH opportunity so the
+        // call can be acquired without relying on a later MM re-registration.
+        self.drive_network_frame18_scch_announce(queue);
 
         // Energy-economy group-call announce batching: re-emit the group D-SETUP across the
         // union of affiliated EE members' wake frames so members on a different sleep phase
@@ -462,6 +472,72 @@ impl CcBsSubentity {
         match self.individual_calls.get(&call_id).and_then(|c| c.setup_timer_started) {
             Some(started) => started.age(self.dltime) < EE_DSETUP_FALLBACK_TS,
             None => false, // no setup clock to bound the wait — don't gate
+        }
+    }
+
+    /// Queue network-originated group D-SETUP on the advertised primary-carrier common SCCH.
+    ///
+    /// MM tells AIv2/common-SCCH terminals to monitor TS1 in frame 18. The scheduler historically
+    /// rejected every addressed MAC resource in frame 18, so an idle terminal could miss all
+    /// initial D-SETUPs and only join after an unrelated location update made it listen on MCCH.
+    /// Queue two slots ahead (frame 17/TS3 -> frame 18/TS1), and only when TS1 is not occupied by
+    /// the rotating mandatory BSCH/BNCH mapping. The UMAC scheduler then emits the addressed SCH/F
+    /// in that exact frame-18 SCCH opportunity.
+    fn drive_network_frame18_scch_announce(&mut self, queue: &mut MessageQueue) {
+        if self.dltime.f != 17 || self.dltime.t != 3 {
+            return;
+        }
+
+        let target = self.dltime.add_timeslots(2);
+        if target.f != 18
+            || target.t != 1
+            || target.is_mandatory_bsch()
+            || target.is_mandatory_bnch()
+        {
+            return;
+        }
+
+        let due_calls: Vec<(u16, u8, u8, i32)> = self
+            .active_calls
+            .iter()
+            .filter_map(|(call_id, call)| {
+                let age = call.created_at.age(self.dltime);
+                (matches!(&call.origin, CallOrigin::Network { .. })
+                    && call.is_tx_active()
+                    && age < NETWORK_FRAME18_SCCH_WINDOW_TS
+                    && call.frame18_scch_pages_sent < NETWORK_FRAME18_SCCH_MAX_PAGES)
+                    .then_some((*call_id, call.usage, call.ts, age))
+            })
+            .collect();
+
+        for (call_id, usage, ts, age) in due_calls {
+            let Some(cached) = self.cached_setups.get(&call_id) else {
+                continue;
+            };
+
+            let dest_addr = cached.dest_addr;
+            let priority = cached.pdu.call_priority;
+            let (sdu, chan_alloc) =
+                Self::build_d_setup_prim(&cached.pdu, usage, ts, UlDlAssignment::Both);
+            let prim = Self::build_sapmsg(sdu, Some(chan_alloc), self.dltime, dest_addr, None);
+            queue.push_back(prim);
+
+            let mut page_no = 0;
+            if let Some(call) = self.active_calls.get_mut(&call_id) {
+                call.frame18_scch_pages_sent = call.frame18_scch_pages_sent.saturating_add(1);
+                page_no = call.frame18_scch_pages_sent;
+            }
+
+            tracing::info!(
+                "CMCE: network D-SETUP queued for frame-18 common SCCH call_id={} gssi={} page={}/{} target={} age_ts={} priority={}",
+                call_id,
+                dest_addr.ssi,
+                page_no,
+                NETWORK_FRAME18_SCCH_MAX_PAGES,
+                target,
+                age,
+                priority
+            );
         }
     }
 

@@ -1138,9 +1138,20 @@ impl BsChannelScheduler {
     /// If none; return first in-progress fragmented message.
     /// If none; return first to-be-transmitted resource.
     /// If none, return None.
+    #[inline]
+    fn frame18_common_scch_available(&self, ts: TdmaTime) -> bool {
+        self.downlink_mode == CarrierDownlinkMode::PrimaryMcch
+            && ts.f == 18
+            && ts.t == 1
+            && !ts.is_mandatory_bsch()
+            && !ts.is_mandatory_bnch()
+    }
+
     pub fn dl_take_prioritized_sched_item(&mut self, ts: TdmaTime) -> Option<DlSchedElem> {
-        if ts.f == 18 {
-            // No resources on frame 18
+        if ts.f == 18 && !self.frame18_common_scch_available(ts) {
+            // Frame 18 is normally broadcast/associated-control territory. The one exception is
+            // the advertised primary-carrier common SCCH on TS1 when that slot is not occupied by
+            // the mandatory rotating BSCH/BNCH mapping.
             return None;
         }
 
@@ -1348,9 +1359,14 @@ impl BsChannelScheduler {
             }
         };
 
-        // Sanity check: frame 18 should not carry user blocks
-        if elem.blk1.is_some() {
-            assert!(ts.f != 18, "frame 18 shouldn't have blk1 set");
+        // Frame 18 normally carries BSCH/BNCH or associated control. On the primary carrier,
+        // TS1 may carry the common SCCH when the rotating mandatory BSCH/BNCH mapping leaves it
+        // free. That slot is intentionally allowed to contain an addressed SCH/F block.
+        if elem.blk1.is_some() && ts.f == 18 {
+            assert!(
+                self.frame18_common_scch_available(ts),
+                "frame 18 user/control block outside advertised common SCCH slot"
+            );
         }
 
         // Construct the BBK block to reflect UL/DL usage
@@ -2083,6 +2099,40 @@ mod tests {
         assert_eq!(sched.dltx_queues[0].len(), 0);
         assert_eq!(sched.dltx_queues[1].len(), 1);
         assert_eq!(sched.dltx_queues[2].len(), 1);
+    }
+
+    #[test]
+    fn test_frame_18_primary_ts1_common_scch_delivers_when_broadcast_free() {
+        let mut sched = get_testing_slotter();
+        let addr = TetraAddress {
+            ssi_type: SsiType::Gssi,
+            ssi: 15201,
+        };
+        let pdu = BsChannelScheduler::dl_make_minimal_resource(&addr, None, false);
+        sched.dl_enqueue_tma_for_link(1, pdu, BitBuffer::new(0), None);
+
+        // In multiframe 1 the mandatory frame-18 BSCH/BNCH slots are TS2 and TS4, so TS1 is
+        // available for the common SCCH advertised by MM.
+        let block = sched.dl_build_block_from_signalling_schedule(TdmaTime { t: 1, f: 18, m: 1, h: 0 });
+        assert!(block.is_some());
+        assert!(sched.dltx_queues[0].is_empty());
+    }
+
+    #[test]
+    fn test_frame_18_primary_ts1_defers_when_mandatory_broadcast_occupies_slot() {
+        let mut sched = get_testing_slotter();
+        let addr = TetraAddress {
+            ssi_type: SsiType::Gssi,
+            ssi: 15201,
+        };
+        let pdu = BsChannelScheduler::dl_make_minimal_resource(&addr, None, false);
+        sched.dl_enqueue_tma_for_link(1, pdu, BitBuffer::new(0), None);
+
+        // In multiframe 2 TS1 is the mandatory BSCH slot; the control message must remain queued
+        // for the next usable common-SCCH opportunity rather than replacing the broadcast block.
+        let block = sched.dl_build_block_from_signalling_schedule(TdmaTime { t: 1, f: 18, m: 2, h: 0 });
+        assert!(block.is_none());
+        assert_eq!(sched.dltx_queues[0].len(), 1);
     }
 
     #[test]
