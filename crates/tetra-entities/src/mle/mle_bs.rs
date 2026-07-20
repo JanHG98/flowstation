@@ -304,7 +304,10 @@ impl MleBs {
                     packet_data_flag: false,
                     n_tlsdu_repeats: 0,
                     data_class_info: None,
-                    req_handle: 0,
+                    // Preserve the CMCE request handle. Most callers use zero; the
+                    // frame-18 common-SCCH path uses a BS-internal marker that LLC/UMAC
+                    // must retain until the scheduler pins the PDU to that control slot.
+                    req_handle: prim.handle as i32,
 
                     chan_alloc,
                     tx_reporter: prim.tx_reporter.take(),

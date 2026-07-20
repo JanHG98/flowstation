@@ -21,6 +21,7 @@ use super::sec_health::{CfgHealthDto, apply_health_patch};
 use super::sec_meshcom::{CfgMeshcomDto, apply_meshcom_patch};
 use super::sec_recovery::{CfgRecoveryDto, apply_recovery_patch};
 use super::sec_audio_player::{CfgAudioPlayerDto, apply_audio_player_patch};
+use super::sec_tts::{CfgTtsDto, apply_tts_patch};
 use super::sec_recording::{CfgRecordingDto, apply_recording_patch};
 use super::sec_security::{CfgSecurityDto, apply_security_patch};
 use super::sec_snom_notify::{CfgSnomNotifyDto, apply_snom_notify_patch};
@@ -200,6 +201,13 @@ pub fn from_toml_str(toml_str: &str) -> Result<StackConfig, Box<dyn std::error::
         return Err(format!("Unrecognized fields in audio_player config: {:?}", sorted_keys(&audio_player.extra)).into());
     }
 
+    // Optional tts section
+    if let Some(ref tts) = root.tts
+        && !tts.extra.is_empty()
+    {
+        return Err(format!("Unrecognized fields in tts config: {:?}", sorted_keys(&tts.extra)).into());
+    }
+
     // Optional telemetry section
     if let Some(ref telemetry) = root.telemetry
         && !telemetry.extra.is_empty()
@@ -290,6 +298,7 @@ pub fn from_toml_str(toml_str: &str) -> Result<StackConfig, Box<dyn std::error::
         dashboard: None,
         recording: apply_recording_patch(root.recording.unwrap_or_default())?,
         audio_player: apply_audio_player_patch(root.audio_player.unwrap_or_default())?,
+        tts: apply_tts_patch(root.tts.unwrap_or_default())?,
         telemetry: None,
         control: None,
         control_room: None,
@@ -379,6 +388,7 @@ struct TomlConfigRoot {
     dashboard: Option<CfgDashboardDto>,
     recording: Option<CfgRecordingDto>,
     audio_player: Option<CfgAudioPlayerDto>,
+    tts: Option<CfgTtsDto>,
     telemetry: Option<CfgTelemetryDto>,
     command: Option<CfgControlDto>,
     control_room: Option<CfgControlRoomDto>,

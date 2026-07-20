@@ -2,6 +2,25 @@ use tetra_core::{BitBuffer, EndpointId, LinkId, TetraAddress, Todo, TxReporter};
 
 use crate::lcmc::fields::chan_alloc_req::CmceChanAllocReq;
 
+/// Internal BS-only request-handle namespace for group-signalling pinned to the
+/// primary carrier's usable frame-18 common-SCCH opportunity. The low 16 bits
+/// carry the CMCE call identifier so UMAC can deduplicate and retire stale pages.
+/// These values are never sent over the air.
+pub const TMA_REQ_HANDLE_FRAME18_COMMON_SCCH_PREFIX: Todo = 0x180000;
+pub const TMA_REQ_HANDLE_FRAME18_COMMON_SCCH_MASK: Todo = 0xFF0000;
+
+#[inline]
+pub fn make_frame18_common_scch_handle(call_id: u16) -> Todo {
+    TMA_REQ_HANDLE_FRAME18_COMMON_SCCH_PREFIX | Todo::from(call_id)
+}
+
+#[inline]
+pub fn parse_frame18_common_scch_handle(handle: Todo) -> Option<u16> {
+    ((handle & TMA_REQ_HANDLE_FRAME18_COMMON_SCCH_MASK)
+        == TMA_REQ_HANDLE_FRAME18_COMMON_SCCH_PREFIX)
+        .then_some((handle & 0xFFFF) as u16)
+}
+
 /// Clause 20.4.1.1.1
 /// TMA-CANCEL request: this primitive shall be used to cancel a TMA-UNITDATA
 /// request primitive that was submitted by the LLC.

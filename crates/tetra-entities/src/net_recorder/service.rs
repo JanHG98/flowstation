@@ -1,6 +1,6 @@
 use std::ffi::CString;
-use std::fs;
-use std::io;
+use std::fs::{self, File, OpenOptions};
+use std::io::{self, Read};
 use std::os::unix::ffi::OsStrExt;
 use std::path::{Component, Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -8,6 +8,7 @@ use std::sync::mpsc::{SyncSender, sync_channel};
 use std::sync::{Arc, Mutex};
 
 use tetra_config::bluestation::{CfgRecording, RecordingMode};
+use uuid::Uuid;
 
 use super::archive::{recording_is_archived, spawn_archive_worker};
 use super::types::{RecorderStatus, RecordingMetadata};
@@ -44,7 +45,7 @@ impl RecorderHandle {
     pub(crate) fn new(config: CfgRecording) -> io::Result<Self> {
         let root = PathBuf::from(&config.directory);
         fs::create_dir_all(&root)?;
-        let (archive_tx, archive_rx) = if config.archive_enabled {
+        let (archive_tx, archive_rx) = if config.archive_enabled || config.tts_archive_enabled {
             let (tx, rx) = sync_channel(1);
             (Some(tx), Some(rx))
         } else {
@@ -179,6 +180,8 @@ impl RecorderHandle {
             last_error,
             archive_enabled: self.inner.config.archive_enabled,
             archive_directory: self.inner.config.archive_directory.clone(),
+            tts_archive_enabled: self.inner.config.tts_archive_enabled,
+            tts_archive_directory: self.inner.config.tts_archive_directory.clone(),
             archive_available,
             archive_active,
             archive_pending,
@@ -192,6 +195,110 @@ impl RecorderHandle {
         let mut metadata = self.scan_recordings();
         metadata.truncate(limit.unwrap_or(self.inner.config.max_list_entries).min(self.inner.config.max_list_entries));
         metadata
+    }
+
+    /// Import a finished 8-kHz mono PCM WAV into the local recording library.
+    /// The WAV and JSON sidecar are written exactly like normal call recordings,
+    /// so playback, deletion and retention use the same code path. The archive
+    /// worker routes `origin = "tts"` to the dedicated TTS server directory.
+    pub fn import_named_wav(&self, source: &Path, title: &str, origin: &str) -> Result<RecordingMetadata, String> {
+        if !self.has_minimum_free_space() {
+            return Err(format!(
+                "minimum free space threshold reached ({} MiB)",
+                self.inner.config.minimum_free_space_mb
+            ));
+        }
+        let title = normalize_library_title(title)?;
+        let origin = normalize_library_origin(origin)?;
+        let (duration_ms, audio_bytes) = inspect_recording_wav(source)?;
+        let now = chrono::Local::now();
+        let id = Uuid::new_v4().to_string();
+        let day_dir = self
+            .root()
+            .join(now.format("%Y").to_string())
+            .join(now.format("%m").to_string())
+            .join(now.format("%d").to_string());
+        fs::create_dir_all(&day_dir).map_err(|error| format!("cannot create {}: {error}", day_dir.display()))?;
+        let safe_title = library_filename_component(&title);
+        let stem = format!(
+            "{}-{}_{}_{}",
+            origin.to_uppercase(),
+            safe_title,
+            now.format("%Y-%m-%d_%H-%M-%S"),
+            id
+        );
+        let final_audio_path = day_dir.join(format!("{stem}.wav"));
+        let part_audio_path = day_dir.join(format!("{stem}.wav.part"));
+        let final_metadata_path = day_dir.join(format!("{stem}.json"));
+
+        let result = (|| -> Result<RecordingMetadata, String> {
+            fs::copy(source, &part_audio_path).map_err(|error| {
+                format!(
+                    "cannot copy generated WAV {} -> {}: {error}",
+                    source.display(),
+                    part_audio_path.display()
+                )
+            })?;
+            OpenOptions::new()
+                .write(true)
+                .open(&part_audio_path)
+                .and_then(|file| file.sync_all())
+                .map_err(|error| format!("cannot sync {}: {error}", part_audio_path.display()))?;
+            fs::rename(&part_audio_path, &final_audio_path).map_err(|error| {
+                format!(
+                    "cannot publish generated WAV {} -> {}: {error}",
+                    part_audio_path.display(),
+                    final_audio_path.display()
+                )
+            })?;
+
+            let relative_audio_path = final_audio_path
+                .strip_prefix(self.root())
+                .map_err(|error| error.to_string())?
+                .to_string_lossy()
+                .replace('\\', "/");
+            let timestamp = now.to_rfc3339();
+            let metadata = RecordingMetadata {
+                schema_version: 1,
+                id: id.clone(),
+                title: Some(title.clone()),
+                origin: Some(origin.clone()),
+                call_id: 0,
+                source_issi: 0,
+                destination_id: 0,
+                destination_type: "library".to_string(),
+                started_at: timestamp.clone(),
+                ended_at: timestamp,
+                duration_ms,
+                audio_bytes,
+                relative_audio_path,
+                recovered_after_unclean_shutdown: false,
+                segments: Vec::new(),
+            };
+            write_recording_metadata_atomic(&final_metadata_path, &metadata)?;
+            Ok(metadata)
+        })();
+
+        match result {
+            Ok(metadata) => {
+                self.note_completed(metadata.id.clone());
+                tracing::info!(
+                    "Recorder: imported {} WAV title={} id={} duration_ms={} path={}",
+                    origin,
+                    title,
+                    metadata.id,
+                    metadata.duration_ms,
+                    final_audio_path.display()
+                );
+                Ok(metadata)
+            }
+            Err(error) => {
+                let _ = fs::remove_file(&part_audio_path);
+                let _ = fs::remove_file(&final_audio_path);
+                let _ = fs::remove_file(&final_metadata_path);
+                Err(error)
+            }
+        }
     }
 
     pub(super) fn scan_recordings(&self) -> Vec<RecordingMetadata> {
@@ -345,7 +452,9 @@ impl RecorderHandle {
             let Ok(audio) = self.audio_path(&item.id) else { continue };
             let modified = audio.metadata().and_then(|m| m.modified()).unwrap_or(std::time::SystemTime::now());
             if modified < cutoff {
-                if self.inner.config.archive_enabled && !recording_is_archived(&self.inner, &item) {
+                if super::archive::recording_requires_archive(&self.inner, &item)
+                    && !recording_is_archived(&self.inner, &item)
+                {
                     tracing::warn!(
                         "Recorder: retention kept unarchived recording id={} because archive copy is not confirmed",
                         item.id
@@ -384,6 +493,94 @@ impl RecorderShared {
         metadata.sort_by(|a, b| b.started_at.cmp(&a.started_at));
         metadata
     }
+}
+
+fn normalize_library_title(title: &str) -> Result<String, String> {
+    let title = title.split_whitespace().collect::<Vec<_>>().join(" ");
+    let count = title.chars().count();
+    if count == 0 || count > 120 {
+        return Err("recording name must contain 1-120 characters".to_string());
+    }
+    if title.chars().any(char::is_control) {
+        return Err("recording name contains invalid control characters".to_string());
+    }
+    Ok(title)
+}
+
+fn normalize_library_origin(origin: &str) -> Result<String, String> {
+    let origin = origin.trim().to_ascii_lowercase();
+    if origin.is_empty()
+        || origin.len() > 24
+        || !origin.chars().all(|ch| ch.is_ascii_alphanumeric() || ch == '-' || ch == '_')
+    {
+        return Err("invalid recording origin".to_string());
+    }
+    Ok(origin)
+}
+
+fn library_filename_component(title: &str) -> String {
+    let mut out = String::new();
+    let mut separator = false;
+    for ch in title.chars() {
+        if ch.is_alphanumeric() || matches!(ch, '-' | '_') {
+            out.push(ch);
+            separator = false;
+        } else if !separator {
+            out.push('_');
+            separator = true;
+        }
+        if out.chars().count() >= 80 {
+            break;
+        }
+    }
+    let out = out.trim_matches('_');
+    if out.is_empty() {
+        "Durchsage".to_string()
+    } else {
+        out.to_string()
+    }
+}
+
+fn inspect_recording_wav(path: &Path) -> Result<(u64, u64), String> {
+    let mut file = File::open(path).map_err(|error| format!("cannot open generated WAV {}: {error}", path.display()))?;
+    let mut header = [0u8; 44];
+    file.read_exact(&mut header)
+        .map_err(|error| format!("cannot read generated WAV header {}: {error}", path.display()))?;
+    let pcm_format = u16::from_le_bytes([header[20], header[21]]);
+    let channels = u16::from_le_bytes([header[22], header[23]]);
+    let sample_rate = u32::from_le_bytes([header[24], header[25], header[26], header[27]]);
+    let bits_per_sample = u16::from_le_bytes([header[34], header[35]]);
+    let data_bytes = u32::from_le_bytes([header[40], header[41], header[42], header[43]]) as u64;
+    if &header[0..4] != b"RIFF"
+        || &header[8..12] != b"WAVE"
+        || &header[12..16] != b"fmt "
+        || &header[36..40] != b"data"
+        || pcm_format != 1
+        || channels != 1
+        || sample_rate != 8_000
+        || bits_per_sample != 16
+    {
+        return Err("generated WAV is not canonical PCM s16le/mono/8000Hz".to_string());
+    }
+    let file_len = file.metadata().map_err(|error| error.to_string())?.len();
+    if data_bytes == 0 || file_len < 44u64.saturating_add(data_bytes) || data_bytes % 2 != 0 {
+        return Err("generated WAV has an invalid or empty data chunk".to_string());
+    }
+    let samples = data_bytes / 2;
+    let duration_ms = samples.saturating_mul(1000) / 8_000;
+    Ok((duration_ms, data_bytes))
+}
+
+fn write_recording_metadata_atomic(path: &Path, metadata: &RecordingMetadata) -> Result<(), String> {
+    let body = serde_json::to_vec_pretty(metadata).map_err(|error| error.to_string())?;
+    let tmp = PathBuf::from(format!("{}.tmp", path.display()));
+    fs::write(&tmp, body).map_err(|error| format!("cannot write {}: {error}", tmp.display()))?;
+    OpenOptions::new()
+        .write(true)
+        .open(&tmp)
+        .and_then(|file| file.sync_all())
+        .map_err(|error| format!("cannot sync {}: {error}", tmp.display()))?;
+    fs::rename(&tmp, path).map_err(|error| format!("cannot rename {} -> {}: {error}", tmp.display(), path.display()))
 }
 
 fn valid_id(id: &str) -> bool {

@@ -1,5 +1,5 @@
 use std::fs;
-use std::io::{self, Read};
+use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -8,6 +8,121 @@ use tetra_config::bluestation::CfgAudioPlayer;
 use crate::net_audio::{TETRA_PCM_SAMPLE_RATE, TETRA_PCM_SAMPLES_PER_BLOCK, TetraSpeechEncoder};
 
 use super::types::PreparedAudio;
+
+/// Convert a fully generated WAV into the exact on-disk format produced by
+/// FlowStation's recorder: 8 kHz, mono, signed 16-bit PCM with a canonical
+/// 44-byte RIFF/WAVE header.
+///
+/// The file is written to `part_path`, flushed to stable storage and only then
+/// atomically renamed to `final_path`. TTS uses this before calling
+/// `AudioPlayerHandle::play_recording`, so generated announcements and saved
+/// recordings enter the radio path with the same file format and the same
+/// playback entrypoint.
+pub(crate) fn materialize_recording_wav(
+    config: &CfgAudioPlayer,
+    source_path: &Path,
+    part_path: &Path,
+    final_path: &Path,
+) -> Result<PathBuf, String> {
+    let metadata = fs::metadata(source_path)
+        .map_err(|e| format!("cannot stat generated WAV {}: {e}", source_path.display()))?;
+    if !metadata.is_file() {
+        return Err("generated TTS source is not a regular file".to_string());
+    }
+    let max_bytes = config.max_file_size_mb.saturating_mul(1024 * 1024);
+    if metadata.len() > max_bytes {
+        return Err(format!(
+            "generated TTS WAV is too large ({} bytes; limit {} MiB)",
+            metadata.len(), config.max_file_size_mb
+        ));
+    }
+
+    let pcm = decode_wav_native(source_path).or_else(|native_err| {
+        tracing::debug!(
+            "AudioPlayer: native TTS WAV decode failed for {}: {}; trying ffmpeg",
+            source_path.display(),
+            native_err
+        );
+        decode_with_ffmpeg(&config.ffmpeg_path, source_path, config.max_duration_seconds)
+    })?;
+    if pcm.is_empty() {
+        return Err("generated TTS WAV contains no samples".to_string());
+    }
+    let max_samples = (config.max_duration_seconds as usize).saturating_mul(TETRA_PCM_SAMPLE_RATE as usize);
+    if pcm.len() > max_samples {
+        return Err(format!(
+            "generated TTS WAV is longer than the configured {} second limit",
+            config.max_duration_seconds
+        ));
+    }
+
+    if let Some(parent) = part_path.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|e| format!("cannot create recording spool {}: {e}", parent.display()))?;
+    }
+    if let Some(parent) = final_path.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|e| format!("cannot create recording spool {}: {e}", parent.display()))?;
+    }
+    let _ = fs::remove_file(part_path);
+    let _ = fs::remove_file(final_path);
+
+    let result = write_recording_wav(part_path, &pcm).and_then(|_| {
+        fs::rename(part_path, final_path)
+            .map_err(|e| format!("cannot publish materialized recording WAV {}: {e}", final_path.display()))
+    });
+    if let Err(error) = result {
+        let _ = fs::remove_file(part_path);
+        let _ = fs::remove_file(final_path);
+        return Err(error);
+    }
+
+    let canonical = final_path
+        .canonicalize()
+        .map_err(|e| format!("cannot canonicalize materialized recording WAV {}: {e}", final_path.display()))?;
+    if !canonical.is_file() {
+        return Err("materialized recording WAV is not a regular file".to_string());
+    }
+    Ok(canonical)
+}
+
+fn write_recording_wav(path: &Path, pcm: &[i16]) -> Result<(), String> {
+    let data_bytes = pcm
+        .len()
+        .checked_mul(2)
+        .ok_or_else(|| "recording WAV size overflow".to_string())?;
+    let data_len = u32::try_from(data_bytes).map_err(|_| "recording WAV exceeds RIFF size limit".to_string())?;
+    let riff_len = 36u32
+        .checked_add(data_len)
+        .ok_or_else(|| "recording WAV exceeds RIFF size limit".to_string())?;
+
+    let mut output = fs::File::create(path)
+        .map_err(|e| format!("cannot create materialized recording WAV {}: {e}", path.display()))?;
+    output.write_all(b"RIFF").map_err(|e| e.to_string())?;
+    output.write_all(&riff_len.to_le_bytes()).map_err(|e| e.to_string())?;
+    output.write_all(b"WAVE").map_err(|e| e.to_string())?;
+    output.write_all(b"fmt ").map_err(|e| e.to_string())?;
+    output.write_all(&16u32.to_le_bytes()).map_err(|e| e.to_string())?;
+    output.write_all(&1u16.to_le_bytes()).map_err(|e| e.to_string())?;
+    output.write_all(&1u16.to_le_bytes()).map_err(|e| e.to_string())?;
+    output
+        .write_all(&TETRA_PCM_SAMPLE_RATE.to_le_bytes())
+        .map_err(|e| e.to_string())?;
+    output
+        .write_all(&(TETRA_PCM_SAMPLE_RATE * 2).to_le_bytes())
+        .map_err(|e| e.to_string())?;
+    output.write_all(&2u16.to_le_bytes()).map_err(|e| e.to_string())?;
+    output.write_all(&16u16.to_le_bytes()).map_err(|e| e.to_string())?;
+    output.write_all(b"data").map_err(|e| e.to_string())?;
+    output.write_all(&data_len.to_le_bytes()).map_err(|e| e.to_string())?;
+    for sample in pcm {
+        output.write_all(&sample.to_le_bytes()).map_err(|e| e.to_string())?;
+    }
+    output
+        .sync_all()
+        .map_err(|e| format!("cannot sync materialized recording WAV {}: {e}", path.display()))?;
+    Ok(())
+}
 
 pub(crate) fn prepare_audio(
     config: &CfgAudioPlayer,
@@ -81,27 +196,46 @@ fn prepare_audio_from_path(
         return Err("decoded audio contains no samples".to_string());
     }
 
-    let duration_ms = pcm.len() as u64 * 1000 / TETRA_PCM_SAMPLE_RATE as u64;
+    let source_duration_ms = pcm.len() as u64 * 1000 / TETRA_PCM_SAMPLE_RATE as u64;
     let remainder = pcm.len() % TETRA_PCM_SAMPLES_PER_BLOCK;
     if remainder != 0 {
         pcm.resize(pcm.len() + (TETRA_PCM_SAMPLES_PER_BLOCK - remainder), 0);
     }
 
     let mut encoder = TetraSpeechEncoder::new().ok_or_else(|| "tetra encoder creation failed".to_string())?;
-    let mut blocks = Vec::with_capacity(pcm.len() / TETRA_PCM_SAMPLES_PER_BLOCK + config.tail_silence_blocks as usize);
+    let speech_blocks = pcm.len() / TETRA_PCM_SAMPLES_PER_BLOCK;
+    let mut blocks = Vec::with_capacity(
+        config.lead_in_silence_blocks as usize + speech_blocks + config.tail_silence_blocks as usize,
+    );
+    let silence = [0i16; TETRA_PCM_SAMPLES_PER_BLOCK];
+
+    // The CMCE entity can announce a group call and open the traffic circuit in
+    // the same scheduler turn. Subscriber radios still need a short, real TCH/S
+    // window to receive D-SETUP and tune to the assigned channel. Sending encoded
+    // silence here prevents short prompts from disappearing before the MS joins.
+    for _ in 0..config.lead_in_silence_blocks {
+        let encoded = encoder
+            .encode_complete_block(&silence)
+            .ok_or_else(|| "failed to encode TETRA lead-in silence".to_string())?;
+        blocks.push(encoded);
+    }
+
     for block in pcm.chunks_exact(TETRA_PCM_SAMPLES_PER_BLOCK) {
         let encoded = encoder
             .encode_complete_block(block)
             .ok_or_else(|| "failed to encode a complete TETRA speech block".to_string())?;
         blocks.push(encoded);
     }
-    let silence = [0i16; TETRA_PCM_SAMPLES_PER_BLOCK];
     for _ in 0..config.tail_silence_blocks {
         let encoded = encoder
             .encode_complete_block(&silence)
             .ok_or_else(|| "failed to encode TETRA tail silence".to_string())?;
         blocks.push(encoded);
     }
+
+    let guard_duration_ms =
+        (config.lead_in_silence_blocks as u64 + config.tail_silence_blocks as u64) * 60;
+    let duration_ms = source_duration_ms.saturating_add(guard_duration_ms);
 
     Ok(PreparedAudio {
         job_id,
@@ -368,5 +502,23 @@ mod tests {
     #[test]
     fn decodes_pcm16_sample() {
         assert_eq!(decode_one_sample(&1234i16.to_le_bytes(), 1, 16).unwrap(), 1234);
+    }
+
+    #[test]
+    fn materialized_recording_wav_has_recorder_format() {
+        let dir = std::env::temp_dir().join(format!("netcore-tts-recording-wav-test-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("test.wav.part");
+        write_recording_wav(&path, &[1, -1, 42]).unwrap();
+        let bytes = fs::read(&path).unwrap();
+        assert_eq!(&bytes[0..4], b"RIFF");
+        assert_eq!(&bytes[8..12], b"WAVE");
+        assert_eq!(u16::from_le_bytes(bytes[20..22].try_into().unwrap()), 1);
+        assert_eq!(u16::from_le_bytes(bytes[22..24].try_into().unwrap()), 1);
+        assert_eq!(u32::from_le_bytes(bytes[24..28].try_into().unwrap()), 8_000);
+        assert_eq!(u16::from_le_bytes(bytes[34..36].try_into().unwrap()), 16);
+        assert_eq!(u32::from_le_bytes(bytes[40..44].try_into().unwrap()), 6);
+        let _ = fs::remove_dir_all(dir);
     }
 }

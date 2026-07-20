@@ -8,6 +8,24 @@ use super::*;
 /// (6 s / (170/12 ms per slot) ≈ 423 timeslots.)
 pub(super) const EE_DSETUP_FALLBACK_TS: i32 = 423;
 
+/// Extra network-originated group D-SETUP announcements after the immediate + backup pair.
+/// 28 TETRA timeslots are about 397 ms, so stages 1..=4 land at roughly
+/// 0.4 / 0.8 / 1.2 / 1.6 seconds — fully inside the 1.8-second AudioPlayer lead-in.
+pub(super) const NETWORK_SETUP_BURST_INTERVAL_TS: i32 = 28;
+pub(super) const NETWORK_SETUP_BURST_STAGES: u8 = 4;
+
+/// Network calls already emit the immediate D-SETUP, the normal backup and four dense
+/// setup-burst pages. Suppress the separate Energy-Economy re-announce until that initial
+/// sequence is finished, otherwise two or three channel-allocation PDUs can land in the
+/// same TS1 scheduler turn and be deferred/fragmented. 112 timeslots are about 1.6 s.
+pub(super) const NETWORK_EE_ANNOUNCE_MIN_AGE_TS: i32 =
+    NETWORK_SETUP_BURST_INTERVAL_TS * NETWORK_SETUP_BURST_STAGES as i32;
+
+/// Keep explicit common-SCCH paging active for the young-call window. Six seconds covers several
+/// frame-18 opportunities even when TS1 is occupied by the rotating mandatory BSCH/BNCH mapping.
+pub(super) const NETWORK_FRAME18_SCCH_WINDOW_TS: i32 = 6 * 18 * 4;
+pub(super) const NETWORK_FRAME18_SCCH_MAX_PAGES: u8 = 3;
+
 impl CcBsSubentity {
     pub fn tick_start(&mut self, queue: &mut MessageQueue, dltime: TdmaTime) {
         self.dltime = dltime;
@@ -23,6 +41,16 @@ impl CcBsSubentity {
         self.check_individual_setup_timeout(queue);
         // Check hangtime expiry for active local calls
         self.check_hangtime_expiry(queue);
+
+        // Network-originated group calls (AudioPlayer/TTS/Brew) get a dense initial D-SETUP
+        // burst while the encoded lead-in is still silent. This closes the five-second hole
+        // between the ETSI initial/backup pair and normal late-entry paging.
+        self.drive_network_setup_burst(queue);
+
+        // Idle AIv2/common-SCCH terminals may only inspect their advertised frame-18 control slot.
+        // Queue a fresh group D-SETUP just before each usable TS1 common-SCCH opportunity so the
+        // call can be acquired without relying on a later MM re-registration.
+        self.drive_network_frame18_scch_announce(queue);
 
         // Energy-economy group-call announce batching: re-emit the group D-SETUP across the
         // union of affiliated EE members' wake frames so members on a different sleep phase
@@ -297,6 +325,65 @@ impl CcBsSubentity {
         }
     }
 
+    /// Emit four additional group-addressed D-SETUPs for a young network-originated call.
+    ///
+    /// The immediate D-SETUP is queued by `fsm_on_network_call_start`, and CircuitMgr supplies
+    /// the normal one-frame backup. These extra pages are intentionally untracked: they are a
+    /// bounded reliability burst, must not be blocked by a still-pending receipt from the backup,
+    /// and stop automatically after stage four.
+    fn drive_network_setup_burst(&mut self, queue: &mut MessageQueue) {
+        let due_calls: Vec<(u16, u8, u8, u8, i32)> = self
+            .active_calls
+            .iter()
+            .filter_map(|(call_id, call)| {
+                if !matches!(&call.origin, CallOrigin::Network { .. })
+                    || !call.is_tx_active()
+                    || call.network_setup_burst_stage >= NETWORK_SETUP_BURST_STAGES
+                {
+                    return None;
+                }
+
+                let next_stage = call.network_setup_burst_stage + 1;
+                let due_age = NETWORK_SETUP_BURST_INTERVAL_TS * i32::from(next_stage);
+                let age = call.created_at.age(self.dltime);
+                (age >= due_age).then_some((*call_id, call.usage, call.ts, next_stage, age))
+            })
+            .collect();
+
+        for (call_id, usage, ts, stage, age) in due_calls {
+            let Some(cached) = self.cached_setups.get(&call_id) else {
+                tracing::debug!(
+                    "CMCE: network D-SETUP burst stopped for call_id={} (cached setup missing)",
+                    call_id
+                );
+                if let Some(call) = self.active_calls.get_mut(&call_id) {
+                    call.network_setup_burst_stage = NETWORK_SETUP_BURST_STAGES;
+                }
+                continue;
+            };
+
+            let dest_addr = cached.dest_addr;
+            let priority = cached.pdu.call_priority;
+            let (sdu, chan_alloc) = Self::build_d_setup_prim(&cached.pdu, usage, ts, UlDlAssignment::Both);
+            let prim = Self::build_sapmsg(sdu, Some(chan_alloc), self.dltime, dest_addr, None);
+            queue.push_back(prim);
+
+            if let Some(call) = self.active_calls.get_mut(&call_id) {
+                call.network_setup_burst_stage = stage;
+            }
+
+            tracing::info!(
+                "CMCE: network D-SETUP burst call_id={} gssi={} stage={}/{} age_ts={} priority={}",
+                call_id,
+                dest_addr.ssi,
+                stage,
+                NETWORK_SETUP_BURST_STAGES,
+                age,
+                priority
+            );
+        }
+    }
+
     /// Release individual setup attempts that exceed setup timeout.
     pub(super) fn check_individual_setup_timeout(&mut self, queue: &mut MessageQueue) {
         let expired_setup_calls: Vec<u16> = self
@@ -395,6 +482,78 @@ impl CcBsSubentity {
         }
     }
 
+    /// Queue network-originated group D-SETUP on the advertised primary-carrier common SCCH.
+    ///
+    /// MM tells AIv2/common-SCCH terminals to monitor TS1 in frame 18. The scheduler historically
+    /// rejected every addressed MAC resource in frame 18, so an idle terminal could miss all
+    /// initial D-SETUPs and only join after an unrelated location update made it listen on MCCH.
+    /// Queue two slots ahead (frame 17/TS3 -> frame 18/TS1), and only when TS1 is not occupied by
+    /// the rotating mandatory BSCH/BNCH mapping. The UMAC scheduler then emits the addressed SCH/F
+    /// in that exact frame-18 SCCH opportunity.
+    fn drive_network_frame18_scch_announce(&mut self, queue: &mut MessageQueue) {
+        if self.dltime.f != 17 || self.dltime.t != 3 {
+            return;
+        }
+
+        let target = self.dltime.add_timeslots(2);
+        if target.f != 18
+            || target.t != 1
+            || target.is_mandatory_bsch()
+            || target.is_mandatory_bnch()
+        {
+            return;
+        }
+
+        let due_calls: Vec<(u16, u8, u8, i32)> = self
+            .active_calls
+            .iter()
+            .filter_map(|(call_id, call)| {
+                let age = call.created_at.age(self.dltime);
+                (matches!(&call.origin, CallOrigin::Network { .. })
+                    && call.is_tx_active()
+                    && age < NETWORK_FRAME18_SCCH_WINDOW_TS
+                    && call.frame18_scch_pages_sent < NETWORK_FRAME18_SCCH_MAX_PAGES)
+                    .then_some((*call_id, call.usage, call.ts, age))
+            })
+            .collect();
+
+        for (call_id, usage, ts, age) in due_calls {
+            let Some(cached) = self.cached_setups.get(&call_id) else {
+                continue;
+            };
+
+            let dest_addr = cached.dest_addr;
+            let priority = cached.pdu.call_priority;
+            let (sdu, chan_alloc) =
+                Self::build_d_setup_prim(&cached.pdu, usage, ts, UlDlAssignment::Both);
+            let prim = Self::build_sapmsg_frame18_common_scch(
+                call_id,
+                sdu,
+                Some(chan_alloc),
+                dest_addr,
+                None,
+            );
+            queue.push_back(prim);
+
+            let mut page_no = 0;
+            if let Some(call) = self.active_calls.get_mut(&call_id) {
+                call.frame18_scch_pages_sent = call.frame18_scch_pages_sent.saturating_add(1);
+                page_no = call.frame18_scch_pages_sent;
+            }
+
+            tracing::info!(
+                "CMCE: network D-SETUP queued for frame-18 common SCCH call_id={} gssi={} page={}/{} target={} age_ts={} priority={}",
+                call_id,
+                dest_addr.ssi,
+                page_no,
+                NETWORK_FRAME18_SCCH_MAX_PAGES,
+                target,
+                age,
+                priority
+            );
+        }
+    }
+
     /// Energy-economy group-call announce batching (ETSI EN 300 392-2 §23.5 / §23.7).
     ///
     /// A group D-SETUP sent once reaches only members awake at that instant. EE members sleep on
@@ -419,7 +578,15 @@ impl CcBsSubentity {
             // Only re-announce while someone is actively transmitting. Once the group call is in
             // hangtime / NoActiveSpeaker, extra D-SETUPs can be interpreted by some radios as a
             // denied retake rather than a harmless late-entry announce.
-            .filter(|(_, c)| c.is_tx_active() && !c.ee_announce_done && c.created_at.age(now) < EE_DSETUP_FALLBACK_TS)
+            .filter(|(_, c)| {
+                let age = c.created_at.age(now);
+                let initial_network_burst_active = matches!(&c.origin, CallOrigin::Network { .. })
+                    && age <= NETWORK_EE_ANNOUNCE_MIN_AGE_TS;
+                c.is_tx_active()
+                    && !c.ee_announce_done
+                    && age < EE_DSETUP_FALLBACK_TS
+                    && !initial_network_burst_active
+            })
             .map(|(&id, _)| id)
             .collect();
         if candidates.is_empty() {

@@ -564,6 +564,11 @@ max_list_entries = 2000
 # The destination root must already exist and be writable by the service user.
 archive_enabled = true
 archive_directory = "/mnt/nfs-share/Recordings"
+
+# TTS-WAVs remain in the local recording library for selection/playback, but their
+# server copy is routed separately and never placed in the Recordings archive.
+tts_archive_enabled = true
+tts_archive_directory = "/mnt/nfs-share/TTS-Dateien"
 archive_retry_seconds = 60
 
 ###############################################################################
@@ -580,7 +585,11 @@ source_issi = 4010099
 default_priority = 5
 max_file_size_mb = 100
 max_duration_seconds = 1800
+# 12 × 60 ms = 720 ms encoded TCH/S lead-in before the first syllable.
+lead_in_silence_blocks = 12
 tail_silence_blocks = 3
+# CMCE group-call hangtime is 5 seconds; keep AudioPlayer busy slightly longer.
+group_release_guard_seconds = 6
 individual_answer_timeout_seconds = 30
 ffmpeg_path = "ffmpeg"
 
@@ -588,6 +597,52 @@ ffmpeg_path = "ffmpeg"
 id = "server"
 name = "NFS-Server"
 path = "/mnt/nfs-share"
+
+###############################################################################
+
+# LOCAL PIPER TEXT TO SPEECH (NetCore TTS Phase 1)
+# Piper runs as a separate localhost HTTP service. FlowStation creates the complete
+# WAV locally before handing it to the existing TETRA audio dispatcher.
+[tts]
+enabled = true
+endpoint = "http://127.0.0.1:5005"
+cache_directory = "/var/cache/netcore/tts"
+template_directory = "/var/lib/netcore/tts/templates"
+auto_save_generated_templates = true
+default_voice = "de-thorsten"
+default_speed = 0.95
+default_priority = 5
+max_text_characters = 2000
+synthesis_timeout_seconds = 90
+max_output_file_mb = 25
+cache_retention_minutes = 1440
+keep_generated_audio = false
+
+[[tts.voices]]
+id = "de-thorsten"
+name = "Deutsch – Thorsten (mittel)"
+provider_voice = "de_DE-thorsten-medium"
+
+[[tts.voices]]
+id = "de-thorsten-high"
+name = "Deutsch – Thorsten (hoch)"
+provider_voice = "de_DE-thorsten-high"
+
+[[tts.voices]]
+id = "de-karlsson"
+name = "Deutsch – Karlsson"
+provider_voice = "de_DE-karlsson-low"
+
+[[tts.voices]]
+id = "de-pavoque"
+name = "Deutsch – Pavoque"
+provider_voice = "de_DE-pavoque-low"
+
+[[tts.voices]]
+id = "de-thorsten-neutral"
+name = "Deutsch – Thorsten emotional (neutral)"
+provider_voice = "de_DE-thorsten_emotional-medium"
+speaker_id = 4
 
 ###############################################################################
 

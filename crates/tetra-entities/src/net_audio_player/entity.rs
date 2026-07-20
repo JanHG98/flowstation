@@ -20,6 +20,13 @@ use super::types::{
     AudioPlayerCommand, AudioPlayerState, AudioTargetType, PrepareEvent, PreparedAudio,
 };
 
+const GROUP_CALL_PREPARE_SETTLE: Duration = Duration::from_millis(1000);
+
+struct PendingPlayback {
+    prepared: PreparedAudio,
+    not_before: Instant,
+}
+
 struct ActivePlayback {
     job_id: String,
     call_uuid: Uuid,
@@ -40,6 +47,7 @@ pub struct AudioPlayerEntity {
     prepare_tx: crossbeam_channel::Sender<PrepareEvent>,
     prepare_rx: crossbeam_channel::Receiver<PrepareEvent>,
     current_job_id: Option<String>,
+    pending_playback: Option<PendingPlayback>,
     playback: Option<ActivePlayback>,
     dltime: TdmaTime,
 }
@@ -59,6 +67,7 @@ impl AudioPlayerEntity {
                 prepare_tx,
                 prepare_rx,
                 current_job_id: None,
+                pending_playback: None,
                 playback: None,
                 dltime: TdmaTime::default(),
             },
@@ -111,7 +120,7 @@ impl AudioPlayerEntity {
         }
     }
 
-    fn process_prepare_events(&mut self, queue: &mut MessageQueue) {
+    fn process_prepare_events(&mut self, _queue: &mut MessageQueue) {
         while let Ok(event) = self.prepare_rx.try_recv() {
             match event {
                 PrepareEvent::Ready(prepared) => {
@@ -119,7 +128,20 @@ impl AudioPlayerEntity {
                         tracing::debug!("AudioPlayer: ignoring stale prepared job {}", prepared.job_id);
                         continue;
                     }
-                    self.start_prepared(queue, prepared);
+                    let delayed = prepared.target_type == AudioTargetType::Group;
+                    let not_before = if delayed {
+                        Instant::now() + GROUP_CALL_PREPARE_SETTLE
+                    } else {
+                        Instant::now()
+                    };
+                    tracing::info!(
+                        "AudioPlayer: prepared media queued for common launch gate job={} target={:?}:{} settle_ms={}",
+                        prepared.job_id,
+                        prepared.target_type,
+                        prepared.target_id,
+                        if delayed { GROUP_CALL_PREPARE_SETTLE.as_millis() } else { 0 }
+                    );
+                    self.pending_playback = Some(PendingPlayback { prepared, not_before });
                 }
                 PrepareEvent::Failed { job_id, error } => {
                     if self.current_job_id.as_deref() != Some(job_id.as_str()) {
@@ -130,6 +152,30 @@ impl AudioPlayerEntity {
                 }
             }
         }
+    }
+
+
+    fn try_start_pending(&mut self, queue: &mut MessageQueue) {
+        let should_start = self.pending_playback.as_ref().is_some_and(|pending| {
+            if Instant::now() < pending.not_before {
+                return false;
+            }
+            pending.prepared.target_type != AudioTargetType::Group || group_call_launch_slot(self.dltime)
+        });
+        if !should_start {
+            return;
+        }
+        let Some(pending) = self.pending_playback.take() else {
+            return;
+        };
+        tracing::info!(
+            "AudioPlayer: launching prepared media through common recording/TTS gate job={} target={:?}:{} dltime={:?}",
+            pending.prepared.job_id,
+            pending.prepared.target_type,
+            pending.prepared.target_id,
+            self.dltime
+        );
+        self.start_prepared(queue, pending.prepared);
     }
 
     fn start_prepared(&mut self, queue: &mut MessageQueue, prepared: PreparedAudio) {
@@ -247,8 +293,10 @@ impl AudioPlayerEntity {
 
     fn request_finish(&mut self, queue: &mut MessageQueue, reason: &str, finish_error: Option<String>) {
         let Some(playback) = self.playback.as_mut() else {
-            // A stop during asynchronous preparation cancels the pending job. Any later worker
-            // result is ignored because current_job_id no longer matches it.
+            // A stop during asynchronous preparation or the common launch gate cancels the
+            // pending job. Any later worker result is ignored because current_job_id no longer
+            // matches it.
+            self.pending_playback = None;
             self.current_job_id = None;
             self.handle.mark_idle();
             return;
@@ -288,6 +336,7 @@ impl AudioPlayerEntity {
     }
 
     fn fail_current(&mut self, error: impl Into<String>) {
+        self.pending_playback = None;
         self.playback = None;
         self.current_job_id = None;
         self.handle.mark_failed(error);
@@ -317,8 +366,12 @@ impl AudioPlayerEntity {
             .as_ref()
             .map(|playback| {
                 let elapsed = playback.phase_started.elapsed();
+                let finish_guard_seconds = match playback.target_type {
+                    AudioTargetType::Group => self.handle.config().group_release_guard_seconds as u64,
+                    AudioTargetType::Individual => 3,
+                };
                 (
-                    playback.finishing && elapsed >= Duration::from_secs(3),
+                    playback.finishing && elapsed >= Duration::from_secs(finish_guard_seconds),
                     !playback.finishing
                         && playback.ts.is_none()
                         && elapsed >= Duration::from_secs(self.handle.config().individual_answer_timeout_seconds as u64),
@@ -432,6 +485,7 @@ impl TetraEntityTrait for AudioPlayerEntity {
         self.dltime = ts;
         self.process_commands(queue);
         self.process_prepare_events(queue);
+        self.try_start_pending(queue);
         self.lifecycle_timeout(queue);
         self.playout(queue);
     }
@@ -440,6 +494,7 @@ impl TetraEntityTrait for AudioPlayerEntity {
 impl Drop for AudioPlayerEntity {
     fn drop(&mut self) {
         self.current_job_id = None;
+        self.pending_playback = None;
         self.playback = None;
         self.handle.mark_idle();
     }
@@ -450,5 +505,30 @@ fn carrier_for_logical_ts(config: &SharedConfig, ts: u8) -> u16 {
         config.config().cell.secondary_carrier.unwrap_or(config.config().cell.main_carrier)
     } else {
         config.config().cell.main_carrier
+    }
+}
+
+
+fn group_call_launch_slot(ts: TdmaTime) -> bool {
+    ts.t == 4 && !matches!(ts.f, 1 | 17 | 18)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::group_call_launch_slot;
+    use tetra_core::TdmaTime;
+
+    #[test]
+    fn group_launch_gate_accepts_clean_timeslot_four() {
+        assert!(group_call_launch_slot(TdmaTime { h: 0, m: 1, f: 2, t: 4 }));
+        assert!(group_call_launch_slot(TdmaTime { h: 0, m: 1, f: 16, t: 4 }));
+    }
+
+    #[test]
+    fn group_launch_gate_rejects_special_frames_and_other_slots() {
+        assert!(!group_call_launch_slot(TdmaTime { h: 0, m: 1, f: 1, t: 4 }));
+        assert!(!group_call_launch_slot(TdmaTime { h: 0, m: 1, f: 17, t: 4 }));
+        assert!(!group_call_launch_slot(TdmaTime { h: 0, m: 1, f: 18, t: 4 }));
+        assert!(!group_call_launch_slot(TdmaTime { h: 0, m: 1, f: 2, t: 1 }));
     }
 }

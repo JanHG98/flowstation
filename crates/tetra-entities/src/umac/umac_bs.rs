@@ -24,7 +24,9 @@ use tetra_saps::control::call_control::{CallControl, Circuit};
 use tetra_saps::lcmc::enums::alloc_type::ChanAllocType;
 use tetra_saps::lcmc::enums::ul_dl_assignment::UlDlAssignment;
 use tetra_saps::lcmc::fields::chan_alloc_req::CmceChanAllocReq;
-use tetra_saps::tma::{TmaReport, TmaReportInd, TmaUnitdataInd};
+use tetra_saps::tma::{
+    parse_frame18_common_scch_handle, TmaReport, TmaReportInd, TmaUnitdataInd,
+};
 use tetra_saps::tmv::{TmvConfigureReq, TmvUnitdataReqSlots};
 use tetra_saps::tmv::enums::logical_chans::LogicalChannel;
 use tetra_saps::{SapMsg, SapMsgInner};
@@ -1521,9 +1523,20 @@ impl UmacBs {
         // the LLC link context. FACCH/traffic-slot signalling uses the explicit
         // stealing path above. Logical secondary link ids (5..7) have no matching
         // physical slot on the main scheduler, so use link_id=0 to force MCCH/TS1.
-        let scheduler_link_id = if prim.link_id <= 4 { prim.link_id } else { 0 };
-        self.channel_scheduler
-            .dl_enqueue_tma_for_link(scheduler_link_id, pdu, sdu, prim.tx_reporter);
+        if let Some(call_id) = parse_frame18_common_scch_handle(prim.req_handle) {
+            tracing::info!(
+                "UMAC: routing marked group signalling to dedicated frame-18 common SCCH queue call_id={} addr={} dltime={}",
+                call_id,
+                prim.main_address,
+                self.dltime
+            );
+            self.channel_scheduler
+                .dl_enqueue_frame18_common_scch(call_id, pdu, sdu, prim.tx_reporter);
+        } else {
+            let scheduler_link_id = if prim.link_id <= 4 { prim.link_id } else { 0 };
+            self.channel_scheduler
+                .dl_enqueue_tma_for_link(scheduler_link_id, pdu, sdu, prim.tx_reporter);
+        }
     }
 
     fn rx_tma_prim(&mut self, queue: &mut MessageQueue, message: SapMsg) {
@@ -2083,9 +2096,12 @@ impl UmacBs {
                     self.ul_signal_owner[ts as usize - 1] = None;
                 }
             }
-            CallControl::CallEnded { ts, .. } => {
+            CallControl::CallEnded { call_id, ts } => {
                 let air_ts = Self::air_ts_for_logical(ts);
                 self.scheduler_for_logical_mut(ts).set_hangtime(air_ts, false);
+                // Frame-18 group-call paging always lives on the primary MCCH
+                // scheduler, even when the traffic channel itself is on another carrier.
+                self.channel_scheduler.drop_frame18_common_scch_call(call_id);
                 if (1..=7).contains(&ts) {
                     self.last_ul_voice[ts as usize - 1] = None;
                     self.ul_signal_owner[ts as usize - 1] = None;

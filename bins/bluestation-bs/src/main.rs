@@ -27,6 +27,8 @@ use tetra_entities::net_recorder::{RecorderEntity, RecorderHandle};
 
 #[cfg(feature = "audio-player")]
 use tetra_entities::net_audio_player::{AudioPlayerEntity, AudioPlayerHandle};
+#[cfg(feature = "audio-player")]
+use tetra_entities::net_tts::TtsHandle;
 
 #[cfg(feature = "recording")]
 type OptionalRecorderHandle = Option<RecorderHandle>;
@@ -370,6 +372,12 @@ fn build_bs_stack(
                         cfg.config().recording.archive_retry_seconds
                     );
                 }
+                if cfg.config().recording.tts_archive_enabled {
+                    eprintln!(
+                        "    TTS WAV archive: {} (separate from recordings)",
+                        cfg.config().recording.tts_archive_directory
+                    );
+                }
             }
             Err(err) => {
                 tracing::error!("Recorder disabled: {}", err);
@@ -394,6 +402,11 @@ fn build_bs_stack(
                     cfg.config().audio_player.directory,
                     handle.cache_root().display(),
                     cfg.config().audio_player.shares.len()
+                );
+                eprintln!(
+                    "    RF guard: {} ms lead-in, {} s group-release guard",
+                    u64::from(cfg.config().audio_player.lead_in_silence_blocks) * 60,
+                    cfg.config().audio_player.group_release_guard_seconds
                 );
                 if let Some(warning) = handle.startup_warning() {
                     eprintln!("    Audio cache warning: {warning}");
@@ -540,6 +553,56 @@ fn main() {
     let (echolink_cmd_tx, echolink_cmd_rx) = echolink_channel();
     let (mut router, tsource, cdispatchers, dapnet_telemetry_sink, recorder_handle, audio_player_handle) =
         build_bs_stack(&mut cfg, &args.config, echolink_cmd_rx);
+    #[cfg(feature = "audio-player")]
+    let tts_handle = if cfg.config().tts.enabled {
+        match (audio_player_handle.clone(), recorder_handle.clone()) {
+            (Some(player), Some(recorder)) => match TtsHandle::new(cfg.config().tts.clone(), player, recorder) {
+                Ok(handle) => {
+                    eprintln!(
+                        " -> Local Piper TTS enabled (endpoint: {}, cache: {}, voices: {})",
+                        handle.config().endpoint,
+                        handle.cache_root().display(),
+                        handle.config().voices.len()
+                    );
+                    let tts_status = handle.status();
+                    if tts_status.template_available {
+                        eprintln!(
+                            "    Local templates: {} (auto-save: {})",
+                            tts_status.template_directory,
+                            if tts_status.auto_save_generated_templates { "on" } else { "off" }
+                        );
+                    } else if let Some(error) = tts_status.template_error {
+                        eprintln!("    TTS template warning: {error}");
+                    }
+                    if let Some(warning) = handle.startup_warning() {
+                        eprintln!("    TTS cache warning: {warning}");
+                    }
+                    Some(handle)
+                }
+                Err(error) => {
+                    tracing::error!("TTS disabled: {}", error);
+                    eprintln!(" -> Local Piper TTS unavailable: {error}");
+                    None
+                }
+            },
+            (None, _) => {
+                tracing::error!("TTS requires the audio-player service");
+                eprintln!(" -> Local Piper TTS unavailable: audio-player service is not available");
+                None
+            }
+            (_, None) => {
+                tracing::error!("TTS recording library requires the local recording service");
+                eprintln!(" -> Local Piper TTS unavailable: recording service is not available");
+                None
+            }
+        }
+    } else {
+        None
+    };
+    #[cfg(not(feature = "audio-player"))]
+    if cfg.config().tts.enabled {
+        eprintln!(" -> Local Piper TTS configured but audio-player support is not compiled in");
+    }
     let dapnet_cmd_tx = cdispatchers.get(&TetraEntity::Cmce).map(|dispatcher| dispatcher.clone_sender());
     let mut dapnet_telegram_sink: Option<TelegramAlertSink> = None;
     let mut geoalarm_sink: Option<GeoAlarmSink> = None;
@@ -616,6 +679,10 @@ fn main() {
             #[cfg(feature = "audio-player")]
             if let Some(handle) = audio_player_handle.clone() {
                 dashboard.set_audio_player_handle(handle);
+            }
+            #[cfg(feature = "audio-player")]
+            if let Some(handle) = tts_handle.clone() {
+                dashboard.set_tts_handle(handle);
             }
 
             // Create a control link so dashboard can send commands to CMCE

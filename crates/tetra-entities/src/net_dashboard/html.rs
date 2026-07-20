@@ -3931,6 +3931,75 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
         <div class="stat-card is-idle"><div class="stat-label">Verkehrskanal</div><div class="stat-value is-text" id="audio-channel">—</div><div class="stat-sub" id="audio-call">Kein aktiver Ruf</div></div>
         <div class="stat-card is-idle"><div class="stat-label">MP3-Decoder</div><div class="stat-value is-text" id="audio-ffmpeg">—</div><div class="stat-sub" id="audio-error">Kein Fehler</div></div>
       </div>
+      <div class="card" id="tts-template-card">
+        <div class="card-head">
+          <div>
+            <div class="card-title">Lokale TTS-Vorlagen</div>
+            <div class="card-sub" id="tts-template-directory">/var/lib/netcore/tts/templates</div>
+          </div>
+          <div class="card-actions" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <span class="badge" id="tts-template-badge">PRÜFE …</span>
+            <button class="btn btn-sm" id="tts-template-refresh" onclick="loadTtsTemplates()">Aktualisieren</button>
+          </div>
+        </div>
+        <div class="card-body">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
+            <label><span class="mesh-msg-filter-label">Vorlage auswählen</span><select class="form-input" id="tts-template-select" onchange="loadSelectedTtsTemplate()"><option value="">Keine Vorlage ausgewählt</option></select></label>
+            <label><span class="mesh-msg-filter-label">Vorlagenname</span><input class="form-input" id="tts-template-name" maxlength="120" placeholder="z. B. Evakuierung Haupthalle"></label>
+          </div>
+          <div class="stat-sub" id="tts-template-state" style="margin-top:10px">Erzeugte Texte werden automatisch lokal gespeichert.</div>
+          <div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:12px">
+            <button class="btn" id="tts-template-new" onclick="newTtsTemplate()">Neue Vorlage</button>
+            <button class="btn btn-primary" id="tts-template-save" onclick="saveCurrentTtsTemplate()">Speichern</button>
+            <button class="btn btn-danger" id="tts-template-delete" onclick="deleteCurrentTtsTemplate()" disabled>Löschen</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" id="tts-card">
+        <div class="card-head">
+          <div>
+            <div class="card-title">Textdurchsage</div>
+            <div class="card-sub" id="tts-provider-detail">Lokale Piper-Sprachsynthese</div>
+          </div>
+          <div class="card-actions" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <span class="badge" id="tts-provider-state">PRÜFE …</span>
+            <button class="btn btn-sm btn-danger" id="tts-stop" onclick="stopTtsJob()" disabled>Abbrechen</button>
+          </div>
+        </div>
+        <div class="card-body">
+          <label>
+            <span class="mesh-msg-filter-label">Sprechtext</span>
+            <textarea class="form-input" id="tts-text" rows="6" placeholder="Text der Durchsage eingeben …" oninput="updateTtsCharacterCount()"></textarea>
+          </label>
+          <div class="stat-sub" id="tts-character-count" style="text-align:right;margin-top:5px">0 Zeichen</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:12px">
+            <label><span class="mesh-msg-filter-label">Stimme</span><select class="form-input" id="tts-voice" onchange="renderTtsStatus()"><option value="">Lade Stimmen …</option></select></label>
+            <label><span class="mesh-msg-filter-label">Sprechtempo</span><div style="display:flex;gap:10px;align-items:center"><input id="tts-speed" type="range" min="50" max="150" step="5" value="95" oninput="updateTtsSpeedLabel()" style="width:100%"><strong id="tts-speed-label" style="min-width:52px;text-align:right">95 %</strong></div></label>
+            <label><span class="mesh-msg-filter-label">Name der WAV / Durchsage</span><input class="form-input" id="tts-recording-name" maxlength="120" placeholder="Bei Freitext zwingend erforderlich"></label>
+          </div>
+          <div id="tts-job-state" class="stat-sub" style="margin-top:12px">Bereit zum Erzeugen einer WAV-Datei.</div>
+          <div class="stat-sub" style="margin-top:12px">Die TTS wird vollständig erzeugt, unter Aufzeichnungen gespeichert und später ausschließlich von dort ausgewählt und gesendet. Bei einer Vorlage wird automatisch der Vorlagenname verwendet.</div>
+          <div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:14px">
+            <button class="btn btn-primary" id="tts-generate" onclick="generateTtsRecording()">💾 Als WAV in Aufzeichnungen speichern</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" id="tts-preview-card" style="display:none">
+        <div class="card-head">
+          <div><div class="card-title">Erzeugte TTS-Vorschau</div><div class="card-sub" id="tts-preview-title">—</div></div>
+          <div class="card-actions"><button class="btn btn-sm" onclick="closeTtsPreview()">Schließen</button></div>
+        </div>
+        <div class="card-body">
+          <audio id="tts-preview-player" controls preload="metadata" style="width:100%"></audio>
+          <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;margin-top:10px">
+            <div class="stat-sub" id="tts-preview-state">Als Aufzeichnung gespeichert</div>
+            <button class="btn btn-primary" id="tts-open-recording" onclick="showSavedTtsRecording()">Zu den Aufzeichnungen</button>
+          </div>
+        </div>
+      </div>
+
       <div class="card">
         <div class="card-head">
           <div><div class="card-title">WAV-/MP3-Medienbibliothek</div><div class="card-sub" id="audio-root">—</div></div>
@@ -3977,7 +4046,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
       </div>
 
       <!-- ── LOCAL RECORDINGS ── -->
-      <div class="section-label" style="margin-top:24px">AUFZEICHNUNGEN</div>
+      <div class="section-label" style="margin-top:24px">AUFZEICHNUNGEN & TTS-WAVs</div>
       <div class="stat-grid" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">
         <div class="stat-card is-idle" id="rec-state-card">
           <div class="stat-label">Aufzeichnung</div>
@@ -4010,7 +4079,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
       <div class="card">
         <div class="card-head">
           <div>
-            <div class="card-title">Lokale Gesprächsaufzeichnungen</div>
+            <div class="card-title">Lokale Aufzeichnungen und gespeicherte TTS-WAVs</div>
             <div class="card-sub">8 kHz · Mono · 16 Bit PCM WAV mit JSON-Metadaten</div>
           </div>
           <div class="card-actions" style="display:flex;gap:8px;flex-wrap:wrap">
@@ -4022,7 +4091,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
           <div style="display:flex;gap:12px;align-items:end;flex-wrap:wrap;margin-bottom:12px">
             <label style="flex:1;min-width:220px">
               <span class="mesh-msg-filter-label">Suche</span>
-              <input class="form-input" id="rec-filter" type="search" placeholder="Datum, Call-ID, ISSI oder GSSI" oninput="renderRecordings()">
+              <input class="form-input" id="rec-filter" type="search" placeholder="Name, Datum, Call-ID, ISSI oder GSSI" oninput="renderRecordings()">
             </label>
             <div id="rec-dir" class="stat-sub" style="max-width:100%;word-break:break-all">—</div>
           </div>
@@ -4031,6 +4100,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
             <table>
               <thead><tr>
                 <th>Zeitpunkt</th>
+                <th>Name</th>
                 <th>Quelle</th>
                 <th>Ziel</th>
                 <th>Call</th>
@@ -4038,7 +4108,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
                 <th>Größe</th>
                 <th>Aktionen</th>
               </tr></thead>
-              <tbody id="rec-tbody"><tr><td colspan="7" class="sds-empty">Lade Aufzeichnungen…</td></tr></tbody>
+              <tbody id="rec-tbody"><tr><td colspan="8" class="sds-empty">Lade Aufzeichnungen…</td></tr></tbody>
             </table>
           </div>
           <div id="rec-player-box" style="display:none;margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
@@ -10119,6 +10189,113 @@ window.addEventListener('resize', () => {
 
 // ── Local/server WAV/MP3 audio dispatch ──────────────────────────────────
 let audioCurrentPath='',audioCurrentSource='local',audioSources=[],audioEntries=[],audioStatus=null,audioPendingSource=null,audioGroups={},audioDevices={};
+let ttsStatus=null,ttsVoices=[],ttsTemplates=[],ttsSelectedTemplateId="",ttsLastSavedTemplateId="",ttsDefaultsApplied=false,ttsPreviewLoadedJob=null,ttsRequestInFlight=false,ttsTemplateRequestInFlight=false;
+function ttsStateLabel(state){return ({idle:'BEREIT',synthesizing:'ERZEUGT UND SPEICHERT WAV',ready:'ALS AUFZEICHNUNG GESPEICHERT',dispatching:'VERALTETER DIREKTPFAD',failed:'FEHLER',cancelled:'ABGEBROCHEN'})[state]||String(state||'—').toUpperCase();}
+function updateTtsCharacterCount(){const input=document.getElementById('tts-text'),label=document.getElementById('tts-character-count');if(!input||!label)return;const count=[...input.value].length,max=ttsStatus?.max_text_characters||2000;input.maxLength=max;label.textContent=count+' / '+max+' Zeichen';}
+function updateTtsSpeedLabel(){const slider=document.getElementById('tts-speed'),label=document.getElementById('tts-speed-label');if(slider&&label)label.textContent=slider.value+' %';}
+async function loadTtsVoices(){const select=document.getElementById('tts-voice');if(!select)return;try{const r=await fetch('/api/audio/tts/voices',{cache:'no-store'}),j=await r.json().catch(()=>({error:'HTTP '+r.status}));if(!r.ok)throw new Error(j.error||('HTTP '+r.status));ttsVoices=Array.isArray(j.voices)?j.voices:[];const requested=select.value||ttsStatus?.default_voice||'',fallback=ttsVoices.find(v=>v.id===requested)||ttsVoices.find(v=>v.available)||ttsVoices[0],current=fallback?.id||'';select.innerHTML=ttsVoices.map(v=>'<option value="'+escAttr(v.id)+'"'+(v.id===current?' selected':'')+(v.available?'':' disabled')+'>'+escHtml(v.name+(v.available?'':' · NICHT INSTALLIERT'))+'</option>').join('')||'<option value="">Keine Stimme konfiguriert</option>';select.title=ttsVoices.find(v=>v.id===current)?.error||'';}catch(error){ttsVoices=[];select.innerHTML='<option value="">TTS nicht verfügbar</option>';select.title=String(error);}}
+
+function formatTtsTemplateTime(value){if(!value)return '';const d=new Date(value);return Number.isNaN(d.getTime())?String(value):d.toLocaleString('de-DE',{dateStyle:'short',timeStyle:'short'});}
+function renderTtsTemplateControls(){
+  const available=!!ttsStatus?.template_available,badge=document.getElementById('tts-template-badge'),dir=document.getElementById('tts-template-directory'),state=document.getElementById('tts-template-state'),select=document.getElementById('tts-template-select');
+  if(dir)dir.textContent=ttsStatus?.template_directory||'/var/lib/netcore/tts/templates';
+  if(badge){badge.textContent=available?'LOKAL BEREIT':'LOKAL OFFLINE';badge.style.color=available?'var(--success)':'var(--danger)';badge.title=ttsStatus?.template_error||'';}
+  const selected=ttsTemplates.find(t=>t.id===ttsSelectedTemplateId);
+  if(state&&!ttsTemplateRequestInFlight){state.textContent=!available?(ttsStatus?.template_error||'Lokaler Vorlagenspeicher ist nicht verfügbar.'):selected?((selected.auto_saved?'Automatisch gespeichert':'Gespeichert')+' · '+formatTtsTemplateTime(selected.updated_at)):(ttsStatus?.auto_save_generated_templates?'Erzeugte Texte werden automatisch lokal gespeichert.':'Automatisches Speichern ist deaktiviert.');}
+  if(select)select.disabled=!available||ttsTemplateRequestInFlight;
+  const save=document.getElementById('tts-template-save'),del=document.getElementById('tts-template-delete'),fresh=document.getElementById('tts-template-new'),refresh=document.getElementById('tts-template-refresh');
+  if(save)save.disabled=!available||ttsTemplateRequestInFlight;
+  if(del)del.disabled=!available||ttsTemplateRequestInFlight||!ttsSelectedTemplateId;
+  if(fresh)fresh.disabled=!available||ttsTemplateRequestInFlight;
+  if(refresh)refresh.disabled=!available||ttsTemplateRequestInFlight;
+}
+async function loadTtsTemplates(preferredId=''){
+  const select=document.getElementById('tts-template-select');if(!select)return;
+  try{
+    const r=await fetch('/api/audio/tts/templates',{cache:'no-store'}),j=await r.json().catch(()=>({error:'HTTP '+r.status}));if(!r.ok)throw new Error(j.error||('HTTP '+r.status));
+    ttsTemplates=Array.isArray(j.templates)?j.templates:[];
+    const wanted=preferredId||ttsSelectedTemplateId||select.value||'';
+    select.innerHTML='<option value="">Keine Vorlage ausgewählt</option>'+ttsTemplates.map(t=>'<option value="'+escAttr(t.id)+'">'+escHtml((t.auto_saved?'AUTO · ':'')+t.name)+'</option>').join('');
+    if(wanted&&ttsTemplates.some(t=>t.id===wanted)){select.value=wanted;ttsSelectedTemplateId=wanted;const t=ttsTemplates.find(row=>row.id===wanted);document.getElementById('tts-template-name').value=t?.name||'';}else{select.value='';ttsSelectedTemplateId='';}
+  }catch(error){ttsTemplates=[];select.innerHTML='<option value="">Vorlagen nicht verfügbar</option>';const state=document.getElementById('tts-template-state');if(state)state.textContent=String(error.message||error);}
+  renderTtsTemplateControls();syncTtsRecordingName();
+}
+function syncTtsRecordingName(){
+  const input=document.getElementById('tts-recording-name');if(!input)return;
+  const selected=ttsTemplates.find(row=>row.id===ttsSelectedTemplateId);
+  if(selected){input.value=selected.name||'';input.readOnly=true;input.title='Für Vorlagen wird automatisch der Vorlagenname als WAV-Name verwendet.';}
+  else{const wasReadOnly=input.readOnly;input.readOnly=false;if(wasReadOnly)input.value='';input.title='Bei Freitext ist ein eigener Name zwingend erforderlich.';}
+}
+function loadSelectedTtsTemplate(){
+  const id=document.getElementById('tts-template-select')?.value||'';ttsSelectedTemplateId=id;const t=ttsTemplates.find(row=>row.id===id);
+  if(!t){document.getElementById('tts-template-name').value='';syncTtsRecordingName();renderTtsTemplateControls();return;}
+  document.getElementById('tts-template-name').value=t.name||'';document.getElementById('tts-text').value=t.text||'';
+  const voice=document.getElementById('tts-voice');if(voice&&[...voice.options].some(o=>o.value===t.voice_id))voice.value=t.voice_id;
+  document.getElementById('tts-speed').value=Math.round(Number(t.speed||0.95)*100);
+  syncTtsRecordingName();updateTtsSpeedLabel();updateTtsCharacterCount();renderTtsTemplateControls();
+}
+function newTtsTemplate(){ttsSelectedTemplateId='';const select=document.getElementById('tts-template-select');if(select)select.value='';document.getElementById('tts-template-name').value='';const recordingName=document.getElementById('tts-recording-name');if(recordingName){recordingName.value='';recordingName.readOnly=false;}renderTtsTemplateControls();document.getElementById('tts-template-name').focus();}
+function ttsSynthesisPayload(){
+  const text=document.getElementById('tts-text').value.trim();if(!text)throw new Error('Bitte zuerst einen Sprechtext eingeben.');
+  return {text,voice_id:document.getElementById('tts-voice').value,speed:Number(document.getElementById('tts-speed').value)/100};
+}
+function currentTtsTemplatePayload(){
+  const generation=ttsSynthesisPayload(),name=document.getElementById('tts-template-name').value.trim();if(!name)throw new Error('Bitte einen Namen für die Vorlage eingeben.');
+  const payload={...generation,name,priority:ttsStatus?.default_priority??5};if(ttsSelectedTemplateId)payload.id=ttsSelectedTemplateId;
+  return payload;
+}
+async function saveCurrentTtsTemplate(){if(ttsTemplateRequestInFlight)return;let payload;try{payload=currentTtsTemplatePayload();}catch(error){alert(error.message||String(error));return;}ttsTemplateRequestInFlight=true;const state=document.getElementById('tts-template-state');if(state)state.textContent='Vorlage wird gespeichert …';renderTtsTemplateControls();try{const j=await postTts('/api/audio/tts/templates/save',payload),id=j.template?.id||'';ttsSelectedTemplateId=id;await loadTtsTemplates(id);syncTtsRecordingName();if(state)state.textContent='Vorlage gespeichert.';}catch(error){alert(error.message||String(error));if(state)state.textContent=String(error.message||error);}finally{ttsTemplateRequestInFlight=false;renderTtsTemplateControls();}}
+async function deleteCurrentTtsTemplate(){if(ttsTemplateRequestInFlight||!ttsSelectedTemplateId)return;const t=ttsTemplates.find(row=>row.id===ttsSelectedTemplateId);if(!confirm('Vorlage „'+(t?.name||ttsSelectedTemplateId)+'“ wirklich löschen?'))return;ttsTemplateRequestInFlight=true;renderTtsTemplateControls();try{await postTts('/api/audio/tts/templates/delete',{id:ttsSelectedTemplateId});ttsSelectedTemplateId='';document.getElementById('tts-template-name').value='';await loadTtsTemplates();syncTtsRecordingName();}catch(error){alert(error.message||String(error));}finally{ttsTemplateRequestInFlight=false;renderTtsTemplateControls();}}
+function ttsGenerationPayload(){
+  const payload=ttsSynthesisPayload(),selected=ttsTemplates.find(row=>row.id===ttsSelectedTemplateId),nameInput=document.getElementById('tts-recording-name');
+  const recordingName=(selected?.name||nameInput?.value||'').trim();
+  if(!recordingName)throw new Error('Bitte für den Freitext einen Namen der WAV / Durchsage eingeben.');
+  payload.recording_name=recordingName;
+  return payload;
+}
+async function postTts(url,body){const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})}),j=await r.json().catch(()=>({error:'HTTP '+r.status}));if(!r.ok)throw new Error(j.error||('HTTP '+r.status));return j;}
+function audioDispatchBusy(){return !!audioStatus&&!['idle','failed'].includes(audioStatus.state);}
+async function generateTtsRecording(){
+  if(ttsRequestInFlight)return;
+  let payload;try{payload=ttsGenerationPayload();}catch(error){alert(error.message||String(error));return;}
+  ttsRequestInFlight=true;renderTtsStatus();
+  try{await postTts('/api/audio/tts/generate',payload);await loadTtsStatus();}
+  catch(error){alert(error.message||String(error));}
+  finally{ttsRequestInFlight=false;renderTtsStatus();}
+}
+async function showSavedTtsRecording(){
+  const id=ttsStatus?.recording_id;if(!id){alert('Die gespeicherte Aufzeichnung wurde noch nicht gefunden.');return;}
+  await loadRecordings(true);
+  const filter=document.getElementById('rec-filter');if(filter){filter.value='';renderRecordings();}
+  const row=document.querySelector('[data-recording-id="'+CSS.escape(id)+'"]');
+  if(row){row.scrollIntoView({behavior:'smooth',block:'center'});row.style.outline='2px solid var(--success)';setTimeout(()=>{row.style.outline='';},2500);}
+}
+async function stopTtsJob(){try{await postTts('/api/audio/tts/stop',{});closeTtsPreview();await Promise.all([loadTtsStatus(),loadAudioStatus()]);}catch(error){alert(error.message||String(error));}}
+function closeTtsPreview(){const card=document.getElementById('tts-preview-card'),player=document.getElementById('tts-preview-player');if(player){player.pause();player.removeAttribute('src');player.load();}if(card)card.style.display='none';ttsPreviewLoadedJob=null;}
+function renderTtsStatus(){
+  const s=ttsStatus||{},provider=document.getElementById('tts-provider-state'),detail=document.getElementById('tts-provider-detail'),job=document.getElementById('tts-job-state');
+  if(!provider||!job)return;
+  provider.textContent=s.provider_available?'PIPER ONLINE':'PIPER OFFLINE';
+  provider.style.color=s.provider_available?'var(--success)':'var(--danger)';
+  detail.textContent=s.provider_endpoint||'Lokale Piper-Sprachsynthese';provider.title=s.provider_error||s.startup_warning||'';
+  if(!ttsDefaultsApplied&&s.available){document.getElementById('tts-speed').value=Math.round(Number(s.default_speed||0.95)*100);ttsDefaultsApplied=true;updateTtsSpeedLabel();updateTtsCharacterCount();}
+  const busy=s.state==='synthesizing',ready=s.state==='ready'&&s.generated_audio_available,selectedVoiceId=document.getElementById('tts-voice')?.value||'',selectedVoice=ttsVoices.find(v=>v.id===selectedVoiceId),voiceReady=!!selectedVoice?.available;
+  const generate=document.getElementById('tts-generate'),openRecording=document.getElementById('tts-open-recording');
+  generate.disabled=busy||ttsRequestInFlight||!s.provider_available||!voiceReady;
+  generate.title=!voiceReady?(selectedVoice?.error||'Die ausgewählte Stimme ist nicht installiert.'):'Erzeugt eine vollständige WAV und speichert sie in der Aufzeichnungsbibliothek.';
+  if(openRecording)openRecording.disabled=!ready||!s.recording_id;
+  document.getElementById('tts-stop').disabled=!busy&&!ready&&s.state!=='failed'&&s.state!=='cancelled';
+  let status=ttsStateLabel(s.state);if(ttsRequestInFlight&&!busy)status='AUFTRAG WIRD ÜBERGEBEN';if(s.text_preview)status+=' · '+s.text_preview;if(s.recording_id)status+=' · Aufzeichnung '+s.recording_id;if(s.last_error)status+=' · '+s.last_error;
+  job.textContent=status;job.style.color=s.state==='failed'?'var(--danger)':s.state==='ready'?'var(--success)':'';
+  const card=document.getElementById('tts-preview-card'),player=document.getElementById('tts-preview-player');
+  if(s.generated_audio_available&&s.job_id){
+    card.style.display='block';document.getElementById('tts-preview-title').textContent=s.file_name||'TTS-Durchsage';
+    document.getElementById('tts-preview-state').textContent=s.recording_id?'Als WAV unter Aufzeichnungen gespeichert. Von dort auswählen und senden.':'WAV wird gespeichert …';
+    if(ttsPreviewLoadedJob!==s.job_id){player.pause();player.src='/api/audio/tts/preview?job_id='+encodeURIComponent(s.job_id)+'&_='+Date.now();player.load();ttsPreviewLoadedJob=s.job_id;}
+  }else if(!busy){closeTtsPreview();}
+  syncTtsRecordingName();
+}
+async function loadTtsStatus(){try{const r=await fetch('/api/audio/tts/status',{cache:'no-store'}),j=await r.json().catch(()=>({error:'HTTP '+r.status}));if(!r.ok)throw new Error(j.error||('HTTP '+r.status));ttsStatus=j;renderTtsStatus();renderTtsTemplateControls();if(j.saved_template_id&&j.saved_template_id!==ttsLastSavedTemplateId){ttsLastSavedTemplateId=j.saved_template_id;loadTtsTemplates();}}catch(error){ttsStatus={available:false,provider_available:false,template_available:false,state:'failed',last_error:String(error)};renderTtsStatus();renderTtsTemplateControls();}}
 function audioStateLabel(s){return ({idle:'BEREIT',preparing:'VORBEREITUNG',calling:'RUFBAU',waiting_for_answer:'WARTE AUF ANNAHME',playing:'SENDET',finishing:'BEENDET RUF',failed:'FEHLER'})[s]||String(s||'—').toUpperCase();}
 async function loadAudioRegistries(){
   if(!deviceRegistryLoaded&&!deviceRegistryInflight)await loadDeviceRegistry(); audioDevices=deviceRegistry||{};
@@ -10147,7 +10324,7 @@ async function loadAudioStatus(){
     const card=document.getElementById('audio-state-card');card.classList.remove('is-ok','is-danger','is-idle','is-warn');card.classList.add(j.state==='failed'?'is-danger':active?'is-ok':'is-idle');
     document.getElementById('audio-state').textContent=audioStateLabel(j.state);const targetText=j.target_id?((j.target_type==='group'?'GSSI ':'ISSI ')+j.target_id):'Bereit';const sourceText=j.source_id?(' ['+j.source_id+']'):'';document.getElementById('audio-target').textContent=(j.file_name?j.file_name+sourceText+' → ':'')+targetText;
     document.getElementById('audio-progress').textContent=recFmtDuration(j.position_ms)+' / '+recFmtDuration(j.duration_ms);document.getElementById('audio-blocks').textContent=(j.sent_blocks||0)+' / '+(j.total_blocks||0)+' Blöcke';
-    document.getElementById('audio-channel').textContent=j.timeslot?'TS '+j.timeslot:'—';document.getElementById('audio-call').textContent=j.call_id?'Call '+j.call_id:'Kein aktiver Ruf';document.getElementById('audio-ffmpeg').textContent=j.ffmpeg_available?'VERFÜGBAR':'NICHT GEFUNDEN';document.getElementById('audio-error').textContent=j.last_error||j.startup_warning||'Kein Fehler';document.getElementById('audio-stop').disabled=!active;updateAudioSourceHeader();
+    document.getElementById('audio-channel').textContent=j.timeslot?'TS '+j.timeslot:'—';document.getElementById('audio-call').textContent=j.call_id?'Call '+j.call_id:'Kein aktiver Ruf';document.getElementById('audio-ffmpeg').textContent=j.ffmpeg_available?'VERFÜGBAR':'NICHT GEFUNDEN';document.getElementById('audio-error').textContent=j.last_error||j.startup_warning||'Kein Fehler';document.getElementById('audio-stop').disabled=!active;updateAudioSourceHeader();renderTtsStatus();
   }catch(e){document.getElementById('audio-state').textContent='NICHT VERFÜGBAR';document.getElementById('audio-error').textContent=String(e);}
 }
 async function browseAudio(path){
@@ -10185,7 +10362,8 @@ function closeAudioPreview(){const card=document.getElementById('audio-preview-c
 function audioContextPreview(){const source=audioPendingSource;if(!source)return;hideAudioContext();if(source.type==='recording'){playRecording(source.id);const box=document.getElementById('rec-player-box');if(box)box.scrollIntoView({behavior:'smooth',block:'nearest'});return;}previewAudioFile(source.id,source.label,source.sourceId);}
 function audioUp(){if(!audioCurrentPath)return;const p=audioCurrentPath.split('/');p.pop();browseAudio(p.join('/'));}
 async function loadAudioPage(force){
-  await Promise.all([loadAudioStatus(),loadAudioRegistries()]);
+  await Promise.all([loadAudioStatus(),loadAudioRegistries(),loadTtsStatus()]);
+  await loadTtsVoices();await loadTtsTemplates();syncTtsRecordingName();
   try{await loadAudioSources();await browseAudio(audioCurrentPath);}catch(e){document.getElementById('audio-tbody').innerHTML='<tr><td colspan="4" class="sds-empty">'+escHtml(e)+'</td></tr>';}
   refreshAudioTargetOptions();
 }
@@ -10235,7 +10413,7 @@ function refreshAudioTargetOptions(){const type=document.getElementById('audio-t
 function audioSelectTarget(){const v=document.getElementById('audio-target-select').value;if(v)document.getElementById('audio-target-manual').value=v;}
 async function submitAudioTransmission(){if(!audioPendingSource)return;const targetId=Number(document.getElementById('audio-target-manual').value),priority=Number(document.getElementById('audio-priority').value);if(!Number.isInteger(targetId)||targetId<=0||targetId>0xFFFFFF){alert('Bitte gültige 24-Bit-ISSI/GSSI eingeben.');return;}if(!Number.isInteger(priority)||priority<0||priority>15){alert('Priorität muss zwischen 0 und 15 liegen.');return;}const body={source_type:audioPendingSource.type,target_type:document.getElementById('audio-target-type').value,target_id:targetId,priority};if(audioPendingSource.type==='recording')body.recording_id=audioPendingSource.id;else{body.path=audioPendingSource.id;body.source_id=audioPendingSource.sourceId||audioCurrentSource||'local';}const r=await fetch('/api/audio/play',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}),j=await r.json().catch(()=>({error:'HTTP '+r.status}));if(!r.ok){alert(j.error||'Aussendung konnte nicht gestartet werden');return;}closeAudioSend();await loadAudioStatus();}
 async function stopAudioTransmission(){const r=await fetch('/api/audio/stop',{method:'POST'}),j=await r.json().catch(()=>({error:'HTTP '+r.status}));if(!r.ok)alert(j.error||'Stop fehlgeschlagen');await loadAudioStatus();}
-setInterval(()=>{const page=document.getElementById('page-audio');if(page&&page.classList.contains('active'))loadAudioStatus();},1000);
+setInterval(()=>{const page=document.getElementById('page-audio');if(page&&page.classList.contains('active'))Promise.all([loadAudioStatus(),loadTtsStatus()]);},1000);
 
 // ── Local call recordings ────────────────────────────────────────────────
 let recordingRows=[];
@@ -10280,7 +10458,9 @@ function recFmtDuration(ms){
 function recFmtTime(value){
   const d=new Date(value); return Number.isNaN(d.getTime())?String(value||'—'):d.toLocaleString();
 }
+function recDisplayName(row){return row.title||((row.origin==='tts'||row.destination_type==='library')?'TTS-Durchsage':'Aufzeichnung Call '+row.call_id);}
 function recSourceLabel(row){
+  if(row.origin==='tts'||row.destination_type==='library')return 'TTS';
   const sources=[...new Set((row.segments||[]).map(s=>s.source_issi).filter(Boolean))];
   const ids=sources.length?sources:(row.source_issi?[row.source_issi]:[]);
   if(!ids.length)return '—';
@@ -10290,6 +10470,7 @@ function recSourceLabel(row){
   }).join(', ');
 }
 function recDestinationLabel(row){
+  if(row.origin==='tts'||row.destination_type==='library')return 'Noch nicht gesendet';
   const id=row.destination_id??'—';
   if(row.destination_type==='group'){
     const name=recordingGroupRegistry[String(id)]||'';
@@ -10320,16 +10501,20 @@ async function loadRecordingStatus(){
     document.getElementById('rec-error').textContent=j.last_error||'Kein Fehler';
     const archiveCard=document.getElementById('rec-archive-card');
     archiveCard.classList.remove('is-ok','is-danger','is-idle','is-warn');
+    const anyArchive=!!(j.archive_enabled||j.tts_archive_enabled);
     let archiveState='DEAKTIVIERT',archiveClass='is-idle';
-    if(j.archive_enabled){
+    if(anyArchive){
       if(j.archive_active){archiveState='ÜBERTRÄGT';archiveClass='is-warn';}
       else if(j.archive_available){archiveState=j.archive_pending?'WARTESCHLANGE':'ONLINE';archiveClass=j.archive_pending?'is-warn':'is-ok';}
       else{archiveState='OFFLINE';archiveClass='is-danger';}
     }
     archiveCard.classList.add(archiveClass);
     document.getElementById('rec-archive-state').textContent=archiveState;
-    document.getElementById('rec-archive-progress').textContent=j.archive_enabled?`${j.archive_completed||0} archiviert · ${j.archive_pending||0} ausstehend`:'Automatische Kopie aus';
-    const archiveDetail=j.archive_last_error||j.archive_directory||'—';
+    document.getElementById('rec-archive-progress').textContent=anyArchive?`${j.archive_completed||0} archiviert · ${j.archive_pending||0} ausstehend`:'Automatische Kopie aus';
+    const archivePaths=[];
+    if(j.archive_enabled)archivePaths.push(`Recordings: ${j.archive_directory}`);
+    if(j.tts_archive_enabled)archivePaths.push(`TTS: ${j.tts_archive_directory}`);
+    const archiveDetail=j.archive_last_error||archivePaths.join(' · ')||'—';
     document.getElementById('rec-archive-detail').textContent=archiveDetail;
     document.getElementById('rec-archive-detail').title=j.archive_last_success_at?`Letzte erfolgreiche Kopie: ${recFmtTime(j.archive_last_success_at)}`:archiveDetail;
     document.getElementById('rec-toggle').textContent=j.active?'Aufzeichnung pausieren':'Aufzeichnung aktivieren';
@@ -10352,31 +10537,33 @@ async function loadRecordings(force){
     recordingRows=await r.json();
     renderRecordings();
   }catch(e){
-    const tb=document.getElementById('rec-tbody'); if(tb)tb.innerHTML='<tr><td colspan="7" class="sds-empty">Fehler beim Laden: '+escHtml(e)+'</td></tr>';
+    const tb=document.getElementById('rec-tbody'); if(tb)tb.innerHTML='<tr><td colspan="8" class="sds-empty">Fehler beim Laden: '+escHtml(e)+'</td></tr>';
   }finally{recordingBusy=false;}
 }
 function renderRecordings(){
   const tb=document.getElementById('rec-tbody'); if(!tb)return;
   const q=(document.getElementById('rec-filter')?.value||'').trim().toLowerCase();
   const rows=recordingRows.filter(r=>{
-    const hay=[r.started_at,r.call_id,r.source_issi,r.destination_id,r.destination_type,recSourceLabel(r),recDestinationLabel(r)].join(' ').toLowerCase();
+    const hay=[r.title,r.origin,r.started_at,r.call_id,r.source_issi,r.destination_id,r.destination_type,recSourceLabel(r),recDestinationLabel(r)].join(' ').toLowerCase();
     return !q||hay.includes(q);
   });
-  if(!rows.length){tb.innerHTML='<tr><td colspan="7" class="sds-empty">Keine passenden Aufzeichnungen vorhanden.</td></tr>';return;}
+  if(!rows.length){tb.innerHTML='<tr><td colspan="8" class="sds-empty">Keine passenden Aufzeichnungen vorhanden.</td></tr>';return;}
   tb.innerHTML=rows.map(r=>{
     const dest=recDestinationLabel(r);
     const recovered=r.recovered_after_unclean_shutdown?' <span class="pill pill-warn">Wiederhergestellt</span>':'';
-    return '<tr class="audio-context-row" oncontextmenu="return openAudioContext(event,\'recording\',\''+escAttr(r.id)+'\',\'Aufzeichnung Call '+escAttr(String(r.call_id))+'\')">'+
+    const name=recDisplayName(r),callLabel=(r.origin==='tts'||r.destination_type==='library')?'—':String(r.call_id);
+    return '<tr class="audio-context-row" data-recording-id="'+escAttr(r.id)+'" oncontextmenu="return openAudioContext(event,\'recording\',\''+escAttr(r.id)+'\',\''+escAttr(name)+'\')">'+
       '<td>'+escHtml(recFmtTime(r.started_at))+recovered+'</td>'+
+      '<td><strong>'+escHtml(name)+'</strong>'+(r.origin==='tts'?' <span class="pill pill-info">TTS</span>':'')+'</td>'+
       '<td>'+escHtml(recSourceLabel(r))+'</td>'+
       '<td>'+escHtml(dest)+'</td>'+
-      '<td>'+escHtml(r.call_id)+'</td>'+
+      '<td>'+escHtml(callLabel)+'</td>'+
       '<td>'+escHtml(recFmtDuration(r.duration_ms))+'</td>'+
       '<td>'+escHtml(recFmtBytes(r.audio_bytes))+'</td>'+
       '<td style="white-space:nowrap">'+
         '<button class="btn btn-sm btn-primary" onclick="playRecording(\''+escAttr(r.id)+'\')">▶</button> '+
-        '<button class="btn btn-sm" onclick="openAudioSend(\'recording\',\''+escAttr(r.id)+'\',\'Aufzeichnung Call '+escAttr(String(r.call_id))+'\')">Senden</button> '+
-        '<a class="btn btn-sm" href="/api/recordings/'+encodeURIComponent(r.id)+'/audio" download="recording-'+escAttr(r.id)+'.wav">Download</a> '+
+        '<button class="btn btn-sm" onclick="openAudioSend(\'recording\',\''+escAttr(r.id)+'\',\''+escAttr(name)+'\')">Senden</button> '+
+        '<a class="btn btn-sm" href="/api/recordings/'+encodeURIComponent(r.id)+'/audio" download="'+escAttr(name.replace(/[^a-zA-Z0-9._-]+/g,'_'))+'.wav">Download</a> '+
         '<button class="btn btn-sm btn-danger" onclick="deleteRecording(\''+escAttr(r.id)+'\')">Löschen</button>'+
       '</td></tr>';
   }).join('');
@@ -10384,7 +10571,7 @@ function renderRecordings(){
 function playRecording(id){
   const row=recordingRows.find(r=>r.id===id);
   const box=document.getElementById('rec-player-box'),player=document.getElementById('rec-player');
-  document.getElementById('rec-player-title').textContent=row?`${recFmtTime(row.started_at)} · Call ${row.call_id}`:'Wiedergabe';
+  document.getElementById('rec-player-title').textContent=row?`${recDisplayName(row)} · ${recFmtTime(row.started_at)}`:'Wiedergabe';
   player.src='/api/recordings/'+encodeURIComponent(id)+'/audio';
   box.style.display='block';
   player.play().catch(()=>{});

@@ -58,6 +58,21 @@ fn register_subscriber(test: &mut ComponentTest, issi: u32, gssi: u32) {
     test.dump_sinks();
 }
 
+fn start_network_group_call(test: &mut ComponentTest, gssi: u32, priority: u8) {
+    let brew_uuid = uuid::Uuid::new_v4();
+    test.submit_message(SapMsg {
+        sap: Sap::Control,
+        src: TetraEntity::AudioPlayer,
+        dest: TetraEntity::Cmce,
+        msg: SapMsgInner::CmceCallControl(CallControl::NetworkCallStart {
+            brew_uuid,
+            source_issi: 4010001,
+            dest_gssi: gssi,
+            priority,
+        }),
+    });
+}
+
 /// Helper: build a U-SETUP SAP message for a group call.
 fn build_u_setup_msg(calling_issi: u32, dest_gssi: u32) -> SapMsg {
     let u_setup = USetup {
@@ -1381,6 +1396,120 @@ fn test_group_ee_announce_excludes_speaker() {
     assert_eq!(
         batched, 0,
         "the speaker's own EE window must not trigger batched re-sends (got {batched})"
+    );
+}
+
+#[test]
+fn test_network_group_start_uses_requested_priority_without_group_d_connect() {
+    debug::setup_logging_verbose();
+
+    let mut test = ComponentTest::new(
+        StackMode::Bs,
+        Some(TdmaTime { h: 0, m: 1, f: 1, t: 1 }),
+    );
+    test.populate_entities(
+        vec![TetraEntity::Cmce],
+        vec![TetraEntity::Mle, TetraEntity::Umac, TetraEntity::AudioPlayer],
+    );
+    register_subscriber(&mut test, TEST_ISSI, TEST_GSSI);
+
+    start_network_group_call(&mut test, TEST_GSSI, 5);
+    test.run_stack(Some(1));
+    let msgs = test.dump_sinks();
+
+    let (mut setup_sdu, _) =
+        find_lcmc_req(&msgs, TEST_GSSI, CmcePduTypeDl::DSetup).expect("Expected network group D-SETUP");
+    let setup = DSetup::from_bitbuf(&mut setup_sdu).expect("Failed to parse network group D-SETUP");
+    assert_eq!(
+        setup.call_priority, 5,
+        "network group D-SETUP must preserve requested priority"
+    );
+
+    assert!(
+        find_lcmc_req(&msgs, TEST_GSSI, CmcePduTypeDl::DConnect).is_none(),
+        "network-originated group calls must not send a group-addressed D-CONNECT"
+    );
+}
+
+#[test]
+fn test_network_group_start_emits_dense_initial_dsetup_burst() {
+    debug::setup_logging_verbose();
+
+    let mut test = ComponentTest::new(
+        StackMode::Bs,
+        Some(TdmaTime { h: 0, m: 1, f: 1, t: 1 }),
+    );
+    test.populate_entities(
+        vec![TetraEntity::Cmce],
+        vec![TetraEntity::Mle, TetraEntity::Umac, TetraEntity::AudioPlayer],
+    );
+    register_subscriber(&mut test, TEST_ISSI, TEST_GSSI);
+
+    start_network_group_call(&mut test, TEST_GSSI, 5);
+    test.run_stack(Some(1));
+    test.dump_sinks(); // discard immediate + normal backup announcements
+
+    // Four additional pages are due by ~1.6 seconds (4 × 28 timeslots). This is still well
+    // before the normal five-second late-entry interval.
+    test.run_stack(Some(120));
+    let burst_msgs = test.dump_sinks();
+    let burst_count = burst_msgs
+        .iter()
+        .filter(|msg| {
+            matches!(
+                &msg.msg,
+                SapMsgInner::LcmcMleUnitdataReq(prim)
+                    if prim.main_address.ssi == TEST_GSSI
+                        && dl_pdu_type(&prim.sdu) == Some(CmcePduTypeDl::DSetup)
+            )
+        })
+        .count();
+    assert!(
+        burst_count >= 4,
+        "expected at least four dense initial D-SETUP burst pages, got {burst_count}"
+    );
+}
+
+#[test]
+fn test_network_group_call_reannounced_after_affiliation_refresh() {
+    debug::setup_logging_verbose();
+
+    let mut test = ComponentTest::new(
+        StackMode::Bs,
+        Some(TdmaTime { h: 0, m: 1, f: 1, t: 1 }),
+    );
+    test.populate_entities(
+        vec![TetraEntity::Cmce],
+        vec![TetraEntity::Mle, TetraEntity::Umac, TetraEntity::AudioPlayer],
+    );
+    register_subscriber(&mut test, TEST_ISSI, TEST_GSSI);
+
+    start_network_group_call(&mut test, TEST_GSSI, 5);
+    test.run_stack(Some(1));
+    test.dump_sinks();
+
+    // Same group again models the MM coverage-return/re-register resync path: it is not a new
+    // affiliation, but the active network call still needs an immediate fresh D-SETUP.
+    test.submit_message(SapMsg {
+        sap: Sap::Control,
+        src: TetraEntity::Mm,
+        dest: TetraEntity::Cmce,
+        msg: SapMsgInner::MmSubscriberUpdate(MmSubscriberUpdate {
+            issi: TEST_ISSI,
+            groups: vec![TEST_GSSI],
+            action: BrewSubscriberAction::Affiliate,
+        }),
+    });
+    test.run_stack(Some(1));
+    let refresh_msgs = test.dump_sinks();
+
+    assert!(
+        find_lcmc_req(&refresh_msgs, TEST_GSSI, CmcePduTypeDl::DSetup).is_some(),
+        "affiliation refresh during an active network group call must trigger an immediate D-SETUP"
+    );
+    assert!(
+        find_lcmc_req(&refresh_msgs, TEST_GSSI, CmcePduTypeDl::DConnect).is_none(),
+        "affiliation refresh must not emit group-addressed D-CONNECT"
     );
 }
 

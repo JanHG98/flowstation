@@ -44,7 +44,7 @@ asterisk = ["tetra-codec"]
 recording = ["tetra-codec", "dep:libc"]
 
 # Compile the local WAV/MP3 TETRA audio player and dashboard API.
-audio-player = ["tetra-codec"]
+audio-player = ["tetra-codec", "recording"]
 
 [dependencies]
 tetra-core = { workspace = true }
@@ -62,6 +62,7 @@ soapysdr = { workspace = true, optional = true }
 
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+toml = { workspace = true }
 bitcode = { workspace = true }
 quinn = { version = "0.11", optional = true }
 rustls = { version = "0.23", default-features = false, features = ["ring"], optional = true }

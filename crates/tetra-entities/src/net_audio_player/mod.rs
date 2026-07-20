@@ -9,5 +9,6 @@ mod service;
 mod types;
 
 pub use entity::AudioPlayerEntity;
+pub(crate) use media::materialize_recording_wav;
 pub use service::AudioPlayerHandle;
 pub use types::{AudioPlayerState, AudioPlayerStatus, AudioSourceType, AudioTargetType, MediaEntry, MediaSourceInfo};

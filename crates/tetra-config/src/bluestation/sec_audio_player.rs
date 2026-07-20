@@ -34,8 +34,18 @@ pub struct CfgAudioPlayer {
     pub max_file_size_mb: u64,
     /// Reject or truncate decoded audio beyond this duration.
     pub max_duration_seconds: u32,
+    /// Number of encoded silence blocks sent before the source audio starts.
+    ///
+    /// This gives group-call subscribers time to receive D-SETUP and switch to
+    /// the assigned traffic channel before the first spoken syllable.
+    pub lead_in_silence_blocks: u8,
     /// Number of encoded silence blocks appended before call release.
     pub tail_silence_blocks: u8,
+    /// Keep a completed group dispatch busy until CMCE hangtime has fully expired.
+    ///
+    /// This prevents a subsequent dispatch from replacing the Brew UUID of a
+    /// group call that is still in NoActiveSpeaker/hangtime.
+    pub group_release_guard_seconds: u32,
     /// Maximum time to wait for an individual subscriber to answer.
     pub individual_answer_timeout_seconds: u32,
     /// ffmpeg executable used for MP3 and non-native WAV conversion.
@@ -78,8 +88,12 @@ pub struct CfgAudioPlayerDto {
     pub max_file_size_mb: u64,
     #[serde(default = "default_max_duration_seconds")]
     pub max_duration_seconds: u32,
+    #[serde(default = "default_lead_in_silence_blocks")]
+    pub lead_in_silence_blocks: u8,
     #[serde(default = "default_tail_silence_blocks")]
     pub tail_silence_blocks: u8,
+    #[serde(default = "default_group_release_guard_seconds")]
+    pub group_release_guard_seconds: u32,
     #[serde(default = "default_individual_answer_timeout_seconds")]
     pub individual_answer_timeout_seconds: u32,
     #[serde(default = "default_ffmpeg_path")]
@@ -99,7 +113,9 @@ impl Default for CfgAudioPlayerDto {
             default_priority: default_priority(),
             max_file_size_mb: default_max_file_size_mb(),
             max_duration_seconds: default_max_duration_seconds(),
+            lead_in_silence_blocks: default_lead_in_silence_blocks(),
             tail_silence_blocks: default_tail_silence_blocks(),
+            group_release_guard_seconds: default_group_release_guard_seconds(),
             individual_answer_timeout_seconds: default_individual_answer_timeout_seconds(),
             ffmpeg_path: default_ffmpeg_path(),
             extra: HashMap::new(),
@@ -125,8 +141,14 @@ fn default_max_file_size_mb() -> u64 {
 fn default_max_duration_seconds() -> u32 {
     1_800
 }
+fn default_lead_in_silence_blocks() -> u8 {
+    12
+}
 fn default_tail_silence_blocks() -> u8 {
     3
+}
+fn default_group_release_guard_seconds() -> u32 {
+    6
 }
 fn default_individual_answer_timeout_seconds() -> u32 {
     30
@@ -171,8 +193,14 @@ pub fn apply_audio_player_patch(mut src: CfgAudioPlayerDto) -> Result<CfgAudioPl
     if src.max_duration_seconds == 0 {
         return Err("audio_player: max_duration_seconds must be greater than zero".to_string());
     }
+    if src.lead_in_silence_blocks > 40 {
+        return Err("audio_player: lead_in_silence_blocks must be 0-40".to_string());
+    }
     if src.tail_silence_blocks > 20 {
         return Err("audio_player: tail_silence_blocks must be 0-20".to_string());
+    }
+    if !(5..=30).contains(&src.group_release_guard_seconds) {
+        return Err("audio_player: group_release_guard_seconds must be 5-30".to_string());
     }
     if src.individual_answer_timeout_seconds == 0 {
         return Err("audio_player: individual_answer_timeout_seconds must be greater than zero".to_string());
@@ -223,7 +251,9 @@ pub fn apply_audio_player_patch(mut src: CfgAudioPlayerDto) -> Result<CfgAudioPl
         default_priority: src.default_priority,
         max_file_size_mb: src.max_file_size_mb,
         max_duration_seconds: src.max_duration_seconds,
+        lead_in_silence_blocks: src.lead_in_silence_blocks,
         tail_silence_blocks: src.tail_silence_blocks,
+        group_release_guard_seconds: src.group_release_guard_seconds,
         individual_answer_timeout_seconds: src.individual_answer_timeout_seconds,
         ffmpeg_path: src.ffmpeg_path,
     })
@@ -239,6 +269,8 @@ mod tests {
         assert!(!cfg.enabled);
         assert_eq!(cfg.source_issi, 4_010_099);
         assert!(cfg.max_duration_seconds > 0);
+        assert_eq!(cfg.lead_in_silence_blocks, 12);
+        assert_eq!(cfg.group_release_guard_seconds, 6);
         assert!(cfg.shares.is_empty());
     }
 
@@ -247,6 +279,21 @@ mod tests {
         let dto = CfgAudioPlayerDto {
             source_issi: 0,
             default_priority: 16,
+            ..CfgAudioPlayerDto::default()
+        };
+        assert!(apply_audio_player_patch(dto).is_err());
+    }
+
+    #[test]
+    fn rejects_unsafe_rf_guard_values() {
+        let dto = CfgAudioPlayerDto {
+            lead_in_silence_blocks: 41,
+            ..CfgAudioPlayerDto::default()
+        };
+        assert!(apply_audio_player_patch(dto).is_err());
+
+        let dto = CfgAudioPlayerDto {
+            group_release_guard_seconds: 4,
             ..CfgAudioPlayerDto::default()
         };
         assert!(apply_audio_player_patch(dto).is_err());
