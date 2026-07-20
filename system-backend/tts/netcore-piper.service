@@ -1,7 +1,7 @@
 [Unit]
 Description=NetCore local Piper TTS provider
 After=network.target
-Before=bluestation-bs.service
+Before=bluestation-bs.service tetra.service
 
 [Service]
 Type=simple
@@ -10,7 +10,7 @@ Group=bluestation
 WorkingDirectory=/var/lib/netcore/piper
 Environment=HOME=/var/lib/netcore/piper
 Environment=PYTHONUNBUFFERED=1
-ExecStart=/opt/netcore-piper/bin/python -m piper.http_server -m de_DE-thorsten-medium --data-dir /var/lib/netcore/piper --host 127.0.0.1 --port 5000
+ExecStart=/opt/netcore-piper/bin/python -m piper.http_server -m de_DE-thorsten-medium --data-dir /var/lib/netcore/piper --host 127.0.0.1 --port 5005
 Restart=on-failure
 RestartSec=3
 TimeoutStopSec=15

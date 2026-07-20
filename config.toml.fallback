@@ -580,7 +580,11 @@ source_issi = 4010099
 default_priority = 5
 max_file_size_mb = 100
 max_duration_seconds = 1800
+# 12 × 60 ms = 720 ms encoded TCH/S lead-in before the first syllable.
+lead_in_silence_blocks = 12
 tail_silence_blocks = 3
+# CMCE group-call hangtime is 5 seconds; keep AudioPlayer busy slightly longer.
+group_release_guard_seconds = 6
 individual_answer_timeout_seconds = 30
 ffmpeg_path = "ffmpeg"
 
@@ -596,7 +600,7 @@ path = "/mnt/nfs-share"
 # WAV locally before handing it to the existing TETRA audio dispatcher.
 [tts]
 enabled = true
-endpoint = "http://127.0.0.1:5000"
+endpoint = "http://127.0.0.1:5005"
 cache_directory = "/var/cache/netcore/tts"
 default_voice = "de-thorsten"
 default_speed = 0.95

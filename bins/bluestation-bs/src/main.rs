@@ -397,6 +397,11 @@ fn build_bs_stack(
                     handle.cache_root().display(),
                     cfg.config().audio_player.shares.len()
                 );
+                eprintln!(
+                    "    RF guard: {} ms lead-in, {} s group-release guard",
+                    u64::from(cfg.config().audio_player.lead_in_silence_blocks) * 60,
+                    cfg.config().audio_player.group_release_guard_seconds
+                );
                 if let Some(warning) = handle.startup_warning() {
                     eprintln!("    Audio cache warning: {warning}");
                 }

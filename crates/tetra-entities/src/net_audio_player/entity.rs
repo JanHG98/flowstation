@@ -317,8 +317,12 @@ impl AudioPlayerEntity {
             .as_ref()
             .map(|playback| {
                 let elapsed = playback.phase_started.elapsed();
+                let finish_guard_seconds = match playback.target_type {
+                    AudioTargetType::Group => self.handle.config().group_release_guard_seconds as u64,
+                    AudioTargetType::Individual => 3,
+                };
                 (
-                    playback.finishing && elapsed >= Duration::from_secs(3),
+                    playback.finishing && elapsed >= Duration::from_secs(finish_guard_seconds),
                     !playback.finishing
                         && playback.ts.is_none()
                         && elapsed >= Duration::from_secs(self.handle.config().individual_answer_timeout_seconds as u64),

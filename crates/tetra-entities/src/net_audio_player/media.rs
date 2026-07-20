@@ -81,27 +81,46 @@ fn prepare_audio_from_path(
         return Err("decoded audio contains no samples".to_string());
     }
 
-    let duration_ms = pcm.len() as u64 * 1000 / TETRA_PCM_SAMPLE_RATE as u64;
+    let source_duration_ms = pcm.len() as u64 * 1000 / TETRA_PCM_SAMPLE_RATE as u64;
     let remainder = pcm.len() % TETRA_PCM_SAMPLES_PER_BLOCK;
     if remainder != 0 {
         pcm.resize(pcm.len() + (TETRA_PCM_SAMPLES_PER_BLOCK - remainder), 0);
     }
 
     let mut encoder = TetraSpeechEncoder::new().ok_or_else(|| "tetra encoder creation failed".to_string())?;
-    let mut blocks = Vec::with_capacity(pcm.len() / TETRA_PCM_SAMPLES_PER_BLOCK + config.tail_silence_blocks as usize);
+    let speech_blocks = pcm.len() / TETRA_PCM_SAMPLES_PER_BLOCK;
+    let mut blocks = Vec::with_capacity(
+        config.lead_in_silence_blocks as usize + speech_blocks + config.tail_silence_blocks as usize,
+    );
+    let silence = [0i16; TETRA_PCM_SAMPLES_PER_BLOCK];
+
+    // The CMCE entity can announce a group call and open the traffic circuit in
+    // the same scheduler turn. Subscriber radios still need a short, real TCH/S
+    // window to receive D-SETUP and tune to the assigned channel. Sending encoded
+    // silence here prevents short prompts from disappearing before the MS joins.
+    for _ in 0..config.lead_in_silence_blocks {
+        let encoded = encoder
+            .encode_complete_block(&silence)
+            .ok_or_else(|| "failed to encode TETRA lead-in silence".to_string())?;
+        blocks.push(encoded);
+    }
+
     for block in pcm.chunks_exact(TETRA_PCM_SAMPLES_PER_BLOCK) {
         let encoded = encoder
             .encode_complete_block(block)
             .ok_or_else(|| "failed to encode a complete TETRA speech block".to_string())?;
         blocks.push(encoded);
     }
-    let silence = [0i16; TETRA_PCM_SAMPLES_PER_BLOCK];
     for _ in 0..config.tail_silence_blocks {
         let encoded = encoder
             .encode_complete_block(&silence)
             .ok_or_else(|| "failed to encode TETRA tail silence".to_string())?;
         blocks.push(encoded);
     }
+
+    let guard_duration_ms =
+        (config.lead_in_silence_blocks as u64 + config.tail_silence_blocks as u64) * 60;
+    let duration_ms = source_duration_ms.saturating_add(guard_duration_ms);
 
     Ok(PreparedAudio {
         job_id,

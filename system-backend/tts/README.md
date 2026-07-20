@@ -1,6 +1,6 @@
 # NetCore local Piper TTS provider
 
-FlowStation TTS Phase 1 expects a Piper HTTP server on `127.0.0.1:5000`.
+FlowStation TTS Phase 1 expects a Piper HTTP server on `127.0.0.1:5005`.
 The provider is intentionally separate from the RF process: it creates a complete WAV first;
 FlowStation then passes that file into the existing audio-player/ACELP path.
 
@@ -16,14 +16,14 @@ sudo SERVICE_USER=bluestation SERVICE_GROUP=bluestation ./install-piper.sh
 Optional voice override:
 
 ```bash
-sudo VOICE=de_DE-thorsten-medium SERVICE_USER=bluestation ./install-piper.sh
+sudo VOICE=de_DE-thorsten-medium PIPER_PORT=5005 SERVICE_USER=bluestation ./install-piper.sh
 ```
 
 ## Manual health checks
 
 ```bash
 systemctl status netcore-piper --no-pager
-curl -fsS http://127.0.0.1:5000/voices
+curl -fsS http://127.0.0.1:5005/voices
 ```
 
 Synthesis test:
@@ -32,7 +32,7 @@ Synthesis test:
 curl -fsS \
   -H 'Content-Type: application/json' \
   -d '{"text":"Achtung. Dies ist eine Testdurchsage.","voice":"de_DE-thorsten-medium","length_scale":1.0526}' \
-  http://127.0.0.1:5000/synthesize \
+  http://127.0.0.1:5005/synthesize \
   -o /tmp/netcore-tts-test.wav
 file /tmp/netcore-tts-test.wav
 ```

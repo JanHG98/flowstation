@@ -36,7 +36,7 @@ Provider latency never occurs while a TETRA traffic channel is held.
 ```toml
 [tts]
 enabled = true
-endpoint = "http://127.0.0.1:5000"
+endpoint = "http://127.0.0.1:5005"
 cache_directory = "/var/cache/netcore/tts"
 default_voice = "de-thorsten"
 default_speed = 0.95
@@ -55,6 +55,26 @@ provider_voice = "de_DE-thorsten-medium"
 
 `speed` is operator-facing: `1.0` is normal, `0.95` is five percent slower. Piper receives the
 corresponding inverse `length_scale`.
+
+
+## RF reliability guards
+
+The shared AudioPlayer now adds two radio-side guards before/after generated audio:
+
+```toml
+[audio_player]
+lead_in_silence_blocks = 12
+tail_silence_blocks = 3
+group_release_guard_seconds = 6
+```
+
+Each speech block represents 60 ms. The default lead-in therefore transmits 720 ms of encoded
+silence after CMCE reports the traffic channel ready. This gives subscriber radios time to receive
+D-SETUP and move from MCCH to TCH/S before the first spoken syllable.
+
+After a group announcement ends, the AudioPlayer remains in `finishing` for six seconds. CMCE uses a
+five-second group hangtime; the extra guard prevents a new audio job from replacing the Brew UUID of
+a group call that has not been fully released yet.
 
 ## API
 

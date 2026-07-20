@@ -7,6 +7,7 @@ VOICE="${VOICE:-de_DE-thorsten-medium}"
 VENV="${VENV:-/opt/netcore-piper}"
 VOICE_DIR="${VOICE_DIR:-/var/lib/netcore/piper}"
 TTS_CACHE="${TTS_CACHE:-/var/cache/netcore/tts}"
+PIPER_PORT="${PIPER_PORT:-5005}"
 UNIT_PATH="/etc/systemd/system/netcore-piper.service"
 
 if [[ ${EUID} -ne 0 ]]; then
@@ -32,7 +33,7 @@ sed \
   -e "s|^Group=.*|Group=$SERVICE_GROUP|" \
   -e "s|^WorkingDirectory=.*|WorkingDirectory=$VOICE_DIR|" \
   -e "s|^Environment=HOME=.*|Environment=HOME=$VOICE_DIR|" \
-  -e "s|^ExecStart=.*|ExecStart=$VENV/bin/python -m piper.http_server -m $VOICE --data-dir $VOICE_DIR --host 127.0.0.1 --port 5000|" \
+  -e "s|^ExecStart=.*|ExecStart=$VENV/bin/python -m piper.http_server -m $VOICE --data-dir $VOICE_DIR --host 127.0.0.1 --port $PIPER_PORT|" \
   -e "s|^ReadWritePaths=.*|ReadWritePaths=$VOICE_DIR $TTS_CACHE|" \
   "$(dirname "$0")/netcore-piper.service" > "$UNIT_PATH"
 chmod 0644 "$UNIT_PATH"
@@ -43,5 +44,5 @@ systemctl --no-pager --full status netcore-piper.service || true
 
 echo
 echo "Piper health check:"
-curl --fail --silent --show-error http://127.0.0.1:5000/voices | head -c 500 || true
+curl --fail --silent --show-error http://127.0.0.1:$PIPER_PORT/voices | head -c 500 || true
 echo

@@ -10166,7 +10166,7 @@ window.addEventListener('resize', () => {
 
 // ── Local/server WAV/MP3 audio dispatch ──────────────────────────────────
 let audioCurrentPath='',audioCurrentSource='local',audioSources=[],audioEntries=[],audioStatus=null,audioPendingSource=null,audioGroups={},audioDevices={};
-let ttsStatus=null,ttsVoices=[],ttsDefaultsApplied=false,ttsPreviewLoadedJob=null;
+let ttsStatus=null,ttsVoices=[],ttsDefaultsApplied=false,ttsPreviewLoadedJob=null,ttsRequestInFlight=false;
 function ttsStateLabel(state){return ({idle:'BEREIT',synthesizing:'ERZEUGT SPRACHE',ready:'VORSCHAU BEREIT',dispatching:'SENDET',failed:'FEHLER',cancelled:'ABGEBROCHEN'})[state]||String(state||'—').toUpperCase();}
 function updateTtsCharacterCount(){const input=document.getElementById('tts-text'),label=document.getElementById('tts-character-count');if(!input||!label)return;const count=[...input.value].length,max=ttsStatus?.max_text_characters||2000;input.maxLength=max;label.textContent=count+' / '+max+' Zeichen';}
 function updateTtsSpeedLabel(){const slider=document.getElementById('tts-speed'),label=document.getElementById('tts-speed-label');if(slider&&label)label.textContent=slider.value+' %';}
@@ -10176,12 +10176,73 @@ async function loadTtsVoices(){const select=document.getElementById('tts-voice')
 function ttsTargetPayload(){const targetId=Number(document.getElementById('tts-target-manual').value),priority=Number(document.getElementById('tts-priority').value);if(!Number.isInteger(targetId)||targetId<=0||targetId>0xFFFFFF)throw new Error('Bitte gültige 24-Bit-ISSI/GSSI eingeben.');if(!Number.isInteger(priority)||priority<0||priority>15)throw new Error('Priorität muss zwischen 0 und 15 liegen.');return {target_type:document.getElementById('tts-target-type').value,target_id:targetId,priority};}
 function ttsGenerationPayload(){const text=document.getElementById('tts-text').value.trim();if(!text)throw new Error('Bitte zuerst einen Sprechtext eingeben.');return {text,voice_id:document.getElementById('tts-voice').value,speed:Number(document.getElementById('tts-speed').value)/100};}
 async function postTts(url,body){const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})}),j=await r.json().catch(()=>({error:'HTTP '+r.status}));if(!r.ok)throw new Error(j.error||('HTTP '+r.status));return j;}
-async function generateTtsPreview(){try{await postTts('/api/audio/tts/generate',ttsGenerationPayload());await loadTtsStatus();}catch(error){alert(error.message||String(error));}}
-async function dispatchTtsNow(){try{await postTts('/api/audio/tts/dispatch',{...ttsGenerationPayload(),...ttsTargetPayload()});await Promise.all([loadTtsStatus(),loadAudioStatus()]);}catch(error){alert(error.message||String(error));}}
-async function sendGeneratedTts(){try{if(!ttsStatus?.job_id)throw new Error('Es ist keine TTS-Vorschau bereit.');await postTts('/api/audio/tts/send',{job_id:ttsStatus.job_id,...ttsTargetPayload()});await Promise.all([loadTtsStatus(),loadAudioStatus()]);}catch(error){alert(error.message||String(error));}}
+function audioDispatchBusy(){return !!audioStatus&&!['idle','failed'].includes(audioStatus.state);}
+function assertAudioDispatchReady(){if(audioDispatchBusy())throw new Error('Die Audioausgabe ist noch belegt ('+audioStateLabel(audioStatus.state)+'). Bitte den laufenden Ruf vollständig beenden lassen.');}
+async function generateTtsPreview(){
+  if(ttsRequestInFlight)return;
+  ttsRequestInFlight=true;renderTtsStatus();
+  try{await postTts('/api/audio/tts/generate',ttsGenerationPayload());await loadTtsStatus();}
+  catch(error){alert(error.message||String(error));}
+  finally{ttsRequestInFlight=false;renderTtsStatus();}
+}
+async function dispatchTtsNow(){
+  if(ttsRequestInFlight)return;
+  try{assertAudioDispatchReady();}catch(error){alert(error.message||String(error));return;}
+  ttsRequestInFlight=true;renderTtsStatus();
+  try{await postTts('/api/audio/tts/dispatch',{...ttsGenerationPayload(),...ttsTargetPayload()});await Promise.all([loadTtsStatus(),loadAudioStatus()]);}
+  catch(error){alert(error.message||String(error));}
+  finally{ttsRequestInFlight=false;renderTtsStatus();}
+}
+async function sendGeneratedTts(){
+  if(ttsRequestInFlight)return;
+  try{if(!ttsStatus?.job_id)throw new Error('Es ist keine TTS-Vorschau bereit.');assertAudioDispatchReady();}
+  catch(error){alert(error.message||String(error));return;}
+  ttsRequestInFlight=true;renderTtsStatus();
+  try{await postTts('/api/audio/tts/send',{job_id:ttsStatus.job_id,...ttsTargetPayload()});await Promise.all([loadTtsStatus(),loadAudioStatus()]);}
+  catch(error){alert(error.message||String(error));}
+  finally{ttsRequestInFlight=false;renderTtsStatus();}
+}
 async function stopTtsJob(){try{await postTts('/api/audio/tts/stop',{});closeTtsPreview();await Promise.all([loadTtsStatus(),loadAudioStatus()]);}catch(error){alert(error.message||String(error));}}
 function closeTtsPreview(){const card=document.getElementById('tts-preview-card'),player=document.getElementById('tts-preview-player');if(player){player.pause();player.removeAttribute('src');player.load();}if(card)card.style.display='none';ttsPreviewLoadedJob=null;}
-function renderTtsStatus(){const s=ttsStatus||{},provider=document.getElementById('tts-provider-state'),detail=document.getElementById('tts-provider-detail'),job=document.getElementById('tts-job-state');if(!provider||!job)return;provider.textContent=s.provider_available?'PIPER ONLINE':'PIPER OFFLINE';provider.style.color=s.provider_available?'var(--success)':'var(--danger)';detail.textContent=s.provider_endpoint||'Lokale Piper-Sprachsynthese';provider.title=s.provider_error||s.startup_warning||'';if(!ttsDefaultsApplied&&s.available){document.getElementById('tts-speed').value=Math.round(Number(s.default_speed||0.95)*100);document.getElementById('tts-priority').value=s.default_priority??5;ttsDefaultsApplied=true;updateTtsSpeedLabel();updateTtsCharacterCount();}const busy=['synthesizing','dispatching'].includes(s.state),ready=s.state==='ready'&&s.generated_audio_available;document.getElementById('tts-generate').disabled=busy||!s.provider_available;document.getElementById('tts-dispatch').disabled=busy||!s.provider_available;document.getElementById('tts-stop').disabled=!busy&&!ready&&s.state!=='failed'&&s.state!=='cancelled';document.getElementById('tts-send-preview').disabled=!ready;let status=ttsStateLabel(s.state);if(s.text_preview)status+=' · '+s.text_preview;if(s.target_id)status+=' → '+(s.target_type==='group'?'GSSI ':'ISSI ')+s.target_id;if(s.last_error)status+=' · '+s.last_error;job.textContent=status;job.style.color=s.state==='failed'?'var(--danger)':s.state==='ready'?'var(--success)':'';const card=document.getElementById('tts-preview-card'),player=document.getElementById('tts-preview-player');if(s.generated_audio_available&&s.job_id){card.style.display='block';document.getElementById('tts-preview-title').textContent=s.file_name||'TTS-Durchsage';document.getElementById('tts-preview-state').textContent=s.state==='dispatching'?'Wird über TETRA ausgesendet.':'Bereit zum Vorhören und Senden.';if(ttsPreviewLoadedJob!==s.job_id){player.pause();player.src='/api/audio/tts/preview?job_id='+encodeURIComponent(s.job_id)+'&_='+Date.now();player.load();ttsPreviewLoadedJob=s.job_id;}}else if(!busy){closeTtsPreview();}}
+function renderTtsStatus(){
+  const s=ttsStatus||{},provider=document.getElementById('tts-provider-state'),detail=document.getElementById('tts-provider-detail'),job=document.getElementById('tts-job-state');
+  if(!provider||!job)return;
+  provider.textContent=s.provider_available?'PIPER ONLINE':'PIPER OFFLINE';
+  provider.style.color=s.provider_available?'var(--success)':'var(--danger)';
+  detail.textContent=s.provider_endpoint||'Lokale Piper-Sprachsynthese';
+  provider.title=s.provider_error||s.startup_warning||'';
+  if(!ttsDefaultsApplied&&s.available){
+    document.getElementById('tts-speed').value=Math.round(Number(s.default_speed||0.95)*100);
+    document.getElementById('tts-priority').value=s.default_priority??5;
+    ttsDefaultsApplied=true;updateTtsSpeedLabel();updateTtsCharacterCount();
+  }
+  const busy=['synthesizing','dispatching'].includes(s.state),ready=s.state==='ready'&&s.generated_audio_available,audioBusy=audioDispatchBusy();
+  const generate=document.getElementById('tts-generate'),dispatch=document.getElementById('tts-dispatch'),send=document.getElementById('tts-send-preview');
+  generate.disabled=busy||ttsRequestInFlight||!s.provider_available;
+  dispatch.disabled=busy||ttsRequestInFlight||audioBusy||!s.provider_available;
+  send.disabled=!ready||ttsRequestInFlight||audioBusy;
+  dispatch.title=audioBusy?'Audioausgabe '+audioStateLabel(audioStatus.state)+' — Ruf erst vollständig beenden lassen':'';
+  send.title=dispatch.title;
+  document.getElementById('tts-stop').disabled=!busy&&!ready&&s.state!=='failed'&&s.state!=='cancelled';
+  let status=ttsStateLabel(s.state);
+  if(ttsRequestInFlight&&!busy)status='AUFTRAG WIRD ÜBERGEBEN';
+  if(s.text_preview)status+=' · '+s.text_preview;
+  if(s.target_id)status+=' → '+(s.target_type==='group'?'GSSI ':'ISSI ')+s.target_id;
+  if(s.last_error)status+=' · '+s.last_error;
+  job.textContent=status;
+  job.style.color=s.state==='failed'?'var(--danger)':s.state==='ready'?'var(--success)':'';
+  const card=document.getElementById('tts-preview-card'),player=document.getElementById('tts-preview-player');
+  if(s.generated_audio_available&&s.job_id){
+    card.style.display='block';
+    document.getElementById('tts-preview-title').textContent=s.file_name||'TTS-Durchsage';
+    document.getElementById('tts-preview-state').textContent=s.state==='dispatching'
+      ?'Wird über TETRA ausgesendet.'
+      :(audioBusy?'Vorschau bereit · Audioausgabe noch '+audioStateLabel(audioStatus.state)+'.':'Bereit zum Vorhören und Senden.');
+    if(ttsPreviewLoadedJob!==s.job_id){
+      player.pause();player.src='/api/audio/tts/preview?job_id='+encodeURIComponent(s.job_id)+'&_='+Date.now();player.load();ttsPreviewLoadedJob=s.job_id;
+    }
+  }else if(!busy){closeTtsPreview();}
+}
 async function loadTtsStatus(){try{const r=await fetch('/api/audio/tts/status',{cache:'no-store'}),j=await r.json().catch(()=>({error:'HTTP '+r.status}));if(!r.ok)throw new Error(j.error||('HTTP '+r.status));ttsStatus=j;renderTtsStatus();}catch(error){ttsStatus={available:false,provider_available:false,state:'failed',last_error:String(error)};renderTtsStatus();}}
 function audioStateLabel(s){return ({idle:'BEREIT',preparing:'VORBEREITUNG',calling:'RUFBAU',waiting_for_answer:'WARTE AUF ANNAHME',playing:'SENDET',finishing:'BEENDET RUF',failed:'FEHLER'})[s]||String(s||'—').toUpperCase();}
 async function loadAudioRegistries(){
@@ -10211,7 +10272,7 @@ async function loadAudioStatus(){
     const card=document.getElementById('audio-state-card');card.classList.remove('is-ok','is-danger','is-idle','is-warn');card.classList.add(j.state==='failed'?'is-danger':active?'is-ok':'is-idle');
     document.getElementById('audio-state').textContent=audioStateLabel(j.state);const targetText=j.target_id?((j.target_type==='group'?'GSSI ':'ISSI ')+j.target_id):'Bereit';const sourceText=j.source_id?(' ['+j.source_id+']'):'';document.getElementById('audio-target').textContent=(j.file_name?j.file_name+sourceText+' → ':'')+targetText;
     document.getElementById('audio-progress').textContent=recFmtDuration(j.position_ms)+' / '+recFmtDuration(j.duration_ms);document.getElementById('audio-blocks').textContent=(j.sent_blocks||0)+' / '+(j.total_blocks||0)+' Blöcke';
-    document.getElementById('audio-channel').textContent=j.timeslot?'TS '+j.timeslot:'—';document.getElementById('audio-call').textContent=j.call_id?'Call '+j.call_id:'Kein aktiver Ruf';document.getElementById('audio-ffmpeg').textContent=j.ffmpeg_available?'VERFÜGBAR':'NICHT GEFUNDEN';document.getElementById('audio-error').textContent=j.last_error||j.startup_warning||'Kein Fehler';document.getElementById('audio-stop').disabled=!active;updateAudioSourceHeader();
+    document.getElementById('audio-channel').textContent=j.timeslot?'TS '+j.timeslot:'—';document.getElementById('audio-call').textContent=j.call_id?'Call '+j.call_id:'Kein aktiver Ruf';document.getElementById('audio-ffmpeg').textContent=j.ffmpeg_available?'VERFÜGBAR':'NICHT GEFUNDEN';document.getElementById('audio-error').textContent=j.last_error||j.startup_warning||'Kein Fehler';document.getElementById('audio-stop').disabled=!active;updateAudioSourceHeader();renderTtsStatus();
   }catch(e){document.getElementById('audio-state').textContent='NICHT VERFÜGBAR';document.getElementById('audio-error').textContent=String(e);}
 }
 async function browseAudio(path){

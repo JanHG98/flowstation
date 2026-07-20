@@ -288,6 +288,14 @@ impl TtsHandle {
         live.target_id = Some(target_id);
         live.priority = Some(priority);
         live.dispatch_seen = true;
+        tracing::info!(
+            "TTS: dispatch queued job={} audio_job={} target={:?}:{} priority={}",
+            job_id,
+            audio_job_id,
+            target_type,
+            target_id,
+            priority
+        );
         Ok(audio_job_id)
     }
 
@@ -430,6 +438,11 @@ impl TtsHandle {
             TtsIntent::Preview => {
                 let mut live = self.inner.live.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
                 if live.job_id.as_deref() == Some(job_id.as_str()) {
+                    tracing::info!(
+                        "TTS: preview ready job={} file={}",
+                        job_id,
+                        path.display()
+                    );
                     live.state = TtsState::Ready;
                     live.generated_path = Some(path);
                     live.last_error = None;
@@ -458,6 +471,14 @@ impl TtsHandle {
                             {
                                 live.state = TtsState::Dispatching;
                                 live.generated_path = Some(path.clone());
+                                tracing::info!(
+                                    "TTS: direct dispatch queued job={} audio_job={} target={:?}:{} priority={}",
+                                    job_id,
+                                    audio_job_id,
+                                    target_type,
+                                    target_id,
+                                    priority
+                                );
                                 live.audio_player_job_id = Some(audio_job_id);
                                 live.dispatch_seen = true;
                                 live.last_error = None;
@@ -620,22 +641,36 @@ impl TtsHandle {
         if live.state != TtsState::Dispatching {
             return;
         }
-        let Some(expected_job) = live.audio_player_job_id.as_deref() else {
+        let Some(expected_job) = live.audio_player_job_id.clone() else {
             return;
         };
-        if audio.job_id.as_deref() == Some(expected_job) {
+        if audio.job_id.as_deref() == Some(expected_job.as_str()) {
             live.dispatch_seen = true;
             if audio.state == AudioPlayerState::Failed {
+                let error = audio.last_error.or_else(|| Some("TTS radio dispatch failed".to_string()));
+                tracing::error!(
+                    "TTS: dispatch failed job={} audio_job={} error={}",
+                    live.job_id.as_deref().unwrap_or("unknown"),
+                    expected_job,
+                    error.as_deref().unwrap_or("unknown")
+                );
                 live.state = TtsState::Failed;
-                live.last_error = audio.last_error.or_else(|| Some("TTS radio dispatch failed".to_string()));
+                live.last_error = error;
                 live.audio_player_job_id = None;
             }
             return;
         }
         if live.dispatch_seen && matches!(audio.state, AudioPlayerState::Idle | AudioPlayerState::Failed) {
             if audio.state == AudioPlayerState::Failed {
+                let error = audio.last_error.or_else(|| Some("TTS radio dispatch failed".to_string()));
+                tracing::error!(
+                    "TTS: dispatch failed after handoff job={} audio_job={} error={}",
+                    live.job_id.as_deref().unwrap_or("unknown"),
+                    expected_job,
+                    error.as_deref().unwrap_or("unknown")
+                );
                 live.state = TtsState::Failed;
-                live.last_error = audio.last_error.or_else(|| Some("TTS radio dispatch failed".to_string()));
+                live.last_error = error;
                 live.audio_player_job_id = None;
             } else if self.inner.config.keep_generated_audio {
                 live.state = TtsState::Ready;
@@ -646,6 +681,11 @@ impl TtsHandle {
                 live.priority = None;
                 live.dispatch_seen = false;
             } else {
+                tracing::info!(
+                    "TTS: dispatch completed job={} audio_job={}",
+                    live.job_id.as_deref().unwrap_or("unknown"),
+                    expected_job
+                );
                 completed_path = live.generated_path.take();
                 *live = LiveStatus::default();
             }
