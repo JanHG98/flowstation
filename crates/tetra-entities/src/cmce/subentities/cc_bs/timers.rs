@@ -8,6 +8,12 @@ use super::*;
 /// (6 s / (170/12 ms per slot) ≈ 423 timeslots.)
 pub(super) const EE_DSETUP_FALLBACK_TS: i32 = 423;
 
+/// Extra network-originated group D-SETUP announcements after the immediate + backup pair.
+/// 28 TETRA timeslots are about 397 ms, so stages 1..=4 land at roughly
+/// 0.4 / 0.8 / 1.2 / 1.6 seconds — fully inside the 1.8-second AudioPlayer lead-in.
+pub(super) const NETWORK_SETUP_BURST_INTERVAL_TS: i32 = 28;
+pub(super) const NETWORK_SETUP_BURST_STAGES: u8 = 4;
+
 impl CcBsSubentity {
     pub fn tick_start(&mut self, queue: &mut MessageQueue, dltime: TdmaTime) {
         self.dltime = dltime;
@@ -23,6 +29,11 @@ impl CcBsSubentity {
         self.check_individual_setup_timeout(queue);
         // Check hangtime expiry for active local calls
         self.check_hangtime_expiry(queue);
+
+        // Network-originated group calls (AudioPlayer/TTS/Brew) get a dense initial D-SETUP
+        // burst while the encoded lead-in is still silent. This closes the five-second hole
+        // between the ETSI initial/backup pair and normal late-entry paging.
+        self.drive_network_setup_burst(queue);
 
         // Energy-economy group-call announce batching: re-emit the group D-SETUP across the
         // union of affiliated EE members' wake frames so members on a different sleep phase
@@ -294,6 +305,65 @@ impl CcBsSubentity {
         for call_id in expired_individual_calls {
             tracing::info!("Call timeout expired for individual call_id={}, releasing", call_id);
             self.release_individual_call(queue, call_id, DisconnectCause::SwmiRequestedDisconnection);
+        }
+    }
+
+    /// Emit four additional group-addressed D-SETUPs for a young network-originated call.
+    ///
+    /// The immediate D-SETUP is queued by `fsm_on_network_call_start`, and CircuitMgr supplies
+    /// the normal one-frame backup. These extra pages are intentionally untracked: they are a
+    /// bounded reliability burst, must not be blocked by a still-pending receipt from the backup,
+    /// and stop automatically after stage four.
+    fn drive_network_setup_burst(&mut self, queue: &mut MessageQueue) {
+        let due_calls: Vec<(u16, u8, u8, u8, i32)> = self
+            .active_calls
+            .iter()
+            .filter_map(|(call_id, call)| {
+                if !matches!(&call.origin, CallOrigin::Network { .. })
+                    || !call.is_tx_active()
+                    || call.network_setup_burst_stage >= NETWORK_SETUP_BURST_STAGES
+                {
+                    return None;
+                }
+
+                let next_stage = call.network_setup_burst_stage + 1;
+                let due_age = NETWORK_SETUP_BURST_INTERVAL_TS * i32::from(next_stage);
+                let age = call.created_at.age(self.dltime);
+                (age >= due_age).then_some((*call_id, call.usage, call.ts, next_stage, age))
+            })
+            .collect();
+
+        for (call_id, usage, ts, stage, age) in due_calls {
+            let Some(cached) = self.cached_setups.get(&call_id) else {
+                tracing::debug!(
+                    "CMCE: network D-SETUP burst stopped for call_id={} (cached setup missing)",
+                    call_id
+                );
+                if let Some(call) = self.active_calls.get_mut(&call_id) {
+                    call.network_setup_burst_stage = NETWORK_SETUP_BURST_STAGES;
+                }
+                continue;
+            };
+
+            let dest_addr = cached.dest_addr;
+            let priority = cached.pdu.call_priority;
+            let (sdu, chan_alloc) = Self::build_d_setup_prim(&cached.pdu, usage, ts, UlDlAssignment::Both);
+            let prim = Self::build_sapmsg(sdu, Some(chan_alloc), self.dltime, dest_addr, None);
+            queue.push_back(prim);
+
+            if let Some(call) = self.active_calls.get_mut(&call_id) {
+                call.network_setup_burst_stage = stage;
+            }
+
+            tracing::info!(
+                "CMCE: network D-SETUP burst call_id={} gssi={} stage={}/{} age_ts={} priority={}",
+                call_id,
+                dest_addr.ssi,
+                stage,
+                NETWORK_SETUP_BURST_STAGES,
+                age,
+                priority
+            );
         }
     }
 

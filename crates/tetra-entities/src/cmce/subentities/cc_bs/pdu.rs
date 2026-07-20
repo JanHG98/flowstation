@@ -493,6 +493,42 @@ impl CcBsSubentity {
         }
     }
 
+    fn reannounce_network_calls_after_affiliation(
+        &self,
+        queue: &mut MessageQueue,
+        issi: u32,
+        groups: &[u32],
+    ) {
+        if groups.is_empty() {
+            return;
+        }
+
+        for (call_id, call) in &self.active_calls {
+            if !call.is_tx_active()
+                || !matches!(&call.origin, CallOrigin::Network { .. })
+                || !groups.contains(&call.dest_gssi)
+            {
+                continue;
+            }
+
+            let Some(cached) = self.cached_setups.get(call_id) else {
+                continue;
+            };
+            let (sdu, chan_alloc) =
+                Self::build_d_setup_prim(&cached.pdu, call.usage, call.ts, UlDlAssignment::Both);
+            let prim = Self::build_sapmsg(sdu, Some(chan_alloc), self.dltime, cached.dest_addr, None);
+            queue.push_back(prim);
+
+            tracing::info!(
+                "CMCE: re-announcing active network call after affiliation refresh issi={} call_id={} gssi={} priority={}",
+                issi,
+                call_id,
+                call.dest_gssi,
+                cached.pdu.call_priority
+            );
+        }
+    }
+
     pub fn handle_subscriber_update(&mut self, queue: &mut MessageQueue, update: MmSubscriberUpdate) {
         let issi = update.issi;
         let groups = update.groups;
@@ -515,10 +551,11 @@ impl CcBsSubentity {
                 tracing::debug!("CMCE: subscriber deregister issi={}", issi);
             }
             BrewSubscriberAction::Affiliate => {
+                let reported_groups = groups;
                 let mut new_groups = Vec::new();
                 {
                     let entry = self.subscriber_groups.entry(issi).or_insert_with(HashSet::new);
-                    for gssi in groups {
+                    for &gssi in &reported_groups {
                         if entry.insert(gssi) {
                             new_groups.push(gssi);
                         }
@@ -530,10 +567,21 @@ impl CcBsSubentity {
                 }
 
                 if new_groups.is_empty() {
-                    tracing::debug!("CMCE: affiliate ignored (no new groups) issi={}", issi);
+                    tracing::debug!(
+                        "CMCE: affiliate refresh (no new groups) issi={} groups={:?}",
+                        issi,
+                        reported_groups
+                    );
                 } else {
                     tracing::info!("CMCE: subscriber affiliate issi={} groups={:?}", issi, new_groups);
                 }
+
+                // A RoamingLocationUpdating/ITSI re-attach can temporarily pull the terminal back
+                // to control-channel signalling while a network-originated group call is active.
+                // Re-announce each matching active network call immediately after the group state
+                // is restored, so the radio receives a fresh channel assignment instead of waiting
+                // up to five seconds for normal late-entry paging.
+                self.reannounce_network_calls_after_affiliation(queue, issi, &reported_groups);
             }
             BrewSubscriberAction::Deaffiliate => {
                 let mut removed_groups = Vec::new();

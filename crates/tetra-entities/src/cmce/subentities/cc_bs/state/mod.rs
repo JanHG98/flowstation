@@ -61,7 +61,7 @@ pub(super) enum CallOrigin {
     Local {
         caller_addr: TetraAddress, // For D-CALL-PROCEEDING, D-CONNECT routing
     },
-    /// Network-initiated call from TetraPack/Brew
+    /// Network-initiated call from AudioPlayer, TetraPack/Brew or another bridge
     Network {
         network_entity: TetraEntity,
         brew_uuid: uuid::Uuid, // For Brew tracking
@@ -158,6 +158,10 @@ pub(super) struct ActiveCall {
     pub(super) usage: u8,
     /// True if someone is currently transmitting
     pub(super) tx_active: bool,
+    /// Initial network-group paging burst progress. Network-originated calls send four extra
+    /// D-SETUP announcements during the first 1.6 seconds (inside the configured AudioPlayer
+    /// lead-in); local MS-originated calls start at the terminal stage and are unaffected.
+    pub(super) network_setup_burst_stage: u8,
     /// Energy-economy group-announce batching: set once every affiliated EE member has had a
     /// downlink wake frame covered by an announce re-send (or the bounded window elapsed).
     pub(super) ee_announce_done: bool,
@@ -197,6 +201,7 @@ impl ActiveCall {
             ts,
             usage,
             tx_active: true,
+            network_setup_burst_stage: u8::MAX,
             ee_announce_done: false,
             ee_announce_covered: std::collections::HashSet::new(),
             formal_state: CcFormalState::Idle
@@ -230,6 +235,7 @@ impl ActiveCall {
             ts,
             usage,
             tx_active: true,
+            network_setup_burst_stage: 0,
             ee_announce_done: false,
             ee_announce_covered: std::collections::HashSet::new(),
             formal_state: CcFormalState::Idle

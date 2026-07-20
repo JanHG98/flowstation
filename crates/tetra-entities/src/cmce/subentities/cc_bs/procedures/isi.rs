@@ -802,6 +802,10 @@ impl CcBsSubentity {
             return;
         }
 
+        // D-SETUP carries a four-bit ETSI call priority. Clamp peer/UI input defensively instead
+        // of silently wrapping it during serialization.
+        let priority = priority.min(15);
+
         // Speaker change for an existing GSSI call
         if let Some((call_id, old_speaker)) = self
             .active_calls
@@ -870,12 +874,13 @@ impl CcBsSubentity {
         let usage = circuit.usage;
 
         tracing::info!(
-            "CMCE: starting NEW network call brew_uuid={} gssi={} speaker={} ts={} call_id={}",
+            "CMCE: starting NEW network call brew_uuid={} gssi={} speaker={} ts={} call_id={} priority={} (D-SETUP only)",
             brew_uuid,
             dest_gssi,
             source_issi,
             ts,
-            call_id
+            call_id,
+            priority
         );
 
         Self::signal_umac_circuit_open(queue, &circuit, self.dltime, None, CircuitDlMediaSource::LocalLoopback);
@@ -901,7 +906,7 @@ impl CcBsSubentity {
             },
             transmission_grant: TransmissionGrant::GrantedToOtherUser,
             transmission_request_permission: false,
-            call_priority: 0,
+            call_priority: priority,
             notification_indicator: None,
             temporary_address: None,
             calling_party_address_ssi: Some(source_issi),
@@ -927,49 +932,10 @@ impl CcBsSubentity {
         let setup_msg = Self::build_sapmsg(setup_sdu, Some(setup_chan_alloc), self.dltime, dest_addr.clone(), None);
         queue.push_back(setup_msg);
 
-        let d_connect = DConnect {
-            call_identifier: call_id,
-            call_time_out: CallTimeout::T5m,
-            hook_method_selection: false,
-            simplex_duplex_selection: false,
-            transmission_grant: TransmissionGrant::GrantedToOtherUser,
-            transmission_request_permission: false,
-            call_ownership: false,
-            call_priority: None,
-            basic_service_information: None,
-            temporary_address: None,
-            notification_indicator: None,
-            facility: None,
-            proprietary: None,
-        };
-
-        let mut connect_sdu = BitBuffer::new_autoexpand(30);
-        d_connect.to_bitbuf(&mut connect_sdu).expect("Failed to serialize DConnect");
-        connect_sdu.seek(0);
-
-        let connect_msg = SapMsg {
-            sap: Sap::LcmcSap,
-            src: TetraEntity::Cmce,
-            dest: TetraEntity::Mle,
-            msg: SapMsgInner::LcmcMleUnitdataReq(LcmcMleUnitdataReq {
-                sdu: connect_sdu,
-                handle: 0,
-                endpoint_id: 0,
-                link_id: 0,
-                // GROUP-addressed D-CONNECT (main_address is the GSSI) for a network-initiated
-                // group call: acknowledged LLC has no single peer to ACK, so this must be
-                // unacknowledged BL-UDATA — same class as the FIX 2 group D-SETUP/D-RELEASE bug.
-                layer2service: Layer2Service::Unacknowledged,
-                pdu_prio: 0,
-                layer2_qos: 0,
-                stealing_permission: false,
-                stealing_repeats_flag: false,
-                chan_alloc: None,
-                main_address: dest_addr,
-                tx_reporter: None,
-            }),
-        };
-        queue.push_back(connect_msg);
+        // A network-originated group call has no local calling MS leg. D-CONNECT is a
+        // calling-party confirmation and must therefore not be addressed to the GSSI. Group
+        // members are paged exclusively with D-SETUP + channel allocation (and the bounded
+        // initial burst driven from timers.rs).
 
         self.active_calls.insert(
             call_id,
