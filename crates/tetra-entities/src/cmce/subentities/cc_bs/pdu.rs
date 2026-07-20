@@ -172,6 +172,7 @@ impl CcBsSubentity {
     /// The delivery hint is carried only as an internal request-handle marker through
     /// MLE and LLC; it is consumed by UMAC and is never encoded on the air interface.
     pub(super) fn build_sapmsg_frame18_common_scch(
+        call_id: u16,
         sdu: BitBuffer,
         chan_alloc: Option<CmceChanAllocReq>,
         address: TetraAddress,
@@ -179,7 +180,7 @@ impl CcBsSubentity {
     ) -> SapMsg {
         let mut msg = Self::build_sapmsg(sdu, chan_alloc, TdmaTime::default(), address, reporter);
         if let SapMsgInner::LcmcMleUnitdataReq(ref mut prim) = msg.msg {
-            prim.handle = tetra_saps::tma::TMA_REQ_HANDLE_FRAME18_COMMON_SCCH as u32;
+            prim.handle = tetra_saps::tma::make_frame18_common_scch_handle(call_id) as u32;
         }
         msg
     }

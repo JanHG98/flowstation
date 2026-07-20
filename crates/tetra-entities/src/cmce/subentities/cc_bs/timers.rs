@@ -520,6 +520,7 @@ impl CcBsSubentity {
             let (sdu, chan_alloc) =
                 Self::build_d_setup_prim(&cached.pdu, usage, ts, UlDlAssignment::Both);
             let prim = Self::build_sapmsg_frame18_common_scch(
+                call_id,
                 sdu,
                 Some(chan_alloc),
                 dest_addr,

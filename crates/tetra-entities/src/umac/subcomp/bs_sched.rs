@@ -94,7 +94,7 @@ pub struct BsChannelScheduler {
     /// carrier's usable frame-18/TS1 common-SCCH opportunity. Keeping this
     /// separate is essential: a normal TS1 queue entry would otherwise be
     /// consumed by the very next MCCH slot before frame 18 arrives.
-    frame18_common_scch_queue: Vec<DlSchedElem>,
+    frame18_common_scch_queue: Vec<Frame18CommonScchEntry>,
     ulsched: [[TimeslotSchedule; MACSCHED_NUM_FRAMES]; 4],
 
     circuits: CircuitMgr,
@@ -125,6 +125,13 @@ pub struct BsChannelScheduler {
     /// fragmented MM PDU (e.g. ULocationUpdate when re-entering coverage).
     /// Issuing a real marker fixes that.
     next_usage_marker: [u8; 4],
+}
+
+#[derive(Debug)]
+struct Frame18CommonScchEntry {
+    call_id: u16,
+    gssi: u32,
+    elem: DlSchedElem,
 }
 
 #[derive(Debug)]
@@ -685,20 +692,90 @@ impl BsChannelScheduler {
     /// Enqueue a MAC-RESOURCE for the next usable primary-carrier frame-18/TS1
     /// common-SCCH opportunity. The entry is never visible to ordinary TS1 MCCH
     /// scheduling, so it cannot leak out early.
+    ///
+    /// Only one pending page per call/GSSI is retained. A newer call to the same
+    /// GSSI supersedes queued pages from the old call, preventing a later frame-18
+    /// opportunity from announcing an already released call or an obsolete usage marker.
     pub fn dl_enqueue_frame18_common_scch(
         &mut self,
+        call_id: u16,
         pdu: MacResource,
         sdu: BitBuffer,
         tx_reporter: Option<TxReporter>,
     ) {
+        let Some(addr) = pdu.addr else {
+            tracing::warn!(
+                "BsChannelScheduler: dropping frame-18 common SCCH resource without address call_id={}",
+                call_id
+            );
+            return;
+        };
+        if addr.ssi_type != SsiType::Gssi {
+            tracing::warn!(
+                "BsChannelScheduler: dropping non-group frame-18 common SCCH resource call_id={} addr={}",
+                call_id,
+                addr
+            );
+            return;
+        }
+        let gssi = addr.ssi;
+
+        let before = self.frame18_common_scch_queue.len();
+        self.frame18_common_scch_queue
+            .retain(|entry| entry.gssi != gssi || entry.call_id == call_id);
+        let purged = before - self.frame18_common_scch_queue.len();
+        if purged > 0 {
+            tracing::warn!(
+                "BsChannelScheduler: purged {} stale frame-18 common SCCH page(s) for gssi={} before call_id={}",
+                purged,
+                gssi,
+                call_id
+            );
+        }
+
+        if self
+            .frame18_common_scch_queue
+            .iter()
+            .any(|entry| entry.call_id == call_id && entry.gssi == gssi)
+        {
+            tracing::debug!(
+                "BsChannelScheduler: deduplicating pending frame-18 common SCCH page call_id={} gssi={} depth={}",
+                call_id,
+                gssi,
+                self.frame18_common_scch_queue.len()
+            );
+            return;
+        }
+
         tracing::info!(
-            "BsChannelScheduler: queued dedicated frame-18 common SCCH resource addr={:?} chan_alloc={} depth_before={}",
-            pdu.addr,
+            "BsChannelScheduler: queued dedicated frame-18 common SCCH resource call_id={} gssi={} chan_alloc={} depth_before={}",
+            call_id,
+            gssi,
             pdu.chan_alloc_element.is_some(),
             self.frame18_common_scch_queue.len()
         );
+        self.frame18_common_scch_queue.push(Frame18CommonScchEntry {
+            call_id,
+            gssi,
+            elem: DlSchedElem::Resource(pdu, sdu, tx_reporter),
+        });
+    }
+
+    /// Remove all pinned common-SCCH pages and continuation fragments belonging
+    /// to a released call. CMCE sends CallEnded with the call identifier, allowing
+    /// UMAC to retire the queue entry before a later call can inherit it.
+    pub fn drop_frame18_common_scch_call(&mut self, call_id: u16) {
+        let before = self.frame18_common_scch_queue.len();
         self.frame18_common_scch_queue
-            .push(DlSchedElem::Resource(pdu, sdu, tx_reporter));
+            .retain(|entry| entry.call_id != call_id);
+        let dropped = before - self.frame18_common_scch_queue.len();
+        if dropped > 0 {
+            tracing::info!(
+                "BsChannelScheduler: retired {} frame-18 common SCCH page(s) for ended call_id={}",
+                dropped,
+                call_id
+            );
+        }
     }
 
     pub fn dl_enqueue_tma(&mut self, pdu: MacResource, sdu: BitBuffer, tx_reporter: Option<TxReporter>) {
@@ -1030,6 +1107,10 @@ impl BsChannelScheduler {
     }
 
     fn dl_build_block_from_signalling_schedule(&mut self, ts: TdmaTime) -> Option<BitBuffer> {
+        if ts.f == 18 {
+            return self.dl_build_frame18_common_scch_block(ts);
+        }
+
         let mut buf_opt = None;
 
         while !self.dltx_queues[ts.t as usize - 1].is_empty() {
@@ -1174,28 +1255,62 @@ impl BsChannelScheduler {
             && !ts.is_mandatory_bnch()
     }
 
-    pub fn dl_take_prioritized_sched_item(&mut self, ts: TdmaTime) -> Option<DlSchedElem> {
-        if ts.f == 18 {
-            if !self.frame18_common_scch_available(ts) {
-                // Frame 18 is normally broadcast/associated-control territory. The one exception is
-                // the advertised primary-carrier common SCCH on TS1 when that slot is not occupied by
-                // the mandatory rotating BSCH/BNCH mapping.
-                return None;
-            }
+    /// Build at most one pinned common-SCCH MAC resource in a frame-18/TS1
+    /// opportunity. If that resource fragments, its continuation is prepended to
+    /// the ordinary TS1 queue for the immediately following frame, as required by
+    /// the MAC fragmentation sequence. Crucially, no second pinned D-SETUP is
+    /// started in the same frame-18 slot.
+    fn dl_build_frame18_common_scch_block(&mut self, ts: TdmaTime) -> Option<BitBuffer> {
+        if !self.frame18_common_scch_available(ts) {
+            return None;
+        }
 
-            // Crucially, frame 18 may consume only explicitly pinned common-SCCH
-            // resources. Ordinary MCCH/TS1 traffic must remain in the normal queue.
-            if self.frame18_common_scch_queue.is_empty() {
-                return None;
+        let entry = if self.frame18_common_scch_queue.is_empty() {
+            return None;
+        } else {
+            self.frame18_common_scch_queue.remove(0)
+        };
+
+        tracing::info!(
+            "BsChannelScheduler: transmitting dedicated frame-18 common SCCH resource carrier={} ts={} call_id={} gssi={} remaining={}",
+            self.carrier_num,
+            ts,
+            entry.call_id,
+            entry.gssi,
+            self.frame18_common_scch_queue.len()
+        );
+
+        let mut buf = BitBuffer::new(SCH_F_CAP);
+        match entry.elem {
+            DlSchedElem::Resource(pdu, sdu, tx_reporter) => {
+                let mut fragger = BsFragger::new(pdu, sdu, tx_reporter);
+                if !fragger.get_next_chunk(&mut buf) {
+                    tracing::debug!(
+                        "BsChannelScheduler: scheduling frame-18 common SCCH continuation on next TS1 frame call_id={} gssi={}",
+                        entry.call_id,
+                        entry.gssi
+                    );
+                    self.dltx_queues[0].insert(0, DlSchedElem::FragBuf(fragger));
+                }
             }
-            let elem = self.frame18_common_scch_queue.remove(0);
-            tracing::info!(
-                "BsChannelScheduler: transmitting dedicated frame-18 common SCCH resource carrier={} ts={} remaining={}",
-                self.carrier_num,
-                ts,
-                self.frame18_common_scch_queue.len()
-            );
-            return Some(elem);
+            other => {
+                tracing::warn!(
+                    "BsChannelScheduler: dropping unexpected frame-18 common SCCH item call_id={} gssi={} item={:?}",
+                    entry.call_id,
+                    entry.gssi,
+                    other
+                );
+            }
+        }
+
+        Some(buf)
+    }
+
+    pub fn dl_take_prioritized_sched_item(&mut self, ts: TdmaTime) -> Option<DlSchedElem> {
+        // Frame-18 common-SCCH traffic is handled by
+        // dl_build_frame18_common_scch_block(), never by the ordinary queues.
+        if ts.f == 18 {
+            return None;
         }
 
         // Map 1-based ts to 0-based index, bail on 0 or out of range.
@@ -2152,7 +2267,7 @@ mod tests {
             ssi: 15201,
         };
         let pdu = BsChannelScheduler::dl_make_minimal_resource(&addr, None, false);
-        sched.dl_enqueue_frame18_common_scch(pdu, BitBuffer::new(0), None);
+        sched.dl_enqueue_frame18_common_scch(4, pdu, BitBuffer::new(0), None);
 
         // In multiframe 1 the mandatory frame-18 BSCH/BNCH slots are TS2 and TS4, so TS1 is
         // available for the common SCCH advertised by MM.
@@ -2184,13 +2299,112 @@ mod tests {
             ssi: 15201,
         };
         let pdu = BsChannelScheduler::dl_make_minimal_resource(&addr, None, false);
-        sched.dl_enqueue_frame18_common_scch(pdu, BitBuffer::new(0), None);
+        sched.dl_enqueue_frame18_common_scch(4, pdu, BitBuffer::new(0), None);
 
         // In multiframe 2 TS1 is the mandatory BSCH slot; the control message must remain queued
         // for the next usable common-SCCH opportunity rather than replacing the broadcast block.
         let block = sched.dl_build_block_from_signalling_schedule(TdmaTime { t: 1, f: 18, m: 2, h: 0 });
         assert!(block.is_none());
         assert_eq!(sched.frame18_common_scch_queue.len(), 1);
+    }
+
+    #[test]
+    fn test_frame_18_common_scch_deduplicates_same_call() {
+        let mut sched = get_testing_slotter();
+        let addr = TetraAddress {
+            ssi_type: SsiType::Gssi,
+            ssi: 15201,
+        };
+        let pdu = BsChannelScheduler::dl_make_minimal_resource(&addr, None, false);
+
+        sched.dl_enqueue_frame18_common_scch(4, pdu.clone(), BitBuffer::new(0), None);
+        sched.dl_enqueue_frame18_common_scch(4, pdu, BitBuffer::new(0), None);
+
+        assert_eq!(sched.frame18_common_scch_queue.len(), 1);
+        assert_eq!(sched.frame18_common_scch_queue[0].call_id, 4);
+    }
+
+    #[test]
+    fn test_frame_18_common_scch_new_call_replaces_stale_same_group() {
+        let mut sched = get_testing_slotter();
+        let addr = TetraAddress {
+            ssi_type: SsiType::Gssi,
+            ssi: 15201,
+        };
+        let old_pdu = BsChannelScheduler::dl_make_minimal_resource(&addr, None, false);
+        let new_pdu = BsChannelScheduler::dl_make_minimal_resource(&addr, None, false);
+
+        sched.dl_enqueue_frame18_common_scch(4, old_pdu, BitBuffer::new(0), None);
+        sched.dl_enqueue_frame18_common_scch(5, new_pdu, BitBuffer::new(0), None);
+
+        assert_eq!(sched.frame18_common_scch_queue.len(), 1);
+        assert_eq!(sched.frame18_common_scch_queue[0].call_id, 5);
+        assert_eq!(sched.frame18_common_scch_queue[0].gssi, 15201);
+    }
+
+    #[test]
+    fn test_frame_18_common_scch_call_end_retires_only_matching_call() {
+        let mut sched = get_testing_slotter();
+        let addr_a = TetraAddress {
+            ssi_type: SsiType::Gssi,
+            ssi: 15201,
+        };
+        let addr_b = TetraAddress {
+            ssi_type: SsiType::Gssi,
+            ssi: 15202,
+        };
+        let pdu_a = BsChannelScheduler::dl_make_minimal_resource(&addr_a, None, false);
+        let pdu_b = BsChannelScheduler::dl_make_minimal_resource(&addr_b, None, false);
+
+        sched.dl_enqueue_frame18_common_scch(4, pdu_a, BitBuffer::new(0), None);
+        sched.dl_enqueue_frame18_common_scch(5, pdu_b, BitBuffer::new(0), None);
+        sched.drop_frame18_common_scch_call(4);
+
+        assert_eq!(sched.frame18_common_scch_queue.len(), 1);
+        assert_eq!(sched.frame18_common_scch_queue[0].call_id, 5);
+    }
+
+    #[test]
+    fn test_frame_18_common_scch_sends_at_most_one_entry_per_opportunity() {
+        let mut sched = get_testing_slotter();
+        let addr_a = TetraAddress {
+            ssi_type: SsiType::Gssi,
+            ssi: 15201,
+        };
+        let addr_b = TetraAddress {
+            ssi_type: SsiType::Gssi,
+            ssi: 15202,
+        };
+        let pdu_a = BsChannelScheduler::dl_make_minimal_resource(&addr_a, None, false);
+        let pdu_b = BsChannelScheduler::dl_make_minimal_resource(&addr_b, None, false);
+
+        sched.dl_enqueue_frame18_common_scch(4, pdu_a, BitBuffer::new(0), None);
+        sched.dl_enqueue_frame18_common_scch(5, pdu_b, BitBuffer::new(0), None);
+        assert_eq!(sched.frame18_common_scch_queue.len(), 2);
+
+        let block = sched.dl_build_block_from_signalling_schedule(TdmaTime { t: 1, f: 18, m: 1, h: 0 });
+        assert!(block.is_some());
+        assert_eq!(sched.frame18_common_scch_queue.len(), 1);
+        assert_eq!(sched.frame18_common_scch_queue[0].call_id, 5);
+    }
+
+    #[test]
+    fn test_frame_18_common_scch_fragment_continues_on_next_ts1_only() {
+        let mut sched = get_testing_slotter();
+        let addr = TetraAddress {
+            ssi_type: SsiType::Gssi,
+            ssi: 15201,
+        };
+        let pdu = BsChannelScheduler::dl_make_minimal_resource(&addr, None, false);
+
+        sched.dl_enqueue_frame18_common_scch(4, pdu, BitBuffer::new(600), None);
+        let block = sched.dl_build_block_from_signalling_schedule(TdmaTime { t: 1, f: 18, m: 1, h: 0 });
+
+        assert!(block.is_some());
+        assert!(sched.frame18_common_scch_queue.is_empty());
+        assert!(sched.dltx_next_slot_queue.is_empty());
+        assert_eq!(sched.dltx_queues[0].len(), 1);
+        assert!(matches!(&sched.dltx_queues[0][0], DlSchedElem::FragBuf(_)));
     }
 
     #[test]
