@@ -685,6 +685,10 @@ impl TtsHandle {
         let copied = std::io::copy(&mut response.take(max_bytes.saturating_add(1)), &mut output)
             .map_err(|error| format!("cannot store Piper WAV: {error}"))?;
         output.sync_all().map_err(|error| format!("cannot sync Piper WAV: {error}"))?;
+        // Do not hand an open output handle to the AudioPlayer preparation worker.
+        // The file is fully written, flushed and closed before it is validated and
+        // atomically published under its final .wav name.
+        drop(output);
         if copied > max_bytes {
             let _ = fs::remove_file(&part_path);
             return Err(format!("Piper output exceeds {} MiB", self.inner.config.max_output_file_mb));
@@ -692,6 +696,11 @@ impl TtsHandle {
         validate_wav(&part_path)?;
         fs::rename(&part_path, &final_path)
             .map_err(|error| format!("cannot finalize generated TTS WAV {}: {error}", final_path.display()))?;
+        tracing::info!(
+            "TTS: finalized complete WAV before AudioPlayer handoff job={} file={}",
+            job_id,
+            final_path.display()
+        );
         Ok(final_path)
     }
 

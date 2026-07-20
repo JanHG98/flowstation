@@ -14,6 +14,13 @@ pub(super) const EE_DSETUP_FALLBACK_TS: i32 = 423;
 pub(super) const NETWORK_SETUP_BURST_INTERVAL_TS: i32 = 28;
 pub(super) const NETWORK_SETUP_BURST_STAGES: u8 = 4;
 
+/// Network calls already emit the immediate D-SETUP, the normal backup and four dense
+/// setup-burst pages. Suppress the separate Energy-Economy re-announce until that initial
+/// sequence is finished, otherwise two or three channel-allocation PDUs can land in the
+/// same TS1 scheduler turn and be deferred/fragmented. 112 timeslots are about 1.6 s.
+pub(super) const NETWORK_EE_ANNOUNCE_MIN_AGE_TS: i32 =
+    NETWORK_SETUP_BURST_INTERVAL_TS * NETWORK_SETUP_BURST_STAGES as i32;
+
 /// Keep explicit common-SCCH paging active for the young-call window. Six seconds covers several
 /// frame-18 opportunities even when TS1 is occupied by the rotating mandatory BSCH/BNCH mapping.
 pub(super) const NETWORK_FRAME18_SCCH_WINDOW_TS: i32 = 6 * 18 * 4;
@@ -571,7 +578,15 @@ impl CcBsSubentity {
             // Only re-announce while someone is actively transmitting. Once the group call is in
             // hangtime / NoActiveSpeaker, extra D-SETUPs can be interpreted by some radios as a
             // denied retake rather than a harmless late-entry announce.
-            .filter(|(_, c)| c.is_tx_active() && !c.ee_announce_done && c.created_at.age(now) < EE_DSETUP_FALLBACK_TS)
+            .filter(|(_, c)| {
+                let age = c.created_at.age(now);
+                let initial_network_burst_active = matches!(&c.origin, CallOrigin::Network { .. })
+                    && age <= NETWORK_EE_ANNOUNCE_MIN_AGE_TS;
+                c.is_tx_active()
+                    && !c.ee_announce_done
+                    && age < EE_DSETUP_FALLBACK_TS
+                    && !initial_network_burst_active
+            })
             .map(|(&id, _)| id)
             .collect();
         if candidates.is_empty() {
