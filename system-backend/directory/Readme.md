@@ -1,5 +1,5 @@
 NetCore Directory Server `0.1.0`
-Lokaler RadioID-ähnlicher Server für NetCore-Tetra / FlowStation.
+Lokaler RadioID-ähnlicher Server für NetCore-Tetra.
 ---
 Lokaler Start
 ```bash
