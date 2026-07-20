@@ -3931,6 +3931,31 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
         <div class="stat-card is-idle"><div class="stat-label">Verkehrskanal</div><div class="stat-value is-text" id="audio-channel">—</div><div class="stat-sub" id="audio-call">Kein aktiver Ruf</div></div>
         <div class="stat-card is-idle"><div class="stat-label">MP3-Decoder</div><div class="stat-value is-text" id="audio-ffmpeg">—</div><div class="stat-sub" id="audio-error">Kein Fehler</div></div>
       </div>
+      <div class="card" id="tts-template-card">
+        <div class="card-head">
+          <div>
+            <div class="card-title">Lokale TTS-Vorlagen</div>
+            <div class="card-sub" id="tts-template-directory">/var/lib/netcore/tts/templates</div>
+          </div>
+          <div class="card-actions" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <span class="badge" id="tts-template-badge">PRÜFE …</span>
+            <button class="btn btn-sm" id="tts-template-refresh" onclick="loadTtsTemplates()">Aktualisieren</button>
+          </div>
+        </div>
+        <div class="card-body">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
+            <label><span class="mesh-msg-filter-label">Vorlage auswählen</span><select class="form-input" id="tts-template-select" onchange="loadSelectedTtsTemplate()"><option value="">Keine Vorlage ausgewählt</option></select></label>
+            <label><span class="mesh-msg-filter-label">Vorlagenname</span><input class="form-input" id="tts-template-name" maxlength="120" placeholder="z. B. Evakuierung Haupthalle"></label>
+          </div>
+          <div class="stat-sub" id="tts-template-state" style="margin-top:10px">Erzeugte Texte werden automatisch lokal gespeichert.</div>
+          <div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:12px">
+            <button class="btn" id="tts-template-new" onclick="newTtsTemplate()">Neue Vorlage</button>
+            <button class="btn btn-primary" id="tts-template-save" onclick="saveCurrentTtsTemplate()">Speichern</button>
+            <button class="btn btn-danger" id="tts-template-delete" onclick="deleteCurrentTtsTemplate()" disabled>Löschen</button>
+          </div>
+        </div>
+      </div>
+
       <div class="card" id="tts-card">
         <div class="card-head">
           <div>
@@ -3949,7 +3974,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
           </label>
           <div class="stat-sub" id="tts-character-count" style="text-align:right;margin-top:5px">0 Zeichen</div>
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-top:12px">
-            <label><span class="mesh-msg-filter-label">Stimme</span><select class="form-input" id="tts-voice"><option value="">Lade Stimmen …</option></select></label>
+            <label><span class="mesh-msg-filter-label">Stimme</span><select class="form-input" id="tts-voice" onchange="renderTtsStatus()"><option value="">Lade Stimmen …</option></select></label>
             <label><span class="mesh-msg-filter-label">Sprechtempo</span><div style="display:flex;gap:10px;align-items:center"><input id="tts-speed" type="range" min="50" max="150" step="5" value="95" oninput="updateTtsSpeedLabel()" style="width:100%"><strong id="tts-speed-label" style="min-width:52px;text-align:right">95 %</strong></div></label>
             <label><span class="mesh-msg-filter-label">Zielart</span><select class="form-input" id="tts-target-type" onchange="refreshTtsTargetOptions()"><option value="group">Gruppe</option><option value="individual">Einzelgerät</option></select></label>
             <label><span class="mesh-msg-filter-label">Telefon-/Gruppenbuch</span><select class="form-input" id="tts-target-select" onchange="ttsSelectTarget()"><option value="">Bitte wählen …</option></select></label>
@@ -10166,15 +10191,57 @@ window.addEventListener('resize', () => {
 
 // ── Local/server WAV/MP3 audio dispatch ──────────────────────────────────
 let audioCurrentPath='',audioCurrentSource='local',audioSources=[],audioEntries=[],audioStatus=null,audioPendingSource=null,audioGroups={},audioDevices={};
-let ttsStatus=null,ttsVoices=[],ttsDefaultsApplied=false,ttsPreviewLoadedJob=null,ttsRequestInFlight=false;
+let ttsStatus=null,ttsVoices=[],ttsTemplates=[],ttsSelectedTemplateId="",ttsLastSavedTemplateId="",ttsDefaultsApplied=false,ttsPreviewLoadedJob=null,ttsRequestInFlight=false,ttsTemplateRequestInFlight=false;
 function ttsStateLabel(state){return ({idle:'BEREIT',synthesizing:'ERZEUGT SPRACHE',ready:'VORSCHAU BEREIT',dispatching:'SENDET',failed:'FEHLER',cancelled:'ABGEBROCHEN'})[state]||String(state||'—').toUpperCase();}
 function updateTtsCharacterCount(){const input=document.getElementById('tts-text'),label=document.getElementById('tts-character-count');if(!input||!label)return;const count=[...input.value].length,max=ttsStatus?.max_text_characters||2000;input.maxLength=max;label.textContent=count+' / '+max+' Zeichen';}
 function updateTtsSpeedLabel(){const slider=document.getElementById('tts-speed'),label=document.getElementById('tts-speed-label');if(slider&&label)label.textContent=slider.value+' %';}
 function refreshTtsTargetOptions(){const type=document.getElementById('tts-target-type')?.value||'group',map=type==='group'?audioGroups:audioDevices,sel=document.getElementById('tts-target-select');if(!sel)return;const rows=Object.entries(map||{}).map(([id,v])=>[id,typeof v==='string'?v:(v?.name||v?.label||v?.callsign||'')]);rows.sort((a,b)=>(a[1]||a[0]).localeCompare(b[1]||b[0]));sel.innerHTML='<option value="">Bitte wählen …</option>'+rows.map(([id,name])=>'<option value="'+escAttr(id)+'">'+escHtml((name?name+' · ':'')+(type==='group'?'GSSI ':'ISSI ')+id)+'</option>').join('');}
 function ttsSelectTarget(){const value=document.getElementById('tts-target-select')?.value;if(value)document.getElementById('tts-target-manual').value=value;}
-async function loadTtsVoices(){const select=document.getElementById('tts-voice');if(!select)return;try{const r=await fetch('/api/audio/tts/voices',{cache:'no-store'}),j=await r.json().catch(()=>({error:'HTTP '+r.status}));if(!r.ok)throw new Error(j.error||('HTTP '+r.status));ttsVoices=Array.isArray(j.voices)?j.voices:[];const current=select.value||ttsStatus?.default_voice||'';select.innerHTML=ttsVoices.map(v=>'<option value="'+escAttr(v.id)+'"'+(v.id===current?' selected':'')+'>'+escHtml(v.name+(v.available?'':' · OFFLINE'))+'</option>').join('')||'<option value="">Keine Stimme konfiguriert</option>';}catch(error){ttsVoices=[];select.innerHTML='<option value="">TTS nicht verfügbar</option>';select.title=String(error);}}
+async function loadTtsVoices(){const select=document.getElementById('tts-voice');if(!select)return;try{const r=await fetch('/api/audio/tts/voices',{cache:'no-store'}),j=await r.json().catch(()=>({error:'HTTP '+r.status}));if(!r.ok)throw new Error(j.error||('HTTP '+r.status));ttsVoices=Array.isArray(j.voices)?j.voices:[];const requested=select.value||ttsStatus?.default_voice||'',fallback=ttsVoices.find(v=>v.id===requested)||ttsVoices.find(v=>v.available)||ttsVoices[0],current=fallback?.id||'';select.innerHTML=ttsVoices.map(v=>'<option value="'+escAttr(v.id)+'"'+(v.id===current?' selected':'')+(v.available?'':' disabled')+'>'+escHtml(v.name+(v.available?'':' · NICHT INSTALLIERT'))+'</option>').join('')||'<option value="">Keine Stimme konfiguriert</option>';select.title=ttsVoices.find(v=>v.id===current)?.error||'';}catch(error){ttsVoices=[];select.innerHTML='<option value="">TTS nicht verfügbar</option>';select.title=String(error);}}
+
+function formatTtsTemplateTime(value){if(!value)return '';const d=new Date(value);return Number.isNaN(d.getTime())?String(value):d.toLocaleString('de-DE',{dateStyle:'short',timeStyle:'short'});}
+function renderTtsTemplateControls(){
+  const available=!!ttsStatus?.template_available,badge=document.getElementById('tts-template-badge'),dir=document.getElementById('tts-template-directory'),state=document.getElementById('tts-template-state'),select=document.getElementById('tts-template-select');
+  if(dir)dir.textContent=ttsStatus?.template_directory||'/var/lib/netcore/tts/templates';
+  if(badge){badge.textContent=available?'LOKAL BEREIT':'LOKAL OFFLINE';badge.style.color=available?'var(--success)':'var(--danger)';badge.title=ttsStatus?.template_error||'';}
+  const selected=ttsTemplates.find(t=>t.id===ttsSelectedTemplateId);
+  if(state&&!ttsTemplateRequestInFlight){state.textContent=!available?(ttsStatus?.template_error||'Lokaler Vorlagenspeicher ist nicht verfügbar.'):selected?((selected.auto_saved?'Automatisch gespeichert':'Gespeichert')+' · '+formatTtsTemplateTime(selected.updated_at)):(ttsStatus?.auto_save_generated_templates?'Erzeugte Texte werden automatisch lokal gespeichert.':'Automatisches Speichern ist deaktiviert.');}
+  if(select)select.disabled=!available||ttsTemplateRequestInFlight;
+  const save=document.getElementById('tts-template-save'),del=document.getElementById('tts-template-delete'),fresh=document.getElementById('tts-template-new'),refresh=document.getElementById('tts-template-refresh');
+  if(save)save.disabled=!available||ttsTemplateRequestInFlight;
+  if(del)del.disabled=!available||ttsTemplateRequestInFlight||!ttsSelectedTemplateId;
+  if(fresh)fresh.disabled=!available||ttsTemplateRequestInFlight;
+  if(refresh)refresh.disabled=!available||ttsTemplateRequestInFlight;
+}
+async function loadTtsTemplates(preferredId=''){
+  const select=document.getElementById('tts-template-select');if(!select)return;
+  try{
+    const r=await fetch('/api/audio/tts/templates',{cache:'no-store'}),j=await r.json().catch(()=>({error:'HTTP '+r.status}));if(!r.ok)throw new Error(j.error||('HTTP '+r.status));
+    ttsTemplates=Array.isArray(j.templates)?j.templates:[];
+    const wanted=preferredId||ttsSelectedTemplateId||select.value||'';
+    select.innerHTML='<option value="">Keine Vorlage ausgewählt</option>'+ttsTemplates.map(t=>'<option value="'+escAttr(t.id)+'">'+escHtml((t.auto_saved?'AUTO · ':'')+t.name)+'</option>').join('');
+    if(wanted&&ttsTemplates.some(t=>t.id===wanted)){select.value=wanted;ttsSelectedTemplateId=wanted;const t=ttsTemplates.find(row=>row.id===wanted);document.getElementById('tts-template-name').value=t?.name||'';}else{select.value='';ttsSelectedTemplateId='';}
+  }catch(error){ttsTemplates=[];select.innerHTML='<option value="">Vorlagen nicht verfügbar</option>';const state=document.getElementById('tts-template-state');if(state)state.textContent=String(error.message||error);}
+  renderTtsTemplateControls();
+}
+function loadSelectedTtsTemplate(){
+  const id=document.getElementById('tts-template-select')?.value||'';ttsSelectedTemplateId=id;const t=ttsTemplates.find(row=>row.id===id);if(!t){document.getElementById('tts-template-name').value='';renderTtsTemplateControls();return;}
+  document.getElementById('tts-template-name').value=t.name||'';document.getElementById('tts-text').value=t.text||'';
+  const voice=document.getElementById('tts-voice');if(voice&&[...voice.options].some(o=>o.value===t.voice_id))voice.value=t.voice_id;
+  document.getElementById('tts-speed').value=Math.round(Number(t.speed||0.95)*100);document.getElementById('tts-priority').value=t.priority??5;
+  if(t.target_type&&t.target_id){document.getElementById('tts-target-type').value=t.target_type;refreshTtsTargetOptions();document.getElementById('tts-target-manual').value=String(t.target_id);document.getElementById('tts-target-select').value=String(t.target_id);}else{document.getElementById('tts-target-manual').value='';document.getElementById('tts-target-select').value='';}
+  updateTtsSpeedLabel();updateTtsCharacterCount();renderTtsTemplateControls();
+}
+function newTtsTemplate(){ttsSelectedTemplateId='';const select=document.getElementById('tts-template-select');if(select)select.value='';document.getElementById('tts-template-name').value='';renderTtsTemplateControls();document.getElementById('tts-template-name').focus();}
+function currentTtsTemplatePayload(){
+  const generation=ttsGenerationPayload(),name=document.getElementById('tts-template-name').value.trim();if(!name)throw new Error('Bitte einen Namen für die Vorlage eingeben.');
+  const payload={...generation,name};if(ttsSelectedTemplateId)payload.id=ttsSelectedTemplateId;
+  return payload;
+}
+async function saveCurrentTtsTemplate(){if(ttsTemplateRequestInFlight)return;let payload;try{payload=currentTtsTemplatePayload();}catch(error){alert(error.message||String(error));return;}ttsTemplateRequestInFlight=true;const state=document.getElementById('tts-template-state');if(state)state.textContent='Vorlage wird gespeichert …';renderTtsTemplateControls();try{const j=await postTts('/api/audio/tts/templates/save',payload),id=j.template?.id||'';ttsSelectedTemplateId=id;await loadTtsTemplates(id);if(state)state.textContent='Vorlage gespeichert.';}catch(error){alert(error.message||String(error));if(state)state.textContent=String(error.message||error);}finally{ttsTemplateRequestInFlight=false;renderTtsTemplateControls();}}
+async function deleteCurrentTtsTemplate(){if(ttsTemplateRequestInFlight||!ttsSelectedTemplateId)return;const t=ttsTemplates.find(row=>row.id===ttsSelectedTemplateId);if(!confirm('Vorlage „'+(t?.name||ttsSelectedTemplateId)+'“ wirklich löschen?'))return;ttsTemplateRequestInFlight=true;renderTtsTemplateControls();try{await postTts('/api/audio/tts/templates/delete',{id:ttsSelectedTemplateId});ttsSelectedTemplateId='';document.getElementById('tts-template-name').value='';await loadTtsTemplates();}catch(error){alert(error.message||String(error));}finally{ttsTemplateRequestInFlight=false;renderTtsTemplateControls();}}
 function ttsTargetPayload(){const targetId=Number(document.getElementById('tts-target-manual').value),priority=Number(document.getElementById('tts-priority').value);if(!Number.isInteger(targetId)||targetId<=0||targetId>0xFFFFFF)throw new Error('Bitte gültige 24-Bit-ISSI/GSSI eingeben.');if(!Number.isInteger(priority)||priority<0||priority>15)throw new Error('Priorität muss zwischen 0 und 15 liegen.');return {target_type:document.getElementById('tts-target-type').value,target_id:targetId,priority};}
-function ttsGenerationPayload(){const text=document.getElementById('tts-text').value.trim();if(!text)throw new Error('Bitte zuerst einen Sprechtext eingeben.');return {text,voice_id:document.getElementById('tts-voice').value,speed:Number(document.getElementById('tts-speed').value)/100};}
+function ttsGenerationPayload(){const text=document.getElementById('tts-text').value.trim(),priority=Number(document.getElementById('tts-priority').value);if(!text)throw new Error('Bitte zuerst einen Sprechtext eingeben.');if(!Number.isInteger(priority)||priority<0||priority>15)throw new Error('Priorität muss zwischen 0 und 15 liegen.');const payload={text,voice_id:document.getElementById('tts-voice').value,speed:Number(document.getElementById('tts-speed').value)/100,priority};const targetRaw=document.getElementById('tts-target-manual').value.trim();if(targetRaw){const targetId=Number(targetRaw);if(!Number.isInteger(targetId)||targetId<=0||targetId>0xFFFFFF)throw new Error('Bitte gültige 24-Bit-ISSI/GSSI eingeben.');payload.target_type=document.getElementById('tts-target-type').value;payload.target_id=targetId;}return payload;}
 async function postTts(url,body){const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})}),j=await r.json().catch(()=>({error:'HTTP '+r.status}));if(!r.ok)throw new Error(j.error||('HTTP '+r.status));return j;}
 function audioDispatchBusy(){return !!audioStatus&&!['idle','failed'].includes(audioStatus.state);}
 function assertAudioDispatchReady(){if(audioDispatchBusy())throw new Error('Die Audioausgabe ist noch belegt ('+audioStateLabel(audioStatus.state)+'). Bitte den laufenden Ruf vollständig beenden lassen.');}
@@ -10216,12 +10283,13 @@ function renderTtsStatus(){
     document.getElementById('tts-priority').value=s.default_priority??5;
     ttsDefaultsApplied=true;updateTtsSpeedLabel();updateTtsCharacterCount();
   }
-  const busy=['synthesizing','dispatching'].includes(s.state),ready=s.state==='ready'&&s.generated_audio_available,audioBusy=audioDispatchBusy();
+  const busy=['synthesizing','dispatching'].includes(s.state),ready=s.state==='ready'&&s.generated_audio_available,audioBusy=audioDispatchBusy(),selectedVoiceId=document.getElementById('tts-voice')?.value||'',selectedVoice=ttsVoices.find(v=>v.id===selectedVoiceId),voiceReady=!!selectedVoice?.available;
   const generate=document.getElementById('tts-generate'),dispatch=document.getElementById('tts-dispatch'),send=document.getElementById('tts-send-preview');
-  generate.disabled=busy||ttsRequestInFlight||!s.provider_available;
-  dispatch.disabled=busy||ttsRequestInFlight||audioBusy||!s.provider_available;
+  generate.disabled=busy||ttsRequestInFlight||!s.provider_available||!voiceReady;
+  dispatch.disabled=busy||ttsRequestInFlight||audioBusy||!s.provider_available||!voiceReady;
   send.disabled=!ready||ttsRequestInFlight||audioBusy;
-  dispatch.title=audioBusy?'Audioausgabe '+audioStateLabel(audioStatus.state)+' — Ruf erst vollständig beenden lassen':'';
+  generate.title=!voiceReady?(selectedVoice?.error||'Die ausgewählte Stimme ist nicht installiert.'):'';
+  dispatch.title=audioBusy?'Audioausgabe '+audioStateLabel(audioStatus.state)+' — Ruf erst vollständig beenden lassen':generate.title;
   send.title=dispatch.title;
   document.getElementById('tts-stop').disabled=!busy&&!ready&&s.state!=='failed'&&s.state!=='cancelled';
   let status=ttsStateLabel(s.state);
@@ -10243,7 +10311,7 @@ function renderTtsStatus(){
     }
   }else if(!busy){closeTtsPreview();}
 }
-async function loadTtsStatus(){try{const r=await fetch('/api/audio/tts/status',{cache:'no-store'}),j=await r.json().catch(()=>({error:'HTTP '+r.status}));if(!r.ok)throw new Error(j.error||('HTTP '+r.status));ttsStatus=j;renderTtsStatus();}catch(error){ttsStatus={available:false,provider_available:false,state:'failed',last_error:String(error)};renderTtsStatus();}}
+async function loadTtsStatus(){try{const r=await fetch('/api/audio/tts/status',{cache:'no-store'}),j=await r.json().catch(()=>({error:'HTTP '+r.status}));if(!r.ok)throw new Error(j.error||('HTTP '+r.status));ttsStatus=j;renderTtsStatus();renderTtsTemplateControls();if(j.saved_template_id&&j.saved_template_id!==ttsLastSavedTemplateId){ttsLastSavedTemplateId=j.saved_template_id;loadTtsTemplates(j.saved_template_id);}}catch(error){ttsStatus={available:false,provider_available:false,template_available:false,state:'failed',last_error:String(error)};renderTtsStatus();renderTtsTemplateControls();}}
 function audioStateLabel(s){return ({idle:'BEREIT',preparing:'VORBEREITUNG',calling:'RUFBAU',waiting_for_answer:'WARTE AUF ANNAHME',playing:'SENDET',finishing:'BEENDET RUF',failed:'FEHLER'})[s]||String(s||'—').toUpperCase();}
 async function loadAudioRegistries(){
   if(!deviceRegistryLoaded&&!deviceRegistryInflight)await loadDeviceRegistry(); audioDevices=deviceRegistry||{};
@@ -10311,7 +10379,7 @@ function audioContextPreview(){const source=audioPendingSource;if(!source)return
 function audioUp(){if(!audioCurrentPath)return;const p=audioCurrentPath.split('/');p.pop();browseAudio(p.join('/'));}
 async function loadAudioPage(force){
   await Promise.all([loadAudioStatus(),loadAudioRegistries(),loadTtsStatus()]);
-  await loadTtsVoices();refreshTtsTargetOptions();
+  await loadTtsVoices();refreshTtsTargetOptions();await loadTtsTemplates();
   try{await loadAudioSources();await browseAudio(audioCurrentPath);}catch(e){document.getElementById('audio-tbody').innerHTML='<tr><td colspan="4" class="sds-empty">'+escHtml(e)+'</td></tr>';}
   refreshAudioTargetOptions();
 }

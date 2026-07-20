@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::fs::{self, File};
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -13,11 +14,18 @@ use uuid::Uuid;
 
 use crate::net_audio_player::{AudioPlayerHandle, AudioPlayerState, AudioTargetType};
 
+use super::templates::{
+    auto_save_template, delete_template, list_templates, save_template, TtsTemplate, TtsTemplateDraft,
+};
 use super::types::{TtsState, TtsStatus, TtsVoiceStatus};
 
 #[derive(Debug, Clone, Copy)]
 enum TtsIntent {
-    Preview,
+    Preview {
+        target_type: Option<AudioTargetType>,
+        target_id: Option<u32>,
+        priority: u8,
+    },
     Dispatch {
         target_type: AudioTargetType,
         target_id: u32,
@@ -30,6 +38,7 @@ struct ProviderStatus {
     available: bool,
     error: Option<String>,
     last_probe: Option<Instant>,
+    voice_models: HashSet<String>,
 }
 
 impl Default for ProviderStatus {
@@ -38,6 +47,7 @@ impl Default for ProviderStatus {
             available: false,
             error: Some("Piper provider has not been checked yet".to_string()),
             last_probe: None,
+            voice_models: HashSet::new(),
         }
     }
 }
@@ -56,6 +66,7 @@ struct LiveStatus {
     target_id: Option<u32>,
     priority: Option<u8>,
     dispatch_seen: bool,
+    saved_template_id: Option<String>,
     last_error: Option<String>,
 }
 
@@ -74,6 +85,7 @@ impl Default for LiveStatus {
             target_id: None,
             priority: None,
             dispatch_seen: false,
+            saved_template_id: None,
             last_error: None,
         }
     }
@@ -83,6 +95,9 @@ struct TtsShared {
     config: CfgTts,
     cache_root: PathBuf,
     startup_warning: Option<String>,
+    template_root: Option<PathBuf>,
+    template_error: Option<String>,
+    template_lock: Mutex<()>,
     client: Client,
     audio_player: AudioPlayerHandle,
     provider: Mutex<ProviderStatus>,
@@ -135,6 +150,19 @@ impl TtsHandle {
         };
         cleanup_stale_cache(&cache_root, config.cache_retention_minutes);
 
+        let configured_templates = PathBuf::from(&config.template_directory);
+        let (template_root, template_error) = match prepare_writable_template_directory(&configured_templates) {
+            Ok(path) => (Some(path), None),
+            Err(error) => {
+                let warning = format!(
+                    "local TTS templates unavailable at {}: {error}",
+                    configured_templates.display()
+                );
+                tracing::warn!("TTS: {warning}");
+                (None, Some(warning))
+            }
+        };
+
         let client = Client::builder()
             .connect_timeout(Duration::from_secs(config.synthesis_timeout_seconds.min(10)))
             .timeout(Duration::from_secs(config.synthesis_timeout_seconds))
@@ -148,6 +176,9 @@ impl TtsHandle {
                 config,
                 cache_root,
                 startup_warning,
+                template_root,
+                template_error,
+                template_lock: Mutex::new(()),
                 client,
                 audio_player,
                 provider: Mutex::new(ProviderStatus::default()),
@@ -182,6 +213,11 @@ impl TtsHandle {
             provider_error: provider.error.clone(),
             cache_directory: self.inner.cache_root.display().to_string(),
             startup_warning: self.inner.startup_warning.clone(),
+            template_available: self.inner.template_root.is_some(),
+            template_directory: self.inner.config.template_directory.clone(),
+            template_error: self.inner.template_error.clone(),
+            auto_save_generated_templates: self.inner.config.auto_save_generated_templates,
+            saved_template_id: live.saved_template_id.clone(),
             state: live.state,
             job_id: live.job_id.clone(),
             audio_player_job_id: live.audio_player_job_id.clone(),
@@ -207,19 +243,90 @@ impl TtsHandle {
             .config
             .voices
             .iter()
-            .map(|voice| TtsVoiceStatus {
-                id: voice.id.clone(),
-                name: voice.name.clone(),
-                provider_voice: voice.provider_voice.clone(),
-                speaker_id: voice.speaker_id,
-                available: provider.available,
-                error: if provider.available { None } else { provider.error.clone() },
+            .map(|voice| {
+                let model_available = provider.available && provider.voice_models.contains(&voice.provider_voice);
+                TtsVoiceStatus {
+                    id: voice.id.clone(),
+                    name: voice.name.clone(),
+                    provider_voice: voice.provider_voice.clone(),
+                    speaker_id: voice.speaker_id,
+                    available: model_available,
+                    error: if !provider.available {
+                        provider.error.clone()
+                    } else if model_available {
+                        None
+                    } else {
+                        Some(format!("Piper voice model '{}' is not downloaded", voice.provider_voice))
+                    },
+                }
             })
             .collect()
     }
 
-    pub fn generate_preview(&self, text: &str, voice_id: Option<&str>, speed: Option<f32>) -> Result<String, String> {
-        self.start_job(text, voice_id, speed, TtsIntent::Preview)
+    pub fn templates(&self) -> Result<Vec<TtsTemplate>, String> {
+        let root = self.template_root()?;
+        let _guard = self
+            .inner
+            .template_lock
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        list_templates(root)
+    }
+
+    pub fn save_template(&self, mut draft: TtsTemplateDraft) -> Result<TtsTemplate, String> {
+        draft.name = normalize_template_name(&draft.name)?;
+        draft.text = normalize_text(&draft.text, self.inner.config.max_text_characters)?;
+        let voice = self.resolve_voice(Some(&draft.voice_id))?;
+        draft.voice_id = voice.id.clone();
+        validate_speed(draft.speed)?;
+        validate_priority(draft.priority)?;
+        validate_optional_target(draft.target_type, draft.target_id)?;
+        draft.auto_saved = false;
+        let root = self.template_root()?;
+        let _guard = self
+            .inner
+            .template_lock
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let template = save_template(root, draft)?;
+        tracing::info!("TTS templates: saved id={} name={}", template.id, template.name);
+        Ok(template)
+    }
+
+    pub fn delete_template(&self, id: &str) -> Result<(), String> {
+        let root = self.template_root()?;
+        let _guard = self
+            .inner
+            .template_lock
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        delete_template(root, id.trim())?;
+        tracing::info!("TTS templates: deleted id={}", id.trim());
+        Ok(())
+    }
+
+    pub fn generate_preview(
+        &self,
+        text: &str,
+        voice_id: Option<&str>,
+        speed: Option<f32>,
+        target_type: Option<AudioTargetType>,
+        target_id: Option<u32>,
+        priority: Option<u8>,
+    ) -> Result<String, String> {
+        validate_optional_target(target_type, target_id)?;
+        let priority = priority.unwrap_or(self.inner.config.default_priority);
+        validate_priority(priority)?;
+        self.start_job(
+            text,
+            voice_id,
+            speed,
+            TtsIntent::Preview {
+                target_type,
+                target_id,
+                priority,
+            },
+        )
     }
 
     pub fn generate_and_dispatch(
@@ -361,6 +468,7 @@ impl TtsHandle {
 
         let text = normalize_text(text, self.inner.config.max_text_characters)?;
         let voice = self.resolve_voice(voice_id)?.clone();
+        self.ensure_voice_available(&voice)?;
         let speed = speed.unwrap_or(self.inner.config.default_speed);
         validate_speed(speed)?;
         cleanup_stale_cache(&self.inner.cache_root, self.inner.config.cache_retention_minutes);
@@ -381,16 +489,15 @@ impl TtsHandle {
                 text_preview: Some(short_text_preview(&text)),
                 file_name: Some(display_name),
                 target_type: match intent {
-                    TtsIntent::Preview => None,
+                    TtsIntent::Preview { target_type, .. } => target_type,
                     TtsIntent::Dispatch { target_type, .. } => Some(target_type),
                 },
                 target_id: match intent {
-                    TtsIntent::Preview => None,
+                    TtsIntent::Preview { target_id, .. } => target_id,
                     TtsIntent::Dispatch { target_id, .. } => Some(target_id),
                 },
                 priority: match intent {
-                    TtsIntent::Preview => None,
-                    TtsIntent::Dispatch { priority, .. } => Some(priority),
+                    TtsIntent::Preview { priority, .. } | TtsIntent::Dispatch { priority, .. } => Some(priority),
                 },
                 ..LiveStatus::default()
             };
@@ -434,8 +541,16 @@ impl TtsHandle {
             return;
         }
 
+        let saved_template_id = self.auto_save_generated(&text, &voice.id, speed, intent);
+        {
+            let mut live = self.inner.live.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+            if live.job_id.as_deref() == Some(job_id.as_str()) {
+                live.saved_template_id = saved_template_id;
+            }
+        }
+
         match intent {
-            TtsIntent::Preview => {
+            TtsIntent::Preview { .. } => {
                 let mut live = self.inner.live.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
                 if live.job_id.as_deref() == Some(job_id.as_str()) {
                     tracing::info!(
@@ -593,6 +708,96 @@ impl TtsHandle {
             .ok_or_else(|| format!("unknown TTS voice '{id}'"))
     }
 
+    fn template_root(&self) -> Result<&Path, String> {
+        self.inner
+            .template_root
+            .as_deref()
+            .ok_or_else(|| {
+                self.inner
+                    .template_error
+                    .clone()
+                    .unwrap_or_else(|| "local TTS template storage is unavailable".to_string())
+            })
+    }
+
+    fn ensure_voice_available(&self, voice: &CfgTtsVoice) -> Result<(), String> {
+        let provider = self
+            .inner
+            .provider
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if !provider.available {
+            return Err(provider
+                .error
+                .clone()
+                .unwrap_or_else(|| "Piper TTS provider is unavailable".to_string()));
+        }
+        if !provider.voice_models.contains(&voice.provider_voice) {
+            return Err(format!(
+                "Piper voice model '{}' is not downloaded",
+                voice.provider_voice
+            ));
+        }
+        Ok(())
+    }
+
+    fn auto_save_generated(
+        &self,
+        text: &str,
+        voice_id: &str,
+        speed: f32,
+        intent: TtsIntent,
+    ) -> Option<String> {
+        if !self.inner.config.auto_save_generated_templates {
+            return None;
+        }
+        let Some(root) = self.inner.template_root.as_deref() else {
+            return None;
+        };
+        let (target_type, target_id, priority) = match intent {
+            TtsIntent::Preview {
+                target_type,
+                target_id,
+                priority,
+            } => (target_type, target_id, priority),
+            TtsIntent::Dispatch {
+                target_type,
+                target_id,
+                priority,
+            } => (Some(target_type), Some(target_id), priority),
+        };
+        let draft = TtsTemplateDraft {
+            id: None,
+            name: auto_template_name(text),
+            text: text.to_string(),
+            voice_id: voice_id.to_string(),
+            speed,
+            priority,
+            target_type,
+            target_id,
+            auto_saved: true,
+        };
+        let _guard = self
+            .inner
+            .template_lock
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        match auto_save_template(root, draft) {
+            Ok(template) => {
+                tracing::info!(
+                    "TTS templates: auto-saved id={} name={}",
+                    template.id,
+                    template.name
+                );
+                Some(template.id)
+            }
+            Err(error) => {
+                tracing::warn!("TTS templates: automatic save failed: {}", error);
+                None
+            }
+        }
+    }
+
     fn current_job_matches(&self, job_id: &str) -> bool {
         self.inner
             .live
@@ -709,17 +914,38 @@ impl TtsHandle {
 
     fn probe_provider(&self) {
         let url = piper_voices_url(&self.inner.config.endpoint);
-        let result = self.inner.client.get(url).send().and_then(|response| response.error_for_status());
+        let result = (|| -> Result<HashSet<String>, String> {
+            let response = self
+                .inner
+                .client
+                .get(url)
+                .send()
+                .map_err(|error| format!("Piper provider unavailable: {error}"))?
+                .error_for_status()
+                .map_err(|error| format!("Piper provider unavailable: {error}"))?;
+            let payload: serde_json::Value = response
+                .json()
+                .map_err(|error| format!("Piper /voices returned invalid JSON: {error}"))?;
+            let models = payload
+                .as_object()
+                .ok_or_else(|| "Piper /voices did not return a JSON object".to_string())?
+                .keys()
+                .cloned()
+                .collect::<HashSet<_>>();
+            Ok(models)
+        })();
         let mut provider = self.inner.provider.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
         provider.last_probe = Some(Instant::now());
         match result {
-            Ok(_) => {
+            Ok(models) => {
                 provider.available = true;
                 provider.error = None;
+                provider.voice_models = models;
             }
             Err(error) => {
                 provider.available = false;
-                provider.error = Some(format!("Piper provider unavailable: {error}"));
+                provider.error = Some(error);
+                provider.voice_models.clear();
             }
         }
     }
@@ -759,6 +985,35 @@ fn normalize_text(text: &str, max_characters: usize) -> Result<String, String> {
         return Err(format!("TTS text has {count} characters; limit is {max_characters}"));
     }
     Ok(normalized)
+}
+
+fn normalize_template_name(name: &str) -> Result<String, String> {
+    let name = name.split_whitespace().collect::<Vec<_>>().join(" ");
+    let count = name.chars().count();
+    if count == 0 || count > 120 {
+        return Err("template name must contain 1-120 characters".to_string());
+    }
+    Ok(name)
+}
+
+fn validate_optional_target(
+    target_type: Option<AudioTargetType>,
+    target_id: Option<u32>,
+) -> Result<(), String> {
+    match (target_type, target_id) {
+        (None, None) => Ok(()),
+        (Some(_), Some(target_id)) => validate_target(target_id),
+        _ => Err("target_type and target_id must either both be set or both be omitted".to_string()),
+    }
+}
+
+fn auto_template_name(text: &str) -> String {
+    let mut name = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    if name.chars().count() > 72 {
+        name = name.chars().take(72).collect::<String>();
+        name.push('…');
+    }
+    format!("Auto · {name}")
 }
 
 fn validate_speed(speed: f32) -> Result<(), String> {
@@ -821,6 +1076,22 @@ fn prepare_writable_cache(path: &Path) -> Result<PathBuf, String> {
     fs::write(&probe, b"netcore-tts-cache-probe")
         .map_err(|error| format!("{} is not writable: {error}", canonical.display()))?;
     fs::remove_file(&probe).map_err(|error| format!("cannot remove TTS cache probe {}: {error}", probe.display()))?;
+    Ok(canonical)
+}
+
+fn prepare_writable_template_directory(path: &Path) -> Result<PathBuf, String> {
+    fs::create_dir_all(path).map_err(|error| format!("cannot create {}: {error}", path.display()))?;
+    let canonical = path
+        .canonicalize()
+        .map_err(|error| format!("cannot canonicalize {}: {error}", path.display()))?;
+    if !canonical.is_dir() {
+        return Err(format!("{} is not a directory", canonical.display()));
+    }
+    let probe = canonical.join(format!(".write-probe-{}", Uuid::new_v4()));
+    fs::write(&probe, b"netcore-tts-template-probe")
+        .map_err(|error| format!("{} is not writable: {error}", canonical.display()))?;
+    fs::remove_file(&probe)
+        .map_err(|error| format!("cannot remove TTS template probe {}: {error}", probe.display()))?;
     Ok(canonical)
 }
 

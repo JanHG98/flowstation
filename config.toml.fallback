@@ -602,6 +602,8 @@ path = "/mnt/nfs-share"
 enabled = true
 endpoint = "http://127.0.0.1:5005"
 cache_directory = "/var/cache/netcore/tts"
+template_directory = "/var/lib/netcore/tts/templates"
+auto_save_generated_templates = true
 default_voice = "de-thorsten"
 default_speed = 0.95
 default_priority = 5
@@ -613,9 +615,29 @@ keep_generated_audio = false
 
 [[tts.voices]]
 id = "de-thorsten"
-name = "Deutsch – Thorsten"
+name = "Deutsch – Thorsten (mittel)"
 provider_voice = "de_DE-thorsten-medium"
-# speaker_id = 0
+
+[[tts.voices]]
+id = "de-thorsten-high"
+name = "Deutsch – Thorsten (hoch)"
+provider_voice = "de_DE-thorsten-high"
+
+[[tts.voices]]
+id = "de-karlsson"
+name = "Deutsch – Karlsson"
+provider_voice = "de_DE-karlsson-low"
+
+[[tts.voices]]
+id = "de-pavoque"
+name = "Deutsch – Pavoque"
+provider_voice = "de_DE-pavoque-low"
+
+[[tts.voices]]
+id = "de-thorsten-neutral"
+name = "Deutsch – Thorsten emotional (neutral)"
+provider_voice = "de_DE-thorsten_emotional-medium"
+speaker_id = 4
 
 ###############################################################################
 

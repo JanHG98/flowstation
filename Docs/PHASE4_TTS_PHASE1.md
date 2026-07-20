@@ -148,3 +148,12 @@ cargo build --release \
 
 No additional Rust feature is required: TTS is compiled with `audio-player` because it depends on
 that dispatcher.
+
+---
+
+## Erweiterung: lokale Vorlagenbibliothek
+
+Der aktuelle Ausbau ergänzt die Freitext-TTS-Funktion um lokale `.tts.toml`-Vorlagen unter
+`/var/lib/netcore/tts/templates`. Auswahl, Laden, Speichern und Löschen erfolgen direkt in der
+Audio-Zentrale. Jede erfolgreich erzeugte Durchsage wird standardmäßig automatisch gespeichert.
+Details stehen in `Docs/PHASE4_TTS_TEMPLATES_LOCAL.md`.

@@ -23,10 +23,14 @@ pub struct CfgTts {
     /// Instantiate the TTS service and dashboard API.
     pub enabled: bool,
     /// Piper HTTP base URL. The service is expected to expose `/voices` and accept
-    /// JSON synthesis requests on `/`.
+    /// JSON synthesis requests on `/synthesize`.
     pub endpoint: String,
     /// Local directory for generated WAV files.
     pub cache_directory: String,
+    /// Local directory for persistent operator templates.
+    pub template_directory: String,
+    /// Automatically store every successfully generated text as a local template.
+    pub auto_save_generated_templates: bool,
     /// Stable ID of the voice selected by default in the dashboard.
     pub default_voice: String,
     /// Operator-facing speed multiplier. 1.0 is normal, values above 1.0 are faster.
@@ -75,6 +79,10 @@ pub struct CfgTtsDto {
     pub endpoint: String,
     #[serde(default = "default_cache_directory")]
     pub cache_directory: String,
+    #[serde(default = "default_template_directory")]
+    pub template_directory: String,
+    #[serde(default = "default_auto_save_generated_templates")]
+    pub auto_save_generated_templates: bool,
     #[serde(default = "default_voice")]
     pub default_voice: String,
     #[serde(default = "default_speed")]
@@ -103,6 +111,8 @@ impl Default for CfgTtsDto {
             enabled: false,
             endpoint: default_endpoint(),
             cache_directory: default_cache_directory(),
+            template_directory: default_template_directory(),
+            auto_save_generated_templates: default_auto_save_generated_templates(),
             default_voice: default_voice(),
             default_speed: default_speed(),
             default_priority: default_priority(),
@@ -118,11 +128,19 @@ impl Default for CfgTtsDto {
 }
 
 fn default_endpoint() -> String {
-    "http://127.0.0.1:5000".to_string()
+    "http://127.0.0.1:5005".to_string()
 }
 
 fn default_cache_directory() -> String {
     "/var/cache/netcore/tts".to_string()
+}
+
+fn default_template_directory() -> String {
+    "/var/lib/netcore/tts/templates".to_string()
+}
+
+fn default_auto_save_generated_templates() -> bool {
+    true
 }
 
 fn default_voice() -> String {
@@ -174,11 +192,15 @@ fn validate_endpoint(endpoint: &str) -> Result<(), String> {
 pub fn apply_tts_patch(mut src: CfgTtsDto) -> Result<CfgTts, String> {
     src.endpoint = src.endpoint.trim().trim_end_matches('/').to_string();
     src.cache_directory = src.cache_directory.trim().to_string();
+    src.template_directory = src.template_directory.trim().to_string();
     src.default_voice = src.default_voice.trim().to_string();
 
     validate_endpoint(&src.endpoint)?;
     if src.cache_directory.is_empty() || !Path::new(&src.cache_directory).is_absolute() {
         return Err("tts: cache_directory must be a non-empty absolute path".to_string());
+    }
+    if src.template_directory.is_empty() || !Path::new(&src.template_directory).is_absolute() {
+        return Err("tts: template_directory must be a non-empty absolute path".to_string());
     }
     if !(0.50..=1.50).contains(&src.default_speed) {
         return Err("tts: default_speed must be between 0.50 and 1.50".to_string());
@@ -245,6 +267,8 @@ pub fn apply_tts_patch(mut src: CfgTtsDto) -> Result<CfgTts, String> {
         enabled: src.enabled,
         endpoint: src.endpoint,
         cache_directory: src.cache_directory,
+        template_directory: src.template_directory,
+        auto_save_generated_templates: src.auto_save_generated_templates,
         default_voice: src.default_voice,
         default_speed: src.default_speed,
         default_priority: src.default_priority,
@@ -276,6 +300,8 @@ mod tests {
         let cfg = CfgTts::default();
         assert!(!cfg.enabled);
         assert!(cfg.endpoint.starts_with("http://"));
+        assert!(Path::new(&cfg.template_directory).is_absolute());
+        assert!(cfg.auto_save_generated_templates);
         assert!(cfg.voices.is_empty());
     }
 

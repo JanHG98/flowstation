@@ -558,6 +558,16 @@ fn main() {
                         handle.cache_root().display(),
                         handle.config().voices.len()
                     );
+                    let tts_status = handle.status();
+                    if tts_status.template_available {
+                        eprintln!(
+                            "    Local templates: {} (auto-save: {})",
+                            tts_status.template_directory,
+                            if tts_status.auto_save_generated_templates { "on" } else { "off" }
+                        );
+                    } else if let Some(error) = tts_status.template_error {
+                        eprintln!("    TTS template warning: {error}");
+                    }
                     if let Some(warning) = handle.startup_warning() {
                         eprintln!("    TTS cache warning: {warning}");
                     }

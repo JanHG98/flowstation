@@ -5,7 +5,9 @@
 //! active TETRA traffic channel.
 
 mod service;
+mod templates;
 mod types;
 
 pub use service::TtsHandle;
+pub use templates::{TtsTemplate, TtsTemplateDraft};
 pub use types::{TtsState, TtsStatus, TtsVoiceStatus};

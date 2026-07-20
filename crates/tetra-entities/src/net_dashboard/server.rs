@@ -18,7 +18,7 @@ use crate::net_recorder::RecorderHandle;
 #[cfg(feature = "audio-player")]
 use crate::net_audio_player::{AudioPlayerHandle, AudioTargetType};
 #[cfg(feature = "audio-player")]
-use crate::net_tts::TtsHandle;
+use crate::net_tts::{TtsHandle, TtsTemplateDraft};
 use crate::net_telemetry::TelemetryEvent;
 use crate::tpg2200::{build_sds_text_payload, build_tpg2200_callout_payload, format_hex_bytes, parse_hex_payload, tpg2200_incident_byte};
 use tetra_config::bluestation::CfgBrew;
@@ -2197,22 +2197,40 @@ fn serve_audio_preview(
 }
 
 #[cfg(feature = "audio-player")]
-fn parse_tts_target(request: &serde_json::Value) -> Result<(AudioTargetType, u32, Option<u8>), String> {
-    let target_type = match request.get("target_type").and_then(|value| value.as_str()) {
+fn parse_optional_tts_target(
+    request: &serde_json::Value,
+) -> Result<(Option<AudioTargetType>, Option<u32>), String> {
+    let raw_type = request.get("target_type").and_then(|value| value.as_str());
+    let raw_id = request.get("target_id");
+    if raw_type.is_none() && raw_id.is_none() {
+        return Ok((None, None));
+    }
+    let target_type = match raw_type {
         Some("group") => AudioTargetType::Group,
         Some("individual") => AudioTargetType::Individual,
         _ => return Err("target_type must be group or individual".to_string()),
     };
-    let target_id = request
-        .get("target_id")
+    let target_id = raw_id
         .and_then(|value| value.as_u64())
         .and_then(|value| u32::try_from(value).ok())
         .ok_or_else(|| "target_id must be an integer".to_string())?;
+    if target_id == 0 || target_id > 0x00ff_ffff {
+        return Err("target_id must be a valid 24-bit ISSI/GSSI".to_string());
+    }
+    Ok((Some(target_type), Some(target_id)))
+}
+
+fn parse_tts_target(request: &serde_json::Value) -> Result<(AudioTargetType, u32, Option<u8>), String> {
+    let (target_type, target_id) = parse_optional_tts_target(request)?;
     let priority = request
         .get("priority")
         .and_then(|value| value.as_u64())
         .and_then(|value| u8::try_from(value).ok());
-    Ok((target_type, target_id, priority))
+    Ok((
+        target_type.ok_or_else(|| "target_type is required".to_string())?,
+        target_id.ok_or_else(|| "target_id is required".to_string())?,
+        priority,
+    ))
 }
 
 #[cfg(feature = "audio-player")]
@@ -2248,6 +2266,22 @@ fn serve_tts_request(
         return;
     }
 
+    if method == "GET" && route == "/api/audio/tts/templates" {
+        drain_http_headers(&mut stream);
+        match handle.templates() {
+            Ok(templates) => {
+                let body = serde_json::json!({"templates": templates}).to_string();
+                http_json_response(stream, 200, &body);
+            }
+            Err(error) => http_json_response(
+                stream,
+                503,
+                &serde_json::json!({"templates":[],"error":error}).to_string(),
+            ),
+        }
+        return;
+    }
+
     if matches!(method, "GET" | "HEAD") && route == "/api/audio/tts/preview" {
         let path = request_path(req_line).unwrap_or("/api/audio/tts/preview");
         let params = query_params(path);
@@ -2273,6 +2307,110 @@ fn serve_tts_request(
         return;
     }
 
+    if method == "POST"
+        && matches!(
+            route,
+            "/api/audio/tts/templates/save" | "/api/audio/tts/templates/delete"
+        )
+    {
+        let body = read_http_body(&mut stream);
+        let request: serde_json::Value = match serde_json::from_slice(&body) {
+            Ok(value) => value,
+            Err(error) => {
+                http_json_response(
+                    stream,
+                    400,
+                    &serde_json::json!({"ok":false,"error":format!("invalid JSON: {error}")}).to_string(),
+                );
+                return;
+            }
+        };
+
+        if route == "/api/audio/tts/templates/delete" {
+            let id = request.get("id").and_then(|value| value.as_str()).unwrap_or("");
+            let result = if id.trim().is_empty() {
+                Err("template id is required".to_string())
+            } else {
+                handle.delete_template(id)
+            };
+            match result {
+                Ok(()) => http_json_response(stream, 200, &serde_json::json!({"ok":true}).to_string()),
+                Err(error) => http_json_response(
+                    stream,
+                    409,
+                    &serde_json::json!({"ok":false,"error":error}).to_string(),
+                ),
+            }
+            return;
+        }
+
+        let target_type_raw = request.get("target_type").and_then(|value| value.as_str());
+        let target_id_raw = request
+            .get("target_id")
+            .and_then(|value| value.as_u64())
+            .and_then(|value| u32::try_from(value).ok());
+        let (target_type, target_id) = match (target_type_raw, target_id_raw) {
+            (None, None) => (None, None),
+            (Some("group"), Some(id)) => (Some(AudioTargetType::Group), Some(id)),
+            (Some("individual"), Some(id)) => (Some(AudioTargetType::Individual), Some(id)),
+            _ => {
+                http_json_response(
+                    stream,
+                    400,
+                    &serde_json::json!({"ok":false,"error":"target_type and target_id must both be valid or both be omitted"}).to_string(),
+                );
+                return;
+            }
+        };
+        let draft = TtsTemplateDraft {
+            id: request
+                .get("id")
+                .and_then(|value| value.as_str())
+                .map(|value| value.to_string()),
+            name: request
+                .get("name")
+                .and_then(|value| value.as_str())
+                .unwrap_or("")
+                .to_string(),
+            text: request
+                .get("text")
+                .and_then(|value| value.as_str())
+                .unwrap_or("")
+                .to_string(),
+            voice_id: request
+                .get("voice_id")
+                .and_then(|value| value.as_str())
+                .unwrap_or(&handle.config().default_voice)
+                .to_string(),
+            speed: request
+                .get("speed")
+                .and_then(|value| value.as_f64())
+                .map(|value| value as f32)
+                .unwrap_or(handle.config().default_speed),
+            priority: request
+                .get("priority")
+                .and_then(|value| value.as_u64())
+                .and_then(|value| u8::try_from(value).ok())
+                .unwrap_or(handle.config().default_priority),
+            target_type,
+            target_id,
+            auto_saved: false,
+        };
+        match handle.save_template(draft) {
+            Ok(template) => http_json_response(
+                stream,
+                200,
+                &serde_json::json!({"ok":true,"template":template}).to_string(),
+            ),
+            Err(error) => http_json_response(
+                stream,
+                409,
+                &serde_json::json!({"ok":false,"error":error}).to_string(),
+            ),
+        }
+        return;
+    }
+
     if method == "POST" && matches!(route, "/api/audio/tts/generate" | "/api/audio/tts/dispatch" | "/api/audio/tts/send") {
         let body = read_http_body(&mut stream);
         let request: serde_json::Value = match serde_json::from_slice(&body) {
@@ -2288,7 +2426,16 @@ fn serve_tts_request(
                 let text = request.get("text").and_then(|value| value.as_str()).unwrap_or("");
                 let voice_id = request.get("voice_id").and_then(|value| value.as_str());
                 let speed = request.get("speed").and_then(|value| value.as_f64()).map(|value| value as f32);
-                handle.generate_preview(text, voice_id, speed)
+                let priority = request
+                    .get("priority")
+                    .and_then(|value| value.as_u64())
+                    .and_then(|value| u8::try_from(value).ok());
+                match parse_optional_tts_target(&request) {
+                    Ok((target_type, target_id)) => {
+                        handle.generate_preview(text, voice_id, speed, target_type, target_id, priority)
+                    }
+                    Err(error) => Err(error),
+                }
             }
             "/api/audio/tts/dispatch" => {
                 let text = request.get("text").and_then(|value| value.as_str()).unwrap_or("");
