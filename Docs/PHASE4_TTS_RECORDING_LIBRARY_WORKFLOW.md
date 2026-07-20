@@ -39,7 +39,7 @@ TTS-WAVs werden über `RecorderHandle::import_named_wav()` importiert. Dadurch v
 - Aussendung über `source_type=recording`
 - Löschen
 - Aufbewahrungslogik
-- NFS-Archivierung und Archivmarker
+- NFS-Archivierung und Archivmarker; TTS wird getrennt nach `/mnt/nfs-share/TTS-Dateien` kopiert
 
 ## Entfernt
 
@@ -59,3 +59,15 @@ TTS: saved as recording job=... recording_id=... name=...
 ```
 
 Beim späteren Senden erscheint der Eintrag wie jede andere Aufzeichnung im AudioPlayer und CMCE.
+
+
+## Getrennte Serverkopie
+
+Die lokale Bibliothek bleibt gemeinsam. Für das NFS-Archiv werden die Einträge anhand von `origin` getrennt geroutet:
+
+```text
+origin = tts  -> /mnt/nfs-share/TTS-Dateien
+alle anderen -> /mnt/nfs-share/Recordings
+```
+
+Details: `Docs/PHASE4_TTS_SEPARATE_NFS_ARCHIVE.md`.

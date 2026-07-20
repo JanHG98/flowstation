@@ -45,9 +45,13 @@ pub struct CfgRecording {
     pub max_list_entries: usize,
     /// Copy completed WAV/JSON pairs to the configured archive directory.
     pub archive_enabled: bool,
-    /// Existing writable directory on an OS-mounted server share.
+    /// Existing writable directory on an OS-mounted server share for normal call recordings.
     pub archive_directory: String,
-    /// Retry interval for pending copies while the share is unavailable.
+    /// Copy imported TTS library WAV/JSON pairs to a separate server directory.
+    pub tts_archive_enabled: bool,
+    /// Existing writable directory on an OS-mounted server share for TTS library WAVs.
+    pub tts_archive_directory: String,
+    /// Retry interval for pending copies while either share is unavailable.
     pub archive_retry_seconds: u64,
 }
 
@@ -83,6 +87,10 @@ pub struct CfgRecordingDto {
     pub archive_enabled: bool,
     #[serde(default = "default_archive_directory")]
     pub archive_directory: String,
+    #[serde(default)]
+    pub tts_archive_enabled: bool,
+    #[serde(default = "default_tts_archive_directory")]
+    pub tts_archive_directory: String,
     #[serde(default = "default_archive_retry_seconds")]
     pub archive_retry_seconds: u64,
     #[serde(flatten)]
@@ -104,6 +112,8 @@ impl Default for CfgRecordingDto {
             max_list_entries: default_max_list_entries(),
             archive_enabled: false,
             archive_directory: default_archive_directory(),
+            tts_archive_enabled: false,
+            tts_archive_directory: default_tts_archive_directory(),
             archive_retry_seconds: default_archive_retry_seconds(),
             extra: HashMap::new(),
         }
@@ -138,6 +148,10 @@ fn default_archive_directory() -> String {
     "/mnt/nfs-share/Recordings".to_string()
 }
 
+fn default_tts_archive_directory() -> String {
+    "/mnt/nfs-share/TTS-Dateien".to_string()
+}
+
 fn default_archive_retry_seconds() -> u64 {
     60
 }
@@ -157,19 +171,29 @@ pub fn apply_recording_patch(mut src: CfgRecordingDto) -> Result<CfgRecording, S
         return Err("recording: max_list_entries must be greater than zero".to_string());
     }
     src.archive_directory = src.archive_directory.trim().to_string();
-    if src.archive_enabled {
-        if src.archive_directory.is_empty() {
-            return Err("recording: archive_directory cannot be empty when archive_enabled = true".to_string());
-        }
-        if !Path::new(&src.archive_directory).is_absolute() {
-            return Err("recording: archive_directory must be an absolute path".to_string());
-        }
-        if src.archive_directory == src.directory {
-            return Err("recording: archive_directory must differ from directory".to_string());
-        }
-        if src.archive_retry_seconds == 0 {
-            return Err("recording: archive_retry_seconds must be greater than zero".to_string());
-        }
+    src.tts_archive_directory = src.tts_archive_directory.trim().to_string();
+    validate_archive_directory(
+        "archive_directory",
+        src.archive_enabled,
+        &src.archive_directory,
+        &src.directory,
+    )?;
+    validate_archive_directory(
+        "tts_archive_directory",
+        src.tts_archive_enabled,
+        &src.tts_archive_directory,
+        &src.directory,
+    )?;
+    if src.archive_enabled
+        && src.tts_archive_enabled
+        && src.archive_directory == src.tts_archive_directory
+    {
+        return Err(
+            "recording: archive_directory and tts_archive_directory must differ".to_string(),
+        );
+    }
+    if (src.archive_enabled || src.tts_archive_enabled) && src.archive_retry_seconds == 0 {
+        return Err("recording: archive_retry_seconds must be greater than zero".to_string());
     }
     if src.selected_groups.iter().any(|gssi| *gssi == 0 || *gssi > 0x00ff_ffff) {
         return Err("recording: selected_groups entries must be valid 24-bit GSSIs".to_string());
@@ -190,8 +214,35 @@ pub fn apply_recording_patch(mut src: CfgRecordingDto) -> Result<CfgRecording, S
         max_list_entries: src.max_list_entries,
         archive_enabled: src.archive_enabled,
         archive_directory: src.archive_directory,
+        tts_archive_enabled: src.tts_archive_enabled,
+        tts_archive_directory: src.tts_archive_directory,
         archive_retry_seconds: src.archive_retry_seconds,
     })
+}
+
+fn validate_archive_directory(
+    field: &str,
+    enabled: bool,
+    value: &str,
+    local_directory: &str,
+) -> Result<(), String> {
+    if !enabled {
+        return Ok(());
+    }
+    if value.is_empty() {
+        return Err(format!(
+            "recording: {field} cannot be empty when its archive is enabled"
+        ));
+    }
+    if !Path::new(value).is_absolute() {
+        return Err(format!("recording: {field} must be an absolute path"));
+    }
+    if value == local_directory {
+        return Err(format!(
+            "recording: {field} must differ from directory"
+        ));
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -224,5 +275,29 @@ mod tests {
             ..CfgRecordingDto::default()
         };
         assert!(apply_recording_patch(dto).is_err());
+    }
+
+    #[test]
+    fn rejects_relative_tts_archive_directory() {
+        let dto = CfgRecordingDto {
+            tts_archive_enabled: true,
+            tts_archive_directory: "relative/tts".to_string(),
+            ..CfgRecordingDto::default()
+        };
+        assert!(apply_recording_patch(dto).is_err());
+    }
+
+    #[test]
+    fn keeps_recording_and_tts_archive_separate() {
+        let dto = CfgRecordingDto {
+            archive_enabled: true,
+            tts_archive_enabled: true,
+            archive_directory: "/mnt/nfs-share/Recordings".to_string(),
+            tts_archive_directory: "/mnt/nfs-share/TTS-Dateien".to_string(),
+            ..CfgRecordingDto::default()
+        };
+        let cfg = apply_recording_patch(dto).expect("split archive config should be valid");
+        assert_eq!(cfg.archive_directory, "/mnt/nfs-share/Recordings");
+        assert_eq!(cfg.tts_archive_directory, "/mnt/nfs-share/TTS-Dateien");
     }
 }

@@ -564,6 +564,11 @@ max_list_entries = 2000
 # The destination root must already exist and be writable by the service user.
 archive_enabled = true
 archive_directory = "/mnt/nfs-share/Recordings"
+
+# TTS-WAVs remain in the local recording library for selection/playback, but their
+# server copy is routed separately and never placed in the Recordings archive.
+tts_archive_enabled = true
+tts_archive_directory = "/mnt/nfs-share/TTS-Dateien"
 archive_retry_seconds = 60
 
 ###############################################################################

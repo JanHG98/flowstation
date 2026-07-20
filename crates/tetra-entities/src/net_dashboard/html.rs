@@ -10501,16 +10501,20 @@ async function loadRecordingStatus(){
     document.getElementById('rec-error').textContent=j.last_error||'Kein Fehler';
     const archiveCard=document.getElementById('rec-archive-card');
     archiveCard.classList.remove('is-ok','is-danger','is-idle','is-warn');
+    const anyArchive=!!(j.archive_enabled||j.tts_archive_enabled);
     let archiveState='DEAKTIVIERT',archiveClass='is-idle';
-    if(j.archive_enabled){
+    if(anyArchive){
       if(j.archive_active){archiveState='ÜBERTRÄGT';archiveClass='is-warn';}
       else if(j.archive_available){archiveState=j.archive_pending?'WARTESCHLANGE':'ONLINE';archiveClass=j.archive_pending?'is-warn':'is-ok';}
       else{archiveState='OFFLINE';archiveClass='is-danger';}
     }
     archiveCard.classList.add(archiveClass);
     document.getElementById('rec-archive-state').textContent=archiveState;
-    document.getElementById('rec-archive-progress').textContent=j.archive_enabled?`${j.archive_completed||0} archiviert · ${j.archive_pending||0} ausstehend`:'Automatische Kopie aus';
-    const archiveDetail=j.archive_last_error||j.archive_directory||'—';
+    document.getElementById('rec-archive-progress').textContent=anyArchive?`${j.archive_completed||0} archiviert · ${j.archive_pending||0} ausstehend`:'Automatische Kopie aus';
+    const archivePaths=[];
+    if(j.archive_enabled)archivePaths.push(`Recordings: ${j.archive_directory}`);
+    if(j.tts_archive_enabled)archivePaths.push(`TTS: ${j.tts_archive_directory}`);
+    const archiveDetail=j.archive_last_error||archivePaths.join(' · ')||'—';
     document.getElementById('rec-archive-detail').textContent=archiveDetail;
     document.getElementById('rec-archive-detail').title=j.archive_last_success_at?`Letzte erfolgreiche Kopie: ${recFmtTime(j.archive_last_success_at)}`:archiveDetail;
     document.getElementById('rec-toggle').textContent=j.active?'Aufzeichnung pausieren':'Aufzeichnung aktivieren';

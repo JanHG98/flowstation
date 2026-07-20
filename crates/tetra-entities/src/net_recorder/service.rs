@@ -45,7 +45,7 @@ impl RecorderHandle {
     pub(crate) fn new(config: CfgRecording) -> io::Result<Self> {
         let root = PathBuf::from(&config.directory);
         fs::create_dir_all(&root)?;
-        let (archive_tx, archive_rx) = if config.archive_enabled {
+        let (archive_tx, archive_rx) = if config.archive_enabled || config.tts_archive_enabled {
             let (tx, rx) = sync_channel(1);
             (Some(tx), Some(rx))
         } else {
@@ -180,6 +180,8 @@ impl RecorderHandle {
             last_error,
             archive_enabled: self.inner.config.archive_enabled,
             archive_directory: self.inner.config.archive_directory.clone(),
+            tts_archive_enabled: self.inner.config.tts_archive_enabled,
+            tts_archive_directory: self.inner.config.tts_archive_directory.clone(),
             archive_available,
             archive_active,
             archive_pending,
@@ -197,7 +199,8 @@ impl RecorderHandle {
 
     /// Import a finished 8-kHz mono PCM WAV into the local recording library.
     /// The WAV and JSON sidecar are written exactly like normal call recordings,
-    /// so playback, deletion, retention and NFS archiving use the same code path.
+    /// so playback, deletion and retention use the same code path. The archive
+    /// worker routes `origin = "tts"` to the dedicated TTS server directory.
     pub fn import_named_wav(&self, source: &Path, title: &str, origin: &str) -> Result<RecordingMetadata, String> {
         if !self.has_minimum_free_space() {
             return Err(format!(
@@ -449,7 +452,9 @@ impl RecorderHandle {
             let Ok(audio) = self.audio_path(&item.id) else { continue };
             let modified = audio.metadata().and_then(|m| m.modified()).unwrap_or(std::time::SystemTime::now());
             if modified < cutoff {
-                if self.inner.config.archive_enabled && !recording_is_archived(&self.inner, &item) {
+                if super::archive::recording_requires_archive(&self.inner, &item)
+                    && !recording_is_archived(&self.inner, &item)
+                {
                     tracing::warn!(
                         "Recorder: retention kept unarchived recording id={} because archive copy is not confirmed",
                         item.id

@@ -47,6 +47,8 @@ pub struct RecorderStatus {
     pub last_error: Option<String>,
     pub archive_enabled: bool,
     pub archive_directory: String,
+    pub tts_archive_enabled: bool,
+    pub tts_archive_directory: String,
     pub archive_available: bool,
     pub archive_active: bool,
     pub archive_pending: usize,

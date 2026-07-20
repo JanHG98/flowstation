@@ -372,6 +372,12 @@ fn build_bs_stack(
                         cfg.config().recording.archive_retry_seconds
                     );
                 }
+                if cfg.config().recording.tts_archive_enabled {
+                    eprintln!(
+                        "    TTS WAV archive: {} (separate from recordings)",
+                        cfg.config().recording.tts_archive_directory
+                    );
+                }
             }
             Err(err) => {
                 tracing::error!("Recorder disabled: {}", err);
