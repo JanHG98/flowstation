@@ -83,7 +83,6 @@ GET       /api/audio/tts/status
 GET       /api/audio/tts/voices
 GET|HEAD  /api/audio/tts/preview?job_id=<uuid>
 POST      /api/audio/tts/generate
-POST      /api/audio/tts/dispatch
 POST      /api/audio/tts/send
 POST      /api/audio/tts/stop
 ```

@@ -3982,9 +3982,9 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
             <label><span class="mesh-msg-filter-label">Priorität 0–15</span><input class="form-input" id="tts-priority" type="number" min="0" max="15" value="5"></label>
           </div>
           <div id="tts-job-state" class="stat-sub" style="margin-top:12px">Bereit für eine Textdurchsage.</div>
+          <div class="stat-sub" style="margin-top:12px">Ablauf: Zuerst die Vorschau vollständig erzeugen und prüfen. Anschließend kann genau diese Vorschau gesendet werden.</div>
           <div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:14px">
-            <button class="btn" id="tts-generate" onclick="generateTtsPreview()">▶ Vorschau erzeugen</button>
-            <button class="btn btn-primary" id="tts-dispatch" onclick="dispatchTtsNow()">📡 Erzeugen und senden</button>
+            <button class="btn btn-primary" id="tts-generate" onclick="generateTtsPreview()">▶ Vorschau erzeugen</button>
           </div>
         </div>
       </div>
@@ -10252,14 +10252,6 @@ async function generateTtsPreview(){
   catch(error){alert(error.message||String(error));}
   finally{ttsRequestInFlight=false;renderTtsStatus();}
 }
-async function dispatchTtsNow(){
-  if(ttsRequestInFlight)return;
-  try{assertAudioDispatchReady();}catch(error){alert(error.message||String(error));return;}
-  ttsRequestInFlight=true;renderTtsStatus();
-  try{await postTts('/api/audio/tts/dispatch',{...ttsGenerationPayload(),...ttsTargetPayload()});await Promise.all([loadTtsStatus(),loadAudioStatus()]);}
-  catch(error){alert(error.message||String(error));}
-  finally{ttsRequestInFlight=false;renderTtsStatus();}
-}
 async function sendGeneratedTts(){
   if(ttsRequestInFlight)return;
   try{if(!ttsStatus?.job_id)throw new Error('Es ist keine TTS-Vorschau bereit.');assertAudioDispatchReady();}
@@ -10284,13 +10276,11 @@ function renderTtsStatus(){
     ttsDefaultsApplied=true;updateTtsSpeedLabel();updateTtsCharacterCount();
   }
   const busy=['synthesizing','dispatching'].includes(s.state),ready=s.state==='ready'&&s.generated_audio_available,audioBusy=audioDispatchBusy(),selectedVoiceId=document.getElementById('tts-voice')?.value||'',selectedVoice=ttsVoices.find(v=>v.id===selectedVoiceId),voiceReady=!!selectedVoice?.available;
-  const generate=document.getElementById('tts-generate'),dispatch=document.getElementById('tts-dispatch'),send=document.getElementById('tts-send-preview');
+  const generate=document.getElementById('tts-generate'),send=document.getElementById('tts-send-preview');
   generate.disabled=busy||ttsRequestInFlight||!s.provider_available||!voiceReady;
-  dispatch.disabled=busy||ttsRequestInFlight||audioBusy||!s.provider_available||!voiceReady;
   send.disabled=!ready||ttsRequestInFlight||audioBusy;
-  generate.title=!voiceReady?(selectedVoice?.error||'Die ausgewählte Stimme ist nicht installiert.'):'';
-  dispatch.title=audioBusy?'Audioausgabe '+audioStateLabel(audioStatus.state)+' — Ruf erst vollständig beenden lassen':generate.title;
-  send.title=dispatch.title;
+  generate.title=!voiceReady?(selectedVoice?.error||'Die ausgewählte Stimme ist nicht installiert.'):'Erzeugt ausschließlich eine Vorschau; gesendet wird erst über „Diese Vorschau senden“.';
+  send.title=audioBusy?'Audioausgabe '+audioStateLabel(audioStatus.state)+' — Ruf erst vollständig beenden lassen':'';
   document.getElementById('tts-stop').disabled=!busy&&!ready&&s.state!=='failed'&&s.state!=='cancelled';
   let status=ttsStateLabel(s.state);
   if(ttsRequestInFlight&&!busy)status='AUFTRAG WIRD ÜBERGEBEN';

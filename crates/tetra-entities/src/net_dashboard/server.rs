@@ -2411,7 +2411,7 @@ fn serve_tts_request(
         return;
     }
 
-    if method == "POST" && matches!(route, "/api/audio/tts/generate" | "/api/audio/tts/dispatch" | "/api/audio/tts/send") {
+    if method == "POST" && matches!(route, "/api/audio/tts/generate" | "/api/audio/tts/send") {
         let body = read_http_body(&mut stream);
         let request: serde_json::Value = match serde_json::from_slice(&body) {
             Ok(value) => value,
@@ -2433,17 +2433,6 @@ fn serve_tts_request(
                 match parse_optional_tts_target(&request) {
                     Ok((target_type, target_id)) => {
                         handle.generate_preview(text, voice_id, speed, target_type, target_id, priority)
-                    }
-                    Err(error) => Err(error),
-                }
-            }
-            "/api/audio/tts/dispatch" => {
-                let text = request.get("text").and_then(|value| value.as_str()).unwrap_or("");
-                let voice_id = request.get("voice_id").and_then(|value| value.as_str());
-                let speed = request.get("speed").and_then(|value| value.as_f64()).map(|value| value as f32);
-                match parse_tts_target(&request) {
-                    Ok((target_type, target_id, priority)) => {
-                        handle.generate_and_dispatch(text, voice_id, speed, target_type, target_id, priority)
                     }
                     Err(error) => Err(error),
                 }

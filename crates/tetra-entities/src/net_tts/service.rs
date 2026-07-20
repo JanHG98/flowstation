@@ -329,31 +329,6 @@ impl TtsHandle {
         )
     }
 
-    pub fn generate_and_dispatch(
-        &self,
-        text: &str,
-        voice_id: Option<&str>,
-        speed: Option<f32>,
-        target_type: AudioTargetType,
-        target_id: u32,
-        priority: Option<u8>,
-    ) -> Result<String, String> {
-        validate_target(target_id)?;
-        let priority = priority.unwrap_or(self.inner.config.default_priority);
-        validate_priority(priority)?;
-        ensure_audio_player_available(&self.inner.audio_player)?;
-        self.start_job(
-            text,
-            voice_id,
-            speed,
-            TtsIntent::Dispatch {
-                target_type,
-                target_id,
-                priority,
-            },
-        )
-    }
-
     pub fn dispatch_ready(
         &self,
         job_id: &str,
