@@ -12,7 +12,7 @@ use reqwest::redirect::Policy;
 use tetra_config::bluestation::{CfgTts, CfgTtsVoice};
 use uuid::Uuid;
 
-use crate::net_audio_player::{AudioPlayerHandle, AudioPlayerState, AudioTargetType};
+use crate::net_audio_player::{materialize_recording_wav, AudioPlayerHandle, AudioPlayerState, AudioTargetType};
 
 use super::templates::{
     auto_save_template, delete_template, list_templates, save_template, TtsTemplate, TtsTemplateDraft,
@@ -380,10 +380,15 @@ impl TtsHandle {
             (path, display_name)
         };
 
+        tracing::info!(
+            "TTS: queueing materialized WAV through exact recording playback entrypoint job={} file={}",
+            job_id,
+            path.display()
+        );
         let audio_job_id = self
             .inner
             .audio_player
-            .play_generated_audio(path, display_name, target_type, target_id, Some(priority))?;
+            .play_recording(path, display_name, target_type, target_id, Some(priority))?;
         let mut live = self.inner.live.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
         if live.job_id.as_deref() != Some(job_id) {
             let _ = self.inner.audio_player.stop();
@@ -572,10 +577,15 @@ impl TtsHandle {
                     let live = self.inner.live.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
                     live.file_name.clone().unwrap_or_else(|| "TTS-Durchsage".to_string())
                 };
+                tracing::info!(
+                    "TTS: queueing materialized WAV through exact recording playback entrypoint job={} file={}",
+                    job_id,
+                    path.display()
+                );
                 match self
                     .inner
                     .audio_player
-                    .play_generated_audio(path.clone(), display_name, target_type, target_id, Some(priority))
+                    .play_recording(path.clone(), display_name, target_type, target_id, Some(priority))
                 {
                     Ok(audio_job_id) => {
                         let accepted = {
@@ -632,8 +642,9 @@ impl TtsHandle {
     }
 
     fn synthesize(&self, job_id: &str, text: &str, voice: &CfgTtsVoice, speed: f32) -> Result<PathBuf, String> {
+        let provider_part_path = self.inner.cache_root.join(format!("{job_id}.provider.part.wav"));
+        let recording_part_path = self.inner.cache_root.join(format!("{job_id}.recording.part.wav"));
         let final_path = self.inner.cache_root.join(format!("{job_id}.wav"));
-        let part_path = self.inner.cache_root.join(format!("{job_id}.part.wav"));
         let max_bytes = self.inner.config.max_output_file_mb.saturating_mul(1024 * 1024);
         let length_scale = 1.0_f32 / speed;
         let mut payload = serde_json::json!({
@@ -681,27 +692,40 @@ impl TtsHandle {
             ));
         }
 
-        let mut output = File::create(&part_path).map_err(|error| format!("cannot create {}: {error}", part_path.display()))?;
-        let copied = std::io::copy(&mut response.take(max_bytes.saturating_add(1)), &mut output)
-            .map_err(|error| format!("cannot store Piper WAV: {error}"))?;
-        output.sync_all().map_err(|error| format!("cannot sync Piper WAV: {error}"))?;
-        // Do not hand an open output handle to the AudioPlayer preparation worker.
-        // The file is fully written, flushed and closed before it is validated and
-        // atomically published under its final .wav name.
-        drop(output);
-        if copied > max_bytes {
-            let _ = fs::remove_file(&part_path);
-            return Err(format!("Piper output exceeds {} MiB", self.inner.config.max_output_file_mb));
+        let result = (|| -> Result<PathBuf, String> {
+            let mut output = File::create(&provider_part_path)
+                .map_err(|error| format!("cannot create {}: {error}", provider_part_path.display()))?;
+            let copied = std::io::copy(&mut response.take(max_bytes.saturating_add(1)), &mut output)
+                .map_err(|error| format!("cannot store Piper WAV: {error}"))?;
+            output
+                .sync_all()
+                .map_err(|error| format!("cannot sync Piper WAV: {error}"))?;
+            drop(output);
+            if copied > max_bytes {
+                return Err(format!("Piper output exceeds {} MiB", self.inner.config.max_output_file_mb));
+            }
+            validate_wav(&provider_part_path)?;
+
+            let canonical = materialize_recording_wav(
+                self.inner.audio_player.config(),
+                &provider_part_path,
+                &recording_part_path,
+                &final_path,
+            )?;
+            tracing::info!(
+                "TTS: materialized complete recording-format WAV job={} file={} format=pcm_s16le/mono/8000Hz",
+                job_id,
+                canonical.display()
+            );
+            Ok(canonical)
+        })();
+
+        let _ = fs::remove_file(&provider_part_path);
+        let _ = fs::remove_file(&recording_part_path);
+        if result.is_err() {
+            let _ = fs::remove_file(&final_path);
         }
-        validate_wav(&part_path)?;
-        fs::rename(&part_path, &final_path)
-            .map_err(|error| format!("cannot finalize generated TTS WAV {}: {error}", final_path.display()))?;
-        tracing::info!(
-            "TTS: finalized complete WAV before AudioPlayer handoff job={} file={}",
-            job_id,
-            final_path.display()
-        );
-        Ok(final_path)
+        result
     }
 
     fn resolve_voice(&self, voice_id: Option<&str>) -> Result<&CfgTtsVoice, String> {
