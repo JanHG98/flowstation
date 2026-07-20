@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 NetCore Directory Server
-Local RadioID-style registry for FlowStation / NetCore-Tetra.
+Local RadioID-style registry for NetCore-Tetra.
 
 - No SSL, LAN/local only by design.
 - SQLite storage.
