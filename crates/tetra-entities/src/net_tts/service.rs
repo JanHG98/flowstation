@@ -12,26 +12,13 @@ use reqwest::redirect::Policy;
 use tetra_config::bluestation::{CfgTts, CfgTtsVoice};
 use uuid::Uuid;
 
-use crate::net_audio_player::{materialize_recording_wav, AudioPlayerHandle, AudioPlayerState, AudioTargetType};
+use crate::net_audio_player::{materialize_recording_wav, AudioPlayerHandle, AudioTargetType};
+use crate::net_recorder::RecorderHandle;
 
 use super::templates::{
     auto_save_template, delete_template, list_templates, save_template, TtsTemplate, TtsTemplateDraft,
 };
 use super::types::{TtsState, TtsStatus, TtsVoiceStatus};
-
-#[derive(Debug, Clone, Copy)]
-enum TtsIntent {
-    Preview {
-        target_type: Option<AudioTargetType>,
-        target_id: Option<u32>,
-        priority: u8,
-    },
-    Dispatch {
-        target_type: AudioTargetType,
-        target_id: u32,
-        priority: u8,
-    },
-}
 
 #[derive(Debug)]
 struct ProviderStatus {
@@ -61,11 +48,11 @@ struct LiveStatus {
     speed: Option<f32>,
     text_preview: Option<String>,
     file_name: Option<String>,
+    recording_id: Option<String>,
     generated_path: Option<PathBuf>,
     target_type: Option<AudioTargetType>,
     target_id: Option<u32>,
     priority: Option<u8>,
-    dispatch_seen: bool,
     saved_template_id: Option<String>,
     last_error: Option<String>,
 }
@@ -80,11 +67,11 @@ impl Default for LiveStatus {
             speed: None,
             text_preview: None,
             file_name: None,
+            recording_id: None,
             generated_path: None,
             target_type: None,
             target_id: None,
             priority: None,
-            dispatch_seen: false,
             saved_template_id: None,
             last_error: None,
         }
@@ -100,6 +87,7 @@ struct TtsShared {
     template_lock: Mutex<()>,
     client: Client,
     audio_player: AudioPlayerHandle,
+    recorder: RecorderHandle,
     provider: Mutex<ProviderStatus>,
     live: Mutex<LiveStatus>,
     cancel_requested: AtomicBool,
@@ -111,7 +99,7 @@ pub struct TtsHandle {
 }
 
 impl TtsHandle {
-    pub fn new(mut config: CfgTts, audio_player: AudioPlayerHandle) -> Result<Self, String> {
+    pub fn new(mut config: CfgTts, audio_player: AudioPlayerHandle, recorder: RecorderHandle) -> Result<Self, String> {
         let configured_cache = PathBuf::from(&config.cache_directory);
         let (cache_root, startup_warning) = match prepare_writable_cache(&configured_cache) {
             Ok(path) => (path, None),
@@ -181,6 +169,7 @@ impl TtsHandle {
                 template_lock: Mutex::new(()),
                 client,
                 audio_player,
+                recorder,
                 provider: Mutex::new(ProviderStatus::default()),
                 live: Mutex::new(LiveStatus::default()),
                 cancel_requested: AtomicBool::new(false),
@@ -225,6 +214,7 @@ impl TtsHandle {
             speed: live.speed,
             text_preview: live.text_preview.clone(),
             file_name: live.file_name.clone(),
+            recording_id: live.recording_id.clone(),
             generated_audio_available: live.generated_path.as_ref().is_some_and(|path| path.is_file()),
             target_type: live.target_type,
             target_id: live.target_id,
@@ -310,81 +300,12 @@ impl TtsHandle {
         text: &str,
         voice_id: Option<&str>,
         speed: Option<f32>,
-        target_type: Option<AudioTargetType>,
-        target_id: Option<u32>,
-        priority: Option<u8>,
+        recording_name: &str,
     ) -> Result<String, String> {
-        validate_optional_target(target_type, target_id)?;
-        let priority = priority.unwrap_or(self.inner.config.default_priority);
-        validate_priority(priority)?;
-        self.start_job(
-            text,
-            voice_id,
-            speed,
-            TtsIntent::Preview {
-                target_type,
-                target_id,
-                priority,
-            },
-        )
+        let recording_name = normalize_recording_name(recording_name)?;
+        self.start_job(text, voice_id, speed, recording_name)
     }
 
-    pub fn dispatch_ready(
-        &self,
-        job_id: &str,
-        target_type: AudioTargetType,
-        target_id: u32,
-        priority: Option<u8>,
-    ) -> Result<String, String> {
-        validate_target(target_id)?;
-        let priority = priority.unwrap_or(self.inner.config.default_priority);
-        validate_priority(priority)?;
-        ensure_audio_player_available(&self.inner.audio_player)?;
-
-        let (path, display_name) = {
-            let live = self.inner.live.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
-            if live.state != TtsState::Ready || live.job_id.as_deref() != Some(job_id) {
-                return Err("the requested TTS preview is no longer ready".to_string());
-            }
-            let path = live
-                .generated_path
-                .clone()
-                .filter(|path| path.is_file())
-                .ok_or_else(|| "generated TTS audio is missing".to_string())?;
-            let display_name = live.file_name.clone().unwrap_or_else(|| "TTS-Durchsage".to_string());
-            (path, display_name)
-        };
-
-        tracing::info!(
-            "TTS: queueing materialized WAV through exact recording playback entrypoint job={} file={}",
-            job_id,
-            path.display()
-        );
-        let audio_job_id = self
-            .inner
-            .audio_player
-            .play_recording(path, display_name, target_type, target_id, Some(priority))?;
-        let mut live = self.inner.live.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
-        if live.job_id.as_deref() != Some(job_id) {
-            let _ = self.inner.audio_player.stop();
-            return Err("TTS job changed while dispatch was being queued".to_string());
-        }
-        live.state = TtsState::Dispatching;
-        live.audio_player_job_id = Some(audio_job_id.clone());
-        live.target_type = Some(target_type);
-        live.target_id = Some(target_id);
-        live.priority = Some(priority);
-        live.dispatch_seen = true;
-        tracing::info!(
-            "TTS: dispatch queued job={} audio_job={} target={:?}:{} priority={}",
-            job_id,
-            audio_job_id,
-            target_type,
-            target_id,
-            priority
-        );
-        Ok(audio_job_id)
-    }
 
     pub fn preview_path(&self, job_id: &str) -> Result<PathBuf, String> {
         let live = self.inner.live.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
@@ -403,38 +324,35 @@ impl TtsHandle {
 
     pub fn stop(&self) -> Result<(), String> {
         self.inner.cancel_requested.store(true, Ordering::SeqCst);
-        let (state, path) = {
+        let path = {
             let mut live = self.inner.live.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
-            let state = live.state;
-            let path = live.generated_path.clone();
-            match state {
+            match live.state {
                 TtsState::Idle => return Ok(()),
                 TtsState::Synthesizing => {
                     live.state = TtsState::Cancelled;
                     live.last_error = Some("TTS generation cancelled by operator".to_string());
+                    return Ok(());
                 }
-                TtsState::Dispatching => {
-                    live.state = TtsState::Cancelled;
-                    live.last_error = Some("TTS dispatch cancelled by operator".to_string());
-                }
-                TtsState::Ready | TtsState::Failed | TtsState::Cancelled => {
+                TtsState::Ready | TtsState::Dispatching | TtsState::Failed | TtsState::Cancelled => {
+                    let path = live.generated_path.clone();
                     *live = LiveStatus::default();
+                    path
                 }
             }
-            (state, path)
         };
-        if state == TtsState::Dispatching {
-            self.inner.audio_player.stop()?;
-        }
-        if matches!(state, TtsState::Ready | TtsState::Dispatching | TtsState::Failed | TtsState::Cancelled)
-            && !self.inner.config.keep_generated_audio
-        {
+        if !self.inner.config.keep_generated_audio {
             remove_generated_file(path.as_deref());
         }
         Ok(())
     }
 
-    fn start_job(&self, text: &str, voice_id: Option<&str>, speed: Option<f32>, intent: TtsIntent) -> Result<String, String> {
+    fn start_job(
+        &self,
+        text: &str,
+        voice_id: Option<&str>,
+        speed: Option<f32>,
+        recording_name: String,
+    ) -> Result<String, String> {
         self.refresh_provider_if_stale();
         {
             let provider = self.inner.provider.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
@@ -454,7 +372,7 @@ impl TtsHandle {
         cleanup_stale_cache(&self.inner.cache_root, self.inner.config.cache_retention_minutes);
 
         let job_id = Uuid::new_v4().to_string();
-        let display_name = tts_display_name(&text);
+        let display_name = recording_name.clone();
         let previous_path = {
             let mut live = self.inner.live.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
             if matches!(live.state, TtsState::Synthesizing | TtsState::Dispatching) {
@@ -468,17 +386,9 @@ impl TtsHandle {
                 speed: Some(speed),
                 text_preview: Some(short_text_preview(&text)),
                 file_name: Some(display_name),
-                target_type: match intent {
-                    TtsIntent::Preview { target_type, .. } => target_type,
-                    TtsIntent::Dispatch { target_type, .. } => Some(target_type),
-                },
-                target_id: match intent {
-                    TtsIntent::Preview { target_id, .. } => target_id,
-                    TtsIntent::Dispatch { target_id, .. } => Some(target_id),
-                },
-                priority: match intent {
-                    TtsIntent::Preview { priority, .. } | TtsIntent::Dispatch { priority, .. } => Some(priority),
-                },
+                target_type: None,
+                target_id: None,
+                priority: None,
                 ..LiveStatus::default()
             };
             previous_path
@@ -492,7 +402,7 @@ impl TtsHandle {
         let worker_job_id = job_id.clone();
         thread::Builder::new()
             .name("tts-synthesis".into())
-            .spawn(move || worker.run_job(worker_job_id, text, voice, speed, intent))
+            .spawn(move || worker.run_job(worker_job_id, text, voice, speed, recording_name))
             .map_err(|error| {
                 self.mark_failed(&job_id, format!("cannot spawn TTS worker: {error}"));
                 format!("cannot spawn TTS worker: {error}")
@@ -500,7 +410,14 @@ impl TtsHandle {
         Ok(job_id)
     }
 
-    fn run_job(&self, job_id: String, text: String, voice: CfgTtsVoice, speed: f32, intent: TtsIntent) {
+    fn run_job(
+        &self,
+        job_id: String,
+        text: String,
+        voice: CfgTtsVoice,
+        speed: f32,
+        recording_name: String,
+    ) {
         let path = match self.synthesize(&job_id, &text, &voice, speed) {
             Ok(path) => path,
             Err(error) => {
@@ -521,7 +438,7 @@ impl TtsHandle {
             return;
         }
 
-        let saved_template_id = self.auto_save_generated(&text, &voice.id, speed, intent);
+        let saved_template_id = self.auto_save_generated(&text, &voice.id, speed);
         {
             let mut live = self.inner.live.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
             if live.job_id.as_deref() == Some(job_id.as_str()) {
@@ -529,89 +446,26 @@ impl TtsHandle {
             }
         }
 
-        match intent {
-            TtsIntent::Preview { .. } => {
+        match self.inner.recorder.import_named_wav(&path, &recording_name, "tts") {
+            Ok(metadata) => {
                 let mut live = self.inner.live.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
                 if live.job_id.as_deref() == Some(job_id.as_str()) {
                     tracing::info!(
-                        "TTS: preview ready job={} file={}",
+                        "TTS: saved as recording job={} recording_id={} name={} preview_file={}",
                         job_id,
+                        metadata.id,
+                        recording_name,
                         path.display()
                     );
                     live.state = TtsState::Ready;
+                    live.recording_id = Some(metadata.id);
                     live.generated_path = Some(path);
+                    live.file_name = Some(recording_name);
                     live.last_error = None;
                 }
             }
-            TtsIntent::Dispatch {
-                target_type,
-                target_id,
-                priority,
-            } => {
-                let display_name = {
-                    let live = self.inner.live.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
-                    live.file_name.clone().unwrap_or_else(|| "TTS-Durchsage".to_string())
-                };
-                tracing::info!(
-                    "TTS: queueing materialized WAV through exact recording playback entrypoint job={} file={}",
-                    job_id,
-                    path.display()
-                );
-                match self
-                    .inner
-                    .audio_player
-                    .play_recording(path.clone(), display_name, target_type, target_id, Some(priority))
-                {
-                    Ok(audio_job_id) => {
-                        let accepted = {
-                            let mut live = self.inner.live.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
-                            if live.job_id.as_deref() == Some(job_id.as_str())
-                                && live.state == TtsState::Synthesizing
-                                && !self.inner.cancel_requested.load(Ordering::SeqCst)
-                            {
-                                live.state = TtsState::Dispatching;
-                                live.generated_path = Some(path.clone());
-                                tracing::info!(
-                                    "TTS: direct dispatch queued job={} audio_job={} target={:?}:{} priority={}",
-                                    job_id,
-                                    audio_job_id,
-                                    target_type,
-                                    target_id,
-                                    priority
-                                );
-                                live.audio_player_job_id = Some(audio_job_id);
-                                live.dispatch_seen = true;
-                                live.last_error = None;
-                                true
-                            } else {
-                                false
-                            }
-                        };
-                        if !accepted {
-                            let _ = self.inner.audio_player.stop();
-                            if !self.inner.config.keep_generated_audio {
-                                remove_generated_file(Some(&path));
-                            }
-                            self.mark_cancelled(&job_id, "TTS dispatch cancelled by operator".to_string());
-                        }
-                    }
-                    Err(error) => {
-                        if self.inner.cancel_requested.load(Ordering::SeqCst) {
-                            if !self.inner.config.keep_generated_audio {
-                                remove_generated_file(Some(&path));
-                            }
-                            self.mark_cancelled(&job_id, "TTS dispatch cancelled by operator".to_string());
-                        } else {
-                            {
-                                let mut live = self.inner.live.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
-                                if live.job_id.as_deref() == Some(job_id.as_str()) {
-                                    live.generated_path = Some(path);
-                                }
-                            }
-                            self.mark_failed(&job_id, format!("TTS generated, but dispatch could not start: {error}"));
-                        }
-                    }
-                }
+            Err(error) => {
+                self.mark_failed(&job_id, format!("TTS WAV could not be saved as a recording: {error}"));
             }
         }
     }
@@ -754,7 +608,6 @@ impl TtsHandle {
         text: &str,
         voice_id: &str,
         speed: f32,
-        intent: TtsIntent,
     ) -> Option<String> {
         if !self.inner.config.auto_save_generated_templates {
             return None;
@@ -762,18 +615,9 @@ impl TtsHandle {
         let Some(root) = self.inner.template_root.as_deref() else {
             return None;
         };
-        let (target_type, target_id, priority) = match intent {
-            TtsIntent::Preview {
-                target_type,
-                target_id,
-                priority,
-            } => (target_type, target_id, priority),
-            TtsIntent::Dispatch {
-                target_type,
-                target_id,
-                priority,
-            } => (Some(target_type), Some(target_id), priority),
-        };
+        let target_type = None;
+        let target_id = None;
+        let priority = self.inner.config.default_priority;
         let draft = TtsTemplateDraft {
             id: None,
             name: auto_template_name(text),
@@ -841,71 +685,11 @@ impl TtsHandle {
             .name("tts-monitor".into())
             .spawn(move || loop {
                 thread::sleep(Duration::from_millis(500));
-                handle.reconcile_dispatch();
                 handle.refresh_provider_if_stale();
             })
             .expect("failed to spawn TTS monitor thread");
     }
 
-    fn reconcile_dispatch(&self) {
-        let audio = self.inner.audio_player.status();
-        let mut completed_path = None;
-        let mut live = self.inner.live.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
-        if live.state != TtsState::Dispatching {
-            return;
-        }
-        let Some(expected_job) = live.audio_player_job_id.clone() else {
-            return;
-        };
-        if audio.job_id.as_deref() == Some(expected_job.as_str()) {
-            live.dispatch_seen = true;
-            if audio.state == AudioPlayerState::Failed {
-                let error = audio.last_error.or_else(|| Some("TTS radio dispatch failed".to_string()));
-                tracing::error!(
-                    "TTS: dispatch failed job={} audio_job={} error={}",
-                    live.job_id.as_deref().unwrap_or("unknown"),
-                    expected_job,
-                    error.as_deref().unwrap_or("unknown")
-                );
-                live.state = TtsState::Failed;
-                live.last_error = error;
-                live.audio_player_job_id = None;
-            }
-            return;
-        }
-        if live.dispatch_seen && matches!(audio.state, AudioPlayerState::Idle | AudioPlayerState::Failed) {
-            if audio.state == AudioPlayerState::Failed {
-                let error = audio.last_error.or_else(|| Some("TTS radio dispatch failed".to_string()));
-                tracing::error!(
-                    "TTS: dispatch failed after handoff job={} audio_job={} error={}",
-                    live.job_id.as_deref().unwrap_or("unknown"),
-                    expected_job,
-                    error.as_deref().unwrap_or("unknown")
-                );
-                live.state = TtsState::Failed;
-                live.last_error = error;
-                live.audio_player_job_id = None;
-            } else if self.inner.config.keep_generated_audio {
-                live.state = TtsState::Ready;
-                live.last_error = None;
-                live.audio_player_job_id = None;
-                live.target_type = None;
-                live.target_id = None;
-                live.priority = None;
-                live.dispatch_seen = false;
-            } else {
-                tracing::info!(
-                    "TTS: dispatch completed job={} audio_job={}",
-                    live.job_id.as_deref().unwrap_or("unknown"),
-                    expected_job
-                );
-                completed_path = live.generated_path.take();
-                *live = LiveStatus::default();
-            }
-        }
-        drop(live);
-        remove_generated_file(completed_path.as_deref());
-    }
 
     fn refresh_provider_if_stale(&self) {
         let stale = {
@@ -995,6 +779,18 @@ fn normalize_text(text: &str, max_characters: usize) -> Result<String, String> {
     Ok(normalized)
 }
 
+fn normalize_recording_name(name: &str) -> Result<String, String> {
+    let name = name.split_whitespace().collect::<Vec<_>>().join(" ");
+    let count = name.chars().count();
+    if count == 0 || count > 120 {
+        return Err("recording name must contain 1-120 characters".to_string());
+    }
+    if name.chars().any(char::is_control) {
+        return Err("recording name contains invalid control characters".to_string());
+    }
+    Ok(name)
+}
+
 fn normalize_template_name(name: &str) -> Result<String, String> {
     let name = name.split_whitespace().collect::<Vec<_>>().join(" ");
     let count = name.chars().count();
@@ -1045,14 +841,6 @@ fn validate_priority(priority: u8) -> Result<(), String> {
     Ok(())
 }
 
-fn ensure_audio_player_available(player: &AudioPlayerHandle) -> Result<(), String> {
-    let state = player.status().state;
-    if !matches!(state, AudioPlayerState::Idle | AudioPlayerState::Failed) {
-        return Err("an audio transmission is already active".to_string());
-    }
-    Ok(())
-}
-
 fn short_text_preview(text: &str) -> String {
     const LIMIT: usize = 180;
     let mut preview = text.split_whitespace().collect::<Vec<_>>().join(" ");
@@ -1061,15 +849,6 @@ fn short_text_preview(text: &str) -> String {
         preview.push('…');
     }
     preview
-}
-
-fn tts_display_name(text: &str) -> String {
-    let mut short = text.split_whitespace().collect::<Vec<_>>().join(" ");
-    if short.chars().count() > 56 {
-        short = short.chars().take(56).collect::<String>();
-        short.push('…');
-    }
-    format!("TTS · {short}")
 }
 
 fn prepare_writable_cache(path: &Path) -> Result<PathBuf, String> {

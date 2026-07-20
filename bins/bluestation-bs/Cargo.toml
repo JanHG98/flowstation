@@ -15,7 +15,7 @@ path = "src/main.rs"
 default = ["asterisk", "recording", "audio-player"]
 asterisk = ["tetra-entities/asterisk"]
 recording = ["tetra-entities/recording"]
-audio-player = ["tetra-entities/audio-player"]
+audio-player = ["tetra-entities/audio-player", "recording"]
 
 [dependencies]
 tetra-core = { workspace = true }

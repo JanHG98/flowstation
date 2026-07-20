@@ -43,6 +43,7 @@ pub struct TtsStatus {
     pub speed: Option<f32>,
     pub text_preview: Option<String>,
     pub file_name: Option<String>,
+    pub recording_id: Option<String>,
     pub generated_audio_available: bool,
     pub target_type: Option<AudioTargetType>,
     pub target_id: Option<u32>,

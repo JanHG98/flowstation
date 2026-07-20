@@ -2197,43 +2197,6 @@ fn serve_audio_preview(
 }
 
 #[cfg(feature = "audio-player")]
-fn parse_optional_tts_target(
-    request: &serde_json::Value,
-) -> Result<(Option<AudioTargetType>, Option<u32>), String> {
-    let raw_type = request.get("target_type").and_then(|value| value.as_str());
-    let raw_id = request.get("target_id");
-    if raw_type.is_none() && raw_id.is_none() {
-        return Ok((None, None));
-    }
-    let target_type = match raw_type {
-        Some("group") => AudioTargetType::Group,
-        Some("individual") => AudioTargetType::Individual,
-        _ => return Err("target_type must be group or individual".to_string()),
-    };
-    let target_id = raw_id
-        .and_then(|value| value.as_u64())
-        .and_then(|value| u32::try_from(value).ok())
-        .ok_or_else(|| "target_id must be an integer".to_string())?;
-    if target_id == 0 || target_id > 0x00ff_ffff {
-        return Err("target_id must be a valid 24-bit ISSI/GSSI".to_string());
-    }
-    Ok((Some(target_type), Some(target_id)))
-}
-
-fn parse_tts_target(request: &serde_json::Value) -> Result<(AudioTargetType, u32, Option<u8>), String> {
-    let (target_type, target_id) = parse_optional_tts_target(request)?;
-    let priority = request
-        .get("priority")
-        .and_then(|value| value.as_u64())
-        .and_then(|value| u8::try_from(value).ok());
-    Ok((
-        target_type.ok_or_else(|| "target_type is required".to_string())?,
-        target_id.ok_or_else(|| "target_id is required".to_string())?,
-        priority,
-    ))
-}
-
-#[cfg(feature = "audio-player")]
 fn serve_tts_request(
     mut stream: TcpStream,
     req_line: &str,
@@ -2411,50 +2374,37 @@ fn serve_tts_request(
         return;
     }
 
-    if method == "POST" && matches!(route, "/api/audio/tts/generate" | "/api/audio/tts/send") {
+    if method == "POST" && route == "/api/audio/tts/generate" {
         let body = read_http_body(&mut stream);
         let request: serde_json::Value = match serde_json::from_slice(&body) {
             Ok(value) => value,
             Err(error) => {
-                http_json_response(stream, 400, &serde_json::json!({"ok":false,"error":format!("invalid JSON: {error}")}).to_string());
+                http_json_response(
+                    stream,
+                    400,
+                    &serde_json::json!({"ok":false,"error":format!("invalid JSON: {error}")}).to_string(),
+                );
                 return;
             }
         };
-
-        let result = match route {
-            "/api/audio/tts/generate" => {
-                let text = request.get("text").and_then(|value| value.as_str()).unwrap_or("");
-                let voice_id = request.get("voice_id").and_then(|value| value.as_str());
-                let speed = request.get("speed").and_then(|value| value.as_f64()).map(|value| value as f32);
-                let priority = request
-                    .get("priority")
-                    .and_then(|value| value.as_u64())
-                    .and_then(|value| u8::try_from(value).ok());
-                match parse_optional_tts_target(&request) {
-                    Ok((target_type, target_id)) => {
-                        handle.generate_preview(text, voice_id, speed, target_type, target_id, priority)
-                    }
-                    Err(error) => Err(error),
-                }
-            }
-            "/api/audio/tts/send" => {
-                let job_id = request.get("job_id").and_then(|value| value.as_str()).unwrap_or("");
-                if job_id.is_empty() {
-                    Err("job_id is required".to_string())
-                } else {
-                    match parse_tts_target(&request) {
-                        Ok((target_type, target_id, priority)) => {
-                            handle.dispatch_ready(job_id, target_type, target_id, priority)
-                        }
-                        Err(error) => Err(error),
-                    }
-                }
-            }
-            _ => unreachable!(),
-        };
-        match result {
-            Ok(job_id) => http_json_response(stream, 202, &serde_json::json!({"ok":true,"job_id":job_id}).to_string()),
-            Err(error) => http_json_response(stream, 409, &serde_json::json!({"ok":false,"error":error}).to_string()),
+        let text = request.get("text").and_then(|value| value.as_str()).unwrap_or("");
+        let voice_id = request.get("voice_id").and_then(|value| value.as_str());
+        let speed = request.get("speed").and_then(|value| value.as_f64()).map(|value| value as f32);
+        let recording_name = request
+            .get("recording_name")
+            .and_then(|value| value.as_str())
+            .unwrap_or("");
+        match handle.generate_preview(text, voice_id, speed, recording_name) {
+            Ok(job_id) => http_json_response(
+                stream,
+                202,
+                &serde_json::json!({"ok":true,"job_id":job_id}).to_string(),
+            ),
+            Err(error) => http_json_response(
+                stream,
+                409,
+                &serde_json::json!({"ok":false,"error":error}).to_string(),
+            ),
         }
         return;
     }
@@ -2606,7 +2556,11 @@ fn serve_audio_player_request(
                     };
                     let display_name = recorder
                         .find_recording(id)
-                        .map(|item| format!("Aufzeichnung {} · Call {}", item.started_at, item.call_id))
+                        .map(|item| {
+                            item.title.unwrap_or_else(|| {
+                                format!("Aufzeichnung {} · Call {}", item.started_at, item.call_id)
+                            })
+                        })
                         .unwrap_or_else(|| format!("Aufzeichnung {id}"));
                     handle.play_recording(path, display_name, target_type, target_id, priority)
                 }

@@ -1,8 +1,9 @@
-//! Local Piper HTTP text-to-speech generation for the existing TETRA audio player.
+//! Local Piper HTTP text-to-speech generation for the recording library.
 //!
-//! The TTS provider generates a complete WAV file before the audio player requests
-//! CMCE/RF resources. Provider latency or failure can therefore never starve an
-//! active TETRA traffic channel.
+//! Piper always generates a complete canonical recording-format WAV first. The
+//! finished file is imported into the local recorder with JSON metadata and can
+//! only be transmitted later through the ordinary recording selection workflow.
+
 
 mod service;
 mod templates;

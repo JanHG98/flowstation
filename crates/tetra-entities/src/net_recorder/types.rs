@@ -13,6 +13,10 @@ pub struct RecordingSegment {
 pub struct RecordingMetadata {
     pub schema_version: u8,
     pub id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub origin: Option<String>,
     pub call_id: u16,
     pub source_issi: u32,
     pub destination_id: u32,

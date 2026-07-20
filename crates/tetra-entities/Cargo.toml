@@ -44,7 +44,7 @@ asterisk = ["tetra-codec"]
 recording = ["tetra-codec", "dep:libc"]
 
 # Compile the local WAV/MP3 TETRA audio player and dashboard API.
-audio-player = ["tetra-codec"]
+audio-player = ["tetra-codec", "recording"]
 
 [dependencies]
 tetra-core = { workspace = true }

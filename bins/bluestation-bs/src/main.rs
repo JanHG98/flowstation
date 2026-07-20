@@ -549,8 +549,8 @@ fn main() {
         build_bs_stack(&mut cfg, &args.config, echolink_cmd_rx);
     #[cfg(feature = "audio-player")]
     let tts_handle = if cfg.config().tts.enabled {
-        match audio_player_handle.clone() {
-            Some(player) => match TtsHandle::new(cfg.config().tts.clone(), player) {
+        match (audio_player_handle.clone(), recorder_handle.clone()) {
+            (Some(player), Some(recorder)) => match TtsHandle::new(cfg.config().tts.clone(), player, recorder) {
                 Ok(handle) => {
                     eprintln!(
                         " -> Local Piper TTS enabled (endpoint: {}, cache: {}, voices: {})",
@@ -579,9 +579,14 @@ fn main() {
                     None
                 }
             },
-            None => {
+            (None, _) => {
                 tracing::error!("TTS requires the audio-player service");
                 eprintln!(" -> Local Piper TTS unavailable: audio-player service is not available");
+                None
+            }
+            (_, None) => {
+                tracing::error!("TTS recording library requires the local recording service");
+                eprintln!(" -> Local Piper TTS unavailable: recording service is not available");
                 None
             }
         }

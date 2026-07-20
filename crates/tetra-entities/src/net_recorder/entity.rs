@@ -78,6 +78,8 @@ impl RecordingSession {
         RecordingMetadata {
             schema_version: 1,
             id: self.id.clone(),
+            title: None,
+            origin: None,
             call_id: self.call_id,
             source_issi: self.segments.first().map(|s| s.source_issi).unwrap_or(0),
             destination_id: self.destination_id,
