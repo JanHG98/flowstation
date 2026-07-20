@@ -24,7 +24,9 @@ use tetra_saps::control::call_control::{CallControl, Circuit};
 use tetra_saps::lcmc::enums::alloc_type::ChanAllocType;
 use tetra_saps::lcmc::enums::ul_dl_assignment::UlDlAssignment;
 use tetra_saps::lcmc::fields::chan_alloc_req::CmceChanAllocReq;
-use tetra_saps::tma::{TmaReport, TmaReportInd, TmaUnitdataInd};
+use tetra_saps::tma::{
+    TMA_REQ_HANDLE_FRAME18_COMMON_SCCH, TmaReport, TmaReportInd, TmaUnitdataInd,
+};
 use tetra_saps::tmv::{TmvConfigureReq, TmvUnitdataReqSlots};
 use tetra_saps::tmv::enums::logical_chans::LogicalChannel;
 use tetra_saps::{SapMsg, SapMsgInner};
@@ -1521,9 +1523,19 @@ impl UmacBs {
         // the LLC link context. FACCH/traffic-slot signalling uses the explicit
         // stealing path above. Logical secondary link ids (5..7) have no matching
         // physical slot on the main scheduler, so use link_id=0 to force MCCH/TS1.
-        let scheduler_link_id = if prim.link_id <= 4 { prim.link_id } else { 0 };
-        self.channel_scheduler
-            .dl_enqueue_tma_for_link(scheduler_link_id, pdu, sdu, prim.tx_reporter);
+        if prim.req_handle == TMA_REQ_HANDLE_FRAME18_COMMON_SCCH {
+            tracing::info!(
+                "UMAC: routing marked group signalling to dedicated frame-18 common SCCH queue addr={} dltime={}",
+                prim.main_address,
+                self.dltime
+            );
+            self.channel_scheduler
+                .dl_enqueue_frame18_common_scch(pdu, sdu, prim.tx_reporter);
+        } else {
+            let scheduler_link_id = if prim.link_id <= 4 { prim.link_id } else { 0 };
+            self.channel_scheduler
+                .dl_enqueue_tma_for_link(scheduler_link_id, pdu, sdu, prim.tx_reporter);
+        }
     }
 
     fn rx_tma_prim(&mut self, queue: &mut MessageQueue, message: SapMsg) {

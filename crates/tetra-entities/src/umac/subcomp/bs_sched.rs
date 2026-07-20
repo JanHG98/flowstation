@@ -90,6 +90,11 @@ pub struct BsChannelScheduler {
     dltx_next_slot_queue: Vec<DlSchedElem>,
     /// Four queues for scheduled downlink traffic, one per timeslot
     dltx_queues: [Vec<DlSchedElem>; 4],
+    /// Dedicated queue for group-signalling explicitly pinned to the primary
+    /// carrier's usable frame-18/TS1 common-SCCH opportunity. Keeping this
+    /// separate is essential: a normal TS1 queue entry would otherwise be
+    /// consumed by the very next MCCH slot before frame 18 arrives.
+    frame18_common_scch_queue: Vec<DlSchedElem>,
     ulsched: [[TimeslotSchedule; MACSCHED_NUM_FRAMES]; 4],
 
     circuits: CircuitMgr,
@@ -168,6 +173,7 @@ impl BsChannelScheduler {
             precomps,
             dltx_next_slot_queue: Vec::new(),
             dltx_queues: [Vec::new(), Vec::new(), Vec::new(), Vec::new()],
+            frame18_common_scch_queue: Vec::new(),
             ulsched: EMPTY_SCHED,
             circuits: CircuitMgr::new(),
             hangtime: [false, false, false, false],
@@ -551,7 +557,9 @@ impl BsChannelScheduler {
     /// Total queued downlink scheduling elements across all timeslots plus the next-slot carry-over.
     /// A cheap backlog gauge for the health monitor's Congestion domain (read once per tick).
     pub fn dl_queue_depth(&self) -> usize {
-        self.dltx_queues.iter().map(|q| q.len()).sum::<usize>() + self.dltx_next_slot_queue.len()
+        self.dltx_queues.iter().map(|q| q.len()).sum::<usize>()
+            + self.dltx_next_slot_queue.len()
+            + self.frame18_common_scch_queue.len()
     }
 
     /// Registers that we should transmit a MAC-RESOURCE or similar with a grant, somewhere this tick.
@@ -672,6 +680,25 @@ impl BsChannelScheduler {
                 break;
             }
         }
+    }
+
+    /// Enqueue a MAC-RESOURCE for the next usable primary-carrier frame-18/TS1
+    /// common-SCCH opportunity. The entry is never visible to ordinary TS1 MCCH
+    /// scheduling, so it cannot leak out early.
+    pub fn dl_enqueue_frame18_common_scch(
+        &mut self,
+        pdu: MacResource,
+        sdu: BitBuffer,
+        tx_reporter: Option<TxReporter>,
+    ) {
+        tracing::info!(
+            "BsChannelScheduler: queued dedicated frame-18 common SCCH resource addr={:?} chan_alloc={} depth_before={}",
+            pdu.addr,
+            pdu.chan_alloc_element.is_some(),
+            self.frame18_common_scch_queue.len()
+        );
+        self.frame18_common_scch_queue
+            .push(DlSchedElem::Resource(pdu, sdu, tx_reporter));
     }
 
     pub fn dl_enqueue_tma(&mut self, pdu: MacResource, sdu: BitBuffer, tx_reporter: Option<TxReporter>) {
@@ -1148,11 +1175,27 @@ impl BsChannelScheduler {
     }
 
     pub fn dl_take_prioritized_sched_item(&mut self, ts: TdmaTime) -> Option<DlSchedElem> {
-        if ts.f == 18 && !self.frame18_common_scch_available(ts) {
-            // Frame 18 is normally broadcast/associated-control territory. The one exception is
-            // the advertised primary-carrier common SCCH on TS1 when that slot is not occupied by
-            // the mandatory rotating BSCH/BNCH mapping.
-            return None;
+        if ts.f == 18 {
+            if !self.frame18_common_scch_available(ts) {
+                // Frame 18 is normally broadcast/associated-control territory. The one exception is
+                // the advertised primary-carrier common SCCH on TS1 when that slot is not occupied by
+                // the mandatory rotating BSCH/BNCH mapping.
+                return None;
+            }
+
+            // Crucially, frame 18 may consume only explicitly pinned common-SCCH
+            // resources. Ordinary MCCH/TS1 traffic must remain in the normal queue.
+            if self.frame18_common_scch_queue.is_empty() {
+                return None;
+            }
+            let elem = self.frame18_common_scch_queue.remove(0);
+            tracing::info!(
+                "BsChannelScheduler: transmitting dedicated frame-18 common SCCH resource carrier={} ts={} remaining={}",
+                self.carrier_num,
+                ts,
+                self.frame18_common_scch_queue.len()
+            );
+            return Some(elem);
         }
 
         // Map 1-based ts to 0-based index, bail on 0 or out of range.
@@ -2109,13 +2152,28 @@ mod tests {
             ssi: 15201,
         };
         let pdu = BsChannelScheduler::dl_make_minimal_resource(&addr, None, false);
-        sched.dl_enqueue_tma_for_link(1, pdu, BitBuffer::new(0), None);
+        sched.dl_enqueue_frame18_common_scch(pdu, BitBuffer::new(0), None);
 
         // In multiframe 1 the mandatory frame-18 BSCH/BNCH slots are TS2 and TS4, so TS1 is
         // available for the common SCCH advertised by MM.
         let block = sched.dl_build_block_from_signalling_schedule(TdmaTime { t: 1, f: 18, m: 1, h: 0 });
         assert!(block.is_some());
-        assert!(sched.dltx_queues[0].is_empty());
+        assert!(sched.frame18_common_scch_queue.is_empty());
+    }
+
+    #[test]
+    fn test_frame_18_common_scch_does_not_consume_normal_mcch_queue() {
+        let mut sched = get_testing_slotter();
+        let addr = TetraAddress {
+            ssi_type: SsiType::Gssi,
+            ssi: 15201,
+        };
+        let pdu = BsChannelScheduler::dl_make_minimal_resource(&addr, None, false);
+        sched.dl_enqueue_tma_for_link(1, pdu, BitBuffer::new(0), None);
+
+        let block = sched.dl_build_block_from_signalling_schedule(TdmaTime { t: 1, f: 18, m: 1, h: 0 });
+        assert!(block.is_none());
+        assert_eq!(sched.dltx_queues[0].len(), 1);
     }
 
     #[test]
@@ -2126,13 +2184,13 @@ mod tests {
             ssi: 15201,
         };
         let pdu = BsChannelScheduler::dl_make_minimal_resource(&addr, None, false);
-        sched.dl_enqueue_tma_for_link(1, pdu, BitBuffer::new(0), None);
+        sched.dl_enqueue_frame18_common_scch(pdu, BitBuffer::new(0), None);
 
         // In multiframe 2 TS1 is the mandatory BSCH slot; the control message must remain queued
         // for the next usable common-SCCH opportunity rather than replacing the broadcast block.
         let block = sched.dl_build_block_from_signalling_schedule(TdmaTime { t: 1, f: 18, m: 2, h: 0 });
         assert!(block.is_none());
-        assert_eq!(sched.dltx_queues[0].len(), 1);
+        assert_eq!(sched.frame18_common_scch_queue.len(), 1);
     }
 
     #[test]

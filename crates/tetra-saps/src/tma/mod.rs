@@ -2,6 +2,12 @@ use tetra_core::{BitBuffer, EndpointId, LinkId, TetraAddress, Todo, TxReporter};
 
 use crate::lcmc::fields::chan_alloc_req::CmceChanAllocReq;
 
+/// Internal BS-only request-handle marker: keep this unacknowledged group-signalling
+/// primitive out of the normal TS1 queue and transmit it only in the next usable
+/// frame-18 common-SCCH opportunity. The value is deliberately outside normal
+/// request-handle allocation and is never sent over the air.
+pub const TMA_REQ_HANDLE_FRAME18_COMMON_SCCH: Todo = 0x180001;
+
 /// Clause 20.4.1.1.1
 /// TMA-CANCEL request: this primitive shall be used to cancel a TMA-UNITDATA
 /// request primitive that was submitted by the LLC.

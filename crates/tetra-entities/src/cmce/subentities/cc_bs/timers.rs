@@ -519,7 +519,12 @@ impl CcBsSubentity {
             let priority = cached.pdu.call_priority;
             let (sdu, chan_alloc) =
                 Self::build_d_setup_prim(&cached.pdu, usage, ts, UlDlAssignment::Both);
-            let prim = Self::build_sapmsg(sdu, Some(chan_alloc), self.dltime, dest_addr, None);
+            let prim = Self::build_sapmsg_frame18_common_scch(
+                sdu,
+                Some(chan_alloc),
+                dest_addr,
+                None,
+            );
             queue.push_back(prim);
 
             let mut page_no = 0;
