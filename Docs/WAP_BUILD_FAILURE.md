@@ -1,6 +1,6 @@
 # WAP-Port Buildfehler
 
-Workflow-Exitcode: 1
+Workflow-Exitcode: 101
 
 ```text
 /tmp/wap-port.patch.gz.b64: OK
@@ -8,37 +8,37 @@ Workflow-Exitcode: 1
 /tmp/wap-port.patch: OK
 >>> sudo apt-get update
 Get:1 file:/etc/apt/apt-mirrors.txt Mirrorlist [144 B]
-Hit:6 https://packages.microsoft.com/repos/azure-cli noble InRelease
 Hit:2 http://azure.archive.ubuntu.com/ubuntu noble InRelease
-Get:7 https://packages.microsoft.com/ubuntu/24.04/prod noble InRelease [3600 B]
 Get:3 http://azure.archive.ubuntu.com/ubuntu noble-updates InRelease [126 kB]
-Get:8 https://dl.google.com/linux/chrome-stable/deb stable InRelease [1825 B]
 Get:4 http://azure.archive.ubuntu.com/ubuntu noble-backports InRelease [126 kB]
 Get:5 http://azure.archive.ubuntu.com/ubuntu noble-security InRelease [126 kB]
-Get:9 https://packages.microsoft.com/ubuntu/24.04/prod noble/main arm64 Packages [200 kB]
-Get:10 https://packages.microsoft.com/ubuntu/24.04/prod noble/main amd64 Packages [233 kB]
-Get:11 https://packages.microsoft.com/ubuntu/24.04/prod noble/main armhf Packages [11.7 kB]
-Get:12 http://azure.archive.ubuntu.com/ubuntu noble-updates/main amd64 Packages [1122 kB]
-Get:21 https://dl.google.com/linux/chrome-stable/deb stable/main amd64 Packages [1414 B]
-Get:13 http://azure.archive.ubuntu.com/ubuntu noble-updates/main Translation-en [274 kB]
-Get:14 http://azure.archive.ubuntu.com/ubuntu noble-updates/main amd64 Components [180 kB]
-Get:15 http://azure.archive.ubuntu.com/ubuntu noble-updates/universe amd64 Packages [1666 kB]
-Get:16 http://azure.archive.ubuntu.com/ubuntu noble-updates/universe Translation-en [329 kB]
-Get:17 http://azure.archive.ubuntu.com/ubuntu noble-updates/universe amd64 Components [388 kB]
-Get:18 http://azure.archive.ubuntu.com/ubuntu noble-updates/restricted amd64 Packages [1274 kB]
-Get:19 http://azure.archive.ubuntu.com/ubuntu noble-updates/restricted Translation-en [291 kB]
-Get:20 http://azure.archive.ubuntu.com/ubuntu noble-updates/multiverse amd64 Components [940 B]
-Get:22 http://azure.archive.ubuntu.com/ubuntu noble-backports/main amd64 Components [5752 B]
-Get:23 http://azure.archive.ubuntu.com/ubuntu noble-backports/universe amd64 Components [10.5 kB]
-Get:24 http://azure.archive.ubuntu.com/ubuntu noble-security/main amd64 Packages [861 kB]
-Get:25 http://azure.archive.ubuntu.com/ubuntu noble-security/main Translation-en [192 kB]
-Get:26 http://azure.archive.ubuntu.com/ubuntu noble-security/main amd64 Components [46.3 kB]
-Get:27 http://azure.archive.ubuntu.com/ubuntu noble-security/universe amd64 Packages [1180 kB]
-Get:28 http://azure.archive.ubuntu.com/ubuntu noble-security/universe Translation-en [233 kB]
-Get:29 http://azure.archive.ubuntu.com/ubuntu noble-security/universe amd64 Components [76.3 kB]
-Get:30 http://azure.archive.ubuntu.com/ubuntu noble-security/restricted amd64 Packages [1178 kB]
-Get:31 http://azure.archive.ubuntu.com/ubuntu noble-security/restricted Translation-en [272 kB]
-Fetched 10.4 MB in 1s (7589 kB/s)
+Get:6 https://dl.google.com/linux/chrome-stable/deb stable InRelease [1825 B]
+Get:7 http://azure.archive.ubuntu.com/ubuntu noble-updates/main amd64 Packages [1122 kB]
+Get:8 http://azure.archive.ubuntu.com/ubuntu noble-updates/main Translation-en [274 kB]
+Get:9 http://azure.archive.ubuntu.com/ubuntu noble-updates/main amd64 Components [180 kB]
+Get:10 http://azure.archive.ubuntu.com/ubuntu noble-updates/universe amd64 Packages [1666 kB]
+Get:11 http://azure.archive.ubuntu.com/ubuntu noble-updates/universe Translation-en [329 kB]
+Get:12 http://azure.archive.ubuntu.com/ubuntu noble-updates/universe amd64 Components [388 kB]
+Get:13 http://azure.archive.ubuntu.com/ubuntu noble-updates/restricted amd64 Packages [1274 kB]
+Get:14 http://azure.archive.ubuntu.com/ubuntu noble-updates/restricted Translation-en [291 kB]
+Get:15 http://azure.archive.ubuntu.com/ubuntu noble-updates/multiverse amd64 Components [940 B]
+Hit:16 https://packages.microsoft.com/repos/azure-cli noble InRelease
+Get:17 https://packages.microsoft.com/ubuntu/24.04/prod noble InRelease [3600 B]
+Get:18 http://azure.archive.ubuntu.com/ubuntu noble-backports/main amd64 Components [5752 B]
+Get:19 http://azure.archive.ubuntu.com/ubuntu noble-backports/universe amd64 Components [10.5 kB]
+Get:20 http://azure.archive.ubuntu.com/ubuntu noble-security/main amd64 Packages [861 kB]
+Get:21 http://azure.archive.ubuntu.com/ubuntu noble-security/main Translation-en [192 kB]
+Get:22 http://azure.archive.ubuntu.com/ubuntu noble-security/main amd64 Components [46.3 kB]
+Get:23 http://azure.archive.ubuntu.com/ubuntu noble-security/universe amd64 Packages [1180 kB]
+Get:24 http://azure.archive.ubuntu.com/ubuntu noble-security/universe Translation-en [233 kB]
+Get:25 http://azure.archive.ubuntu.com/ubuntu noble-security/universe amd64 Components [76.3 kB]
+Get:26 http://azure.archive.ubuntu.com/ubuntu noble-security/restricted amd64 Packages [1178 kB]
+Get:27 http://azure.archive.ubuntu.com/ubuntu noble-security/restricted Translation-en [272 kB]
+Get:28 https://dl.google.com/linux/chrome-stable/deb stable/main amd64 Packages [1414 B]
+Get:29 https://packages.microsoft.com/ubuntu/24.04/prod noble/main armhf Packages [11.7 kB]
+Get:30 https://packages.microsoft.com/ubuntu/24.04/prod noble/main amd64 Packages [233 kB]
+Get:31 https://packages.microsoft.com/ubuntu/24.04/prod noble/main arm64 Packages [200 kB]
+Fetched 10.4 MB in 1s (8593 kB/s)
 Reading package lists...
 >>> sudo apt-get install --yes pkg-config libsoapysdr-dev
 Reading package lists...
@@ -124,7 +124,7 @@ Get:44 http://azure.archive.ubuntu.com/ubuntu noble/universe amd64 soapysdr0.8-m
 Get:45 http://azure.archive.ubuntu.com/ubuntu noble/universe amd64 soapysdr0.8-module-uhd amd64 0.4.1-4build4 [63.8 kB]
 Get:46 http://azure.archive.ubuntu.com/ubuntu noble/universe amd64 soapysdr0.8-module-all amd64 0.8.1-4build1 [4096 B]
 Get:47 http://azure.archive.ubuntu.com/ubuntu noble/universe amd64 bladerf amd64 0.2023.02-4build1 [128 kB]
-Fetched 11.2 MB in 1s (19.2 MB/s)
+Fetched 11.2 MB in 15s (750 kB/s)
 Selecting previously unselected package libasyncns0:amd64.
 (Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 202507 files and directories currently installed.)
 Preparing to unpack .../00-libasyncns0_0.8-6build4_amd64.deb ...
@@ -350,1099 +350,435 @@ info: default toolchain set to stable-x86_64-unknown-linux-gnu
 
   stable-x86_64-unknown-linux-gnu unchanged - rustc 1.97.1 (8bab26f4f 2026-07-14)
 
->>> rustfmt --edition 2024 --check crates/tetra-config/src/bluestation/config.rs crates/tetra-config/src/bluestation/sec_cell.rs crates/tetra-entities/src/sndcp/ip.rs crates/tetra-entities/src/sndcp/mod.rs crates/tetra-entities/src/sndcp/sndcp_bs.rs crates/tetra-entities/src/sndcp/wap.rs crates/tetra-entities/src/umac/subcomp/bs_sched.rs crates/tetra-entities/src/umac/umac_bs.rs crates/tetra-entities/tests/common/default_stack.rs
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-config/src/bluestation/config.rs:3:
- use tetra_core::freqs::FreqInfo;
- 
- use crate::bluestation::{
--    CfgAsterisk, CfgCellInfo, CfgControl, CfgControlRoom, CfgDapnet, CfgEcholink, CfgEmergency, CfgGeoalarm, CfgHealth, CfgMeshcom, CfgNetInfo, CfgPhyIo,
--    CfgAudioPlayer, CfgRecording, CfgRecovery, CfgTts, CfgSecurity, CfgSnomNotify, CfgTpg2200Action, CfgWxService, PhyBackend, StackState,
-+    CfgAsterisk, CfgAudioPlayer, CfgCellInfo, CfgControl, CfgControlRoom, CfgDapnet, CfgEcholink, CfgEmergency, CfgGeoalarm, CfgHealth,
-+    CfgMeshcom, CfgNetInfo, CfgPhyIo, CfgRecording, CfgRecovery, CfgSecurity, CfgSnomNotify, CfgTpg2200Action, CfgTts, CfgWxService,
-+    PhyBackend, StackState,
- };
- 
- use super::sec_brew::CfgBrew;
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-config/src/bluestation/config.rs:247:
-         if self.cell.wap_ip.enabled && self.cell.wap_ip.response_ttl == 0 {
-             return Err("cell_info.wap_ip.response_ttl must be 1..255");
-         }
--        if self.cell.wap_ip.enabled
--            && !(1..=1024).contains(&self.cell.wap_ip.max_request_payload_bytes)
--        {
-+        if self.cell.wap_ip.enabled && !(1..=1024).contains(&self.cell.wap_ip.max_request_payload_bytes) {
-             return Err("cell_info.wap_ip.max_request_payload_bytes must be 1..1024");
-         }
-         if self.cell.wap_ip.enabled
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-config/src/bluestation/sec_cell.rs:39:
-     pub text: Option<String>,
- }
- 
--
- /// Built-in SNDCP WAP/IP endpoint configuration.
- #[derive(Debug, Clone)]
- pub struct CfgWapIp {
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-config/src/bluestation/sec_cell.rs:94:
- }
- 
- fn parse_ipv4_prefix(value: Option<String>, default: [u8; 3]) -> [u8; 3] {
--    let Some(value) = value else { return default; };
-+    let Some(value) = value else {
-+        return default;
-+    };
-     let mut parts = value.split('.').filter_map(|part| part.parse::<u8>().ok());
-     match (parts.next(), parts.next(), parts.next(), parts.next()) {
-         (Some(a), Some(b), Some(c), None) => [a, b, c],
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-config/src/bluestation/sec_cell.rs:103:
- }
- 
- fn wap_ip_dto_to_cfg(dto: Option<WapIpDto>) -> CfgWapIp {
--    let Some(dto) = dto else { return CfgWapIp::default(); };
-+    let Some(dto) = dto else {
-+        return CfgWapIp::default();
-+    };
-     let defaults = CfgWapIp::default();
-     CfgWapIp {
-         enabled: dto.enabled.unwrap_or(false),
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/sndcp/ip.rs:147:
- 
-     #[test]
-     fn builds_reference_udp_vector() {
--        let packet = build_ipv4_udp_npdu(
--            [192, 0, 2, 1],
--            [192, 0, 2, 2],
--            49_152,
--            9_200,
--            b"wap",
--            7,
--            32,
--        )
--        .unwrap();
--        assert_eq!(
--            packet,
--            hex("4500001f00070000201116c4c0000201c0000202c00023f0000b0000776170")
--        );
-+        let packet = build_ipv4_udp_npdu([192, 0, 2, 1], [192, 0, 2, 2], 49_152, 9_200, b"wap", 7, 32).unwrap();
-+        assert_eq!(packet, hex("4500001f00070000201116c4c0000201c0000202c00023f0000b0000776170"));
-         assert_eq!(internet_checksum(&packet[..20]), 0);
-     }
- 
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/sndcp/ip.rs:147:
- 
-     #[test]
-     fn builds_reference_udp_vector() {
--        let packet = build_ipv4_udp_npdu(
--            [192, 0, 2, 1],
--            [192, 0, 2, 2],
--            49_152,
--            9_200,
--            b"wap",
--            7,
--            32,
--        )
--        .unwrap();
--        assert_eq!(
--            packet,
--            hex("4500001f00070000201116c4c0000201c0000202c00023f0000b0000776170")
--        );
-+        let packet = build_ipv4_udp_npdu([192, 0, 2, 1], [192, 0, 2, 2], 49_152, 9_200, b"wap", 7, 32).unwrap();
-+        assert_eq!(packet, hex("4500001f00070000201116c4c0000201c0000202c00023f0000b0000776170"));
-         assert_eq!(internet_checksum(&packet[..20]), 0);
-     }
- 
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/sndcp/sndcp_bs.rs:79:
- 
-     fn handle_indication(&mut self, queue: &mut MessageQueue, ind: &LtpdMleUnitdataInd) {
-         if !self.config.config().cell.sndcp_service {
--            tracing::debug!("SNDCP: service disabled; ignoring packet-data PDU from {}", ind.received_tetra_address);
-+            tracing::debug!(
-+                "SNDCP: service disabled; ignoring packet-data PDU from {}",
-+                ind.received_tetra_address
-+            );
-             return;
-         }
- 
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/sndcp/sndcp_bs.rs:110:
-             SN_RECONNECT => self.handle_reconnect(queue, ind, &pdu),
-             SN_UNITDATA | SN_DATA => self.handle_user_data(queue, ind, &mut pdu),
-             _ => {
--                tracing::warn!("SNDCP/WAP: unsupported inbound SN-PDU type {} from {}", sn_type, ind.received_tetra_address);
-+                tracing::warn!(
-+                    "SNDCP/WAP: unsupported inbound SN-PDU type {} from {}",
-+                    sn_type,
-+                    ind.received_tetra_address
-+                );
-                 Ok(())
-             }
-         };
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/sndcp/sndcp_bs.rs:119:
-         }
-     }
- 
--    fn handle_activate(
--        &mut self,
--        queue: &mut MessageQueue,
--        ind: &LtpdMleUnitdataInd,
--        pdu: &BitBuffer,
--    ) -> Result<(), String> {
-+    fn handle_activate(&mut self, queue: &mut MessageQueue, ind: &LtpdMleUnitdataInd, pdu: &BitBuffer) -> Result<(), String> {
-         let nsapi_hint = pdu.peek_bits_startoffset(8, 4).map(|value| value as u8);
-         let demand = match decode_activate_demand(pdu) {
-             Ok(demand) => demand,
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/sndcp/sndcp_bs.rs:138:
- 
-         let issi = ind.received_tetra_address.ssi;
-         let key = (issi, demand.nsapi);
--        if !self.contexts.contains_key(&key)
--            && self.contexts.keys().filter(|(context_issi, _)| *context_issi == issi).count() >= 4
--        {
-+        if !self.contexts.contains_key(&key) && self.contexts.keys().filter(|(context_issi, _)| *context_issi == issi).count() >= 4 {
-             self.send_control(queue, ind, encode_activate_reject(demand.nsapi, 19), None);
-             return Err("maximum of four PDP contexts per ISSI exceeded".into());
-         }
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/sndcp/sndcp_bs.rs:156:
-                     return Err(format!("invalid static IPv4 address {address:?}"));
-                 }
-                 let in_use = self.contexts.iter().any(|(&(context_issi, context_nsapi), context)| {
--                    (context_issi, context_nsapi) != (ind.received_tetra_address.ssi, demand.nsapi)
--                        && context.address == address
-+                    (context_issi, context_nsapi) != (ind.received_tetra_address.ssi, demand.nsapi) && context.address == address
-                 });
-                 if in_use {
-                     self.send_control(queue, ind, encode_activate_reject(demand.nsapi, 9), None);
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/sndcp/sndcp_bs.rs:197:
-         Ok(())
-     }
- 
--    fn handle_deactivate(
--        &mut self,
--        queue: &mut MessageQueue,
--        ind: &LtpdMleUnitdataInd,
--        pdu: &BitBuffer,
--    ) -> Result<(), String> {
-+    fn handle_deactivate(&mut self, queue: &mut MessageQueue, ind: &LtpdMleUnitdataInd, pdu: &BitBuffer) -> Result<(), String> {
-         let mut reader = reader(pdu);
-         expect(&mut reader, 4, SN_DEACTIVATE_DEMAND as u64, "deactivate type")?;
-         let selector = read(&mut reader, 8, "deactivation selector")? as u8;
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/sndcp/sndcp_bs.rs:232:
-         Ok(())
-     }
- 
--    fn handle_data_transmit(
--        &mut self,
--        queue: &mut MessageQueue,
--        ind: &LtpdMleUnitdataInd,
--        pdu: &BitBuffer,
--    ) -> Result<(), String> {
-+    fn handle_data_transmit(&mut self, queue: &mut MessageQueue, ind: &LtpdMleUnitdataInd, pdu: &BitBuffer) -> Result<(), String> {
-         let mut reader = reader(pdu);
-         expect(&mut reader, 4, SN_DATA_TRANSMIT_REQUEST as u64, "data transmit type")?;
-         let nsapi = read(&mut reader, 4, "NSAPI")? as u8;
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/sndcp/sndcp_bs.rs:250:
-         context.state = PacketState::Ready;
-         let response = encode_data_transmit_response(nsapi, true, None);
-         self.send_control(queue, ind, response, Some(packet_data_channel()));
--        tracing::info!("SNDCP/WAP: ISSI={} NSAPI={} entered READY on TS2", ind.received_tetra_address.ssi, nsapi);
-+        tracing::info!(
-+            "SNDCP/WAP: ISSI={} NSAPI={} entered READY on TS2",
-+            ind.received_tetra_address.ssi,
-+            nsapi
-+        );
-         Ok(())
-     }
- 
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/sndcp/sndcp_bs.rs:257:
--    fn handle_reconnect(
--        &mut self,
--        queue: &mut MessageQueue,
--        ind: &LtpdMleUnitdataInd,
--        pdu: &BitBuffer,
--    ) -> Result<(), String> {
-+    fn handle_reconnect(&mut self, queue: &mut MessageQueue, ind: &LtpdMleUnitdataInd, pdu: &BitBuffer) -> Result<(), String> {
-         let mut reader = reader(pdu);
-         expect(&mut reader, 4, SN_RECONNECT as u64, "reconnect type")?;
-         let has_data = read(&mut reader, 1, "data to send")? != 0;
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/sndcp/sndcp_bs.rs:282:
-         }
-     }
- 
--    fn handle_end_of_data(
--        &mut self,
--        queue: &mut MessageQueue,
--        ind: &LtpdMleUnitdataInd,
--        pdu: &BitBuffer,
--    ) -> Result<(), String> {
-+    fn handle_end_of_data(&mut self, queue: &mut MessageQueue, ind: &LtpdMleUnitdataInd, pdu: &BitBuffer) -> Result<(), String> {
-         let mut reader = reader(pdu);
-         expect(&mut reader, 4, SN_END_OF_DATA as u64, "end-of-data type")?;
-         let immediate = read(&mut reader, 1, "immediate service change")?;
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/sndcp/sndcp_bs.rs:307:
-         Ok(())
-     }
- 
--    fn handle_user_data(
--        &mut self,
--        queue: &mut MessageQueue,
--        ind: &LtpdMleUnitdataInd,
--        pdu: &mut BitBuffer,
--    ) -> Result<(), String> {
-+    fn handle_user_data(&mut self, queue: &mut MessageQueue, ind: &LtpdMleUnitdataInd, pdu: &mut BitBuffer) -> Result<(), String> {
-         if !self.wap.enabled {
-             return Err("WAP/IP endpoint is disabled".into());
-         }
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/sndcp/sndcp_bs.rs:332:
-             .ok_or_else(|| "truncated N-PDU".to_string())?;
- 
-         let key = (ind.received_tetra_address.ssi, nsapi);
--        let context = self.contexts.get(&key).copied().ok_or_else(|| format!("missing PDP context for NSAPI {nsapi}"))?;
-+        let context = self
-+            .contexts
-+            .get(&key)
-+            .copied()
-+            .ok_or_else(|| format!("missing PDP context for NSAPI {nsapi}"))?;
-         let request_source = npdu.get(12..16).ok_or_else(|| "IPv4 N-PDU too short".to_string())?;
-         if request_source != &context.address[..] {
-             return Err(format!(
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/sndcp/sndcp_bs.rs:411:
-         }
-     }
- 
--    fn send_control(
--        &self,
--        queue: &mut MessageQueue,
--        ind: &LtpdMleUnitdataInd,
--        sn_pdu: BitBuffer,
--        chan_alloc: Option<CmceChanAllocReq>,
--    ) {
-+    fn send_control(&self, queue: &mut MessageQueue, ind: &LtpdMleUnitdataInd, sn_pdu: BitBuffer, chan_alloc: Option<CmceChanAllocReq>) {
-         queue.push_back(SapMsg {
-             sap: Sap::TlaSap,
-             src: TetraEntity::Sndcp,
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/sndcp/wap.rs:87:
- }
- 
- /// Build a complete IPv4/UDP response. `Ok(None)` means the inbound WTP PDU was an ACK/ABORT.
--pub fn build_response(
--    request_npdu: &[u8],
--    endpoint: WapEndpoint,
--    snapshot: &WapStatusSnapshot,
--) -> Result<Option<Vec<u8>>, WapError> {
-+pub fn build_response(request_npdu: &[u8], endpoint: WapEndpoint, snapshot: &WapStatusSnapshot) -> Result<Option<Vec<u8>>, WapError> {
-     let ip = parse_ipv4_packet(request_npdu)?;
-     if ip.fragmented {
-         return Err(WapError::Fragmented);
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/sndcp/wap.rs:212:
-                 let len = *payload.get(offset + 1).ok_or(WapError::MalformedWtpWsp)? as usize;
-                 offset = offset.checked_add(2 + len).ok_or(WapError::MalformedWtpWsp)?;
-             } else {
--                offset = offset
--                    .checked_add(1 + (h & 0x03) as usize)
--                    .ok_or(WapError::MalformedWtpWsp)?;
-+                offset = offset.checked_add(1 + (h & 0x03) as usize).ok_or(WapError::MalformedWtpWsp)?;
-             }
-             if offset > payload.len() {
-                 return Err(WapError::MalformedWtpWsp);
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/sndcp/wap.rs:338:
-     let state = escape(&snapshot.service_state, 12);
-     let uptime = compact_uptime(snapshot.uptime_secs);
-     let body = match sector {
--        0 => format!("{title}<br/>{state} MS:{} C:{}<br/>Up:{uptime}<br/><a href=\"?s=1\">N</a>", snapshot.registered_ms, snapshot.active_calls),
--        1 => format!("Net {}/{}<br/>Carrier:{}<br/>SDS:{}<br/><a href=\"?s=2\">N</a> <a href=\"?s=0\">H</a>", snapshot.mcc, snapshot.mnc, snapshot.carrier, snapshot.queued_sds),
-+        0 => format!(
-+            "{title}<br/>{state} MS:{} C:{}<br/>Up:{uptime}<br/><a href=\"?s=1\">N</a>",
-+            snapshot.registered_ms, snapshot.active_calls
-+        ),
-+        1 => format!(
-+            "Net {}/{}<br/>Carrier:{}<br/>SDS:{}<br/><a href=\"?s=2\">N</a> <a href=\"?s=0\">H</a>",
-+            snapshot.mcc, snapshot.mnc, snapshot.carrier, snapshot.queued_sds
-+        ),
-         _ => format!("Packet data OK<br/>WTP/WSP active<br/>UDP 9200<br/><a href=\"?s=0\">H</a>"),
-     };
-     let candidates = match format {
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/sndcp/wap.rs:346:
-         PageFormat::Xhtml => vec![
-             format!("<html><body>{body}</body></html>"),
--            format!("<html><body>{title}<br/>{state} MS:{}<br/><a href=\"?s=1\">N</a></body></html>", snapshot.registered_ms),
-+            format!(
-+                "<html><body>{title}<br/>{state} MS:{}<br/><a href=\"?s=1\">N</a></body></html>",
-+                snapshot.registered_ms
-+            ),
-             format!("<html><body>{title}<br/>{state}</body></html>"),
-         ],
-         PageFormat::Wml => vec![
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/sndcp/wap.rs:352:
-             format!("<wml><card><p>{body}</p></card></wml>"),
--            format!("<wml><card><p>{title}<br/>{state} MS:{}<br/><a href=\"?s=1\">N</a></p></card></wml>", snapshot.registered_ms),
-+            format!(
-+                "<wml><card><p>{title}<br/>{state} MS:{}<br/><a href=\"?s=1\">N</a></p></card></wml>",
-+                snapshot.registered_ms
-+            ),
-             format!("<wml><card><p>{title}<br/>{state}</p></card></wml>"),
-         ],
-     };
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/sndcp/wap.rs:437:
-     #[test]
-     fn connect_reply_matches_openwave_shape() {
-         let caps = vec![
--            Capability { id: 0x80, value: vec![0x94, 0x80, 0x00] },
--            Capability { id: 0x81, value: vec![0x94, 0x80, 0x00] },
-+            Capability {
-+                id: 0x80,
-+                value: vec![0x94, 0x80, 0x00],
-+            },
-+            Capability {
-+                id: 0x81,
-+                value: vec![0x94, 0x80, 0x00],
-+            },
-         ];
-         assert_eq!(
-             build_wtp_result(0x13cc, &build_connect_reply(&caps)),
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/sndcp/wap.rs:445:
--            vec![0x12, 0x93, 0xcc, 0x02, 0x01, 0x08, 0x00, 0x03, 0x80, 0x84, 0x21, 0x03, 0x81, 0x84, 0x21]
-+            vec![
-+                0x12, 0x93, 0xcc, 0x02, 0x01, 0x08, 0x00, 0x03, 0x80, 0x84, 0x21, 0x03, 0x81, 0x84, 0x21
-+            ]
-         );
-     }
- 
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/sndcp/wap.rs:454:
-     #[test]
-     fn complete_ipv4_udp_connect_roundtrip_is_byte_exact() {
-         let request_payload = vec![
--            0x08, 0x13, 0xcc, 0x12,
--            0x01, 0x10, 0x08, 0x00,
--            0x03, 0x80, 0x84, 0x21,
--            0x03, 0x81, 0x84, 0x21,
-+            0x08, 0x13, 0xcc, 0x12, 0x01, 0x10, 0x08, 0x00, 0x03, 0x80, 0x84, 0x21, 0x03, 0x81, 0x84, 0x21,
-         ];
--        let request = build_ipv4_udp_npdu(
--            [10, 0, 0, 2],
--            [10, 0, 0, 1],
--            49_152,
--            9_200,
--            &request_payload,
--            0x2222,
--            64,
--        )
--        .unwrap();
-+        let request = build_ipv4_udp_npdu([10, 0, 0, 2], [10, 0, 0, 1], 49_152, 9_200, &request_payload, 0x2222, 64).unwrap();
-         let snapshot = WapStatusSnapshot {
-             title: "NetCore-TETRA".into(),
-             service_state: "ON AIR".into(),
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/sndcp/wap.rs:503:
-         assert_eq!(udp.destination_port, 49_152);
-         assert_eq!(
-             udp.payload,
--            &[0x12, 0x93, 0xcc, 0x02, 0x01, 0x08, 0x00, 0x03, 0x80, 0x84, 0x21, 0x03, 0x81, 0x84, 0x21]
-+            &[
-+                0x12, 0x93, 0xcc, 0x02, 0x01, 0x08, 0x00, 0x03, 0x80, 0x84, 0x21, 0x03, 0x81, 0x84, 0x21
-+            ]
-         );
-     }
- 
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/sndcp/sndcp_bs.rs:79:
- 
-     fn handle_indication(&mut self, queue: &mut MessageQueue, ind: &LtpdMleUnitdataInd) {
-         if !self.config.config().cell.sndcp_service {
--            tracing::debug!("SNDCP: service disabled; ignoring packet-data PDU from {}", ind.received_tetra_address);
-+            tracing::debug!(
-+                "SNDCP: service disabled; ignoring packet-data PDU from {}",
-+                ind.received_tetra_address
-+            );
-             return;
-         }
- 
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/sndcp/sndcp_bs.rs:110:
-             SN_RECONNECT => self.handle_reconnect(queue, ind, &pdu),
-             SN_UNITDATA | SN_DATA => self.handle_user_data(queue, ind, &mut pdu),
-             _ => {
--                tracing::warn!("SNDCP/WAP: unsupported inbound SN-PDU type {} from {}", sn_type, ind.received_tetra_address);
-+                tracing::warn!(
-+                    "SNDCP/WAP: unsupported inbound SN-PDU type {} from {}",
-+                    sn_type,
-+                    ind.received_tetra_address
-+                );
-                 Ok(())
-             }
-         };
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/sndcp/sndcp_bs.rs:119:
-         }
-     }
- 
--    fn handle_activate(
--        &mut self,
--        queue: &mut MessageQueue,
--        ind: &LtpdMleUnitdataInd,
--        pdu: &BitBuffer,
--    ) -> Result<(), String> {
-+    fn handle_activate(&mut self, queue: &mut MessageQueue, ind: &LtpdMleUnitdataInd, pdu: &BitBuffer) -> Result<(), String> {
-         let nsapi_hint = pdu.peek_bits_startoffset(8, 4).map(|value| value as u8);
-         let demand = match decode_activate_demand(pdu) {
-             Ok(demand) => demand,
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/sndcp/sndcp_bs.rs:138:
- 
-         let issi = ind.received_tetra_address.ssi;
-         let key = (issi, demand.nsapi);
--        if !self.contexts.contains_key(&key)
--            && self.contexts.keys().filter(|(context_issi, _)| *context_issi == issi).count() >= 4
--        {
-+        if !self.contexts.contains_key(&key) && self.contexts.keys().filter(|(context_issi, _)| *context_issi == issi).count() >= 4 {
-             self.send_control(queue, ind, encode_activate_reject(demand.nsapi, 19), None);
-             return Err("maximum of four PDP contexts per ISSI exceeded".into());
-         }
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/sndcp/sndcp_bs.rs:156:
-                     return Err(format!("invalid static IPv4 address {address:?}"));
-                 }
-                 let in_use = self.contexts.iter().any(|(&(context_issi, context_nsapi), context)| {
--                    (context_issi, context_nsapi) != (ind.received_tetra_address.ssi, demand.nsapi)
--                        && context.address == address
-+                    (context_issi, context_nsapi) != (ind.received_tetra_address.ssi, demand.nsapi) && context.address == address
-                 });
-                 if in_use {
-                     self.send_control(queue, ind, encode_activate_reject(demand.nsapi, 9), None);
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/sndcp/sndcp_bs.rs:197:
-         Ok(())
-     }
- 
--    fn handle_deactivate(
--        &mut self,
--        queue: &mut MessageQueue,
--        ind: &LtpdMleUnitdataInd,
--        pdu: &BitBuffer,
--    ) -> Result<(), String> {
-+    fn handle_deactivate(&mut self, queue: &mut MessageQueue, ind: &LtpdMleUnitdataInd, pdu: &BitBuffer) -> Result<(), String> {
-         let mut reader = reader(pdu);
-         expect(&mut reader, 4, SN_DEACTIVATE_DEMAND as u64, "deactivate type")?;
-         let selector = read(&mut reader, 8, "deactivation selector")? as u8;
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/sndcp/sndcp_bs.rs:232:
-         Ok(())
-     }
- 
--    fn handle_data_transmit(
--        &mut self,
--        queue: &mut MessageQueue,
--        ind: &LtpdMleUnitdataInd,
--        pdu: &BitBuffer,
--    ) -> Result<(), String> {
-+    fn handle_data_transmit(&mut self, queue: &mut MessageQueue, ind: &LtpdMleUnitdataInd, pdu: &BitBuffer) -> Result<(), String> {
-         let mut reader = reader(pdu);
-         expect(&mut reader, 4, SN_DATA_TRANSMIT_REQUEST as u64, "data transmit type")?;
-         let nsapi = read(&mut reader, 4, "NSAPI")? as u8;
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/sndcp/sndcp_bs.rs:250:
-         context.state = PacketState::Ready;
-         let response = encode_data_transmit_response(nsapi, true, None);
-         self.send_control(queue, ind, response, Some(packet_data_channel()));
--        tracing::info!("SNDCP/WAP: ISSI={} NSAPI={} entered READY on TS2", ind.received_tetra_address.ssi, nsapi);
-+        tracing::info!(
-+            "SNDCP/WAP: ISSI={} NSAPI={} entered READY on TS2",
-+            ind.received_tetra_address.ssi,
-+            nsapi
-+        );
-         Ok(())
-     }
- 
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/sndcp/sndcp_bs.rs:257:
--    fn handle_reconnect(
--        &mut self,
--        queue: &mut MessageQueue,
--        ind: &LtpdMleUnitdataInd,
--        pdu: &BitBuffer,
--    ) -> Result<(), String> {
-+    fn handle_reconnect(&mut self, queue: &mut MessageQueue, ind: &LtpdMleUnitdataInd, pdu: &BitBuffer) -> Result<(), String> {
-         let mut reader = reader(pdu);
-         expect(&mut reader, 4, SN_RECONNECT as u64, "reconnect type")?;
-         let has_data = read(&mut reader, 1, "data to send")? != 0;
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/sndcp/sndcp_bs.rs:282:
-         }
-     }
- 
--    fn handle_end_of_data(
--        &mut self,
--        queue: &mut MessageQueue,
--        ind: &LtpdMleUnitdataInd,
--        pdu: &BitBuffer,
--    ) -> Result<(), String> {
-+    fn handle_end_of_data(&mut self, queue: &mut MessageQueue, ind: &LtpdMleUnitdataInd, pdu: &BitBuffer) -> Result<(), String> {
-         let mut reader = reader(pdu);
-         expect(&mut reader, 4, SN_END_OF_DATA as u64, "end-of-data type")?;
-         let immediate = read(&mut reader, 1, "immediate service change")?;
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/sndcp/sndcp_bs.rs:307:
-         Ok(())
-     }
- 
--    fn handle_user_data(
--        &mut self,
--        queue: &mut MessageQueue,
--        ind: &LtpdMleUnitdataInd,
--        pdu: &mut BitBuffer,
--    ) -> Result<(), String> {
-+    fn handle_user_data(&mut self, queue: &mut MessageQueue, ind: &LtpdMleUnitdataInd, pdu: &mut BitBuffer) -> Result<(), String> {
-         if !self.wap.enabled {
-             return Err("WAP/IP endpoint is disabled".into());
-         }
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/sndcp/sndcp_bs.rs:332:
-             .ok_or_else(|| "truncated N-PDU".to_string())?;
- 
-         let key = (ind.received_tetra_address.ssi, nsapi);
--        let context = self.contexts.get(&key).copied().ok_or_else(|| format!("missing PDP context for NSAPI {nsapi}"))?;
-+        let context = self
-+            .contexts
-+            .get(&key)
-+            .copied()
-+            .ok_or_else(|| format!("missing PDP context for NSAPI {nsapi}"))?;
-         let request_source = npdu.get(12..16).ok_or_else(|| "IPv4 N-PDU too short".to_string())?;
-         if request_source != &context.address[..] {
-             return Err(format!(
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/sndcp/sndcp_bs.rs:411:
-         }
-     }
- 
--    fn send_control(
--        &self,
--        queue: &mut MessageQueue,
--        ind: &LtpdMleUnitdataInd,
--        sn_pdu: BitBuffer,
--        chan_alloc: Option<CmceChanAllocReq>,
--    ) {
-+    fn send_control(&self, queue: &mut MessageQueue, ind: &LtpdMleUnitdataInd, sn_pdu: BitBuffer, chan_alloc: Option<CmceChanAllocReq>) {
-         queue.push_back(SapMsg {
-             sap: Sap::TlaSap,
-             src: TetraEntity::Sndcp,
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/sndcp/wap.rs:87:
- }
- 
- /// Build a complete IPv4/UDP response. `Ok(None)` means the inbound WTP PDU was an ACK/ABORT.
--pub fn build_response(
--    request_npdu: &[u8],
--    endpoint: WapEndpoint,
--    snapshot: &WapStatusSnapshot,
--) -> Result<Option<Vec<u8>>, WapError> {
-+pub fn build_response(request_npdu: &[u8], endpoint: WapEndpoint, snapshot: &WapStatusSnapshot) -> Result<Option<Vec<u8>>, WapError> {
-     let ip = parse_ipv4_packet(request_npdu)?;
-     if ip.fragmented {
-         return Err(WapError::Fragmented);
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/sndcp/wap.rs:212:
-                 let len = *payload.get(offset + 1).ok_or(WapError::MalformedWtpWsp)? as usize;
-                 offset = offset.checked_add(2 + len).ok_or(WapError::MalformedWtpWsp)?;
-             } else {
--                offset = offset
--                    .checked_add(1 + (h & 0x03) as usize)
--                    .ok_or(WapError::MalformedWtpWsp)?;
-+                offset = offset.checked_add(1 + (h & 0x03) as usize).ok_or(WapError::MalformedWtpWsp)?;
-             }
-             if offset > payload.len() {
-                 return Err(WapError::MalformedWtpWsp);
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/sndcp/wap.rs:338:
-     let state = escape(&snapshot.service_state, 12);
-     let uptime = compact_uptime(snapshot.uptime_secs);
-     let body = match sector {
--        0 => format!("{title}<br/>{state} MS:{} C:{}<br/>Up:{uptime}<br/><a href=\"?s=1\">N</a>", snapshot.registered_ms, snapshot.active_calls),
--        1 => format!("Net {}/{}<br/>Carrier:{}<br/>SDS:{}<br/><a href=\"?s=2\">N</a> <a href=\"?s=0\">H</a>", snapshot.mcc, snapshot.mnc, snapshot.carrier, snapshot.queued_sds),
-+        0 => format!(
-+            "{title}<br/>{state} MS:{} C:{}<br/>Up:{uptime}<br/><a href=\"?s=1\">N</a>",
-+            snapshot.registered_ms, snapshot.active_calls
-+        ),
-+        1 => format!(
-+            "Net {}/{}<br/>Carrier:{}<br/>SDS:{}<br/><a href=\"?s=2\">N</a> <a href=\"?s=0\">H</a>",
-+            snapshot.mcc, snapshot.mnc, snapshot.carrier, snapshot.queued_sds
-+        ),
-         _ => format!("Packet data OK<br/>WTP/WSP active<br/>UDP 9200<br/><a href=\"?s=0\">H</a>"),
-     };
-     let candidates = match format {
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/sndcp/wap.rs:346:
-         PageFormat::Xhtml => vec![
-             format!("<html><body>{body}</body></html>"),
--            format!("<html><body>{title}<br/>{state} MS:{}<br/><a href=\"?s=1\">N</a></body></html>", snapshot.registered_ms),
-+            format!(
-+                "<html><body>{title}<br/>{state} MS:{}<br/><a href=\"?s=1\">N</a></body></html>",
-+                snapshot.registered_ms
-+            ),
-             format!("<html><body>{title}<br/>{state}</body></html>"),
-         ],
-         PageFormat::Wml => vec![
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/sndcp/wap.rs:352:
-             format!("<wml><card><p>{body}</p></card></wml>"),
--            format!("<wml><card><p>{title}<br/>{state} MS:{}<br/><a href=\"?s=1\">N</a></p></card></wml>", snapshot.registered_ms),
-+            format!(
-+                "<wml><card><p>{title}<br/>{state} MS:{}<br/><a href=\"?s=1\">N</a></p></card></wml>",
-+                snapshot.registered_ms
-+            ),
-             format!("<wml><card><p>{title}<br/>{state}</p></card></wml>"),
-         ],
-     };
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/sndcp/wap.rs:437:
-     #[test]
-     fn connect_reply_matches_openwave_shape() {
-         let caps = vec![
--            Capability { id: 0x80, value: vec![0x94, 0x80, 0x00] },
--            Capability { id: 0x81, value: vec![0x94, 0x80, 0x00] },
-+            Capability {
-+                id: 0x80,
-+                value: vec![0x94, 0x80, 0x00],
-+            },
-+            Capability {
-+                id: 0x81,
-+                value: vec![0x94, 0x80, 0x00],
-+            },
-         ];
-         assert_eq!(
-             build_wtp_result(0x13cc, &build_connect_reply(&caps)),
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/sndcp/wap.rs:445:
--            vec![0x12, 0x93, 0xcc, 0x02, 0x01, 0x08, 0x00, 0x03, 0x80, 0x84, 0x21, 0x03, 0x81, 0x84, 0x21]
-+            vec![
-+                0x12, 0x93, 0xcc, 0x02, 0x01, 0x08, 0x00, 0x03, 0x80, 0x84, 0x21, 0x03, 0x81, 0x84, 0x21
-+            ]
-         );
-     }
- 
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/sndcp/wap.rs:454:
-     #[test]
-     fn complete_ipv4_udp_connect_roundtrip_is_byte_exact() {
-         let request_payload = vec![
--            0x08, 0x13, 0xcc, 0x12,
--            0x01, 0x10, 0x08, 0x00,
--            0x03, 0x80, 0x84, 0x21,
--            0x03, 0x81, 0x84, 0x21,
-+            0x08, 0x13, 0xcc, 0x12, 0x01, 0x10, 0x08, 0x00, 0x03, 0x80, 0x84, 0x21, 0x03, 0x81, 0x84, 0x21,
-         ];
--        let request = build_ipv4_udp_npdu(
--            [10, 0, 0, 2],
--            [10, 0, 0, 1],
--            49_152,
--            9_200,
--            &request_payload,
--            0x2222,
--            64,
--        )
--        .unwrap();
-+        let request = build_ipv4_udp_npdu([10, 0, 0, 2], [10, 0, 0, 1], 49_152, 9_200, &request_payload, 0x2222, 64).unwrap();
-         let snapshot = WapStatusSnapshot {
-             title: "NetCore-TETRA".into(),
-             service_state: "ON AIR".into(),
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/sndcp/wap.rs:503:
-         assert_eq!(udp.destination_port, 49_152);
-         assert_eq!(
-             udp.payload,
--            &[0x12, 0x93, 0xcc, 0x02, 0x01, 0x08, 0x00, 0x03, 0x80, 0x84, 0x21, 0x03, 0x81, 0x84, 0x21]
-+            &[
-+                0x12, 0x93, 0xcc, 0x02, 0x01, 0x08, 0x00, 0x03, 0x80, 0x84, 0x21, 0x03, 0x81, 0x84, 0x21
-+            ]
-         );
-     }
- 
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/umac/subcomp/bs_sched.rs:55:
-     TrafficOnly,
- }
- 
--
- /// Number of timeslots the scheduler operates on. May become larger when secondary carriers are supported.
- pub const NUM_TIMESLOTS: usize = 4;
- 
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/umac/subcomp/bs_sched.rs:586:
-                     }
-                     if let Some(previous) = self.packet_data_assignments[slot] {
-                         if !Self::same_address(previous.addr, addr) {
--                            tracing::info!(
--                                "packet-data PDCH TS2 owner changed {} -> {}",
--                                previous.addr,
--                                addr
--                            );
-+                            tracing::info!("packet-data PDCH TS2 owner changed {} -> {}", previous.addr, addr);
-                         }
-                     }
-                     self.packet_data_assignments[slot] = Some(PacketDataAssignment {
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/umac/subcomp/bs_sched.rs:598:
-                         ul_dl_assigned,
-                         expires_at: self.cur_dltime.add_timeslots(PACKET_DATA_ASSIGNMENT_TTL_TIMESLOTS),
-                     });
--                    tracing::info!(
--                        "packet-data PDCH assigned to {} on TS2 ({})",
--                        addr,
--                        ul_dl_assigned
--                    );
-+                    tracing::info!("packet-data PDCH assigned to {} on TS2 ({})", addr, ul_dl_assigned);
-                 } else {
--                    self.packet_data_assignments[1] = self.packet_data_assignments[1]
--                        .filter(|current| !Self::same_address(current.addr, addr));
-+                    self.packet_data_assignments[1] =
-+                        self.packet_data_assignments[1].filter(|current| !Self::same_address(current.addr, addr));
-                 }
-             }
-             ChanAllocType::ReplaceWithCarrierSignalling => {
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/umac/subcomp/bs_sched.rs:619:
-             return None;
-         }
-         self.packet_data_assignments[1].filter(|assignment| {
--            assignment.expires_at.diff(ts) > 0
--                && matches!(assignment.ul_dl_assigned, UlDlAssignment::Ul | UlDlAssignment::Both)
-+            assignment.expires_at.diff(ts) > 0 && matches!(assignment.ul_dl_assigned, UlDlAssignment::Ul | UlDlAssignment::Both)
-         })
-     }
- 
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/umac/subcomp/bs_sched.rs:673:
-                 } else {
-                     AccessAssignUlUsage::CommonOnly
-                 }
--            },
-+            }
-             _ => unreachable!("ul2 can't be set with ul1 None"),
-         }
-     }
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/umac/subcomp/bs_sched.rs:702:
-     /// Total queued downlink scheduling elements across all timeslots plus the next-slot carry-over.
-     /// A cheap backlog gauge for the health monitor's Congestion domain (read once per tick).
-     pub fn dl_queue_depth(&self) -> usize {
--        self.dltx_queues.iter().map(|q| q.len()).sum::<usize>()
--            + self.dltx_next_slot_queue.len()
--            + self.frame18_common_scch_queue.len()
-+        self.dltx_queues.iter().map(|q| q.len()).sum::<usize>() + self.dltx_next_slot_queue.len() + self.frame18_common_scch_queue.len()
-     }
- 
-     /// Registers that we should transmit a MAC-RESOURCE or similar with a grant, somewhere this tick.
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/umac/subcomp/bs_sched.rs:834:
-     /// Only one pending page per call/GSSI is retained. A newer call to the same
-     /// GSSI supersedes queued pages from the old call, preventing a later frame-18
-     /// opportunity from announcing an already released call or an obsolete usage marker.
--    pub fn dl_enqueue_frame18_common_scch(
--        &mut self,
--        call_id: u16,
--        pdu: MacResource,
--        sdu: BitBuffer,
--        tx_reporter: Option<TxReporter>,
--    ) {
-+    pub fn dl_enqueue_frame18_common_scch(&mut self, call_id: u16, pdu: MacResource, sdu: BitBuffer, tx_reporter: Option<TxReporter>) {
-         let Some(addr) = pdu.addr else {
-             tracing::warn!(
-                 "BsChannelScheduler: dropping frame-18 common SCCH resource without address call_id={}",
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/umac/subcomp/bs_sched.rs:904:
-     /// UMAC to retire the queue entry before a later call can inherit it.
-     pub fn drop_frame18_common_scch_call(&mut self, call_id: u16) {
-         let before = self.frame18_common_scch_queue.len();
--        self.frame18_common_scch_queue
--            .retain(|entry| entry.call_id != call_id);
-+        self.frame18_common_scch_queue.retain(|entry| entry.call_id != call_id);
-         let dropped = before - self.frame18_common_scch_queue.len();
-         if dropped > 0 {
-             tracing::info!(
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/umac/subcomp/bs_sched.rs:1531:
-         // During hangtime we stop sending traffic frames and switch to signalling mode.
-         // Keep traffic mode while FACCH/stealing is still queued for delivery.
-         let hang_slot = (2..=4).contains(&ts.t) || (self.downlink_mode == CarrierDownlinkMode::TrafficOnly && ts.t == 1);
--        let hang_effective = if hang_slot {
--            self.is_hangtime_effective(ts.t)
--        } else {
--            false
--        };
-+        let hang_effective = if hang_slot { self.is_hangtime_effective(ts.t) } else { false };
- 
-         let dl_is_traffic = dl_circuit_active && !hang_effective;
-         let ul_is_traffic = ul_circuit_active && !hang_effective;
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/umac/subcomp/bs_sched.rs:1547:
-         // Returning an empty TP slot makes PHY skip transmission for this carrier/slot.
-         if ((self.downlink_mode == CarrierDownlinkMode::TrafficOnly)
-             || (self.downlink_mode == CarrierDownlinkMode::SecondaryBcchNoMcch && ts.t != 1))
--            && !dl_is_traffic && !ul_is_traffic {
-+            && !dl_is_traffic
-+            && !ul_is_traffic
-+        {
-             let clear_ts = ts.add_timeslots(-4);
-             let index = self.ul_ts_to_sched_index(&clear_ts);
-             self.ulsched[ts.t as usize - 1][index].ul1 = None;
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/umac/subcomp/bs_sched.rs:1636:
-                 // Otherwise, fall back to default SYNC/SYSINFO.
-                 if hang_effective && dl_circuit_active {
-                     TmvUnitdataReqSlot {
--                    carrier_num: self.carrier_num,
-+                        carrier_num: self.carrier_num,
-                         ts,
-                         blk1: Some(TmvUnitdataReq {
-                             logical_channel: LogicalChannel::SchF,
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/umac/subcomp/bs_sched.rs:1650:
-                 } else {
-                     // Put default SYNC/SYSINFO frame
-                     TmvUnitdataReqSlot {
--                    carrier_num: self.carrier_num,
-+                        carrier_num: self.carrier_num,
-                         ts,
-                         blk1: None,
-                         blk2: None,
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/umac/subcomp/bs_sched.rs:2594:
-         };
-         let ts2 = TdmaTime { t: 2, f: 2, m: 1, h: 0 };
- 
--        sched.update_packet_data_assignment(
--            addr,
--            [false, true, false, false],
--            ChanAllocType::Replace,
--            UlDlAssignment::Both,
--        );
-+        sched.update_packet_data_assignment(addr, [false, true, false, false], ChanAllocType::Replace, UlDlAssignment::Both);
- 
--        assert_eq!(sched.packet_data_uplink_owner(ts2, PhyBlockNum::Both).map(|owner| owner.ssi), Some(addr.ssi));
-+        assert_eq!(
-+            sched.packet_data_uplink_owner(ts2, PhyBlockNum::Both).map(|owner| owner.ssi),
-+            Some(addr.ssi)
-+        );
-         assert_eq!(sched.packet_data_downlink_timeslot_for(addr), Some(2));
-         assert_eq!(sched.ul_get_usage(ts2), AccessAssignUlUsage::AssignedOnly);
--        assert!(sched
--            .packet_data_uplink_owner(TdmaTime { f: 18, ..ts2 }, PhyBlockNum::Both)
--            .is_none());
--
--        sched.update_packet_data_assignment(
--            addr,
--            [false; 4],
--            ChanAllocType::QuitAndGo,
--            UlDlAssignment::Both,
-+        assert!(
-+            sched
-+                .packet_data_uplink_owner(TdmaTime { f: 18, ..ts2 }, PhyBlockNum::Both)
-+                .is_none()
-         );
-+
-+        sched.update_packet_data_assignment(addr, [false; 4], ChanAllocType::QuitAndGo, UlDlAssignment::Both);
-         assert!(sched.packet_data_uplink_owner(ts2, PhyBlockNum::Both).is_none());
-         assert_eq!(sched.packet_data_downlink_timeslot_for(addr), None);
-     }
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/umac/subcomp/bs_sched.rs:2620:
--
- }
- 
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/umac/umac_bs.rs:29:
- use tetra_saps::lcmc::enums::alloc_type::ChanAllocType;
- use tetra_saps::lcmc::enums::ul_dl_assignment::UlDlAssignment;
- use tetra_saps::lcmc::fields::chan_alloc_req::CmceChanAllocReq;
--use tetra_saps::tma::{
--    parse_frame18_common_scch_handle, TmaReport, TmaReportInd, TmaUnitdataInd, TmaUnitdataReq,
--};
--use tetra_saps::tmv::{TmvConfigureReq, TmvUnitdataReqSlots};
-+use tetra_saps::tma::{TmaReport, TmaReportInd, TmaUnitdataInd, TmaUnitdataReq, parse_frame18_common_scch_handle};
- use tetra_saps::tmv::enums::logical_chans::LogicalChannel;
-+use tetra_saps::tmv::{TmvConfigureReq, TmvUnitdataReqSlots};
- use tetra_saps::{SapMsg, SapMsgInner};
- 
- use crate::lmac::components::scrambler;
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/umac/umac_bs.rs:144:
-         {
-             return &mut self.secondary_channel_schedulers[index];
-         }
--        tracing::error!("UMAC: unknown carrier {}, no scheduler configured -- falling back to primary", carrier_num);
-+        tracing::error!(
-+            "UMAC: unknown carrier {}, no scheduler configured -- falling back to primary",
-+            carrier_num
-+        );
-         &mut self.channel_scheduler
-     }
- 
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/umac/umac_bs.rs:159:
-         {
-             Some(sched) => sched,
-             None => {
--                tracing::error!("UMAC: unknown carrier {}, no scheduler configured -- falling back to primary", carrier_num);
-+                tracing::error!(
-+                    "UMAC: unknown carrier {}, no scheduler configured -- falling back to primary",
-+                    carrier_num
-+                );
-                 &self.channel_scheduler
-             }
-         }
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/umac/umac_bs.rs:206:
-             }),
-             Some(other) => {
-                 tracing::warn!("UMAC: ignoring unknown negative CMCE carrier hint {}", other);
--                logical_ts.map(|ts| self.carrier_for_logical_ts(ts)).unwrap_or_else(|| self.main_carrier())
-+                logical_ts
-+                    .map(|ts| self.carrier_for_logical_ts(ts))
-+                    .unwrap_or_else(|| self.main_carrier())
-             }
--            None => logical_ts.map(|ts| self.carrier_for_logical_ts(ts)).unwrap_or_else(|| self.main_carrier()),
-+            None => logical_ts
-+                .map(|ts| self.carrier_for_logical_ts(ts))
-+                .unwrap_or_else(|| self.main_carrier()),
-         }
-     }
- 
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/umac/umac_bs.rs:643:
-                     self.packet_data_link_contexts.clear();
-                 }
-                 if chan_alloc.timeslots.iter().any(|assigned| *assigned) {
--                    self.packet_data_link_contexts
--                        .insert(prim.main_address.ssi, prim.endpoint_id);
-+                    self.packet_data_link_contexts.insert(prim.main_address.ssi, prim.endpoint_id);
-                 }
-             }
-             ChanAllocType::ReplaceWithCarrierSignalling => {}
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/umac/umac_bs.rs:683:
-         let msg_dltime = self.dltime.add_timeslots(-2); // Msg on uplink was sent two timeslots ago.
-         let carrier_num = prim.carrier_num;
-         let logical_ts = self.logical_ts_for_carrier_air_ts(carrier_num, msg_dltime.t);
--        let logical_dltime = TdmaTime { t: logical_ts, ..msg_dltime };
--        let assigned_owner = self
--            .scheduler_for(carrier_num)
--            .packet_data_uplink_owner(msg_dltime, prim.block_num);
-+        let logical_dltime = TdmaTime {
-+            t: logical_ts,
-+            ..msg_dltime
-+        };
-+        let assigned_owner = self.scheduler_for(carrier_num).packet_data_uplink_owner(msg_dltime, prim.block_num);
-         let Some(addr) = pdu.addr.or(assigned_owner) else {
-             tracing::warn!("UMAC: rx_mac_data: PDU has no address and no assigned PDCH owner; dropping");
-             return;
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/umac/umac_bs.rs:780:
-             if let Some((grant, usage_marker)) = grant_result {
-                 // Schedule grant — marker propagates into the MAC-RESOURCE ACK
-                 // so the MS can tag its reservation when continuing the burst.
--                self.scheduler_for_mut(carrier_num).dl_enqueue_grant(msg_dltime.t, addr, grant, usage_marker);
-+                self.scheduler_for_mut(carrier_num)
-+                    .dl_enqueue_grant(msg_dltime.t, addr, grant, usage_marker);
-             } else {
-                 tracing::warn!("rx_mac_data: No grant for reservation request {:?}", res_req);
-             }
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/umac/umac_bs.rs:926:
-         let msg_dltime = self.dltime.add_timeslots(-2); // Msg on uplink was sent two timeslots ago.
-         let carrier_num = prim.carrier_num;
-         let logical_ts = self.logical_ts_for_carrier_air_ts(carrier_num, msg_dltime.t);
--        let logical_dltime = TdmaTime { t: logical_ts, ..msg_dltime };
-+        let logical_dltime = TdmaTime {
-+            t: logical_ts,
-+            ..msg_dltime
-+        };
-         if !self.scheduler_for(carrier_num).circuit_is_active(Direction::Dl, msg_dltime.t) {
-             self.scheduler_for_mut(carrier_num).dl_enqueue_random_access_ack(msg_dltime.t, addr);
-         } else {
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/umac/umac_bs.rs:964:
-             if let Some((grant, usage_marker)) = grant_result {
-                 // Schedule grant — marker propagates into the MAC-RESOURCE ACK
-                 // so the MS can tag its reservation when continuing the burst.
--                self.scheduler_for_mut(carrier_num).dl_enqueue_grant(msg_dltime.t, addr, grant, usage_marker);
-+                self.scheduler_for_mut(carrier_num)
-+                    .dl_enqueue_grant(msg_dltime.t, addr, grant, usage_marker);
-             } else {
-                 tracing::warn!("rx_mac_access: No grant for reservation request {:?}", res_req);
-             }
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/umac/umac_bs.rs:1065:
-         let msg_dltime = self.dltime.add_timeslots(-2); // Msg on uplink was sent two timeslots ago.
-         let carrier_num = prim.carrier_num;
-         let logical_ts = self.logical_ts_for_carrier_air_ts(carrier_num, msg_dltime.t);
--        let logical_dltime = TdmaTime { t: logical_ts, ..msg_dltime };
-+        let logical_dltime = TdmaTime {
-+            t: logical_ts,
-+            ..msg_dltime
-+        };
-         let Some(slot_owner) = self
-             .scheduler_for(carrier_num)
-             .ul_get_slot_owner(msg_dltime, prim.block_num)
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/umac/umac_bs.rs:1150:
-         let msg_dltime = self.dltime.add_timeslots(-2); // Msg on uplink was sent two timeslots ago.
-         let carrier_num = prim.carrier_num;
-         let logical_ts = self.logical_ts_for_carrier_air_ts(carrier_num, msg_dltime.t);
--        let logical_dltime = TdmaTime { t: logical_ts, ..msg_dltime };
-+        let logical_dltime = TdmaTime {
-+            t: logical_ts,
-+            ..msg_dltime
-+        };
-         let Some(slot_owner) = self
-             .scheduler_for(carrier_num)
-             .ul_get_slot_owner(msg_dltime, prim.block_num)
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/umac/umac_bs.rs:1183:
- 
-         // Handle reservation if present
-         if let Some(res_req) = &pdu.reservation_req {
--            let grant_result = self.scheduler_for_mut(carrier_num).ul_process_cap_req(msg_dltime.t, defragbuf.addr, res_req);
-+            let grant_result = self
-+                .scheduler_for_mut(carrier_num)
-+                .ul_process_cap_req(msg_dltime.t, defragbuf.addr, res_req);
-             if let Some((grant, usage_marker)) = grant_result {
-                 // Schedule grant — marker propagates into the MAC-RESOURCE ACK
-                 // so the MS can tag its reservation when continuing the burst.
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/umac/umac_bs.rs:1287:
-         let msg_dltime = self.dltime.add_timeslots(-2); // Msg on uplink was sent two timeslots ago.
-         let carrier_num = prim.carrier_num;
-         let logical_ts = self.logical_ts_for_carrier_air_ts(carrier_num, msg_dltime.t);
--        let logical_dltime = TdmaTime { t: logical_ts, ..msg_dltime };
-+        let logical_dltime = TdmaTime {
-+            t: logical_ts,
-+            ..msg_dltime
-+        };
-         let Some(slot_owner) = self.scheduler_for(carrier_num).ul_get_slot_owner(msg_dltime, prim.block_num) else {
-             tracing::debug!(
-                 "rx_mac_end_hu: MAC-END-HU for unassigned block {:?} on carrier {} logical ts {} / air ts {} (start not seen — normal on RF loss)",
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/umac/umac_bs.rs:1312:
- 
-         // Handle reservation if present
-         if let Some(res_req) = &pdu.reservation_req {
--            let grant_result = self.scheduler_for_mut(carrier_num).ul_process_cap_req(msg_dltime.t, defragbuf.addr, res_req);
-+            let grant_result = self
-+                .scheduler_for_mut(carrier_num)
-+                .ul_process_cap_req(msg_dltime.t, defragbuf.addr, res_req);
-             if let Some((grant, usage_marker)) = grant_result {
-                 // Schedule grant — marker propagates into the MAC-RESOURCE ACK
-                 // so the MS can tag its reservation when continuing the burst.
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/umac/umac_bs.rs:1502:
-                     // Build MAC-RESOURCE PDU for the STCH half-slot (124 type1 bits).
-                     const STCH_CAP: usize = 124;
- 
--                    let has_pending_ra = self.scheduler_for_mut(carrier_num).take_pending_ra_ack(air_ts, prim.main_address.ssi);
-+                    let has_pending_ra = self
-+                        .scheduler_for_mut(carrier_num)
-+                        .take_pending_ra_ack(air_ts, prim.main_address.ssi);
-                     // FACCH/STCH on an already allocated traffic slot is not a random-access
-                     // response by default. Only propagate the flag when we are actually
-                     // carrying a pending RA acknowledgement on this same timeslot.
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/umac/umac_bs.rs:1548:
-                             stch_block.get_len()
-                         );
- 
--                        self.scheduler_for_mut(carrier_num).dl_enqueue_stealing(air_ts, stch_block, prim.tx_reporter);
-+                        self.scheduler_for_mut(carrier_num)
-+                            .dl_enqueue_stealing(air_ts, stch_block, prim.tx_reporter);
-                     } else {
-                         // Larger than one stolen half-slot: fragment across consecutive stolen
-                         // half-slots (panic-safe — a fixed 124-bit buffer used to overflow here and
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/umac/umac_bs.rs:1582:
-         let (usage_marker, mac_chan_alloc) = if let Some(chan_alloc) = prim.chan_alloc {
-             let logical_ts = self.first_logical_ts_in_chan_alloc(&chan_alloc);
-             let target_carrier = self.resolve_cmce_carrier_hint(chan_alloc.carrier, logical_ts);
--            (
--                chan_alloc.usage,
--                Some(Self::cmce_to_mac_chanalloc(&chan_alloc, target_carrier)),
--            )
-+            (chan_alloc.usage, Some(Self::cmce_to_mac_chanalloc(&chan_alloc, target_carrier)))
-         } else {
-             (None, None)
-         };
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/umac/umac_bs.rs:1628:
-                 match self.channel_scheduler.packet_data_downlink_timeslot_for(prim.main_address) {
-                     Some(ts) => u32::from(ts),
-                     None => {
--                        tracing::warn!(
--                            "SNDCP downlink for {} has no active PDCH; falling back to MCCH",
--                            prim.main_address
--                        );
-+                        tracing::warn!("SNDCP downlink for {} has no active PDCH; falling back to MCCH", prim.main_address);
-                         0
-                     }
-                 }
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/src/umac/umac_bs.rs:1846:
- 
-                 let dl_target_carrier = self.carrier_for_logical_ts(dl_target_logical_ts);
-                 let dl_target_air_ts = Self::air_ts_for_logical(dl_target_logical_ts);
--                if self.scheduler_for(dl_target_carrier).circuit_is_active(Direction::Dl, dl_target_air_ts) {
-+                if self
-+                    .scheduler_for(dl_target_carrier)
-+                    .circuit_is_active(Direction::Dl, dl_target_air_ts)
-+                {
-                     if let Some(packed) = pack_ul_acelp_bits(&data) {
-                         self.scheduler_for_mut(dl_target_carrier).dl_schedule_tmd(dl_target_air_ts, packed);
-                     } else {
-Diff in /home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities/tests/common/default_stack.rs:1:
- use tetra_config::bluestation::{
--    CfgAsterisk, CfgAudioPlayer, CfgCellInfo, CfgWapIp, CfgDapnet, CfgEcholink, CfgEmergency, CfgGeoalarm, CfgHealth, CfgMeshcom, CfgNetInfo, CfgPhyIo, CfgRecording, CfgRecovery,
--    CfgSecurity, CfgSnomNotify, CfgTpg2200Action, CfgTts, CfgWxService, PhyBackend, StackConfig, StackMode,
-+    CfgAsterisk, CfgAudioPlayer, CfgCellInfo, CfgDapnet, CfgEcholink, CfgEmergency, CfgGeoalarm, CfgHealth, CfgMeshcom, CfgNetInfo,
-+    CfgPhyIo, CfgRecording, CfgRecovery, CfgSecurity, CfgSnomNotify, CfgTpg2200Action, CfgTts, CfgWapIp, CfgWxService, PhyBackend,
-+    StackConfig, StackMode,
- };
- use tetra_core::{freqs::FreqInfo, ranges::SortedDisjointSsiRanges};
- 
+>>> rustfmt --edition 2024 crates/tetra-config/src/bluestation/config.rs crates/tetra-config/src/bluestation/sec_cell.rs crates/tetra-entities/src/sndcp/ip.rs crates/tetra-entities/src/sndcp/mod.rs crates/tetra-entities/src/sndcp/sndcp_bs.rs crates/tetra-entities/src/sndcp/wap.rs crates/tetra-entities/src/umac/subcomp/bs_sched.rs crates/tetra-entities/src/umac/umac_bs.rs crates/tetra-entities/tests/common/default_stack.rs
+>>> cargo check --locked -p tetra-config
+    Updating crates.io index
+ Downloading crates ...
+  Downloaded arrayvec v0.7.6
+  Downloaded bytemuck v1.25.0
+  Downloaded aho-corasick v1.1.4
+  Downloaded cfg-if v1.0.4
+  Downloaded const_format_proc_macros v0.2.34
+  Downloaded lazy_static v1.5.0
+  Downloaded chrono v0.4.44
+  Downloaded iana-time-zone v0.1.65
+  Downloaded crossbeam-channel v0.5.15
+  Downloaded log v0.4.29
+  Downloaded indexmap v2.13.0
+  Downloaded num-traits v0.2.19
+  Downloaded serde_spanned v0.6.9
+  Downloaded toml_datetime v0.6.11
+  Downloaded nu-ansi-term v0.50.3
+  Downloaded phf v0.12.1
+  Downloaded git-version-macro v0.3.9
+  Downloaded num-conv v0.2.1
+  Downloaded equivalent v1.0.2
+  Downloaded tracing-core v0.1.36
+  Downloaded serde_derive v1.0.228
+  Downloaded unicode-xid v0.2.6
+  Downloaded autocfg v1.5.0
+  Downloaded hashbrown v0.16.1
+  Downloaded pin-project-lite v0.2.17
+  Downloaded thread_local v1.1.9
+  Downloaded time-macros v0.2.27
+  Downloaded smallvec v1.15.1
+  Downloaded bitcode v0.6.9
+  Downloaded memchr v2.8.0
+  Downloaded tracing-appender v0.2.4
+  Downloaded const_format v0.2.35
+  Downloaded regex-syntax v0.8.10
+  Downloaded serde_core v1.0.228
+  Downloaded unicode-ident v1.0.24
+  Downloaded bitcode_derive v0.6.9
+  Downloaded matchers v0.2.0
+  Downloaded thiserror-impl v2.0.18
+  Downloaded deranged v0.5.8
+  Downloaded crossbeam-utils v0.8.21
+  Downloaded itoa v1.0.18
+  Downloaded proc-macro2 v1.0.106
+  Downloaded toml v0.8.23
+  Downloaded once_cell v1.21.4
+  Downloaded serde v1.0.228
+  Downloaded toml_edit v0.22.27
+  Downloaded sharded-slab v0.1.7
+  Downloaded winnow v0.7.15
+  Downloaded tracing v0.1.44
+  Downloaded chrono-tz v0.10.4
+  Downloaded regex-automata v0.4.14
+  Downloaded siphasher v1.0.2
+  Downloaded powerfmt v0.2.0
+  Downloaded quote v1.0.45
+  Downloaded tracing-attributes v0.1.31
+  Downloaded phf_shared v0.12.1
+  Downloaded git-version v0.3.9
+  Downloaded time v0.3.47
+  Downloaded tracing-log v0.2.0
+  Downloaded toml_write v0.1.2
+  Downloaded thiserror v2.0.18
+  Downloaded time-core v0.1.8
+  Downloaded syn v2.0.117
+  Downloaded tracing-subscriber v0.3.23
+  Downloaded glam v0.32.1
+   Compiling proc-macro2 v1.0.106
+   Compiling unicode-ident v1.0.24
+   Compiling quote v1.0.45
+   Compiling serde_core v1.0.228
+   Compiling serde v1.0.228
+   Compiling autocfg v1.5.0
+    Checking once_cell v1.21.4
+    Checking tracing-core v0.1.36
+   Compiling num-traits v0.2.19
+    Checking regex-syntax v0.8.10
+   Compiling syn v2.0.117
+    Checking powerfmt v0.2.0
+   Compiling crossbeam-utils v0.8.21
+    Checking deranged v0.5.8
+    Checking regex-automata v0.4.14
+    Checking siphasher v1.0.2
+    Checking log v0.4.29
+    Checking time-core v0.1.8
+    Checking num-conv v0.2.1
+    Checking itoa v1.0.18
+    Checking cfg-if v1.0.4
+    Checking lazy_static v1.5.0
+   Compiling thiserror v2.0.18
+    Checking pin-project-lite v0.2.17
+    Checking sharded-slab v0.1.7
+    Checking time v0.3.47
+    Checking matchers v0.2.0
+    Checking thread_local v1.1.9
+    Checking tracing-log v0.2.0
+    Checking phf_shared v0.12.1
+   Compiling chrono-tz v0.10.4
+    Checking iana-time-zone v0.1.65
+    Checking hashbrown v0.16.1
+    Checking smallvec v1.15.1
+    Checking equivalent v1.0.2
+   Compiling unicode-xid v0.2.6
+    Checking nu-ansi-term v0.50.3
+   Compiling const_format_proc_macros v0.2.34
+    Checking chrono v0.4.44
+    Checking indexmap v2.13.0
+    Checking crossbeam-channel v0.5.15
+    Checking phf v0.12.1
+    Checking winnow v0.7.15
+    Checking toml_write v0.1.2
+    Checking bytemuck v1.25.0
+    Checking const_format v0.2.35
+   Compiling serde_derive v1.0.228
+   Compiling tracing-attributes v0.1.31
+   Compiling thiserror-impl v2.0.18
+    Checking tracing v0.1.44
+    Checking tracing-subscriber v0.3.23
+   Compiling bitcode_derive v0.6.9
+   Compiling git-version-macro v0.3.9
+    Checking git-version v0.3.9
+    Checking tracing-appender v0.2.4
+    Checking bitcode v0.6.9
+    Checking serde_spanned v0.6.9
+    Checking toml_datetime v0.6.11
+    Checking toml_edit v0.22.27
+    Checking tetra-core v1.3.0 (/home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-core)
+    Checking toml v0.8.23
+    Checking tetra-config v1.3.0 (/home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-config)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 12.45s
+>>> cargo check --locked -p tetra-entities
+ Downloading crates ...
+  Downloaded atomic-waker v1.1.2
+  Downloaded futures-core v0.3.32
+  Downloaded as-any v0.3.2
+  Downloaded find-msvc-tools v0.1.9
+  Downloaded futures-io v0.3.32
+  Downloaded form_urlencoded v1.2.2
+  Downloaded block-buffer v0.10.4
+  Downloaded fastbloom v0.14.1
+  Downloaded httparse v1.10.1
+  Downloaded subtle v2.6.1
+  Downloaded hyper-rustls v0.27.9
+  Downloaded num-rational v0.4.2
+  Downloaded bitflags v2.11.0
+  Downloaded byteorder v1.5.0
+  Downloaded crypto-common v0.1.7
+  Downloaded futures-channel v0.3.32
+  Downloaded tinyvec_macros v0.1.1
+  Downloaded rustls-pki-types v1.14.0
+  Downloaded lru-slab v0.1.2
+  Downloaded icu_properties v2.2.0
+  Downloaded rand_chacha v0.9.0
+  Downloaded ryu v1.0.23
+  Downloaded try-lock v0.2.5
+  Downloaded bytes v1.11.1
+  Downloaded http-body-util v0.1.3
+  Downloaded ipnet v2.12.0
+  Downloaded tinyvec v1.11.0
+  Downloaded base64 v0.22.1
+  Downloaded cc v1.2.58
+  Downloaded icu_collections v2.2.0
+  Downloaded utf-8 v0.7.6
+  Downloaded data-encoding v2.10.0
+  Downloaded tower-layer v0.3.3
+  Downloaded tower-service v0.3.3
+  Downloaded want v0.3.1
+  Downloaded getrandom v0.4.2
+  Downloaded idna_adapter v1.2.2
+  Downloaded num-complex v0.4.6
+  Downloaded transpose v0.2.3
+  Downloaded utf8_iter v1.0.4
+  Downloaded zerovec-derive v0.11.3
+  Downloaded icu_normalizer_data v2.2.0
+  Downloaded icu_properties_data v2.2.0
+  Downloaded md5 v0.7.0
+  Downloaded num v0.4.3
+  Downloaded quinn-proto v0.11.14
+  Downloaded thiserror v1.0.69
+  Downloaded untrusted v0.9.0
+  Downloaded url v2.5.8
+  Downloaded zerofrom v0.1.8
+  Downloaded zerotrie v0.2.4
+  Downloaded zerovec v0.11.6
+  Downloaded zmij v1.0.21
+  Downloaded cfg_aliases v0.2.1
+  Downloaded getrandom v0.3.4
+  Downloaded icu_locale_core v2.2.0
+  Downloaded icu_provider v2.2.0
+  Downloaded litemap v0.8.2
+  Downloaded zeroize v1.8.2
+  Downloaded cpufeatures v0.2.17
+  Downloaded digest v0.10.7
+  Downloaded icu_normalizer v2.2.0
+  Downloaded idna v1.1.0
+  Downloaded mio v1.2.0
+  Downloaded pkg-config v0.3.32
+  Downloaded rand_core v0.9.5
+  Downloaded rustls-pemfile v2.2.0
+  Downloaded tower v0.5.3
+  Downloaded displaydoc v0.2.6
+  Downloaded futures-sink v0.3.32
+  Downloaded num-bigint v0.4.6
+  Downloaded webpki-roots v1.0.7
+  Downloaded yoke v0.8.2
+  Downloaded potential_utf v0.1.5
+  Downloaded rand v0.8.5
+  Downloaded rustls-native-certs v0.8.3
+  Downloaded serde_json v1.0.149
+  Downloaded sync_wrapper v1.0.2
+  Downloaded synstructure v0.13.2
+  Downloaded tungstenite v0.24.0
+  Downloaded version_check v0.9.5
+  Downloaded generic-array v0.14.7
+  Downloaded getrandom v0.2.17
+  Downloaded hyper v1.10.1
+  Downloaded rand v0.9.2
+  Downloaded num-iter v0.1.45
+  Downloaded rand_chacha v0.3.1
+  Downloaded tokio v1.50.0
+  Downloaded zerocopy v0.8.48
+  Downloaded http-body v1.0.1
+  Downloaded openssl-probe v0.1.6
+  Downloaded ppv-lite86 v0.2.21
+  Downloaded tokio-rustls v0.26.4
+  Downloaded uuid v1.23.0
+  Downloaded zerofrom-derive v0.1.7
+  Downloaded typenum v1.19.0
+  Downloaded writeable v0.6.3
+  Downloaded stable_deref_trait v1.2.1
+  Downloaded rustls-platform-verifier v0.6.2
+  Downloaded socket2 v0.6.3
+  Downloaded strength_reduce v0.2.4
+  Downloaded tower-http v0.6.11
+  Downloaded yoke-derive v0.8.2
+  Downloaded quinn-udp v0.5.14
+  Downloaded hyper-util v0.1.20
+  Downloaded openssl-probe v0.2.1
+  Downloaded percent-encoding v2.3.2
+  Downloaded rustc-hash v2.1.2
+  Downloaded rustls-webpki v0.103.10
+  Downloaded slab v0.4.12
+  Downloaded http v1.4.0
+  Downloaded quinn v0.11.9
+  Downloaded libm v0.2.16
+  Downloaded rustfft v6.4.1
+  Downloaded primal-check v0.3.4
+  Downloaded futures-task v0.3.32
+  Downloaded rustls-native-certs v0.7.3
+  Downloaded rand_core v0.6.4
+  Downloaded reqwest v0.12.28
+  Downloaded ring v0.17.14
+  Downloaded serde_urlencoded v0.7.1
+  Downloaded tinystr v0.8.3
+  Downloaded futures-util v0.3.32
+  Downloaded libc v0.2.183
+  Downloaded num-integer v0.1.46
+  Downloaded sha1 v0.10.6
+  Downloaded shlex v1.3.0
+  Downloaded thiserror-impl v1.0.69
+  Downloaded rustls v0.23.37
+  Downloaded soapysdr v0.5.0
+  Downloaded soapysdr-sys v0.8.1
+   Compiling libc v0.2.183
+   Compiling syn v2.0.117
+   Compiling num-traits v0.2.19
+    Checking smallvec v1.15.1
+    Checking stable_deref_trait v1.2.1
+    Checking bytes v1.11.1
+   Compiling find-msvc-tools v0.1.9
+   Compiling shlex v1.3.0
+    Checking zeroize v1.8.2
+    Checking rustls-pki-types v1.14.0
+   Compiling cc v1.2.58
+    Checking getrandom v0.2.17
+   Compiling zerocopy v0.8.48
+    Checking socket2 v0.6.3
+    Checking untrusted v0.9.0
+    Checking futures-core v0.3.32
+    Checking mio v1.2.0
+   Compiling rustls v0.23.37
+    Checking writeable v0.6.3
+    Checking litemap v0.8.2
+    Checking tokio v1.50.0
+   Compiling ring v0.17.14
+   Compiling synstructure v0.13.2
+    Checking ppv-lite86 v0.2.21
+   Compiling zerovec-derive v0.11.3
+   Compiling zerofrom-derive v0.1.7
+   Compiling yoke-derive v0.8.2
+   Compiling tracing-attributes v0.1.31
+   Compiling displaydoc v0.2.6
+   Compiling serde_derive v1.0.228
+    Checking zerofrom v0.1.8
+    Checking yoke v0.8.2
+    Checking zerovec v0.11.6
+    Checking tracing v0.1.44
+    Checking tinystr v0.8.3
+    Checking potential_utf v0.1.5
+    Checking icu_locale_core v2.2.0
+    Checking zerotrie v0.2.4
+   Compiling thiserror-impl v2.0.18
+    Checking http v1.4.0
+    Checking rustls-webpki v0.103.10
+   Compiling typenum v1.19.0
+    Checking subtle v2.6.1
+   Compiling icu_normalizer_data v2.2.0
+    Checking slab v0.4.12
+   Compiling getrandom v0.3.4
+    Checking utf8_iter v1.0.4
+   Compiling icu_properties_data v2.2.0
+    Checking futures-sink v0.3.32
+   Compiling version_check v0.9.5
+    Checking icu_collections v2.2.0
+    Checking thiserror v2.0.18
+   Compiling generic-array v0.14.7
+    Checking icu_provider v2.2.0
+    Checking num-integer v0.1.46
+   Compiling httparse v1.10.1
+    Checking memchr v2.8.0
+    Checking percent-encoding v2.3.2
+    Checking serde v1.0.228
+    Checking http-body v1.0.1
+    Checking futures-task v0.3.32
+   Compiling cfg_aliases v0.2.1
+    Checking futures-io v0.3.32
+    Checking chrono v0.4.44
+    Checking tracing-subscriber v0.3.23
+    Checking futures-util v0.3.32
+    Checking icu_properties v2.2.0
+    Checking rand_core v0.9.5
+    Checking icu_normalizer v2.2.0
+   Compiling git-version-macro v0.3.9
+   Compiling bitcode_derive v0.6.9
+    Checking try-lock v0.2.5
+   Compiling libm v0.2.16
+   Compiling getrandom v0.4.2
+    Checking tower-service v0.3.3
+    Checking idna_adapter v1.2.2
+    Checking want v0.3.1
+    Checking git-version v0.3.9
+    Checking tracing-appender v0.2.4
+    Checking rand_chacha v0.9.0
+    Checking chrono-tz v0.10.4
+    Checking serde_spanned v0.6.9
+    Checking toml_datetime v0.6.11
+    Checking form_urlencoded v1.2.2
+    Checking futures-channel v0.3.32
+    Checking openssl-probe v0.2.1
+    Checking atomic-waker v1.1.2
+   Compiling zmij v1.0.21
+    Checking bitcode v0.6.9
+   Compiling pkg-config v0.3.32
+    Checking toml_edit v0.22.27
+   Compiling soapysdr-sys v0.8.1
+    Checking hyper v1.10.1
+    Checking rustls-native-certs v0.8.3
+    Checking rand v0.9.2
+    Checking idna v1.1.0
+    Checking block-buffer v0.10.4
+    Checking crypto-common v0.1.7
+   Compiling quinn-udp v0.5.14
+    Checking sync_wrapper v1.0.2
+    Checking rand_core v0.6.4
+    Checking num-complex v0.4.6
+    Checking tinyvec_macros v0.1.1
+   Compiling serde_json v1.0.149
+   Compiling thiserror v1.0.69
+    Checking tower-layer v0.3.3
+    Checking base64 v0.22.1
+    Checking ipnet v2.12.0
+    Checking tower v0.5.3
+    Checking fastbloom v0.14.1
+    Checking hyper-util v0.1.20
+    Checking tinyvec v1.11.0
+    Checking rand_chacha v0.3.1
+    Checking digest v0.10.7
+    Checking uuid v1.23.0
+    Checking toml v0.8.23
+    Checking url v2.5.8
+    Checking rustls-platform-verifier v0.6.2
+    Checking tokio-rustls v0.26.4
+   Compiling quinn v0.11.9
+    Checking num-bigint v0.4.6
+   Compiling thiserror-impl v1.0.69
+    Checking rustls-pemfile v2.2.0
+    Checking webpki-roots v1.0.7
+    Checking strength_reduce v0.2.4
+    Checking ryu v1.0.23
+    Checking cpufeatures v0.2.17
+    Checking rustc-hash v2.1.2
+    Checking lru-slab v0.1.2
+    Checking bitflags v2.11.0
+    Checking openssl-probe v0.1.6
+    Checking rustls-native-certs v0.7.3
+    Checking tower-http v0.6.11
+    Checking quinn-proto v0.11.14
+    Checking num-rational v0.4.2
+    Checking sha1 v0.10.6
+    Checking serde_urlencoded v0.7.1
+    Checking transpose v0.2.3
+    Checking tetra-core v1.3.0 (/home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-core)
+    Checking hyper-rustls v0.27.9
+    Checking rand v0.8.5
+    Checking tetra-saps v1.3.0 (/home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-saps)
+    Checking tetra-config v1.3.0 (/home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-config)
+    Checking http-body-util v0.1.3
+    Checking primal-check v0.3.4
+    Checking num-iter v0.1.45
+    Checking data-encoding v2.10.0
+   Compiling tetra-entities v1.3.0 (/home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-entities)
+    Checking utf-8 v0.7.6
+    Checking byteorder v1.5.0
+    Checking num v0.4.3
+    Checking reqwest v0.12.28
+    Checking tungstenite v0.24.0
+    Checking rustfft v6.4.1
+    Checking soapysdr v0.5.0
+    Checking as-any v0.3.2
+    Checking md5 v0.7.0
+    Checking tetra-pdus v1.3.0 (/home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-pdus)
+error[E0432]: unresolved import `tetra_pdus::llc::pdus::al_data`
+ --> crates/tetra-entities/src/umac/umac_bs.rs:8:29
+  |
+8 | use tetra_pdus::llc::pdus::{al_data::AlData, bl_adata::BlAdata, bl_data::BlData, bl_udata::BlUdata};
+  |                             ^^^^^^^ could not find `al_data` in `pdus`
+
+For more information about this error, try `rustc --explain E0432`.
+error: could not compile `tetra-entities` (lib) due to 1 previous error
 ```
