@@ -3,7 +3,7 @@ pub const DASHBOARD_HTML: &str = r#"<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>TETRA FlowStation</title>
+<title>NetCore-Basisstation</title>
 <style>
 /* ── Reset ── */
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -95,7 +95,6 @@ body.touch-mode .btn,
 body.touch-mode .btn-sm{min-height:44px;padding:10px 16px;font-size:13px;}
 body.touch-mode .nav-item{min-height:44px;padding:11px 14px;font-size:15px;}
 body.touch-mode .theme-btn,
-body.touch-mode .lang-btn,
 body.touch-mode .touch-btn{min-height:40px;padding:8px 12px;font-size:13px;}
 body.touch-mode .logout-btn{width:42px;height:42px;font-size:18px;}
 body.touch-mode input[type="text"],
@@ -580,18 +579,6 @@ body{
 .theme-btn+.theme-btn{border-left:1px solid var(--border);}
 .theme-btn:hover{color:var(--text);background:var(--bg3);}
 .theme-btn.active{color:var(--accent);background:rgba(0,212,168,0.08);}
-
-/* Lang picker */
-.lang-picker{display:flex;gap:2px;}
-.lang-btn{
-  padding:3px 6px;border-radius:4px;cursor:pointer;
-  font-family:var(--mono);font-size:10px;font-weight:600;
-  color:var(--text3);background:transparent;
-  border:1px solid transparent;
-  transition:all 0.15s;
-}
-.lang-btn:hover{color:var(--text);background:var(--bg3);}
-.lang-btn.active{color:var(--accent);background:rgba(0,212,168,0.08);border-color:rgba(0,212,168,0.2);}
 
 /* ── Readability eye button + Apple-style level popover ───────────────────── */
 .eye-wrap{position:relative;display:flex;}
@@ -1149,7 +1136,6 @@ tr.row-emergency td:first-child{box-shadow:inset 3px 0 0 var(--danger);}
   .topbar-sep{display:none;}
   .topbar-right{gap:4px;}
   .theme-btn{padding:3px 6px;font-size:9px;}
-  .lang-btn{padding:2px 4px;font-size:9px;}
   .logout-btn{width:30px;height:30px;font-size:13px;}
 
   #content{padding:8px;}
@@ -2318,7 +2304,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
          loadSystemInfo() toggles #sdr-badge + writes #sdr-badge-label;
          handleSysHealth() toggles #pwr-badge + writes #pwr-badge-label. No JS changes. -->
     <div class="hw-status">
-      <div id="sdr-badge" class="hw-row hw-row--sdr" style="display:none" title="Detected SDR hardware">
+      <div id="sdr-badge" class="hw-row hw-row--sdr" style="display:none" title="Erkannte SDR-Hardware">
         <span class="hw-glyph" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
                stroke-linecap="round" stroke-linejoin="round">
@@ -2332,7 +2318,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
         </span>
         <span class="hw-live" aria-hidden="true"><span class="hw-live-dot"></span></span>
       </div>
-      <div id="health-badge" class="hw-row" style="display:none" title="Station health">
+      <div id="health-badge" class="hw-row" style="display:none" title="Zustand der Basisstation">
         <span class="hw-glyph" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
                stroke-linecap="round" stroke-linejoin="round">
@@ -2340,11 +2326,11 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
           </svg>
         </span>
         <span class="hw-meta">
-          <span class="hw-key">HEALTH</span>
+          <span class="hw-key">SYSTEMZUSTAND</span>
           <span class="hw-val" id="health-badge-label">—</span>
         </span>
       </div>
-      <div id="pwr-badge" class="hw-row hw-row--pwr" style="display:none" title="Host system power draw">
+      <div id="pwr-badge" class="hw-row hw-row--pwr" style="display:none" title="Leistungsaufnahme des Hostsystems">
         <span class="hw-glyph" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
                stroke-linecap="round" stroke-linejoin="round">
@@ -2352,7 +2338,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
           </svg>
         </span>
         <span class="hw-meta">
-          <span class="hw-key" data-i18n="power">POWER</span>
+          <span class="hw-key" data-i18n="power">LEISTUNG</span>
           <span class="hw-val" id="pwr-badge-label">—</span>
         </span>
       </div>
@@ -2363,20 +2349,20 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
 
   <div class="sidebar-nav">
     <!-- MONITOR — live, read-mostly surfaces (ordered by glance-frequency). -->
-    <div class="nav-section-label" data-i18n-section="monitor">MONITOR</div>
+    <div class="nav-section-label" data-i18n-section="monitor">ÜBERWACHUNG</div>
     <div class="nav-item active" onclick="showPage('stations',this)" id="nav-stations">
       <span class="nav-icon" data-icon="radios"></span>
-      <span class="nav-label" data-i18n="stations">RADIOS</span>
+      <span class="nav-label" data-i18n="stations">FUNKGERÄTE</span>
       <span class="nav-badge" id="badge-ms">0</span>
     </div>
     <div class="nav-item" onclick="showPage('calls',this)" id="nav-calls">
       <span class="nav-icon" data-icon="calls"></span>
-      <span class="nav-label" data-i18n="calls">CALLS</span>
+      <span class="nav-label" data-i18n="calls">RUFE</span>
       <span class="nav-badge" id="badge-calls" style="display:none">0</span>
     </div>
     <div class="nav-item" onclick="showPage('lastheard',this)" id="nav-lastheard">
       <span class="nav-icon" data-icon="lastheard"></span>
-      <span class="nav-label" data-i18n="lastheard">LAST HEARD</span>
+      <span class="nav-label" data-i18n="lastheard">ZULETZT GEHÖRT</span>
     </div>
     <div class="nav-item" onclick="showPage('rf',this)" id="nav-rf">
       <span class="nav-icon" data-icon="rf"></span>
@@ -2384,7 +2370,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
     </div>
     <div class="nav-item" onclick="showPage('health',this)" id="nav-health">
       <span class="nav-icon" data-icon="health"></span>
-      <span class="nav-label">HEALTH</span>
+      <span class="nav-label">SYSTEMZUSTAND</span>
     </div>
     <div class="nav-item" onclick="showPage('log',this)" id="nav-log">
       <span class="nav-icon" data-icon="log"></span>
@@ -2392,15 +2378,15 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
     </div>
     <div class="nav-item" onclick="showPage('sdslog',this)" id="nav-sdslog">
       <span class="nav-icon" data-icon="sdslog"></span>
-      <span class="nav-label" data-i18n="sdslog">SDS LOG</span>
+      <span class="nav-label" data-i18n="sdslog">SDS-PROTOKOLL</span>
     </div>
     <div class="nav-item" onclick="showPage('maps',this)" id="nav-maps">
       <span class="nav-icon" data-icon="maps"></span>
-      <span class="nav-label" data-i18n="maps">Maps</span>
+      <span class="nav-label" data-i18n="maps">Karte</span>
     </div>
 
     <!-- INTEGRATIONS — external services (each hidden until its probe succeeds). -->
-    <div class="nav-section-label" data-i18n-section="integrations">INTEGRATIONS</div>
+    <div class="nav-section-label" data-i18n-section="integrations">INTEGRATIONEN</div>
     <div class="nav-item" onclick="showPage('asterisk',this)" id="nav-asterisk">
       <span class="nav-icon" data-icon="asterisk"></span>
       <span class="nav-label" data-i18n="asterisk">Asterisk SIP</span>
@@ -2434,14 +2420,14 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
          and toggles this element's display. -->
     <div class="nav-item" onclick="showPage('wifi',this)" id="nav-wifi" style="display:none">
       <span class="nav-icon" data-icon="wifi"></span>
-      <span class="nav-label" data-i18n="wifi">WIFI</span>
+      <span class="nav-label" data-i18n="wifi">WLAN</span>
     </div>
 
     <!-- SYSTEM — configure / operate the station. -->
     <div class="nav-section-label" data-i18n-section="system_sec">SYSTEM</div>
     <div class="nav-item" onclick="showPage('config',this)" id="nav-config">
       <span class="nav-icon" data-icon="config"></span>
-      <span class="nav-label" data-i18n="config">CONFIG</span>
+      <span class="nav-label" data-i18n="config">KONFIGURATION</span>
     </div>
     <div class="nav-item" onclick="showPage('system',this)" id="nav-system">
       <span class="nav-icon" data-icon="system"></span>
@@ -2473,7 +2459,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
       <div class="cr-line" id="cr-ua">—</div>
     </div>
     <!-- Collapse toggle -->
-    <button class="sidebar-toggle" onclick="toggleSidebar()" title="Toggle sidebar" aria-label="Toggle sidebar"><span class="ico18" data-icon="collapse"></span></button>
+    <button class="sidebar-toggle" onclick="toggleSidebar()" title="Seitenleiste ein-/ausblenden" aria-label="Seitenleiste ein-/ausblenden"><span class="ico18" data-icon="collapse"></span></button>
   </div>
 </nav>
 
@@ -2481,15 +2467,15 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
 <div id="main">
   <!-- Topbar -->
   <div id="topbar">
-    <button id="sidebar-toggle-btn" onclick="openMobileSidebar()" aria-label="Menu"><span class="ico18" data-icon="hamburger"></span></button>
-    <div class="topbar-title" id="topbar-title">Radios</div>
+    <button id="sidebar-toggle-btn" onclick="openMobileSidebar()" aria-label="Menü"><span class="ico18" data-icon="hamburger"></span></button>
+    <div class="topbar-title" id="topbar-title">Funkgeräte</div>
 
     <!-- Calm always-visible station-state chips (BS / Brew / Emergency-if-active). -->
     <div class="topbar-chips" aria-hidden="false">
-      <span class="pill pill-idle" id="chip-bs" title="Base station link"><span data-i18n="bs_label">BS</span></span>
-      <span class="pill pill-idle" id="chip-brew" title="Brew network"><span>Brew</span></span>
-      <span class="pill pill-danger" id="chip-emergency" style="display:none" title="Emergency active">
-        <span class="pill-icon" data-icon="emergency"></span><span data-i18n="emg_chip">EMERGENCY</span>
+      <span class="pill pill-idle" id="chip-bs" title="Verbindung zur Basisstation"><span data-i18n="bs_label">BS</span></span>
+      <span class="pill pill-idle" id="chip-brew" title="Brew-Netzwerk"><span>Brew</span></span>
+      <span class="pill pill-danger" id="chip-emergency" style="display:none" title="Notfall aktiv">
+        <span class="pill-icon" data-icon="emergency"></span><span data-i18n="emg_chip">NOTFALL</span>
       </span>
     </div>
 
@@ -2497,20 +2483,20 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
       <!-- Readability: opens an Apple-style level popover (Small/Medium/High/Ultra). -->
       <div class="eye-wrap">
         <button class="eye-btn" id="read-btn" onclick="toggleReadPop(event)"
-                title="Text size &amp; contrast" aria-haspopup="true" aria-expanded="false" aria-label="Readability">
+                title="Text size &amp; contrast" aria-haspopup="true" aria-expanded="false" aria-label="Lesbarkeit">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
                stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/>
             <circle cx="12" cy="12" r="3"/>
           </svg>
         </button>
-        <div class="read-pop" id="read-pop" role="menu" aria-label="Text size">
-          <div class="read-pop-title" data-i18n="readability">READABILITY</div>
+        <div class="read-pop" id="read-pop" role="menu" aria-label="Textgröße">
+          <div class="read-pop-title" data-i18n="readability">LESBARKEIT</div>
           <button class="read-opt" data-size="s" role="menuitemradio" onclick="setUiSize('s')">
             <span class="read-aa">Aa</span>
             <span class="read-opt-text">
-              <span class="read-opt-name" data-i18n="size_small">Small</span>
-              <span class="read-opt-desc" data-i18n="size_small_d">Compact · normal contrast</span>
+              <span class="read-opt-name" data-i18n="size_small">Klein</span>
+              <span class="read-opt-desc" data-i18n="size_small_d">Kompakt · normaler Kontrast</span>
             </span>
             <svg class="read-check" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                  stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
@@ -2518,8 +2504,8 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
           <button class="read-opt" data-size="m" role="menuitemradio" onclick="setUiSize('m')">
             <span class="read-aa">Aa</span>
             <span class="read-opt-text">
-              <span class="read-opt-name" data-i18n="size_medium">Medium</span>
-              <span class="read-opt-desc" data-i18n="size_medium_d">Default · comfortable</span>
+              <span class="read-opt-name" data-i18n="size_medium">Mittel</span>
+              <span class="read-opt-desc" data-i18n="size_medium_d">Standard · angenehm</span>
             </span>
             <svg class="read-check" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                  stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
@@ -2527,8 +2513,8 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
           <button class="read-opt" data-size="h" role="menuitemradio" onclick="setUiSize('h')">
             <span class="read-aa">Aa</span>
             <span class="read-opt-text">
-              <span class="read-opt-name" data-i18n="size_high">High</span>
-              <span class="read-opt-desc" data-i18n="size_high_d">Larger · stronger contrast</span>
+              <span class="read-opt-name" data-i18n="size_high">Groß</span>
+              <span class="read-opt-desc" data-i18n="size_high_d">Größer · stärkerer Kontrast</span>
             </span>
             <svg class="read-check" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                  stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
@@ -2536,8 +2522,8 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
           <button class="read-opt" data-size="u" role="menuitemradio" onclick="setUiSize('u')">
             <span class="read-aa">Aa</span>
             <span class="read-opt-text">
-              <span class="read-opt-name" data-i18n="size_ultra">Ultra</span>
-              <span class="read-opt-desc" data-i18n="size_ultra_d">Largest · maximum contrast</span>
+              <span class="read-opt-name" data-i18n="size_ultra">Sehr groß</span>
+              <span class="read-opt-desc" data-i18n="size_ultra_d">Maximale Größe · maximaler Kontrast</span>
             </span>
             <svg class="read-check" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                  stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
@@ -2545,14 +2531,14 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
         </div>
       </div>
       <div class="theme-picker">
-        <button class="theme-btn" data-t="dark" onclick="setTheme('dark',this)">Dark</button>
-        <button class="theme-btn active" data-t="light" onclick="setTheme('light',this)">Light</button>
-        <button class="theme-btn" data-t="blue" onclick="setTheme('blue',this)">Blue</button>
+        <button class="theme-btn" data-t="dark" onclick="setTheme('dark',this)">Dunkel</button>
+        <button class="theme-btn active" data-t="light" onclick="setTheme('light',this)">Hell</button>
+        <button class="theme-btn" data-t="blue" onclick="setTheme('blue',this)">Blau</button>
       </div>
       <!-- Logout: clears session cookie and redirects to /login. Hidden when auth is off. -->
-      <button class="logout-btn" id="logout-btn" onclick="doLogout()" title="Log out" aria-label="Log out" style="display:none"><span class="ico18" data-icon="shutdown"></span></button>
+      <button class="logout-btn" id="logout-btn" onclick="doLogout()" title="Abmelden" aria-label="Abmelden" style="display:none"><span class="ico18" data-icon="shutdown"></span></button>
       <!-- Login: shown only in anonymous public-overview mode (FH-FEAT-033). -->
-      <button class="logout-btn" id="login-btn" onclick="window.location='/login'" title="Log in" aria-label="Log in" style="display:none"><span class="ico18" data-icon="login"></span></button>
+      <button class="logout-btn" id="login-btn" onclick="window.location='/login'" title="Anmelden" aria-label="Anmelden" style="display:none"><span class="ico18" data-icon="login"></span></button>
     </div>
   </div>
 
@@ -2560,7 +2546,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
   <div id="fallback-banner" class="banner banner-warn" style="display:none">
     <span class="banner-ico" data-icon="alert"></span>
     <div class="banner-body">
-      <div data-i18n="fallback_title">FALLBACK CONFIG ACTIVE — Primary config failed to load</div>
+      <div data-i18n="fallback_title">FALLBACK-KONFIGURATION AKTIV — Primäre Konfiguration konnte nicht geladen werden</div>
       <div id="fallback-reason" class="banner-sub"></div>
     </div>
   </div>
@@ -2570,7 +2556,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
   <div id="emergency-banner" class="banner banner-danger" style="display:none">
     <span class="banner-dot" aria-hidden="true"></span>
     <span class="banner-ico" data-icon="emergency"></span>
-    <span data-i18n="emg_banner_title">EMERGENCY ACTIVE</span>
+    <span data-i18n="emg_banner_title">NOTFALL AKTIV</span>
     <div id="emergency-banner-list" style="display:flex;flex-wrap:wrap;gap:8px"></div>
   </div>
 
@@ -2581,15 +2567,15 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
     <div class="page" id="page-public">
       <div class="stat-grid">
         <div class="stat-card green">
-          <div class="stat-label">Radios</div>
+          <div class="stat-label">Funkgeräte</div>
           <div class="stat-value accent" id="pub-ms">—</div>
-          <div class="stat-sub">registered</div>
+          <div class="stat-sub">registriert</div>
           <div class="stat-icon" data-icon="radios"></div>
         </div>
         <div class="stat-card blue">
-          <div class="stat-label">Active Calls</div>
+          <div class="stat-label">Aktive Rufe</div>
           <div class="stat-value blue" id="pub-calls">—</div>
-          <div class="stat-sub">circuits in use</div>
+          <div class="stat-sub">belegte Rufkanäle</div>
           <div class="stat-icon" data-icon="calls"></div>
         </div>
         <div class="stat-card" id="pub-rf-card">
@@ -2599,19 +2585,19 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
           <div class="stat-icon" data-icon="rf"></div>
         </div>
         <div class="stat-card" id="pub-brew-card">
-          <div class="stat-label">Network</div>
+          <div class="stat-label">Netzwerk</div>
           <div class="stat-value is-text" id="pub-brew">—</div>
           <div class="stat-sub" id="pub-ver">—</div>
           <div class="stat-icon" data-icon="network"></div>
         </div>
       </div>
       <div class="card">
-        <div class="card-head"><div class="card-title">Cell Status</div></div>
+        <div class="card-head"><div class="card-title">Zellstatus</div></div>
         <div class="card-body">
           <div class="empty-state">
             <span class="empty-ico" data-icon="login"></span>
-            <div class="empty-msg">Read-only public overview</div>
-            <div class="empty-sub">Log in for full access and controls.</div>
+            <div class="empty-msg">Öffentliche Übersicht mit Lesezugriff</div>
+            <div class="empty-sub">Für vollständigen Zugriff und Bedienung anmelden.</div>
           </div>
         </div>
       </div>
@@ -2623,12 +2609,12 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
       <div class="hero">
         <span class="hero-dot is-idle" id="stations-hero-dot"></span>
         <div class="hero-main">
-          <div class="hero-title" id="stations-hero-title" data-i18n="terminals">Radios</div>
-          <div class="hero-sub" id="stations-hero-sub" data-i18n="registered">registered</div>
+          <div class="hero-title" id="stations-hero-title" data-i18n="terminals">Funkgeräte</div>
+          <div class="hero-sub" id="stations-hero-sub" data-i18n="registered">registriert</div>
         </div>
         <div class="hero-metrics">
           <div class="hero-metric">
-            <div class="hero-metric-label" data-i18n="active_calls">Active Calls</div>
+            <div class="hero-metric-label" data-i18n="active_calls">Aktive Rufe</div>
             <div class="hero-metric-value" id="stations-hero-calls">0</div>
           </div>
           <div class="hero-metric">
@@ -2640,15 +2626,15 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
       <!-- Stat cards -->
       <div class="stat-grid">
         <div class="stat-card green">
-          <div class="stat-label" data-i18n="terminals">Radios</div>
+          <div class="stat-label" data-i18n="terminals">Funkgeräte</div>
           <div class="stat-value accent" id="stat-ms">0</div>
-          <div class="stat-sub" data-i18n="registered">registered</div>
+          <div class="stat-sub" data-i18n="registered">registriert</div>
           <div class="stat-icon" data-icon="radios"></div>
         </div>
         <div class="stat-card blue">
-          <div class="stat-label" data-i18n="active_calls">Active Calls</div>
+          <div class="stat-label" data-i18n="active_calls">Aktive Rufe</div>
           <div class="stat-value blue" id="stat-calls">0</div>
-          <div class="stat-sub" data-i18n="circuits">circuits in use</div>
+          <div class="stat-sub" data-i18n="circuits">belegte Rufkanäle</div>
           <div class="stat-icon" data-icon="calls"></div>
         </div>
         <div class="stat-card is-danger" id="stat-brew-card">
@@ -2661,20 +2647,20 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
       <!-- TETRA BTS Details — static cell + RF identity from config.toml -->
       <div class="card">
         <div class="card-head">
-          <div class="card-title" data-i18n="bts_details">TETRA BTS Details</div>
+          <div class="card-title" data-i18n="bts_details">Details der TETRA-Basisstation</div>
           <div class="card-actions">
             <span id="bts-neighbor" class="bts-chip">—</span>
             <span id="bts-hang" class="bts-chip">—</span>
           </div>
         </div>
         <div class="bts-grid">
-          <div class="bts-tile"><div class="bts-tile-label" data-i18n="bts_tx">TX Freq</div><div class="bts-tile-value tx" id="bts-tx">—</div></div>
-          <div class="bts-tile"><div class="bts-tile-label" data-i18n="bts_rx">RX Freq</div><div class="bts-tile-value rx" id="bts-rx">—</div></div>
-          <div class="bts-tile"><div class="bts-tile-label" data-i18n="bts_shift">Duplex Shift</div><div class="bts-tile-value" id="bts-shift">—</div></div>
+          <div class="bts-tile"><div class="bts-tile-label" data-i18n="bts_tx">TX-Frequenz</div><div class="bts-tile-value tx" id="bts-tx">—</div></div>
+          <div class="bts-tile"><div class="bts-tile-label" data-i18n="bts_rx">RX-Frequenz</div><div class="bts-tile-value rx" id="bts-rx">—</div></div>
+          <div class="bts-tile"><div class="bts-tile-label" data-i18n="bts_shift">Duplexabstand</div><div class="bts-tile-value" id="bts-shift">—</div></div>
           <div class="bts-tile"><div class="bts-tile-label">MCC</div><div class="bts-tile-value" id="bts-mcc">—</div></div>
           <div class="bts-tile"><div class="bts-tile-label">MNC</div><div class="bts-tile-value" id="bts-mnc">—</div></div>
-          <div class="bts-tile"><div class="bts-tile-label" data-i18n="bts_carrier">Main Carrier</div><div class="bts-tile-value" id="bts-carrier">—</div></div>
-          <div class="bts-tile"><div class="bts-tile-label">Secondary Carrier</div><div class="bts-tile-value" id="bts-secondary-carrier">—</div></div>
+          <div class="bts-tile"><div class="bts-tile-label" data-i18n="bts_carrier">Hauptträger</div><div class="bts-tile-value" id="bts-carrier">—</div></div>
+          <div class="bts-tile"><div class="bts-tile-label">Sekundärträger</div><div class="bts-tile-value" id="bts-secondary-carrier">—</div></div>
         </div>
         <div class="bts-dual-bar">
           <div class="bts-dual-info">
@@ -2682,7 +2668,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
               <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M4 17h16"/><path d="M8 4v6"/><path d="M16 14v6"/></svg>
             </span>
             <div>
-              <div class="bts-dual-title">Dual Carrier</div>
+              <div class="bts-dual-title">Dual-Carrier</div>
               <div class="bts-dual-sub" id="bts-dual-sub">—</div>
             </div>
           </div>
@@ -2697,7 +2683,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
               <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 5v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V5z"/><path d="M9 12l2 2 4-4"/></svg>
             </span>
             <div>
-              <div class="bts-access-title" data-i18n="bts_access">Registration Access</div>
+              <div class="bts-access-title" data-i18n="bts_access">Registrierungszugang</div>
               <div class="bts-access-sub" id="bts-access-sub">—</div>
             </div>
           </div>
@@ -2708,7 +2694,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
       <!-- TS Visualizer -->
       <div class="card">
         <div class="card-head">
-          <div class="card-title">RF Channel — Timeslots</div>
+          <div class="card-title">HF-Kanäle — Zeitschlitze</div>
         </div>
         <div class="ts-grid" id="ts-grid">
           <!-- Rendered by renderTsGrid(): main carrier plus secondary carrier when DualCarrier is running. -->
@@ -2718,19 +2704,19 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
       <!-- Table -->
       <div class="card">
         <div class="card-head">
-          <div class="card-title" data-i18n="registered_terminals">Registered Radios</div>
+          <div class="card-title" data-i18n="registered_terminals">Registrierte Funkgeräte</div>
         </div>
         <div class="card-body">
           <div class="table-wrap">
             <table>
               <thead><tr>
-                <th data-i18n="th_issi_cs">ISSI / Callsign</th>
-                <th data-i18n="th_groups">Groups</th>
-                <th class="col-mobile-hide" data-i18n="th_ee">Energy Economy</th>
+                <th data-i18n="th_issi_cs">ISSI / Rufzeichen</th>
+                <th data-i18n="th_groups">Gruppen</th>
+                <th class="col-mobile-hide" data-i18n="th_ee">Energiesparmodus</th>
                 <th data-i18n="th_signal">Signal</th>
                 <th data-i18n="th_status">Status</th>
-                <th class="col-mobile-hide" data-i18n="th_last_seen">Last seen</th>
-                <th data-i18n="th_actions">Actions</th>
+                <th class="col-mobile-hide" data-i18n="th_last_seen">Zuletzt gesehen</th>
+                <th data-i18n="th_actions">Aktionen</th>
               </tr></thead>
               <tbody id="ms-tbody"></tbody>
             </table>
@@ -2743,18 +2729,18 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
     <div class="page" id="page-calls">
       <div class="card">
         <div class="card-head">
-          <div class="card-title" data-i18n="active_calls">Active Calls</div>
+          <div class="card-title" data-i18n="active_calls">Aktive Rufe</div>
         </div>
         <div class="card-body">
           <div class="table-wrap">
             <table>
               <thead><tr>
                 <th class="col-mobile-hide" data-i18n="th_id">ID</th>
-                <th data-i18n="th_type">Type</th>
-                <th data-i18n="th_caller">Caller</th>
-                <th data-i18n="th_dest">Destination</th>
-                <th data-i18n="th_speaker">Speaker</th>
-                <th data-i18n="th_duration">Duration</th>
+                <th data-i18n="th_type">Typ</th>
+                <th data-i18n="th_caller">Rufquelle</th>
+                <th data-i18n="th_dest">Ziel</th>
+                <th data-i18n="th_speaker">Sprecher</th>
+                <th data-i18n="th_duration">Dauer</th>
               </tr></thead>
               <tbody id="calls-tbody"></tbody>
             </table>
@@ -2767,15 +2753,15 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
     <div class="page" id="page-lastheard">
       <div class="card">
         <div class="card-head">
-          <div class="card-title" data-i18n="last_heard_title">Last Heard</div>
+          <div class="card-title" data-i18n="last_heard_title">Zuletzt gehört</div>
           <div class="card-actions">
-            <button class="btn btn-sm" onclick="clearLastHeard()" data-i18n="clear">Clear</button>
+            <button class="btn btn-sm" onclick="clearLastHeard()" data-i18n="clear">Löschen</button>
           </div>
         </div>
         <div class="card-body">
           <div class="lastheard-filters">
             <div class="mesh-msg-filter-field">
-              <span class="mesh-msg-filter-label">Source</span>
+              <span class="mesh-msg-filter-label">Quelle</span>
               <div class="mesh-msg-filter-buttons">
                 <button class="btn btn-sm btn-primary" id="lh-source-local" onclick="toggleLastHeardSource('local')">local</button>
                 <button class="btn btn-sm btn-primary" id="lh-source-brew" onclick="toggleLastHeardSource('brew')">brew</button>
@@ -2785,11 +2771,11 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
               </div>
             </div>
             <label class="mesh-msg-filter-field">
-              <span class="mesh-msg-filter-label">ISSI regex</span>
+              <span class="mesh-msg-filter-label">ISSI-RegEx</span>
               <input type="search" id="lastheard-issi-filter" class="form-input" placeholder="2632585|DJ2TH" oninput="lastHeardFilterChanged()" spellcheck="false">
             </label>
             <label class="mesh-msg-filter-field">
-              <span class="mesh-msg-filter-label">Destination regex</span>
+              <span class="mesh-msg-filter-label">Ziel-RegEx</span>
               <input type="search" id="lastheard-dest-filter" class="form-input" placeholder="26200|91385" oninput="lastHeardFilterChanged()" spellcheck="false">
             </label>
             <span class="mesh-msg-filter-status" id="lastheard-filter-status">—</span>
@@ -2797,12 +2783,12 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
           <div class="table-wrap">
             <table>
               <thead><tr>
-                <th data-i18n="th_time">Time</th>
+                <th data-i18n="th_time">Zeit</th>
                 <th data-i18n="th_issi">ISSI</th>
-                <th data-i18n="th_source">Source</th>
-                <th data-i18n="th_activity">Activity</th>
-                <th data-i18n="th_dest">Destination</th>
-                <th data-i18n="th_duration">Duration</th>
+                <th data-i18n="th_source">Quelle</th>
+                <th data-i18n="th_activity">Aktivität</th>
+                <th data-i18n="th_dest">Ziel</th>
+                <th data-i18n="th_duration">Dauer</th>
               </tr></thead>
               <tbody id="lastheard-tbody"></tbody>
             </table>
@@ -2815,23 +2801,23 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
     <div class="page" id="page-log">
       <div class="card">
         <div class="card-head">
-          <div class="card-title" data-i18n="live_log">Live Log</div>
+          <div class="card-title" data-i18n="live_log">Live-Protokoll</div>
           <div class="card-actions">
-            <button class="btn btn-sm" onclick="exportLog()"><span class="btn-icon" data-icon="export"></span><span data-i18n="export">Export</span></button>
-            <button class="btn btn-sm" onclick="clearLog()"><span class="btn-icon" data-icon="delete"></span><span data-i18n="clear">Clear</span></button>
+            <button class="btn btn-sm" onclick="exportLog()"><span class="btn-icon" data-icon="export"></span><span data-i18n="export">Exportieren</span></button>
+            <button class="btn btn-sm" onclick="clearLog()"><span class="btn-icon" data-icon="delete"></span><span data-i18n="clear">Löschen</span></button>
           </div>
         </div>
         <div id="log-container" class="log-wrap"></div>
         <div class="log-controls">
           <select id="log-filter" class="log-filter">
-            <option value="" data-i18n="filter_all">All</option>
+            <option value="" data-i18n="filter_all">Alle</option>
             <option value="INFO">INFO+</option>
             <option value="WARN">WARN+</option>
             <option value="ERROR">ERROR</option>
           </select>
           <label class="autoscroll-label">
             <input type="checkbox" id="log-autoscroll" checked>
-            <span data-i18n="autoscroll">Auto-scroll</span>
+            <span data-i18n="autoscroll">Automatisch scrollen</span>
           </label>
         </div>
       </div>
@@ -2844,21 +2830,21 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
     <div class="page" id="page-sdslog">
       <div class="card">
         <div class="card-head">
-          <div class="card-title" data-i18n="sdslog">SDS Log</div>
+          <div class="card-title" data-i18n="sdslog">SDS-Protokoll</div>
           <div class="card-actions">
-            <button class="btn btn-sm" onclick="loadSdsLog()"><span class="btn-icon" data-icon="restart"></span><span data-i18n="sds_refresh">Refresh</span></button>
-            <button class="btn btn-sm" onclick="exportSdsLog()"><span class="btn-icon" data-icon="export"></span><span data-i18n="export">Export</span></button>
-            <button class="btn btn-sm btn-danger" onclick="clearSdsLog()"><span class="btn-icon" data-icon="delete"></span><span data-i18n="clear">Clear</span></button>
+            <button class="btn btn-sm" onclick="loadSdsLog()"><span class="btn-icon" data-icon="restart"></span><span data-i18n="sds_refresh">Aktualisieren</span></button>
+            <button class="btn btn-sm" onclick="exportSdsLog()"><span class="btn-icon" data-icon="export"></span><span data-i18n="export">Exportieren</span></button>
+            <button class="btn btn-sm btn-danger" onclick="clearSdsLog()"><span class="btn-icon" data-icon="delete"></span><span data-i18n="clear">Löschen</span></button>
           </div>
         </div>
         <div class="card-body">
           <div class="sds-log-filters">
             <label class="mesh-msg-filter-field">
-              <span class="mesh-msg-filter-label">From regex</span>
+              <span class="mesh-msg-filter-label">Absender-RegEx</span>
               <input type="search" id="sdslog-from-filter" class="form-input" placeholder="2632585|DJ2TH" oninput="sdsLogFilterChanged()" spellcheck="false">
             </label>
             <label class="mesh-msg-filter-field">
-              <span class="mesh-msg-filter-label">TG regex</span>
+              <span class="mesh-msg-filter-label">Rufgruppen-RegEx</span>
               <input type="search" id="sdslog-tg-filter" class="form-input" placeholder="26200|91102" oninput="sdsLogFilterChanged()" spellcheck="false">
             </label>
             <span class="mesh-msg-filter-status" id="sdslog-filter-status">—</span>
@@ -2866,19 +2852,19 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
           <div class="table-wrap">
             <table>
               <thead><tr>
-                <th data-i18n="th_time">Time</th>
-                <th data-i18n="th_dir">Dir</th>
-                <th data-i18n="th_from">From</th>
-                <th data-i18n="th_to">To</th>
-                <th data-i18n="th_message">Message</th>
+                <th data-i18n="th_time">Zeit</th>
+                <th data-i18n="th_dir">Ri.</th>
+                <th data-i18n="th_from">Von</th>
+                <th data-i18n="th_to">An</th>
+                <th data-i18n="th_message">Nachricht</th>
               </tr></thead>
               <tbody id="sdslog-tbody"></tbody>
             </table>
           </div>
           <div class="log-controls">
-            <button class="btn btn-sm" onclick="sdsLogPrevPage()">‹ Prev</button>
-            <span class="sds-empty" id="sdslog-page">Page 1 / 1</span>
-            <button class="btn btn-sm" onclick="sdsLogNextPage()">Next ›</button>
+            <button class="btn btn-sm" onclick="sdsLogPrevPage()">‹ Zurück</button>
+            <span class="sds-empty" id="sdslog-page">Seite 1 / 1</span>
+            <button class="btn btn-sm" onclick="sdsLogNextPage()">Weiter ›</button>
           </div>
         </div>
       </div>
@@ -2894,12 +2880,12 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
       <div class="hero">
         <span class="hero-dot is-idle" id="rf-hero-dot"></span>
         <div class="hero-main">
-          <div class="hero-title" data-i18n="rf_spectrum">TX DSP Spectrum (pre-PA)</div>
-          <div class="hero-sub" id="rf-hero-sub" data-i18n="rf_waiting">waiting…</div>
+          <div class="hero-title" data-i18n="rf_spectrum">TX-DSP-Spektrum (vor Leistungsverstärker)</div>
+          <div class="hero-sub" id="rf-hero-sub" data-i18n="rf_waiting">Warte auf Daten…</div>
         </div>
         <div class="hero-metrics">
           <div class="hero-metric">
-            <div class="hero-metric-label" data-i18n="rf_freq">Center freq</div>
+            <div class="hero-metric-label" data-i18n="rf_freq">Mittenfrequenz</div>
             <div class="hero-metric-value" id="rf-hero-freq">—</div>
           </div>
           <div class="hero-metric">
@@ -2912,11 +2898,11 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
       <!-- Top stat strip: instantaneous big-number metrics -->
       <div class="rf-metrics">
         <div class="rf-metric">
-          <div class="rf-metric-label" data-i18n="rf_freq">Center freq</div>
+          <div class="rf-metric-label" data-i18n="rf_freq">Mittenfrequenz</div>
           <div class="rf-metric-value" id="rf-freq">—</div>
         </div>
         <div class="rf-metric">
-          <div class="rf-metric-label" data-i18n="rf_rate">Sample rate</div>
+          <div class="rf-metric-label" data-i18n="rf_rate">Abtastrate</div>
           <div class="rf-metric-value" id="rf-rate">—</div>
         </div>
         <div class="rf-metric">
@@ -2924,28 +2910,28 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
           <div class="rf-metric-value" id="rf-rms">—</div>
         </div>
         <div class="rf-metric">
-          <div class="rf-metric-label" data-i18n="rf_peak">Peak</div>
+          <div class="rf-metric-label" data-i18n="rf_peak">Spitzenwert</div>
           <div class="rf-metric-value" id="rf-peak">—</div>
         </div>
         <div class="rf-metric">
-          <div class="rf-metric-label" data-i18n="rf_age">Snapshot</div>
-          <div class="rf-metric-value" id="rf-age" data-i18n="rf_waiting">waiting…</div>
+          <div class="rf-metric-label" data-i18n="rf_age">Momentaufnahme</div>
+          <div class="rf-metric-value" id="rf-age" data-i18n="rf_waiting">Warte auf Daten…</div>
         </div>
       </div>
 
-      <div class="section-label" data-i18n="rf_visualizers">Visualizers</div>
+      <div class="section-label" data-i18n="rf_visualizers">Darstellungen</div>
       <!-- Visualizers grid: spectrum + constellation -->
       <div class="rf-grid">
         <div class="rf-panel">
           <div class="rf-panel-title">
-            <span data-i18n="rf_spectrum">TX DSP Spectrum (pre-PA)</span>
-            <span class="rf-hint" data-i18n="rf_hint_spectrum">live · 512-bin FFT</span>
+            <span data-i18n="rf_spectrum">TX-DSP-Spektrum (vor Leistungsverstärker)</span>
+            <span class="rf-hint" data-i18n="rf_hint_spectrum">live · 512-Bin-FFT</span>
           </div>
           <canvas id="rf-spectrum" class="rf-canvas" width="900" height="260"></canvas>
         </div>
         <div class="rf-panel">
           <div class="rf-panel-title">
-            <span data-i18n="rf_constellation">TX DSP Constellation</span>
+            <span data-i18n="rf_constellation">TX-DSP-Konstellationsdiagramm</span>
             <span class="rf-hint" data-i18n="rf_hint_constellation">π/4-DQPSK</span>
           </div>
           <canvas id="rf-constellation" class="rf-canvas small" width="420" height="260"></canvas>
@@ -2955,18 +2941,18 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
       <!-- Waterfall: time-vs-frequency heatmap, scrolls downward -->
       <div class="rf-panel" style="margin-top:12px">
         <div class="rf-panel-title">
-          <span data-i18n="rf_waterfall">TX Spectrum Waterfall</span>
-          <span class="rf-hint" data-i18n="rf_hint_waterfall">rolling · viridis</span>
+          <span data-i18n="rf_waterfall">TX-Spektrum-Wasserfalldiagramm</span>
+          <span class="rf-hint" data-i18n="rf_hint_waterfall">laufend · Viridis</span>
         </div>
         <canvas id="rf-waterfall" class="rf-canvas tall"></canvas>
       </div>
 
-      <div class="section-label" data-i18n="rf_quality">Signal Quality</div>
+      <div class="section-label" data-i18n="rf_quality">Signalqualität</div>
       <!-- Signal Quality strip — derived metrics with health badges (good/warn/bad) -->
       <div class="rf-quality-card">
         <div class="rf-panel-title">
-          <span data-i18n="rf_quality">Signal Quality</span>
-          <span class="rf-hint" data-i18n="rf_hint_quality">measured pre-PA · derived from same DSP snapshot</span>
+          <span data-i18n="rf_quality">Signalqualität</span>
+          <span class="rf-hint" data-i18n="rf_hint_quality">vor dem Leistungsverstärker gemessen · aus derselben DSP-Momentaufnahme</span>
         </div>
         <div class="rf-quality-grid">
           <div class="rf-qmetric" id="rf-q-evm-wrap">
@@ -2980,38 +2966,38 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
             <div class="gauge"><div class="gauge-track"><div class="gauge-fill" id="rf-papr-bar"></div></div></div>
           </div>
           <div class="rf-qmetric" id="rf-q-cl-wrap">
-            <div class="rf-qmetric-label" data-i18n="rf_carrier">Carrier leak</div>
+            <div class="rf-qmetric-label" data-i18n="rf_carrier">Trägerrest</div>
             <div class="rf-qmetric-value" id="rf-carrier">—</div>
             <div class="gauge"><div class="gauge-track"><div class="gauge-fill" id="rf-carrier-bar"></div></div></div>
           </div>
           <div class="rf-qmetric" id="rf-q-obw-wrap">
-            <div class="rf-qmetric-label" data-i18n="rf_obw">Occupied BW (99%)</div>
+            <div class="rf-qmetric-label" data-i18n="rf_obw">Belegte Bandbreite (99 %)</div>
             <div class="rf-qmetric-value" id="rf-obw">—</div>
             <div class="gauge"><div class="gauge-track"><div class="gauge-fill" id="rf-obw-bar"></div></div></div>
           </div>
         </div>
       </div>
 
-      <div class="section-label" data-i18n="rf_hw_health">Hardware Health</div>
+      <div class="section-label" data-i18n="rf_hw_health">Hardwarezustand</div>
       <!-- Hardware Health — temperature + actual gain readback from the SDR. Updated every ~5s. -->
       <div class="rf-quality-card">
         <div class="rf-panel-title">
-          <span data-i18n="rf_hw_health">Hardware Health</span>
-          <span class="rf-hint"><span data-i18n="rf_hint_health">polled every 5s</span> · <span id="rf-hw-age">—</span></span>
+          <span data-i18n="rf_hw_health">Hardwarezustand</span>
+          <span class="rf-hint"><span data-i18n="rf_hint_health">Abfrage alle 5 s</span> · <span id="rf-hw-age">—</span></span>
         </div>
         <div class="rf-hw-grid">
           <div class="rf-hw-temp">
-            <div class="rf-qmetric-label" data-i18n="rf_temp">SDR Temperature</div>
+            <div class="rf-qmetric-label" data-i18n="rf_temp">SDR-Temperatur</div>
             <div class="rf-hw-temp-value" id="rf-temp">—</div>
             <div class="rf-hw-temp-state" id="rf-temp-state">—</div>
             <div class="gauge" id="rf-temp-gauge"><div class="gauge-track"><div class="gauge-fill" id="rf-temp-bar"></div></div></div>
           </div>
           <div class="rf-hw-gain-block">
-            <div class="rf-qmetric-label" data-i18n="rf_tx_gain">TX Gain Stages (actual)</div>
+            <div class="rf-qmetric-label" data-i18n="rf_tx_gain">TX-Verstärkungsstufen (Istwert)</div>
             <div class="rf-hw-gain-list" id="rf-tx-gains">—</div>
           </div>
           <div class="rf-hw-gain-block">
-            <div class="rf-qmetric-label" data-i18n="rf_rx_gain">RX Gain Stages (actual)</div>
+            <div class="rf-qmetric-label" data-i18n="rf_rx_gain">RX-Verstärkungsstufen (Istwert)</div>
             <div class="rf-hw-gain-list" id="rf-rx-gains">—</div>
           </div>
         </div>
@@ -3021,7 +3007,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
 
     <!-- ── ASTERISK SIP ── -->
     <div class="page" id="page-asterisk">
-      <div class="section-label" data-i18n="integrations">Integrations</div>
+      <div class="section-label" data-i18n="integrations">Integrationen</div>
       <!-- Connection hero — live REGISTER state as a calm status pill. -->
       <div class="hero">
         <span class="hero-dot is-idle" id="ast-hero-dot"></span>
@@ -3037,13 +3023,13 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
         <div class="card-head">
           <div class="card-title" data-i18n="asterisk_title">Asterisk SIP</div>
           <div class="card-actions">
-            <button class="btn btn-sm" onclick="loadAsteriskStatus()"><span class="btn-icon" data-icon="restart"></span><span data-i18n="refresh">Refresh</span></button>
+            <button class="btn btn-sm" onclick="loadAsteriskStatus()"><span class="btn-icon" data-icon="restart"></span><span data-i18n="refresh">Aktualisieren</span></button>
           </div>
         </div>
         <div class="card-body">
           <div class="stat-grid" style="margin-bottom:14px">
             <div class="stat-card" id="ast-configured-card">
-              <div class="stat-label" data-i18n="ast_configured">Configured</div>
+              <div class="stat-label" data-i18n="ast_configured">Konfiguriert</div>
               <div class="stat-value is-text" id="ast-configured">—</div>
               <div class="stat-sub" id="ast-enabled">—</div>
             </div>
@@ -3054,14 +3040,14 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
             </div>
           </div>
           <div class="info-grid">
-            <div class="info-row"><div class="info-key" data-i18n="ast_sip_listen">SIP listen</div><div class="info-val" id="ast-sip-listen">—</div></div>
-            <div class="info-row"><div class="info-key" data-i18n="ast_remote">Remote Asterisk</div><div class="info-val" id="ast-remote">—</div></div>
-            <div class="info-row"><div class="info-key" data-i18n="ast_rtp">RTP ports</div><div class="info-val" id="ast-rtp">—</div></div>
+            <div class="info-row"><div class="info-key" data-i18n="ast_sip_listen">SIP-Listener</div><div class="info-val" id="ast-sip-listen">—</div></div>
+            <div class="info-row"><div class="info-key" data-i18n="ast_remote">Asterisk-Gegenstelle</div><div class="info-val" id="ast-remote">—</div></div>
+            <div class="info-row"><div class="info-key" data-i18n="ast_rtp">RTP-Ports</div><div class="info-val" id="ast-rtp">—</div></div>
             <div class="info-row"><div class="info-key" data-i18n="ast_codec">Codec</div><div class="info-val" id="ast-codec">—</div></div>
-            <div class="info-row"><div class="info-key">Inbound setup timeout</div><div class="info-val" id="ast-setup-timeout">—</div></div>
-            <div class="info-row"><div class="info-key" data-i18n="ast_last_rx">Last RX</div><div class="info-val" id="ast-last-rx">—</div></div>
-            <div class="info-row"><div class="info-key" data-i18n="ast_last_tx">Last TX</div><div class="info-val" id="ast-last-tx">—</div></div>
-            <div class="info-row"><div class="info-key" data-i18n="ast_last_error">Last error</div><div class="info-val" id="ast-last-error">—</div></div>
+            <div class="info-row"><div class="info-key">Zeitlimit für eingehenden Rufaufbau</div><div class="info-val" id="ast-setup-timeout">—</div></div>
+            <div class="info-row"><div class="info-key" data-i18n="ast_last_rx">Letzter Empfang</div><div class="info-val" id="ast-last-rx">—</div></div>
+            <div class="info-row"><div class="info-key" data-i18n="ast_last_tx">Letzte Sendung</div><div class="info-val" id="ast-last-tx">—</div></div>
+            <div class="info-row"><div class="info-key" data-i18n="ast_last_error">Letzter Fehler</div><div class="info-val" id="ast-last-error">—</div></div>
           </div>
         </div>
       </div>
@@ -3070,55 +3056,55 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
         <div class="card-head">
           <div class="card-title">Snom SIP NOTIFY</div>
           <div class="card-actions">
-            <button class="btn btn-sm" onclick="loadSnomNotify()"><span class="btn-icon" data-icon="restart"></span><span data-i18n="refresh">Refresh</span></button>
-            <button class="btn btn-primary" onclick="saveSnomNotify()"><span class="btn-icon" data-icon="save"></span><span data-i18n="save">Save</span></button>
+            <button class="btn btn-sm" onclick="loadSnomNotify()"><span class="btn-icon" data-icon="restart"></span><span data-i18n="refresh">Aktualisieren</span></button>
+            <button class="btn btn-primary" onclick="saveSnomNotify()"><span class="btn-icon" data-icon="save"></span><span data-i18n="save">Speichern</span></button>
           </div>
         </div>
         <div class="card-body">
           <label class="sw-row">
-            <span class="sw-text">Enable SnomIPPhoneText notifications</span>
+            <span class="sw-text">SnomIPPhoneText-Benachrichtigungen aktivieren</span>
             <span class="sw"><input type="checkbox" id="snom-enabled"><i></i></span>
           </label>
 
           <div class="h-form" style="margin-top:14px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))">
-            <label class="h-flabel">AMI host</label>
+            <label class="h-flabel">AMI-Host</label>
             <input type="text" id="snom-ami-host" class="form-input" placeholder="127.0.0.1">
-            <label class="h-flabel">AMI port</label>
+            <label class="h-flabel">AMI-Port</label>
             <input type="number" id="snom-ami-port" class="form-input" min="1" max="65535" placeholder="5038">
-            <label class="h-flabel">AMI user</label>
-            <input type="text" id="snom-ami-user" class="form-input" autocomplete="off" spellcheck="false" placeholder="flowstation">
-            <label class="h-flabel">AMI password</label>
+            <label class="h-flabel">AMI-Benutzer</label>
+            <input type="text" id="snom-ami-user" class="form-input" autocomplete="off" spellcheck="false" placeholder="netcore">
+            <label class="h-flabel">AMI-Passwort</label>
             <input type="password" id="snom-ami-password" class="form-input" autocomplete="new-password" spellcheck="false" oninput="snomPasswordDirty=true">
-            <label class="h-flabel top">PJSIP endpoints</label>
+            <label class="h-flabel top">PJSIP-Endpunkte</label>
             <textarea id="snom-endpoints" class="form-input" rows="3" placeholder="385&#10;386"></textarea>
           </div>
 
           <div class="h-form wide" style="margin-top:16px">
             <div>
-              <label class="sw-row"><span class="sw-text">Notify TETRA SDS</span><span class="sw"><input type="checkbox" id="snom-notify-sds"><i></i></span></label>
+              <label class="sw-row"><span class="sw-text">Bei TETRA-SDS benachrichtigen</span><span class="sw"><input type="checkbox" id="snom-notify-sds"><i></i></span></label>
               <div class="h-fopts" style="margin:8px 0 10px">
                 <label class="h-fopt"><input type="checkbox" id="snom-dir-rx"> RX</label>
                 <label class="h-fopt"><input type="checkbox" id="snom-dir-net"> NET</label>
                 <label class="h-fopt"><input type="checkbox" id="snom-dir-tx"> TX</label>
               </div>
-              <label class="h-flabel">SDS ISSI whitelist</label>
+              <label class="h-flabel">SDS-ISSI-Whitelist</label>
               <textarea id="snom-sds-issis" class="form-input" rows="4" placeholder="2632585&#10;9999"></textarea>
-              <div class="help-text">Empty = every SDS. A match on source or destination ISSI is enough.</div>
+              <div class="help-text">Leer = jede SDS. Eine Übereinstimmung bei Quell- oder Ziel-ISSI genügt.</div>
             </div>
             <div>
-              <label class="sw-row"><span class="sw-text">Notify DAPNET</span><span class="sw"><input type="checkbox" id="snom-notify-dapnet"><i></i></span></label>
-              <label class="h-flabel">DAPNET RIC whitelist</label>
+              <label class="sw-row"><span class="sw-text">Bei DAPNET benachrichtigen</span><span class="sw"><input type="checkbox" id="snom-notify-dapnet"><i></i></span></label>
+              <label class="h-flabel">DAPNET-RIC-Whitelist</label>
               <textarea id="snom-dapnet-rics" class="form-input" rows="4" placeholder="0632585&#10;0000200"></textarea>
-              <div class="help-text">Empty = every DAPNET message. Leading zeros are preserved in config.</div>
+              <div class="help-text">Leer = jede DAPNET-Nachricht. Führende Nullen bleiben in der Konfiguration erhalten.</div>
             </div>
             <div>
-              <label class="sw-row"><span class="sw-text">Notify Telegram</span><span class="sw"><input type="checkbox" id="snom-notify-telegram"><i></i></span></label>
+              <label class="sw-row"><span class="sw-text">Bei Telegram benachrichtigen</span><span class="sw"><input type="checkbox" id="snom-notify-telegram"><i></i></span></label>
               <div class="h-form-pair" style="margin-top:10px">
-                <label class="h-flabel">Title prefix</label>
-                <input type="text" id="snom-title-prefix" class="form-input" placeholder="FlowStation">
-                <label class="h-flabel">Max text chars</label>
+                <label class="h-flabel">Titelpräfix</label>
+                <input type="text" id="snom-title-prefix" class="form-input" placeholder="NetCore">
+                <label class="h-flabel">Maximale Textlänge</label>
                 <input type="number" id="snom-max-text" class="form-input" min="40" max="2000" placeholder="240">
-                <label class="h-flabel">Timeout (s)</label>
+                <label class="h-flabel">Zeitlimit (s)</label>
                 <input type="number" id="snom-timeout" class="form-input" min="1" max="30" placeholder="3">
               </div>
             </div>
@@ -3130,7 +3116,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
 
     <!-- ── DAPNET ── -->
     <div class="page" id="page-dapnet">
-      <div class="section-label" data-i18n="integrations">Integrations</div>
+      <div class="section-label" data-i18n="integrations">Integrationen</div>
       <!-- Connection hero — DAPNET feed state as a calm status pill. -->
       <div class="hero">
         <span class="hero-dot is-idle" id="dap-hero-dot"></span>
@@ -3144,25 +3130,25 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
       </div>
       <div class="card">
         <div class="card-head">
-          <div class="card-title" data-i18n="dapnet_log">DAPNET Log</div>
+          <div class="card-title" data-i18n="dapnet_log">DAPNET-Protokoll</div>
           <div class="card-actions">
-            <button class="btn btn-sm" onclick="loadDapnetLog()"><span class="btn-icon" data-icon="restart"></span><span data-i18n="refresh">Refresh</span></button>
-            <button class="btn btn-sm" onclick="exportDapnetLog()"><span class="btn-icon" data-icon="export"></span><span data-i18n="export">Export</span></button>
-            <button class="btn btn-sm btn-danger" onclick="clearDapnetLog()"><span class="btn-icon" data-icon="delete"></span><span data-i18n="clear">Clear</span></button>
+            <button class="btn btn-sm" onclick="loadDapnetLog()"><span class="btn-icon" data-icon="restart"></span><span data-i18n="refresh">Aktualisieren</span></button>
+            <button class="btn btn-sm" onclick="exportDapnetLog()"><span class="btn-icon" data-icon="export"></span><span data-i18n="export">Exportieren</span></button>
+            <button class="btn btn-sm btn-danger" onclick="clearDapnetLog()"><span class="btn-icon" data-icon="delete"></span><span data-i18n="clear">Löschen</span></button>
           </div>
         </div>
         <div class="card-body">
           <div class="dapnet-log-filters">
             <label class="mesh-msg-filter-field">
-              <span class="mesh-msg-filter-label">Callsign regex</span>
+              <span class="mesh-msg-filter-label">Rufzeichen-RegEx</span>
               <input type="search" id="dapnetlog-callsign-filter" class="form-input" placeholder="DJ2TH|DB0.*" oninput="dapnetLogFilterChanged()" spellcheck="false">
             </label>
             <label class="mesh-msg-filter-field">
-              <span class="mesh-msg-filter-label">Recipient regex</span>
+              <span class="mesh-msg-filter-label">Empfänger-RegEx</span>
               <input type="search" id="dapnetlog-recipient-filter" class="form-input" placeholder="0632585|0000200" oninput="dapnetLogFilterChanged()" spellcheck="false">
             </label>
             <label class="mesh-msg-filter-field">
-              <span class="mesh-msg-filter-label">Message regex</span>
+              <span class="mesh-msg-filter-label">Nachrichten-RegEx</span>
               <input type="search" id="dapnetlog-message-filter" class="form-input" placeholder="alarm|probe|^test" oninput="dapnetLogFilterChanged()" spellcheck="false">
             </label>
             <span class="mesh-msg-filter-status" id="dapnetlog-filter-status">—</span>
@@ -3170,20 +3156,20 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
           <div class="table-wrap">
             <table>
               <thead><tr>
-                <th data-i18n="th_time">Time</th>
-                <th data-i18n="th_dir">Dir</th>
-                <th>Callsign</th>
-                <th>Recipient</th>
-                <th>Paths</th>
-                <th data-i18n="th_message">Message</th>
+                <th data-i18n="th_time">Zeit</th>
+                <th data-i18n="th_dir">Ri.</th>
+                <th>Rufzeichen</th>
+                <th>Empfänger</th>
+                <th>Pfade</th>
+                <th data-i18n="th_message">Nachricht</th>
               </tr></thead>
               <tbody id="dapnetlog-tbody"></tbody>
             </table>
           </div>
           <div class="log-controls">
-            <button class="btn btn-sm" onclick="dapnetLogPrevPage()">‹ Prev</button>
-            <span class="sds-empty" id="dapnetlog-page">Page 1 / 1</span>
-            <button class="btn btn-sm" onclick="dapnetLogNextPage()">Next ›</button>
+            <button class="btn btn-sm" onclick="dapnetLogPrevPage()">‹ Zurück</button>
+            <span class="sds-empty" id="dapnetlog-page">Seite 1 / 1</span>
+            <button class="btn btn-sm" onclick="dapnetLogNextPage()">Weiter ›</button>
           </div>
         </div>
       </div>
@@ -3192,46 +3178,46 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
         <div class="card-head">
           <div class="card-title" data-i18n="dapnet_title">DAPNET</div>
           <div class="card-actions">
-            <button class="btn btn-primary" onclick="saveDapnet()"><span class="btn-icon" data-icon="save"></span><span data-i18n="save">Save</span></button>
+            <button class="btn btn-primary" onclick="saveDapnet()"><span class="btn-icon" data-icon="save"></span><span data-i18n="save">Speichern</span></button>
           </div>
         </div>
         <div class="card-body">
           <label class="sw-row">
-            <span class="sw-text">Enable DAPNET integration</span>
+            <span class="sw-text">DAPNET-Integration aktivieren</span>
             <span class="sw"><input type="checkbox" id="dap-enabled"><i></i></span>
           </label>
           <label class="sw-row">
-            <span class="sw-text">Enable RWTH core receive feed</span>
+            <span class="sw-text">RWTH-Core-Empfang aktivieren</span>
             <span class="sw"><input type="checkbox" id="dap-rwth-enabled"><i></i></span>
           </label>
 
           <div class="h-form" style="margin-top:14px">
-            <label class="h-flabel">Poll interval (s)</label>
+            <label class="h-flabel">Abfrageintervall (s)</label>
             <input type="number" id="dap-poll" class="form-input" min="1" placeholder="30">
-            <label class="h-flabel">Messages limit</label>
+            <label class="h-flabel">Nachrichtenlimit</label>
             <input type="number" id="dap-limit" class="form-input" min="1" placeholder="100">
 
             <label class="h-flabel">Hampager API URL</label>
             <input type="text" id="dap-api-url" class="form-input" placeholder="https://hampager.de/api/calls" style="grid-column:1 / -1;min-width:0">
 
-            <label class="h-flabel">API username</label>
+            <label class="h-flabel">API-Benutzername</label>
             <input type="text" id="dap-username" class="form-input" autocomplete="off" spellcheck="false">
-            <label class="h-flabel">API password</label>
+            <label class="h-flabel">API-Passwort</label>
             <input type="password" id="dap-password" class="form-input" autocomplete="new-password" spellcheck="false" oninput="dapPasswordDirty=true">
 
-            <label class="h-flabel">RWTH host</label>
+            <label class="h-flabel">RWTH-Host</label>
             <input type="text" id="dap-rwth-host" class="form-input" placeholder="dapnet.afu.rwth-aachen.de">
-            <label class="h-flabel">RWTH port</label>
+            <label class="h-flabel">RWTH-Port</label>
             <input type="number" id="dap-rwth-port" class="form-input" min="1" max="65535" placeholder="43434">
 
-            <label class="h-flabel">Device</label>
-            <input type="text" id="dap-rwth-device" class="form-input" placeholder="FlowStation">
+            <label class="h-flabel">Gerät</label>
+            <input type="text" id="dap-rwth-device" class="form-input" placeholder="NetCore">
             <label class="h-flabel">Version</label>
             <input type="text" id="dap-rwth-version" class="form-input" placeholder="1.0">
 
-            <label class="h-flabel">RWTH callsign</label>
+            <label class="h-flabel">RWTH-Rufzeichen</label>
             <input type="text" id="dap-rwth-callsign" class="form-input" autocomplete="off" spellcheck="false" style="text-transform:uppercase">
-            <label class="h-flabel">RWTH authkey</label>
+            <label class="h-flabel">RWTH-Authentifizierungsschlüssel</label>
             <input type="password" id="dap-rwth-authkey" class="form-input" autocomplete="new-password" spellcheck="false" oninput="dapAuthDirty=true">
           </div>
           <div class="config-msg" id="dap-msg"></div>
@@ -3240,64 +3226,64 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
 
       <div class="card">
         <div class="card-head">
-          <div class="card-title" data-i18n="dapnet_routing">Routing</div>
+          <div class="card-title" data-i18n="dapnet_routing">Weiterleitung</div>
           <div class="card-actions">
-            <button class="btn btn-primary" onclick="saveDapnet()"><span class="btn-icon" data-icon="save"></span><span data-i18n="save">Save</span></button>
+            <button class="btn btn-primary" onclick="saveDapnet()"><span class="btn-icon" data-icon="save"></span><span data-i18n="save">Speichern</span></button>
           </div>
         </div>
         <div class="card-body">
           <div class="h-form wide">
             <div>
-              <label class="sw-row"><span class="sw-text">Forward to SDS</span><span class="sw"><input type="checkbox" id="dap-forward-sds"><i></i></span></label>
+              <label class="sw-row"><span class="sw-text">An SDS weiterleiten</span><span class="sw"><input type="checkbox" id="dap-forward-sds"><i></i></span></label>
               <div class="h-form-pair" style="margin-top:10px">
-                <label class="h-flabel">Source ISSI</label>
+                <label class="h-flabel">Quell-ISSI</label>
                 <input type="number" id="dap-sds-source" class="form-input" min="1" max="16777215" placeholder="9999">
-                <label class="h-flabel">Destination</label>
-                <input type="number" id="dap-sds-dest" class="form-input" min="0" max="16777215" placeholder="ISSI or GSSI">
-                <label class="h-flabel">Destination is group</label>
+                <label class="h-flabel">Ziel</label>
+                <input type="number" id="dap-sds-dest" class="form-input" min="0" max="16777215" placeholder="ISSI oder GSSI">
+                <label class="h-flabel">Ziel ist eine Gruppe</label>
                 <label class="h-finline"><span class="sw"><input type="checkbox" id="dap-sds-group"><i></i></span><span class="h-flabel-sm">GSSI</span></label>
                 <label class="h-flabel top">RIC → ISSI</label>
                 <textarea id="dap-ric-routes" class="form-input" rows="3" placeholder="0632585=2632585"></textarea>
                 <label class="h-flabel top">RIC → GSSI</label>
                 <textarea id="dap-ric-group-routes" class="form-input" rows="3" placeholder="0004520=80"></textarea>
-                <label class="h-flabel top">SDS RIC filter</label>
+                <label class="h-flabel top">SDS-RIC-Filter</label>
                 <textarea id="dap-sds-rics" class="form-input" rows="3" placeholder="0004520&#10;0000200"></textarea>
               </div>
             </div>
 
             <div>
-              <label class="sw-row"><span class="sw-text">Forward to TPG2200 Call-Out</span><span class="sw"><input type="checkbox" id="dap-forward-callout"><i></i></span></label>
+              <label class="sw-row"><span class="sw-text">An TPG2200-Call-Out weiterleiten</span><span class="sw"><input type="checkbox" id="dap-forward-callout"><i></i></span></label>
               <div class="h-form-pair" style="margin-top:10px">
-                <label class="h-flabel">Source ISSI</label>
+                <label class="h-flabel">Quell-ISSI</label>
                 <input type="number" id="dap-callout-source" class="form-input" min="1" max="16777215" placeholder="9999">
-                <label class="h-flabel">Destination</label>
+                <label class="h-flabel">Ziel</label>
                 <input type="number" id="dap-callout-dest" class="form-input" min="0" max="16777215" placeholder="TPG2200 ISSI">
                 <label class="h-flabel">TPG RIC</label>
                 <input type="text" id="dap-callout-tpg-ric" class="form-input" placeholder="0x00090D10">
-                <label class="h-flabel">Call-Out ID base</label>
+                <label class="h-flabel">Call-Out-ID-Basis</label>
                 <input type="number" id="dap-callout-id" class="form-input" min="0" max="255" placeholder="33">
-                <label class="h-flabel">Priority / tone</label>
+                <label class="h-flabel">Priorität / Ton</label>
                 <input type="number" id="dap-callout-priority" class="form-input" min="0" max="15" placeholder="15">
-                <label class="h-flabel">Text prefix</label>
+                <label class="h-flabel">Textpräfix</label>
                 <input type="text" id="dap-callout-prefix" class="form-input" placeholder="DAPNET">
-                <label class="h-flabel top">Call-Out RIC filter</label>
+                <label class="h-flabel top">Call-Out-RIC-Filter</label>
                 <textarea id="dap-callout-rics" class="form-input" rows="3" placeholder="0004520"></textarea>
-                <label class="h-flabel top">TPG ISSI → priority</label>
+                <label class="h-flabel top">TPG-ISSI → Priorität</label>
                 <textarea id="dap-callout-issi-priorities" class="form-input" rows="3" placeholder="2632585=15"></textarea>
-                <label class="h-flabel top">TPG RIC → priority</label>
+                <label class="h-flabel top">TPG-RIC → Priorität</label>
                 <textarea id="dap-callout-tpg-ric-priorities" class="form-input" rows="3" placeholder="0x00090D10=15"></textarea>
               </div>
             </div>
 
             <div>
-              <label class="sw-row"><span class="sw-text">Forward to Telegram</span><span class="sw"><input type="checkbox" id="dap-forward-telegram"><i></i></span></label>
+              <label class="sw-row"><span class="sw-text">An Telegram weiterleiten</span><span class="sw"><input type="checkbox" id="dap-forward-telegram"><i></i></span></label>
               <div class="h-form-pair" style="margin-top:10px">
-                <label class="h-flabel">Telegram prefix</label>
+                <label class="h-flabel">Telegram-Präfix</label>
                 <input type="text" id="dap-telegram-prefix" class="form-input" placeholder="DAPNET">
-                <label class="h-flabel top">Telegram RIC filter</label>
+                <label class="h-flabel top">Telegram-RIC-Filter</label>
                 <textarea id="dap-telegram-rics" class="form-input" rows="3" placeholder="0004520"></textarea>
               </div>
-              <div class="help-text" style="margin-top:10px">Uses the existing Telegram alert configuration and recipients.</div>
+              <div class="help-text" style="margin-top:10px">Verwendet die vorhandene Telegram-Konfiguration und deren Empfänger.</div>
             </div>
           </div>
         </div>
@@ -3305,21 +3291,21 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
 
       <div class="card">
         <div class="card-head">
-          <div class="card-title" data-i18n="dapnet_send">Send DAPNET Message</div>
+          <div class="card-title" data-i18n="dapnet_send">DAPNET-Nachricht senden</div>
           <div class="card-actions">
-            <button class="btn btn-primary" onclick="sendDapnetMessage()">Send</button>
+            <button class="btn btn-primary" onclick="sendDapnetMessage()">Senden</button>
           </div>
         </div>
         <div class="card-body">
           <div class="h-form">
-            <label class="h-flabel">Callsign recipients</label>
+            <label class="h-flabel">Rufzeichen-Empfänger</label>
             <input type="text" id="dap-out-callsigns" class="form-input" placeholder="DJ2TH, DB0ABC">
-            <label class="h-flabel">Transmitter groups</label>
+            <label class="h-flabel">Sendergruppen</label>
             <input type="text" id="dap-out-groups" class="form-input" placeholder="dl-all, regional">
-            <label class="h-flabel">Emergency</label>
-            <label class="h-finline"><span class="sw"><input type="checkbox" id="dap-out-emergency"><i></i></span><span class="h-flabel-sm">Set emergency flag</span></label>
-            <label class="h-flabel top">Message</label>
-            <textarea id="dap-out-text" class="form-input" rows="3" maxlength="80" placeholder="Message text"></textarea>
+            <label class="h-flabel">Notfall</label>
+            <label class="h-finline"><span class="sw"><input type="checkbox" id="dap-out-emergency"><i></i></span><span class="h-flabel-sm">Notfallkennzeichen setzen</span></label>
+            <label class="h-flabel top">Nachricht</label>
+            <textarea id="dap-out-text" class="form-input" rows="3" maxlength="80" placeholder="Nachrichtentext"></textarea>
           </div>
           <div class="config-msg" id="dap-send-msg"></div>
         </div>
@@ -3332,14 +3318,14 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
         <div class="card-head">
           <div class="card-title" data-i18n="echolink_title">EchoLink</div>
           <div class="card-actions">
-            <button class="btn btn-sm" onclick="loadEcholink()" data-i18n="refresh">⟳ Refresh</button>
-            <button class="btn btn-primary" onclick="saveEcholink()" data-i18n="save">Save</button>
+            <button class="btn btn-sm" onclick="loadEcholink()" data-i18n="refresh">⟳ Aktualisieren</button>
+            <button class="btn btn-primary" onclick="saveEcholink()" data-i18n="save">Speichern</button>
           </div>
         </div>
         <div class="card-body">
           <div class="stat-grid" style="margin-bottom:14px">
             <div class="stat-card">
-              <div class="stat-label">Directory</div>
+              <div class="stat-label">Verzeichnis</div>
               <div class="stat-value" id="el-directory">—</div>
               <div class="stat-sub" id="el-bind">—</div>
             </div>
@@ -3350,32 +3336,32 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
             </div>
           </div>
           <div class="info-grid" style="margin-bottom:14px">
-            <div class="info-row"><div class="info-key">Callsign</div><div class="info-val" id="el-status-callsign">—</div></div>
-            <div class="info-row"><div class="info-key">TETRA route</div><div class="info-val" id="el-route">—</div></div>
-            <div class="info-row"><div class="info-key">Last TX</div><div class="info-val" id="el-last-tx">—</div></div>
-            <div class="info-row"><div class="info-key">Last error</div><div class="info-val" id="el-last-error">—</div></div>
+            <div class="info-row"><div class="info-key">Rufzeichen</div><div class="info-val" id="el-status-callsign">—</div></div>
+            <div class="info-row"><div class="info-key">TETRA-Weiterleitung</div><div class="info-val" id="el-route">—</div></div>
+            <div class="info-row"><div class="info-key">Letzte Sendung</div><div class="info-val" id="el-last-tx">—</div></div>
+            <div class="info-row"><div class="info-key">Letzter Fehler</div><div class="info-val" id="el-last-error">—</div></div>
           </div>
 
           <label class="sw-row">
-            <span class="sw-text">Enable EchoLink integration</span>
+            <span class="sw-text">EchoLink-Integration aktivieren</span>
             <span class="sw"><input type="checkbox" id="el-enabled"><i></i></span>
           </label>
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;align-items:center;margin-top:14px">
-            <label style="color:var(--muted);font-size:13px">Callsign</label>
+            <label style="color:var(--muted);font-size:13px">Rufzeichen</label>
             <input type="text" id="el-callsign" class="form-input" autocomplete="off" spellcheck="false" style="text-transform:uppercase" placeholder="DJ2TH-L">
-            <label style="color:var(--muted);font-size:13px">Password</label>
+            <label style="color:var(--muted);font-size:13px">Passwort</label>
             <input type="password" id="el-password" class="form-input" autocomplete="new-password" spellcheck="false" oninput="echolinkPasswordDirty=true">
-            <label style="color:var(--muted);font-size:13px">Location</label>
-            <input type="text" id="el-location" class="form-input" placeholder="FlowStation">
-            <label style="color:var(--muted);font-size:13px">Status text</label>
-            <input type="text" id="el-status-text" class="form-input" placeholder="FlowStation EchoLink bridge">
-            <label style="color:var(--muted);font-size:13px">Directory servers</label>
+            <label style="color:var(--muted);font-size:13px">Standort</label>
+            <input type="text" id="el-location" class="form-input" placeholder="NetCore">
+            <label style="color:var(--muted);font-size:13px">Statustext</label>
+            <input type="text" id="el-status-text" class="form-input" placeholder="NetCore-EchoLink-Bridge">
+            <label style="color:var(--muted);font-size:13px">Verzeichnisserver</label>
             <textarea id="el-directory-servers" class="form-input" rows="2" placeholder="servers.echolink.org&#10;backup.echolink.org"></textarea>
-            <label style="color:var(--muted);font-size:13px">Directory port</label>
+            <label style="color:var(--muted);font-size:13px">Verzeichnisport</label>
             <input type="number" id="el-directory-port" class="form-input" min="1" max="65535" placeholder="5200">
-            <label style="color:var(--muted);font-size:13px">Bind address</label>
+            <label style="color:var(--muted);font-size:13px">Bind-Adresse</label>
             <input type="text" id="el-bind-addr" class="form-input" placeholder="0.0.0.0">
-            <label style="color:var(--muted);font-size:13px">Audio / control ports</label>
+            <label style="color:var(--muted);font-size:13px">Audio-/Steuerports</label>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
               <input type="number" id="el-audio-port" class="form-input" min="1" max="65535" placeholder="5198">
               <input type="number" id="el-control-port" class="form-input" min="1" max="65535" placeholder="5199">
@@ -3387,46 +3373,46 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
 
       <div class="card">
         <div class="card-head">
-          <div class="card-title" data-i18n="echolink_routing">Routing</div>
+          <div class="card-title" data-i18n="echolink_routing">Weiterleitung</div>
           <div class="card-actions">
-            <button class="btn btn-primary" onclick="saveEcholink()" data-i18n="save">Save</button>
+            <button class="btn btn-primary" onclick="saveEcholink()" data-i18n="save">Speichern</button>
           </div>
         </div>
         <div class="card-body">
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px">
             <div>
-              <label class="sw-row"><span class="sw-text">Inbound EchoLink → TETRA</span><span class="sw"><input type="checkbox" id="el-inbound"><i></i></span></label>
+              <label class="sw-row"><span class="sw-text">Eingehend: EchoLink → TETRA</span><span class="sw"><input type="checkbox" id="el-inbound"><i></i></span></label>
               <div style="display:grid;grid-template-columns:140px 1fr;gap:10px;align-items:center;margin-top:10px">
-                <label style="color:var(--muted);font-size:13px">Source ISSI</label>
+                <label style="color:var(--muted);font-size:13px">Quell-ISSI</label>
                 <input type="number" id="el-source-issi" class="form-input" min="1" max="16777215" placeholder="9999">
-                <label style="color:var(--muted);font-size:13px">Default destination</label>
+                <label style="color:var(--muted);font-size:13px">Standardziel</label>
                 <input type="number" id="el-dest-issi" class="form-input" min="0" max="16777215" placeholder="ISSI">
-                <label style="color:var(--muted);font-size:13px">Group destination</label>
-                <label style="display:flex;align-items:center;gap:10px"><span class="sw"><input type="checkbox" id="el-dest-group" disabled><i></i></span><span style="color:var(--muted);font-size:12px">not supported yet</span></label>
+                <label style="color:var(--muted);font-size:13px">Gruppenziel</label>
+                <label style="display:flex;align-items:center;gap:10px"><span class="sw"><input type="checkbox" id="el-dest-group" disabled><i></i></span><span style="color:var(--muted);font-size:12px">noch nicht unterstützt</span></label>
               </div>
             </div>
             <div>
-              <label class="sw-row"><span class="sw-text">Outbound TETRA → EchoLink</span><span class="sw"><input type="checkbox" id="el-outbound"><i></i></span></label>
+              <label class="sw-row"><span class="sw-text">Ausgehend: TETRA → EchoLink</span><span class="sw"><input type="checkbox" id="el-outbound"><i></i></span></label>
               <div style="display:grid;grid-template-columns:140px 1fr;gap:10px;align-items:center;margin-top:10px">
-                <label style="color:var(--muted);font-size:13px">Outbound prefix</label>
+                <label style="color:var(--muted);font-size:13px">Ausgehendes Präfix</label>
                 <input type="text" id="el-out-prefix" class="form-input" placeholder="92">
-                <label style="color:var(--muted);font-size:13px">Strip prefix</label>
-                <label style="display:flex;align-items:center;gap:10px"><span class="sw"><input type="checkbox" id="el-strip-prefix"><i></i></span><span style="color:var(--muted);font-size:12px">before lookup</span></label>
-                <label style="color:var(--muted);font-size:13px;align-self:flex-start;padding-top:8px">Service numbers</label>
+                <label style="color:var(--muted);font-size:13px">Präfix entfernen</label>
+                <label style="display:flex;align-items:center;gap:10px"><span class="sw"><input type="checkbox" id="el-strip-prefix"><i></i></span><span style="color:var(--muted);font-size:12px">vor der Suche</span></label>
+                <label style="color:var(--muted);font-size:13px;align-self:flex-start;padding-top:8px">Dienstnummern</label>
                 <textarea id="el-service-numbers" class="form-input" rows="2" placeholder="700"></textarea>
-                <label style="color:var(--muted);font-size:13px;align-self:flex-start;padding-top:8px">Dial → EchoLink target</label>
+                <label style="color:var(--muted);font-size:13px;align-self:flex-start;padding-top:8px">Wahlziel → EchoLink-Ziel</label>
                 <textarea id="el-routes" class="form-input" rows="3" placeholder="700=ECHOTEST&#10;701=DB0ABC-L"></textarea>
               </div>
             </div>
             <div>
               <div style="display:grid;grid-template-columns:140px 1fr;gap:10px;align-items:center">
-                <label style="color:var(--muted);font-size:13px;align-self:flex-start;padding-top:8px">Allowed callsigns</label>
+                <label style="color:var(--muted);font-size:13px;align-self:flex-start;padding-top:8px">Erlaubte Rufzeichen</label>
                 <textarea id="el-allowed-calls" class="form-input" rows="3" placeholder="ECHOTEST&#10;DB0ABC-L"></textarea>
-                <label style="color:var(--muted);font-size:13px;align-self:flex-start;padding-top:8px">Allowed node IDs</label>
+                <label style="color:var(--muted);font-size:13px;align-self:flex-start;padding-top:8px">Erlaubte Node-IDs</label>
                 <textarea id="el-allowed-nodes" class="form-input" rows="3" placeholder="9999"></textarea>
-                <label style="color:var(--muted);font-size:13px">Auto connect</label>
+                <label style="color:var(--muted);font-size:13px">Automatisch verbinden</label>
                 <input type="text" id="el-auto-connect" class="form-input" placeholder="ECHOTEST">
-                <label style="color:var(--muted);font-size:13px">Reconnect / max session</label>
+                <label style="color:var(--muted);font-size:13px">Wiederverbinden / maximale Sitzung</label>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
                   <input type="number" id="el-reconnect" class="form-input" min="1" placeholder="30">
                   <input type="number" id="el-max-session" class="form-input" min="1" placeholder="3600">
@@ -3435,39 +3421,39 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
             </div>
           </div>
           <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px">
-            <input type="text" id="el-connect-target" class="form-input" style="max-width:260px" placeholder="ECHOTEST or node ID">
-            <button class="btn btn-primary" onclick="echolinkConnect()">Connect</button>
-            <button class="btn btn-danger" onclick="echolinkDisconnect()">Disconnect</button>
+            <input type="text" id="el-connect-target" class="form-input" style="max-width:260px" placeholder="ECHOTEST oder Node-ID">
+            <button class="btn btn-primary" onclick="echolinkConnect()">Verbinden</button>
+            <button class="btn btn-danger" onclick="echolinkDisconnect()">Trennen</button>
           </div>
-          <div class="help-text" style="margin-top:10px">EchoLink voice uses UDP 5198/5199 with GSM-FR audio. Calls can be routed from TETRA service numbers/prefixes to EchoLink targets and inbound EchoLink QSOs can ring the configured TETRA ISSI.</div>
+          <div class="help-text" style="margin-top:10px">EchoLink-Audio verwendet UDP 5198/5199 mit GSM-FR. Rufe können über TETRA-Dienstnummern oder Präfixe an EchoLink-Ziele weitergeleitet werden; eingehende EchoLink-QSOs rufen die konfigurierte TETRA-ISSI.</div>
         </div>
       </div>
 
       <div class="card">
         <div class="card-head">
-          <div class="card-title">EchoLink Directory</div>
+          <div class="card-title">EchoLink-Verzeichnis</div>
           <div class="card-actions">
-            <input type="text" id="el-directory-filter" class="form-input" style="width:220px" placeholder="Search callsign, node ID or IP" oninput="echolinkDirectoryPageIndex=0;renderEcholinkDirectory()">
-            <button class="btn btn-sm" onclick="loadEcholinkDirectory()">⟳ Refresh</button>
+            <input type="text" id="el-directory-filter" class="form-input" style="width:220px" placeholder="Rufzeichen, Node-ID oder IP suchen" oninput="echolinkDirectoryPageIndex=0;renderEcholinkDirectory()">
+            <button class="btn btn-sm" onclick="loadEcholinkDirectory()">⟳ Aktualisieren</button>
           </div>
         </div>
         <div class="card-body">
-          <div class="help-text" id="el-directory-summary">Directory not loaded yet.</div>
+          <div class="help-text" id="el-directory-summary">Verzeichnis wurde noch nicht geladen.</div>
           <div class="table-wrap" style="margin-top:10px">
             <table>
               <thead><tr>
-                <th>Callsign</th>
-                <th>Node ID</th>
+                <th>Rufzeichen</th>
+                <th>Node-ID</th>
                 <th>IP</th>
-                <th>Action</th>
+                <th>Aktion</th>
               </tr></thead>
               <tbody id="el-directory-tbody"></tbody>
             </table>
           </div>
           <div class="log-controls">
-            <button class="btn btn-sm" onclick="echolinkDirectoryPrevPage()">‹ Prev</button>
-            <span class="sds-empty" id="el-directory-page">Page 0 / 0 · 0</span>
-            <button class="btn btn-sm" onclick="echolinkDirectoryNextPage()">Next ›</button>
+            <button class="btn btn-sm" onclick="echolinkDirectoryPrevPage()">‹ Zurück</button>
+            <span class="sds-empty" id="el-directory-page">Seite 0 / 0 · 0</span>
+            <button class="btn btn-sm" onclick="echolinkDirectoryNextPage()">Weiter ›</button>
           </div>
         </div>
       </div>
@@ -3479,108 +3465,108 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
         <div class="card-head">
           <div class="card-title" data-i18n="meshcom_title">MeshCom</div>
           <div class="card-actions">
-            <button class="btn btn-sm" onclick="loadMeshcom()" data-i18n="refresh">⟳ Refresh</button>
-            <button class="btn btn-primary" onclick="saveMeshcom()" data-i18n="save">Save</button>
+            <button class="btn btn-sm" onclick="loadMeshcom()" data-i18n="refresh">⟳ Aktualisieren</button>
+            <button class="btn btn-primary" onclick="saveMeshcom()" data-i18n="save">Speichern</button>
           </div>
         </div>
         <div class="card-body">
           <div class="stat-grid" style="margin-bottom:14px">
             <div class="stat-card">
-              <div class="stat-label">UDP RX</div>
+              <div class="stat-label">UDP-Empfang</div>
               <div class="stat-value" id="mesh-rx-count">0</div>
               <div class="stat-sub" id="mesh-bind">—</div>
             </div>
             <div class="stat-card blue">
-              <div class="stat-label">UDP TX</div>
+              <div class="stat-label">UDP-Sendung</div>
               <div class="stat-value blue" id="mesh-tx-count">0</div>
               <div class="stat-sub" id="mesh-tx">—</div>
             </div>
           </div>
           <div class="info-grid" style="margin-bottom:14px">
             <div class="info-row"><div class="info-key">Nodes</div><div class="info-val" id="mesh-node-count">—</div></div>
-            <div class="info-row"><div class="info-key">Last RX</div><div class="info-val" id="mesh-last-rx">—</div></div>
-            <div class="info-row"><div class="info-key">Last TX</div><div class="info-val" id="mesh-last-tx">—</div></div>
-            <div class="info-row"><div class="info-key">Last error</div><div class="info-val" id="mesh-last-error">—</div></div>
+            <div class="info-row"><div class="info-key">Letzter Empfang</div><div class="info-val" id="mesh-last-rx">—</div></div>
+            <div class="info-row"><div class="info-key">Letzte Sendung</div><div class="info-val" id="mesh-last-tx">—</div></div>
+            <div class="info-row"><div class="info-key">Letzter Fehler</div><div class="info-val" id="mesh-last-error">—</div></div>
           </div>
 
           <label class="sw-row">
-            <span class="sw-text">Enable MeshCom UDP integration</span>
+            <span class="sw-text">MeshCom-UDP-Integration aktivieren</span>
             <span class="sw"><input type="checkbox" id="mesh-enabled"><i></i></span>
           </label>
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;align-items:center;margin-top:14px">
-            <label style="color:var(--muted);font-size:13px">Bind address</label>
+            <label style="color:var(--muted);font-size:13px">Bind-Adresse</label>
             <input type="text" id="mesh-bind-addr" class="form-input" placeholder="0.0.0.0">
-            <label style="color:var(--muted);font-size:13px">Bind port</label>
+            <label style="color:var(--muted);font-size:13px">Bind-Port</label>
             <input type="number" id="mesh-bind-port" class="form-input" min="1" max="65535" placeholder="1799">
-            <label style="color:var(--muted);font-size:13px">Node TX host</label>
+            <label style="color:var(--muted);font-size:13px">Node-TX-Host</label>
             <input type="text" id="mesh-tx-host" class="form-input" placeholder="255.255.255.255">
-            <label style="color:var(--muted);font-size:13px">Node TX port</label>
+            <label style="color:var(--muted);font-size:13px">Node-TX-Port</label>
             <input type="number" id="mesh-tx-port" class="form-input" min="1" max="65535" placeholder="1799">
-            <label style="color:var(--muted);font-size:13px">Allow broadcast</label>
-            <label style="display:flex;align-items:center;gap:10px"><span class="sw"><input type="checkbox" id="mesh-broadcast"><i></i></span><span style="color:var(--muted);font-size:12px">required for 255.255.255.255</span></label>
-            <label style="color:var(--muted);font-size:13px">History limits</label>
+            <label style="color:var(--muted);font-size:13px">Broadcast erlauben</label>
+            <label style="display:flex;align-items:center;gap:10px"><span class="sw"><input type="checkbox" id="mesh-broadcast"><i></i></span><span style="color:var(--muted);font-size:12px">für 255.255.255.255 erforderlich</span></label>
+            <label style="color:var(--muted);font-size:13px">Verlaufslimits</label>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
               <input type="number" id="mesh-max-messages" class="form-input" min="10" max="10000" placeholder="500">
               <input type="number" id="mesh-max-nodes" class="form-input" min="10" max="65535" placeholder="1000">
             </div>
           </div>
-          <div class="help-text" style="margin-top:10px">On the MeshCom node, enable extUDP and point it to the FlowStation host, for example: --extudpip &lt;flowstation-ip&gt; and --extudp on.</div>
+          <div class="help-text" style="margin-top:10px">Am MeshCom-Node extUDP aktivieren und auf den Host der Basisstation zeigen lassen, zum Beispiel mit --extudpip &lt;basisstation-ip&gt; und --extudp on.</div>
           <div class="config-msg" id="mesh-msg"></div>
         </div>
       </div>
 
       <div class="card" id="meshcom-routing-card">
         <div class="card-head">
-          <div class="card-title">MeshCom Routing</div>
+          <div class="card-title">MeshCom-Weiterleitung</div>
         </div>
         <div class="card-body">
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px">
             <div>
               <label class="sw-row">
-                <span class="sw-text">Forward MeshCom → SDS</span>
+                <span class="sw-text">MeshCom → SDS weiterleiten</span>
                 <span class="sw"><input type="checkbox" id="mesh-forward-sds"><i></i></span>
               </label>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
-                <label class="h-field"><span class="h-field-label">SDS source ISSI</span><input type="number" id="mesh-sds-source" class="form-input" min="1" max="16777215" placeholder="9999"></label>
-                <label class="h-field"><span class="h-field-label">SDS destination ISSI/GSSI</span><input type="number" id="mesh-sds-dest" class="form-input" min="0" max="16777215" placeholder="0"></label>
+                <label class="h-field"><span class="h-field-label">SDS-Quell-ISSI</span><input type="number" id="mesh-sds-source" class="form-input" min="1" max="16777215" placeholder="9999"></label>
+                <label class="h-field"><span class="h-field-label">SDS-Ziel-ISSI/GSSI</span><input type="number" id="mesh-sds-dest" class="form-input" min="0" max="16777215" placeholder="0"></label>
               </div>
-              <label style="display:flex;align-items:center;gap:10px;margin-top:10px"><span class="sw"><input type="checkbox" id="mesh-sds-group"><i></i></span><span style="color:var(--muted);font-size:12px">Destination is group/GSSI</span></label>
-              <label class="h-field" style="margin-top:10px"><span class="h-field-label">SDS source filter</span><textarea id="mesh-sds-sources" class="form-input" rows="3" placeholder="Allowed MeshCom sources, empty = all"></textarea></label>
+              <label style="display:flex;align-items:center;gap:10px;margin-top:10px"><span class="sw"><input type="checkbox" id="mesh-sds-group"><i></i></span><span style="color:var(--muted);font-size:12px">Ziel ist Gruppe/GSSI</span></label>
+              <label class="h-field" style="margin-top:10px"><span class="h-field-label">SDS-Quellfilter</span><textarea id="mesh-sds-sources" class="form-input" rows="3" placeholder="Erlaubte MeshCom-Quellen; leer = alle"></textarea></label>
             </div>
             <div>
               <label class="sw-row">
-                <span class="sw-text">Forward MeshCom → SIP/Snom</span>
+                <span class="sw-text">MeshCom → SIP/Snom weiterleiten</span>
                 <span class="sw"><input type="checkbox" id="mesh-forward-sip"><i></i></span>
               </label>
-              <label class="h-field" style="margin-top:10px"><span class="h-field-label">Snom title prefix</span><input type="text" id="mesh-sip-prefix" class="form-input" placeholder="MeshCom"></label>
-              <label class="h-field" style="margin-top:10px"><span class="h-field-label">SIP/Snom source filter</span><textarea id="mesh-sip-sources" class="form-input" rows="3" placeholder="Allowed MeshCom sources, empty = all"></textarea></label>
+              <label class="h-field" style="margin-top:10px"><span class="h-field-label">Snom-Titelpräfix</span><input type="text" id="mesh-sip-prefix" class="form-input" placeholder="MeshCom"></label>
+              <label class="h-field" style="margin-top:10px"><span class="h-field-label">SIP-/Snom-Quellfilter</span><textarea id="mesh-sip-sources" class="form-input" rows="3" placeholder="Erlaubte MeshCom-Quellen; leer = alle"></textarea></label>
             </div>
             <div>
               <label class="sw-row">
-                <span class="sw-text">Forward MeshCom → Telegram</span>
+                <span class="sw-text">MeshCom → Telegram weiterleiten</span>
                 <span class="sw"><input type="checkbox" id="mesh-forward-telegram"><i></i></span>
               </label>
-              <label class="h-field" style="margin-top:10px"><span class="h-field-label">Telegram prefix</span><input type="text" id="mesh-telegram-prefix" class="form-input" placeholder="MeshCom"></label>
-              <label class="h-field" style="margin-top:10px"><span class="h-field-label">Telegram source filter</span><textarea id="mesh-telegram-sources" class="form-input" rows="3" placeholder="Allowed MeshCom sources, empty = all"></textarea></label>
+              <label class="h-field" style="margin-top:10px"><span class="h-field-label">Telegram-Präfix</span><input type="text" id="mesh-telegram-prefix" class="form-input" placeholder="MeshCom"></label>
+              <label class="h-field" style="margin-top:10px"><span class="h-field-label">Telegram-Quellfilter</span><textarea id="mesh-telegram-sources" class="form-input" rows="3" placeholder="Erlaubte MeshCom-Quellen; leer = alle"></textarea></label>
             </div>
           </div>
-          <div class="help-text" style="margin-top:10px">Source filters match MeshCom packet src values case-insensitively. Empty filters forward every MeshCom text message.</div>
+          <div class="help-text" style="margin-top:10px">Quellfilter vergleichen MeshCom-src-Werte ohne Beachtung der Groß-/Kleinschreibung. Leere Filter leiten jede MeshCom-Textnachricht weiter.</div>
         </div>
       </div>
 
       <div class="card" id="meshcom-send-card">
         <div class="card-head">
-          <div class="card-title">Send MeshCom Message</div>
+          <div class="card-title">MeshCom-Nachricht senden</div>
           <div class="card-actions">
-            <button class="btn btn-primary" onclick="sendMeshcomMessage()">Send</button>
+            <button class="btn btn-primary" onclick="sendMeshcomMessage()">Senden</button>
           </div>
         </div>
         <div class="card-body">
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;align-items:center">
-            <label style="color:var(--muted);font-size:13px">Destination</label>
+            <label style="color:var(--muted);font-size:13px">Ziel</label>
             <input type="text" id="mesh-out-dst" class="form-input" placeholder="CALLSIGN, group or *">
-            <label style="color:var(--muted);font-size:13px;align-self:flex-start;padding-top:8px">Message</label>
-            <textarea id="mesh-out-msg" class="form-input" rows="3" maxlength="512" placeholder="Message text"></textarea>
+            <label style="color:var(--muted);font-size:13px;align-self:flex-start;padding-top:8px">Nachricht</label>
+            <textarea id="mesh-out-msg" class="form-input" rows="3" maxlength="512" placeholder="Nachrichtentext"></textarea>
           </div>
           <div class="config-msg" id="mesh-send-msg"></div>
         </div>
@@ -3588,12 +3574,12 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
 
       <div class="card" id="meshcom-nodes-card">
         <div class="card-head">
-          <div class="card-title">MeshCom Nodes</div>
+          <div class="card-title">MeshCom-Nodes</div>
           <div class="card-actions">
-            <input type="text" id="mesh-node-filter" class="form-input" style="width:240px" placeholder="Search node, HW-ID or firmware" oninput="meshNodePageIndex=0;renderMeshcomNodes()">
-            <button class="btn btn-sm" onclick="loadMeshcomNodes()"><span class="btn-icon" data-icon="restart"></span><span data-i18n="refresh">Refresh</span></button>
-            <button class="btn btn-sm" onclick="exportMeshcomNodes()"><span class="btn-icon" data-icon="export"></span><span data-i18n="export">Export</span></button>
-            <button class="btn btn-sm btn-danger" onclick="clearMeshcomNodes()"><span class="btn-icon" data-icon="delete"></span><span data-i18n="clear">Clear</span></button>
+            <input type="text" id="mesh-node-filter" class="form-input" style="width:240px" placeholder="Node, HW-ID oder Firmware suchen" oninput="meshNodePageIndex=0;renderMeshcomNodes()">
+            <button class="btn btn-sm" onclick="loadMeshcomNodes()"><span class="btn-icon" data-icon="restart"></span><span data-i18n="refresh">Aktualisieren</span></button>
+            <button class="btn btn-sm" onclick="exportMeshcomNodes()"><span class="btn-icon" data-icon="export"></span><span data-i18n="export">Exportieren</span></button>
+            <button class="btn btn-sm btn-danger" onclick="clearMeshcomNodes()"><span class="btn-icon" data-icon="delete"></span><span data-i18n="clear">Löschen</span></button>
           </div>
         </div>
         <div class="card-body">
@@ -3601,10 +3587,10 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
             <table>
               <thead><tr>
                 <th>Node</th>
-                <th>Via</th>
-                <th>Last seen</th>
+                <th>Über</th>
+                <th>Zuletzt gesehen</th>
                 <th>Position</th>
-                <th>Battery</th>
+                <th>Akku</th>
                 <th>RF</th>
                 <th>Firmware</th>
                 <th>HW-ID</th>
@@ -3613,20 +3599,20 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
             </table>
           </div>
           <div class="log-controls">
-            <button class="btn btn-sm" onclick="meshNodePrevPage()">‹ Prev</button>
-            <span class="sds-empty" id="mesh-nodes-page">Page 1 / 1</span>
-            <button class="btn btn-sm" onclick="meshNodeNextPage()">Next ›</button>
+            <button class="btn btn-sm" onclick="meshNodePrevPage()">‹ Zurück</button>
+            <span class="sds-empty" id="mesh-nodes-page">Seite 1 / 1</span>
+            <button class="btn btn-sm" onclick="meshNodeNextPage()">Weiter ›</button>
           </div>
         </div>
       </div>
 
       <div class="card" id="meshcom-messages-card">
         <div class="card-head">
-          <div class="card-title">MeshCom Messages</div>
+          <div class="card-title">MeshCom-Nachrichten</div>
           <div class="card-actions">
-            <button class="btn btn-sm" onclick="loadMeshcomMessages()"><span class="btn-icon" data-icon="restart"></span><span data-i18n="refresh">Refresh</span></button>
-            <button class="btn btn-sm" onclick="exportMeshcomMessages()"><span class="btn-icon" data-icon="export"></span><span data-i18n="export">Export</span></button>
-            <button class="btn btn-sm btn-danger" onclick="clearMeshcomMessages()"><span class="btn-icon" data-icon="delete"></span><span data-i18n="clear">Clear</span></button>
+            <button class="btn btn-sm" onclick="loadMeshcomMessages()"><span class="btn-icon" data-icon="restart"></span><span data-i18n="refresh">Aktualisieren</span></button>
+            <button class="btn btn-sm" onclick="exportMeshcomMessages()"><span class="btn-icon" data-icon="export"></span><span data-i18n="export">Exportieren</span></button>
+            <button class="btn btn-sm btn-danger" onclick="clearMeshcomMessages()"><span class="btn-icon" data-icon="delete"></span><span data-i18n="clear">Löschen</span></button>
           </div>
         </div>
         <div class="card-body">
@@ -3642,15 +3628,15 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
               </div>
             </div>
             <label class="mesh-msg-filter-field">
-              <span class="mesh-msg-filter-label">Source filter</span>
+              <span class="mesh-msg-filter-label">Quellfilter</span>
               <input type="search" id="mesh-msg-source-filter" class="form-input" placeholder="DJ2TH, OE1ABC-12" oninput="meshMsgFilterChanged()">
             </label>
             <label class="mesh-msg-filter-field">
-              <span class="mesh-msg-filter-label">Destination regex</span>
+              <span class="mesh-msg-filter-label">Ziel-RegEx</span>
               <input type="search" id="mesh-msg-dst-regex-filter" class="form-input" placeholder="\*|262|DJ2TH" oninput="meshMsgFilterChanged()" spellcheck="false">
             </label>
             <label class="mesh-msg-filter-field">
-              <span class="mesh-msg-filter-label">Message regex</span>
+              <span class="mesh-msg-filter-label">Nachrichten-RegEx</span>
               <input type="search" id="mesh-msg-regex-filter" class="form-input" placeholder="alarm|test|^CQ" oninput="meshMsgFilterChanged()" spellcheck="false">
             </label>
             <span class="mesh-msg-filter-status" id="mesh-msg-filter-status">—</span>
@@ -3658,23 +3644,23 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
           <div class="table-wrap">
             <table>
               <thead><tr>
-                <th data-i18n="th_time">Time</th>
-                <th data-i18n="th_dir">Dir</th>
-                <th data-i18n="th_type">Type</th>
-                <th>Source</th>
-                <th>Via</th>
-                <th>Destination</th>
-                <th data-i18n="th_message">Message</th>
-                <th>Paths</th>
-                <th>Position / RF</th>
+                <th data-i18n="th_time">Zeit</th>
+                <th data-i18n="th_dir">Ri.</th>
+                <th data-i18n="th_type">Typ</th>
+                <th>Quelle</th>
+                <th>Über</th>
+                <th>Ziel</th>
+                <th data-i18n="th_message">Nachricht</th>
+                <th>Pfade</th>
+                <th>Position / HF</th>
               </tr></thead>
               <tbody id="mesh-msgs-tbody"></tbody>
             </table>
           </div>
           <div class="log-controls">
-            <button class="btn btn-sm" onclick="meshMsgPrevPage()">‹ Prev</button>
-            <span class="sds-empty" id="mesh-msgs-page">Page 1 / 1</span>
-            <button class="btn btn-sm" onclick="meshMsgNextPage()">Next ›</button>
+            <button class="btn btn-sm" onclick="meshMsgPrevPage()">‹ Zurück</button>
+            <span class="sds-empty" id="mesh-msgs-page">Seite 1 / 1</span>
+            <button class="btn btn-sm" onclick="meshMsgNextPage()">Weiter ›</button>
           </div>
         </div>
       </div>
@@ -3682,24 +3668,24 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
 
     <!-- ── MAPS ── -->
     <div class="page" id="page-maps">
-      <div class="section-label" data-i18n-section="monitor">Monitor</div>
+      <div class="section-label" data-i18n-section="monitor">Überwachung</div>
       <div class="hero">
         <span class="hero-dot is-idle" id="maps-hero-dot"></span>
         <div class="hero-main">
-          <div class="hero-title" data-i18n="maps_title">Maps</div>
-          <div class="hero-sub" id="maps-hero-sub">OpenStreetMap positions</div>
+          <div class="hero-title" data-i18n="maps_title">Karte</div>
+          <div class="hero-sub" id="maps-hero-sub">OpenStreetMap-Positionen</div>
         </div>
         <div class="hero-metrics">
-          <span class="pill pill-idle" id="maps-count">0 markers</span>
+          <span class="pill pill-idle" id="maps-count">0 Markierungen</span>
         </div>
       </div>
       <div class="card">
         <div class="card-head">
-          <div class="card-title" data-i18n="maps_title">Maps</div>
+          <div class="card-title" data-i18n="maps_title">Karte</div>
           <div class="card-actions">
-            <button type="button" class="btn btn-sm" id="maps-latest-btn" aria-pressed="false">Latest only: OFF</button>
-            <button class="btn btn-sm" onclick="refreshMapsData()"><span class="btn-icon" data-icon="restart"></span><span data-i18n="refresh">Refresh</span></button>
-            <button class="btn btn-sm" onclick="openMapsOsm()">Open OSM</button>
+            <button type="button" class="btn btn-sm" id="maps-latest-btn" aria-pressed="false">Nur neueste: AUS</button>
+            <button class="btn btn-sm" onclick="refreshMapsData()"><span class="btn-icon" data-icon="restart"></span><span data-i18n="refresh">Aktualisieren</span></button>
+            <button class="btn btn-sm" onclick="openMapsOsm()">OSM öffnen</button>
           </div>
         </div>
         <div class="card-body">
@@ -3708,8 +3694,8 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
               <div class="maps-tile-layer" id="maps-tile-layer"></div>
               <div class="maps-marker-layer" id="maps-marker-layer"></div>
               <div class="maps-controls">
-                <button class="maps-zoom-btn" onclick="mapsZoom(1)" title="Zoom in">+</button>
-                <button class="maps-zoom-btn" onclick="mapsZoom(-1)" title="Zoom out">−</button>
+                <button class="maps-zoom-btn" onclick="mapsZoom(1)" title="Vergrößern">+</button>
+                <button class="maps-zoom-btn" onclick="mapsZoom(-1)" title="Verkleinern">−</button>
               </div>
               <div class="maps-attribution">© OpenStreetMap contributors</div>
               <div class="maps-popup" id="maps-popup" style="display:none"></div>
@@ -3722,7 +3708,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
 
     <!-- ── GEOALARM ── -->
     <div class="page" id="page-geoalarm">
-      <div class="section-label" data-i18n="integrations">Integrations</div>
+      <div class="section-label" data-i18n="integrations">Integrationen</div>
       <!-- Connection hero — GeoAlarm enabled state as a calm status pill. -->
       <div class="hero">
         <span class="hero-dot is-idle" id="geo-hero-dot"></span>
@@ -3738,57 +3724,57 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
         <div class="card-head">
           <div class="card-title" data-i18n="geoalarm_title">GeoAlarm</div>
           <div class="card-actions">
-            <button class="btn btn-sm" onclick="loadGeoalarm()"><span class="btn-icon" data-icon="restart"></span><span data-i18n="refresh">Refresh</span></button>
-            <button class="btn btn-primary" onclick="saveGeoalarm()"><span class="btn-icon" data-icon="save"></span><span data-i18n="save">Save</span></button>
+            <button class="btn btn-sm" onclick="loadGeoalarm()"><span class="btn-icon" data-icon="restart"></span><span data-i18n="refresh">Aktualisieren</span></button>
+            <button class="btn btn-primary" onclick="saveGeoalarm()"><span class="btn-icon" data-icon="save"></span><span data-i18n="save">Speichern</span></button>
           </div>
         </div>
         <div class="card-body">
           <div class="stat-grid" style="margin-bottom:14px">
             <div class="stat-card">
-              <div class="stat-label">Positions</div>
+              <div class="stat-label">Positionen</div>
               <div class="stat-value" id="geo-seen">0</div>
               <div class="stat-sub" id="geo-center">—</div>
             </div>
             <div class="stat-card blue">
-              <div class="stat-label">Alarms</div>
+              <div class="stat-label">Alarme</div>
               <div class="stat-value blue" id="geo-alarms">0</div>
               <div class="stat-sub" id="geo-radius">—</div>
             </div>
           </div>
           <div class="info-grid" style="margin-bottom:14px">
-            <div class="info-row"><div class="info-key">Last position</div><div class="info-val" id="geo-last-position">—</div></div>
-            <div class="info-row"><div class="info-key">Last alarm</div><div class="info-val" id="geo-last-alarm">—</div></div>
-            <div class="info-row"><div class="info-key">Last error</div><div class="info-val" id="geo-last-error">—</div></div>
+            <div class="info-row"><div class="info-key">Letzte Position</div><div class="info-val" id="geo-last-position">—</div></div>
+            <div class="info-row"><div class="info-key">Letzter Alarm</div><div class="info-val" id="geo-last-alarm">—</div></div>
+            <div class="info-row"><div class="info-key">Letzter Fehler</div><div class="info-val" id="geo-last-error">—</div></div>
           </div>
 
           <label class="sw-row">
-            <span class="sw-text">Enable GeoAlarm</span>
+            <span class="sw-text">GeoAlarm aktivieren</span>
             <span class="sw"><input type="checkbox" id="geo-enabled"><i></i></span>
           </label>
           <div class="h-form" style="margin-top:14px">
-            <label class="h-flabel">FlowStation latitude</label>
+            <label class="h-flabel">Breitengrad der Basisstation</label>
             <input type="number" id="geo-lat" class="form-input" step="0.000001" min="-90" max="90" placeholder="50.775346">
-            <label class="h-flabel">FlowStation longitude</label>
+            <label class="h-flabel">Längengrad der Basisstation</label>
             <input type="number" id="geo-lon" class="form-input" step="0.000001" min="-180" max="180" placeholder="6.083887">
-            <label class="h-flabel">Radius / cooldown</label>
+            <label class="h-flabel">Radius / Sperrzeit</label>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-              <label class="h-field"><span class="h-field-label">Alarm radius (m)</span><input type="number" id="geo-radius-m" class="form-input" min="1" step="1" placeholder="500"></label>
-              <label class="h-field"><span class="h-field-label">Cooldown (s)</span><input type="number" id="geo-cooldown" class="form-input" min="1" max="86400" placeholder="300"></label>
+              <label class="h-field"><span class="h-field-label">Alarmradius (m)</span><input type="number" id="geo-radius-m" class="form-input" min="1" step="1" placeholder="500"></label>
+              <label class="h-field"><span class="h-field-label">Sperrzeit (s)</span><input type="number" id="geo-cooldown" class="form-input" min="1" max="86400" placeholder="300"></label>
             </div>
-            <label class="h-flabel">Input sources</label>
+            <label class="h-flabel">Eingangsquellen</label>
             <div class="h-fopts">
               <label class="h-fopt"><span class="sw"><input type="checkbox" id="geo-trigger-tetra"><i></i></span><span class="h-flabel-sm">TETRA LIP</span></label>
               <label class="h-fopt"><span class="sw"><input type="checkbox" id="geo-trigger-meshcom"><i></i></span><span class="h-flabel-sm">MeshCom</span></label>
             </div>
           </div>
-          <div class="help-text" style="margin-top:10px">GeoAlarm fires when an allowed device enters the radius, then suppresses repeated alarms for the cooldown time.</div>
+          <div class="help-text" style="margin-top:10px">GeoAlarm löst aus, wenn ein zugelassenes Gerät den Radius betritt, und unterdrückt anschließend Wiederholungsalarme für die Dauer der Sperrzeit.</div>
           <div class="config-msg" id="geo-msg"></div>
         </div>
       </div>
 
       <div class="card">
         <div class="card-head">
-          <div class="card-title">GeoAlarm Routing</div>
+          <div class="card-title">GeoAlarm-Weiterleitung</div>
         </div>
         <div class="card-body">
           <div class="h-form wide" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr))">
@@ -3798,22 +3784,22 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
                 <span class="sw"><input type="checkbox" id="geo-forward-tpg"><i></i></span>
               </label>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
-                <label class="h-field"><span class="h-field-label">Source ISSI</span><input type="number" id="geo-tpg-source" class="form-input" min="1" max="16777215" placeholder="9999"></label>
-                <label class="h-field"><span class="h-field-label">TPG2200 ISSI</span><input type="number" id="geo-tpg-dest" class="form-input" min="0" max="16777215" placeholder="0"></label>
+                <label class="h-field"><span class="h-field-label">Quell-ISSI</span><input type="number" id="geo-tpg-source" class="form-input" min="1" max="16777215" placeholder="9999"></label>
+                <label class="h-field"><span class="h-field-label">TPG2200-ISSI</span><input type="number" id="geo-tpg-dest" class="form-input" min="0" max="16777215" placeholder="0"></label>
               </div>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
                 <label class="h-field"><span class="h-field-label">TPG RIC</span><input type="text" id="geo-tpg-ric" class="form-input" placeholder="0x00090D10"></label>
-                <label class="h-field"><span class="h-field-label">Max text chars</span><input type="number" id="geo-tpg-max" class="form-input" min="8" max="160" placeholder="80"></label>
+                <label class="h-field"><span class="h-field-label">Maximale Textlänge</span><input type="number" id="geo-tpg-max" class="form-input" min="8" max="160" placeholder="80"></label>
               </div>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
-                <label class="h-field"><span class="h-field-label">Call-Out ID base</span><input type="number" id="geo-tpg-id" class="form-input" min="0" max="255" placeholder="33"></label>
-                <label class="h-field"><span class="h-field-label">Priority / tone</span><input type="number" id="geo-tpg-priority" class="form-input" min="0" max="15" placeholder="15"></label>
+                <label class="h-field"><span class="h-field-label">Call-Out-ID-Basis</span><input type="number" id="geo-tpg-id" class="form-input" min="0" max="255" placeholder="33"></label>
+                <label class="h-field"><span class="h-field-label">Priorität / Ton</span><input type="number" id="geo-tpg-priority" class="form-input" min="0" max="15" placeholder="15"></label>
               </div>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
-                <label class="h-field"><span class="h-field-label">TPG ISSI → priority</span><textarea id="geo-tpg-issi-priorities" class="form-input" rows="2" placeholder="2632585=15"></textarea></label>
-                <label class="h-field"><span class="h-field-label">TPG RIC → priority</span><textarea id="geo-tpg-ric-priorities" class="form-input" rows="2" placeholder="0x00090D10=15"></textarea></label>
+                <label class="h-field"><span class="h-field-label">TPG-ISSI → Priorität</span><textarea id="geo-tpg-issi-priorities" class="form-input" rows="2" placeholder="2632585=15"></textarea></label>
+                <label class="h-field"><span class="h-field-label">TPG-RIC → Priorität</span><textarea id="geo-tpg-ric-priorities" class="form-input" rows="2" placeholder="0x00090D10=15"></textarea></label>
               </div>
-              <label class="h-field" style="margin-top:10px"><span class="h-field-label">TPG text prefix</span><input type="text" id="geo-tpg-prefix" class="form-input" placeholder="GeoAlarm"></label>
+              <label class="h-field" style="margin-top:10px"><span class="h-field-label">TPG-Textpräfix</span><input type="text" id="geo-tpg-prefix" class="form-input" placeholder="GeoAlarm"></label>
             </div>
             <div>
               <label class="sw-row">
@@ -3821,22 +3807,22 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
                 <span class="sw"><input type="checkbox" id="geo-forward-sds"><i></i></span>
               </label>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
-                <label class="h-field"><span class="h-field-label">Source ISSI</span><input type="number" id="geo-sds-source" class="form-input" min="1" max="16777215" placeholder="9999"></label>
-                <label class="h-field"><span class="h-field-label">Destination ISSI/GSSI</span><input type="number" id="geo-sds-dest" class="form-input" min="0" max="16777215" placeholder="0"></label>
+                <label class="h-field"><span class="h-field-label">Quell-ISSI</span><input type="number" id="geo-sds-source" class="form-input" min="1" max="16777215" placeholder="9999"></label>
+                <label class="h-field"><span class="h-field-label">Ziel-ISSI/GSSI</span><input type="number" id="geo-sds-dest" class="form-input" min="0" max="16777215" placeholder="0"></label>
               </div>
-              <label class="h-finline" style="margin-top:10px"><span class="sw"><input type="checkbox" id="geo-sds-group"><i></i></span><span class="h-flabel-sm">Destination is group/GSSI</span></label>
+              <label class="h-finline" style="margin-top:10px"><span class="sw"><input type="checkbox" id="geo-sds-group"><i></i></span><span class="h-flabel-sm">Ziel ist Gruppe/GSSI</span></label>
             </div>
             <div>
               <label class="sw-row">
                 <span class="sw-text">Alarm → SIP/Snom</span>
                 <span class="sw"><input type="checkbox" id="geo-forward-sip"><i></i></span>
               </label>
-              <label class="h-field" style="margin-top:10px"><span class="h-field-label">Snom title prefix</span><input type="text" id="geo-sip-prefix" class="form-input" placeholder="GeoAlarm"></label>
+              <label class="h-field" style="margin-top:10px"><span class="h-field-label">Snom-Titelpräfix</span><input type="text" id="geo-sip-prefix" class="form-input" placeholder="GeoAlarm"></label>
               <label class="sw-row" style="margin-top:14px">
                 <span class="sw-text">Alarm → Telegram</span>
                 <span class="sw"><input type="checkbox" id="geo-forward-telegram"><i></i></span>
               </label>
-              <label class="h-field" style="margin-top:10px"><span class="h-field-label">Telegram prefix</span><input type="text" id="geo-telegram-prefix" class="form-input" placeholder="GeoAlarm"></label>
+              <label class="h-field" style="margin-top:10px"><span class="h-field-label">Telegram-Präfix</span><input type="text" id="geo-telegram-prefix" class="form-input" placeholder="GeoAlarm"></label>
             </div>
           </div>
         </div>
@@ -3844,71 +3830,71 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
 
       <div class="card">
         <div class="card-head">
-          <div class="card-title">GeoAlarm Filters</div>
+          <div class="card-title">GeoAlarm-Filter</div>
         </div>
         <div class="card-body">
           <div class="h-form wide">
             <div>
-              <label class="h-flabel">TETRA ISSI whitelist</label>
-              <textarea id="geo-tetra-white" class="form-input" rows="4" placeholder="empty = all TETRA ISSIs"></textarea>
+              <label class="h-flabel">TETRA-ISSI-Whitelist</label>
+              <textarea id="geo-tetra-white" class="form-input" rows="4" placeholder="leer = alle TETRA-ISSI"></textarea>
             </div>
             <div>
-              <label class="h-flabel">TETRA ISSI blacklist</label>
-              <textarea id="geo-tetra-black" class="form-input" rows="4" placeholder="blocked ISSIs"></textarea>
+              <label class="h-flabel">TETRA-ISSI-Blacklist</label>
+              <textarea id="geo-tetra-black" class="form-input" rows="4" placeholder="gesperrte ISSI"></textarea>
             </div>
             <div>
-              <label class="h-flabel">MeshCom source whitelist</label>
-              <textarea id="geo-mesh-white" class="form-input" rows="4" placeholder="empty = all MeshCom sources"></textarea>
+              <label class="h-flabel">MeshCom-Quell-Whitelist</label>
+              <textarea id="geo-mesh-white" class="form-input" rows="4" placeholder="leer = alle MeshCom-Quellen"></textarea>
             </div>
             <div>
-              <label class="h-flabel">MeshCom source blacklist</label>
-              <textarea id="geo-mesh-black" class="form-input" rows="4" placeholder="blocked MeshCom sources"></textarea>
+              <label class="h-flabel">MeshCom-Quell-Blacklist</label>
+              <textarea id="geo-mesh-black" class="form-input" rows="4" placeholder="gesperrte MeshCom-Quellen"></textarea>
             </div>
             <div>
-              <label class="h-flabel">Telegram TETRA ISSI whitelist</label>
-              <textarea id="geo-telegram-tetra-white" class="form-input" rows="4" placeholder="empty = all alarmed TETRA ISSIs"></textarea>
+              <label class="h-flabel">Telegram-TETRA-ISSI-Whitelist</label>
+              <textarea id="geo-telegram-tetra-white" class="form-input" rows="4" placeholder="leer = alle alarmierten TETRA-ISSI"></textarea>
             </div>
             <div>
-              <label class="h-flabel">Telegram TETRA ISSI blacklist</label>
-              <textarea id="geo-telegram-tetra-black" class="form-input" rows="4" placeholder="do not forward these ISSIs to Telegram"></textarea>
+              <label class="h-flabel">Telegram-TETRA-ISSI-Blacklist</label>
+              <textarea id="geo-telegram-tetra-black" class="form-input" rows="4" placeholder="diese ISSI nicht an Telegram weiterleiten"></textarea>
             </div>
             <div>
-              <label class="h-flabel">Telegram MeshCom source whitelist</label>
-              <textarea id="geo-telegram-mesh-white" class="form-input" rows="4" placeholder="empty = all alarmed MeshCom sources"></textarea>
+              <label class="h-flabel">Telegram-MeshCom-Quell-Whitelist</label>
+              <textarea id="geo-telegram-mesh-white" class="form-input" rows="4" placeholder="leer = alle alarmierten MeshCom-Quellen"></textarea>
             </div>
             <div>
-              <label class="h-flabel">Telegram MeshCom source blacklist</label>
-              <textarea id="geo-telegram-mesh-black" class="form-input" rows="4" placeholder="do not forward these MeshCom sources to Telegram"></textarea>
+              <label class="h-flabel">Telegram-MeshCom-Quell-Blacklist</label>
+              <textarea id="geo-telegram-mesh-black" class="form-input" rows="4" placeholder="diese MeshCom-Quellen nicht an Telegram weiterleiten"></textarea>
             </div>
           </div>
-          <div class="help-text" style="margin-top:10px">Whitelist empty means allow all. Blacklists always win. The first four filters decide whether GeoAlarm fires at all; Telegram filters only limit the Telegram forwarding path. MeshCom source matching is case-insensitive.</div>
+          <div class="help-text" style="margin-top:10px">Eine leere Whitelist erlaubt alle Geräte. Blacklists haben immer Vorrang. Die ersten vier Filter entscheiden, ob GeoAlarm überhaupt auslöst; Telegram-Filter begrenzen nur die Weiterleitung an Telegram. MeshCom-Quellen werden ohne Beachtung der Groß-/Kleinschreibung verglichen.</div>
         </div>
       </div>
 
       <div class="card">
         <div class="card-head">
-          <div class="card-title">GeoAlarm Events</div>
+          <div class="card-title">GeoAlarm-Ereignisse</div>
         </div>
         <div class="card-body">
           <div class="table-wrap">
             <table>
               <thead><tr>
-                <th data-i18n="th_time">Time</th>
-                <th>Source</th>
-                <th>Device</th>
-                <th>Via</th>
-                <th>Distance</th>
+                <th data-i18n="th_time">Zeit</th>
+                <th>Quelle</th>
+                <th>Gerät</th>
+                <th>Über</th>
+                <th>Entfernung</th>
                 <th>Position</th>
                 <th>Status</th>
-                <th>Paths</th>
+                <th>Pfade</th>
               </tr></thead>
               <tbody id="geo-events-tbody"></tbody>
             </table>
           </div>
           <div class="log-controls">
-            <button class="btn btn-sm" onclick="geoPrevPage()">‹ Prev</button>
-            <span class="sds-empty" id="geo-events-page">Page 1 / 1</span>
-            <button class="btn btn-sm" onclick="geoNextPage()">Next ›</button>
+            <button class="btn btn-sm" onclick="geoPrevPage()">‹ Zurück</button>
+            <span class="sds-empty" id="geo-events-page">Seite 1 / 1</span>
+            <button class="btn btn-sm" onclick="geoNextPage()">Weiter ›</button>
           </div>
         </div>
       </div>
@@ -4095,7 +4081,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
                 <th>Name</th>
                 <th>Quelle</th>
                 <th>Ziel</th>
-                <th>Call</th>
+                <th>Ruf</th>
                 <th>Dauer</th>
                 <th>Größe</th>
                 <th>Aktionen</th>
@@ -4113,21 +4099,21 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
 
     <!-- ── CONFIG ── -->
     <div class="page" id="page-config">
-      <div class="section-label" data-i18n="cfg_sec_configuration">Configuration</div>
+      <div class="section-label" data-i18n="cfg_sec_configuration">Konfiguration</div>
       <div class="card">
         <div class="card-head">
           <div class="card-title">config.toml</div>
           <div class="card-actions">
-            <button class="btn btn-primary" onclick="saveConfig()"><span class="btn-icon" data-icon="save"></span><span data-i18n="save">Save</span></button>
+            <button class="btn btn-primary" onclick="saveConfig()"><span class="btn-icon" data-icon="save"></span><span data-i18n="save">Speichern</span></button>
             <span class="btn-group danger-group">
-              <button class="btn btn-warn" onclick="restartService()"><span class="btn-icon" data-icon="restart"></span><span data-i18n="restart">Restart</span></button>
-              <button class="btn btn-danger" onclick="shutdownService()"><span class="btn-icon" data-icon="shutdown"></span><span data-i18n="shutdown">Shutdown</span></button>
-              <button class="btn" id="update-btn" onclick="startUpdate()"><span class="btn-icon" data-icon="update"></span><span data-i18n="update">Update</span></button>
+              <button class="btn btn-warn" onclick="restartService()"><span class="btn-icon" data-icon="restart"></span><span data-i18n="restart">Neustarten</span></button>
+              <button class="btn btn-danger" onclick="shutdownService()"><span class="btn-icon" data-icon="shutdown"></span><span data-i18n="shutdown">Herunterfahren</span></button>
+              <button class="btn" id="update-btn" onclick="startUpdate()"><span class="btn-icon" data-icon="update"></span><span data-i18n="update">Aktualisieren</span></button>
             </span>
           </div>
         </div>
         <div class="card-body">
-          <textarea id="config-editor" spellcheck="false" placeholder="Loading..."></textarea>
+          <textarea id="config-editor" spellcheck="false" placeholder="Wird geladen…"></textarea>
           <div class="config-msg" id="config-msg"></div>
         </div>
       </div>
@@ -4136,26 +4122,26 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
            Editable access-control list. Empty list = open network (any ISSI may
            register). Changes apply immediately at runtime AND are written back to
            config.toml so they survive a restart. -->
-      <div class="section-label" data-i18n="cfg_sec_access">Access Control</div>
+      <div class="section-label" data-i18n="cfg_sec_access">Zugriffskontrolle</div>
       <div class="card">
         <div class="card-head">
-          <div class="card-title" data-i18n="whitelist_title">ISSI Whitelist</div>
+          <div class="card-title" data-i18n="whitelist_title">ISSI-Whitelist</div>
           <div class="card-actions">
             <span id="whitelist-status" class="badge" style="margin-right:8px"></span>
-            <button class="btn btn-primary" onclick="saveWhitelist()"><span class="btn-icon" data-icon="save"></span><span data-i18n="save">Save</span></button>
+            <button class="btn btn-primary" onclick="saveWhitelist()"><span class="btn-icon" data-icon="save"></span><span data-i18n="save">Speichern</span></button>
           </div>
         </div>
         <div class="card-body">
           <div style="color:var(--muted);font-size:13px;margin-bottom:12px" data-i18n="whitelist_help">
-            When the list is empty, any radio may register (open network). When non-empty,
-            only the listed ISSIs are accepted; all others are rejected. Changes apply
-            instantly and persist across restarts.
+            Ist die Liste leer, darf sich jedes Funkgerät registrieren (offenes Netz). Sobald Einträge vorhanden sind,
+            werden nur die aufgeführten ISSI akzeptiert; alle anderen werden abgewiesen. Änderungen gelten sofort
+            und bleiben nach Neustarts erhalten.
           </div>
           <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
             <input type="number" id="whitelist-input" class="form-input" min="1" max="16777215"
-                   placeholder="e.g. 2260571" style="flex:1;min-width:160px"
+                   placeholder="z. B. 2260571" style="flex:1;min-width:160px"
                    onkeydown="if(event.key==='Enter'){addWhitelistEntry();}">
-            <button class="btn" onclick="addWhitelistEntry()"><span class="btn-icon" data-icon="add"></span><span data-i18n="whitelist_add">Add ISSI</span></button>
+            <button class="btn" onclick="addWhitelistEntry()"><span class="btn-icon" data-icon="add"></span><span data-i18n="whitelist_add">ISSI hinzufügen</span></button>
           </div>
           <div id="whitelist-chips" style="display:flex;gap:8px;flex-wrap:wrap;min-height:32px"></div>
           <div class="config-msg" id="whitelist-msg"></div>
@@ -4170,25 +4156,25 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
       <div class="section-label" data-i18n="cfg_sec_wx">WX / METAR</div>
       <div class="card">
         <div class="card-head">
-          <div class="card-title" data-i18n="wx_title">WX / METAR Service</div>
+          <div class="card-title" data-i18n="wx_title">WX-/METAR-Dienst</div>
           <div class="card-actions">
-            <button class="btn btn-primary" onclick="saveWx()"><span class="btn-icon" data-icon="save"></span><span data-i18n="save">Save</span></button>
+            <button class="btn btn-primary" onclick="saveWx()"><span class="btn-icon" data-icon="save"></span><span data-i18n="save">Speichern</span></button>
           </div>
         </div>
         <div class="card-body">
           <div style="color:var(--muted);font-size:13px;margin-bottom:14px" data-i18n="wx_help">
-            Built-in weather service. Radios send an SDS like "METAR LROP" to the service
-            ISSI to get a decoded report. Optionally auto-send a fixed station's METAR to an
-            ISSI or talkgroup at a set interval. Data from aviationweather.gov.
+            Integrierter Wetterdienst. Funkgeräte senden eine SDS wie „METAR LROP“ an die Dienst-ISSI
+            und erhalten einen dekodierten Bericht. Optional kann das METAR einer festen Station regelmäßig
+            an eine ISSI oder Rufgruppe gesendet werden. Datenquelle: aviationweather.gov.
           </div>
 
           <div class="group-list" style="margin-bottom:18px">
             <label class="field" style="cursor:pointer">
-              <span class="field-label" data-i18n="wx_enabled">Enable on-demand METAR responder</span>
+              <span class="field-label" data-i18n="wx_enabled">METAR-Antwort auf Anfrage aktivieren</span>
               <span class="field-control"><span class="sw"><input type="checkbox" id="wx-enabled"><i></i></span></span>
             </label>
             <div class="field">
-              <span class="field-label" data-i18n="wx_service_issi">Service ISSI</span>
+              <span class="field-label" data-i18n="wx_service_issi">Dienst-ISSI</span>
               <span class="field-control"><input type="number" id="wx-service-issi" class="form-input" min="1" max="16777215"
                      placeholder="9998" style="width:160px"></span>
             </div>
@@ -4196,28 +4182,28 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
 
           <div class="group-list">
             <label class="field" style="cursor:pointer">
-              <span class="field-label" data-i18n="wx_periodic_enabled">Enable periodic auto-broadcast</span>
+              <span class="field-label" data-i18n="wx_periodic_enabled">Periodische Aussendung aktivieren</span>
               <span class="field-control"><span class="sw"><input type="checkbox" id="wx-periodic-enabled"><i></i></span></span>
             </label>
             <div class="field">
-              <span class="field-label" data-i18n="wx_periodic_icao">Station ICAO</span>
+              <span class="field-label" data-i18n="wx_periodic_icao">Stations-ICAO</span>
               <span class="field-control"><input type="text" id="wx-periodic-icao" class="form-input" maxlength="4" placeholder="LROP" style="text-transform:uppercase;width:160px"></span>
             </div>
             <div class="field">
-              <span class="field-label" data-i18n="wx_periodic_dest">Destination</span>
-              <span class="field-control"><input type="number" id="wx-periodic-issi" class="form-input" min="1" max="16777215" placeholder="ISSI or GSSI" style="width:160px"></span>
+              <span class="field-label" data-i18n="wx_periodic_dest">Ziel</span>
+              <span class="field-control"><input type="number" id="wx-periodic-issi" class="form-input" min="1" max="16777215" placeholder="ISSI oder GSSI" style="width:160px"></span>
             </div>
             <label class="field" style="cursor:pointer">
-              <span class="field-label" data-i18n="wx_periodic_isgroup">Destination is group</span>
+              <span class="field-label" data-i18n="wx_periodic_isgroup">Ziel ist eine Gruppe</span>
               <span class="field-control">
-                <span style="color:var(--muted);font-size:12px" data-i18n="wx_periodic_isgroup_hint">(GSSI instead of individual ISSI)</span>
+                <span style="color:var(--muted);font-size:12px" data-i18n="wx_periodic_isgroup_hint">(GSSI statt einzelner ISSI)</span>
                 <span class="sw"><input type="checkbox" id="wx-periodic-isgroup"><i></i></span>
               </span>
             </label>
             <div class="field">
-              <span class="field-label" data-i18n="wx_periodic_interval">Interval (seconds)</span>
+              <span class="field-label" data-i18n="wx_periodic_interval">Intervall (Sekunden)</span>
               <span class="field-control"><input type="number" id="wx-periodic-interval" class="form-input" min="300" placeholder="1800" style="width:160px"></span>
-              <span class="field-hint" data-i18n="wx_interval_hint">Minimum 300 s (5 min) to avoid hammering the weather API.</span>
+              <span class="field-hint" data-i18n="wx_interval_hint">Mindestens 300 s (5 min), um die Wetter-API nicht unnötig zu belasten.</span>
             </div>
           </div>
           <div class="config-msg" id="wx-msg"></div>
@@ -4231,21 +4217,21 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
          which categories to receive, and saves. Applies instantly and persists to
          config.toml. -->
     <div class="page" id="page-telegram">
-      <div class="section-label" data-i18n="integrations">Integrations</div>
+      <div class="section-label" data-i18n="integrations">Integrationen</div>
       <div class="card">
         <div class="card-head">
-          <div class="card-title" data-i18n="tg_title">Telegram Alerts</div>
+          <div class="card-title" data-i18n="tg_title">Telegram-Benachrichtigungen</div>
           <div class="card-actions">
-            <button class="btn" onclick="testTelegram()"><span class="btn-icon" data-icon="telegram"></span><span data-i18n="tg_test">Send test</span></button>
-            <button class="btn btn-primary" onclick="saveTelegram()"><span class="btn-icon" data-icon="save"></span><span data-i18n="save">Save</span></button>
+            <button class="btn" onclick="testTelegram()"><span class="btn-icon" data-icon="telegram"></span><span data-i18n="tg_test">Test senden</span></button>
+            <button class="btn btn-primary" onclick="saveTelegram()"><span class="btn-icon" data-icon="save"></span><span data-i18n="save">Speichern</span></button>
           </div>
         </div>
         <div class="card-body">
           <div class="help-text" style="margin-bottom:6px" data-i18n="tg_help">
-            Get instant Telegram messages when something happens on the station.
+            Sofortige Telegram-Nachrichten bei wichtigen Ereignissen der Basisstation.
           </div>
           <label class="sw-row">
-            <span class="sw-text" data-i18n="tg_enabled">Enable Telegram alerts</span>
+            <span class="sw-text" data-i18n="tg_enabled">Telegram-Benachrichtigungen aktivieren</span>
             <span class="sw"><input type="checkbox" id="tg-enabled"><i></i></span>
           </label>
           <div class="config-msg" id="tg-msg"></div>
@@ -4253,44 +4239,44 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
       </div>
 
       <div class="card">
-        <div class="card-head"><div class="card-title" data-i18n="tg_howto_title">Setup — 4 steps</div></div>
+        <div class="card-head"><div class="card-title" data-i18n="tg_howto_title">Einrichtung — 4 Schritte</div></div>
         <div class="card-body">
           <div class="steps">
-            <div class="step"><span class="step-num"></span><span class="step-body" data-i18n="tg_step1">In Telegram, open @BotFather, send /newbot and copy the bot token.</span></div>
-            <div class="step"><span class="step-num"></span><span class="step-body" data-i18n="tg_step2">Paste the token below and click Verify.</span></div>
-            <div class="step"><span class="step-num"></span><span class="step-body" data-i18n="tg_step3">Send your bot any message, e.g. /start.</span></div>
-            <div class="step"><span class="step-num"></span><span class="step-body" data-i18n="tg_step4">Click Detect Chat ID, add your chat, then Save.</span></div>
+            <div class="step"><span class="step-num"></span><span class="step-body" data-i18n="tg_step1">In Telegram @BotFather öffnen, /newbot senden und das Bot-Token kopieren.</span></div>
+            <div class="step"><span class="step-num"></span><span class="step-body" data-i18n="tg_step2">Das Token unten einfügen und auf „Prüfen“ klicken.</span></div>
+            <div class="step"><span class="step-num"></span><span class="step-body" data-i18n="tg_step3">Dem Bot eine Nachricht senden, zum Beispiel /start.</span></div>
+            <div class="step"><span class="step-num"></span><span class="step-body" data-i18n="tg_step4">Auf „Chat-ID ermitteln“ klicken, den Chat hinzufügen und speichern.</span></div>
           </div>
         </div>
       </div>
 
       <div class="card">
-        <div class="card-head"><div class="card-title" data-i18n="tg_bot_title">Bot token</div></div>
+        <div class="card-head"><div class="card-title" data-i18n="tg_bot_title">Bot-Token</div></div>
         <div class="card-body">
           <div style="color:var(--muted);font-size:13px;margin-bottom:12px" data-i18n="tg_bot_help">
-            The token from @BotFather looks like 123456789:AAExampleTokenString.
+            Das Token von @BotFather sieht beispielsweise so aus: 123456789:AAExampleTokenString.
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <input type="text" id="tg-token" class="form-input" placeholder="123456789:AA…"
                    autocomplete="off" spellcheck="false" oninput="tgTokenDirty=true"
                    style="flex:1;min-width:220px">
-            <button class="btn" onclick="verifyTelegram()"><span class="btn-icon" data-icon="search"></span><span data-i18n="tg_verify">Verify</span></button>
+            <button class="btn" onclick="verifyTelegram()"><span class="btn-icon" data-icon="search"></span><span data-i18n="tg_verify">Prüfen</span></button>
           </div>
           <div id="tg-verify-status" style="margin-top:8px;font-size:13px;min-height:18px"></div>
         </div>
       </div>
 
       <div class="card">
-        <div class="card-head"><div class="card-title" data-i18n="tg_recipients_title">Recipients (Chat IDs)</div></div>
+        <div class="card-head"><div class="card-title" data-i18n="tg_recipients_title">Empfänger (Chat-IDs)</div></div>
         <div class="card-body">
           <div style="color:var(--muted);font-size:13px;margin-bottom:12px" data-i18n="tg_recipients_help">
-            Every alert is sent to each recipient.
+            Jede Benachrichtigung wird an alle Empfänger gesendet.
           </div>
           <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
-            <button class="btn" onclick="detectTelegramChats()"><span class="btn-icon" data-icon="detect"></span><span data-i18n="tg_detect">Detect Chat ID</span></button>
+            <button class="btn" onclick="detectTelegramChats()"><span class="btn-icon" data-icon="detect"></span><span data-i18n="tg_detect">Chat-ID ermitteln</span></button>
             <input type="number" id="tg-chat-input" class="form-input" placeholder="-1001234567890"
                    style="flex:1;min-width:180px" onkeydown="if(event.key==='Enter'){addRecipient();}">
-            <button class="btn" onclick="addRecipient()"><span class="btn-icon" data-icon="add"></span><span data-i18n="tg_add">Add</span></button>
+            <button class="btn" onclick="addRecipient()"><span class="btn-icon" data-icon="add"></span><span data-i18n="tg_add">Hinzufügen</span></button>
           </div>
           <div id="tg-detected" style="margin-bottom:10px"></div>
           <div id="tg-chips" style="display:flex;gap:8px;flex-wrap:wrap;min-height:32px"></div>
@@ -4299,20 +4285,20 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
       </div>
 
       <div class="card">
-        <div class="card-head"><div class="card-title" data-i18n="tg_categories_title">Alert categories</div></div>
+        <div class="card-head"><div class="card-title" data-i18n="tg_categories_title">Benachrichtigungskategorien</div></div>
         <div class="card-body" style="padding-top:4px;padding-bottom:4px">
-          <label class="sw-row"><span class="sw-text" data-i18n="tg_cat_connect">Radio connected</span><span class="sw"><input type="checkbox" id="tg-connect"><i></i></span></label>
-          <label class="sw-row"><span class="sw-text" data-i18n="tg_cat_disconnect">Radio disconnected</span><span class="sw"><input type="checkbox" id="tg-disconnect"><i></i></span></label>
-          <label class="sw-row"><span class="sw-text" data-i18n="tg_cat_t351">Radio dropped (no T351 response)</span><span class="sw"><input type="checkbox" id="tg-t351"><i></i></span></label>
-          <label class="sw-row"><span class="sw-text" data-i18n="tg_cat_lip">LIP/APRS position beacon</span><span class="sw"><input type="checkbox" id="tg-lip"><i></i></span></label>
-          <label class="sw-row"><span class="sw-text" data-i18n="tg_cat_backhaul">Brew backhaul up/down</span><span class="sw"><input type="checkbox" id="tg-backhaul"><i></i></span></label>
+          <label class="sw-row"><span class="sw-text" data-i18n="tg_cat_connect">Funkgerät registriert</span><span class="sw"><input type="checkbox" id="tg-connect"><i></i></span></label>
+          <label class="sw-row"><span class="sw-text" data-i18n="tg_cat_disconnect">Funkgerät abgemeldet</span><span class="sw"><input type="checkbox" id="tg-disconnect"><i></i></span></label>
+          <label class="sw-row"><span class="sw-text" data-i18n="tg_cat_t351">Funkgerät verworfen (keine T351-Antwort)</span><span class="sw"><input type="checkbox" id="tg-t351"><i></i></span></label>
+          <label class="sw-row"><span class="sw-text" data-i18n="tg_cat_lip">LIP-/APRS-Positionsmeldung</span><span class="sw"><input type="checkbox" id="tg-lip"><i></i></span></label>
+          <label class="sw-row"><span class="sw-text" data-i18n="tg_cat_backhaul">Brew-Netzanbindung aktiv/inaktiv</span><span class="sw"><input type="checkbox" id="tg-backhaul"><i></i></span></label>
           <label class="sw-row"><span class="sw-text" data-i18n="tg_cat_brew_register">Brew ISSI REGISTER</span><span class="sw"><input type="checkbox" id="tg-brew-register"><i></i></span></label>
           <div class="form-grid" style="grid-template-columns:repeat(3,minmax(180px,1fr));gap:12px;margin:0 0 10px 0">
-            <label class="h-field"><span class="h-field-label" data-i18n="tg_brew_register_prefix">Brew REGISTER prefix</span><input type="text" id="tg-brew-register-prefix" class="form-input" placeholder="Brew REGISTER"></label>
-            <label class="h-field"><span class="h-field-label" data-i18n="tg_brew_register_white">Brew REGISTER ISSI whitelist</span><textarea id="tg-brew-register-white" class="form-input" rows="3" placeholder="empty = all Brew REGISTER ISSIs"></textarea></label>
-            <label class="h-field"><span class="h-field-label" data-i18n="tg_brew_register_black">Brew REGISTER ISSI blacklist</span><textarea id="tg-brew-register-black" class="form-input" rows="3" placeholder="never alert these ISSIs"></textarea></label>
+            <label class="h-field"><span class="h-field-label" data-i18n="tg_brew_register_prefix">Brew-REGISTER-Präfix</span><input type="text" id="tg-brew-register-prefix" class="form-input" placeholder="Brew REGISTER"></label>
+            <label class="h-field"><span class="h-field-label" data-i18n="tg_brew_register_white">Brew-REGISTER-ISSI-Whitelist</span><textarea id="tg-brew-register-white" class="form-input" rows="3" placeholder="empty = all Brew REGISTER ISSIs"></textarea></label>
+            <label class="h-field"><span class="h-field-label" data-i18n="tg_brew_register_black">Brew-REGISTER-ISSI-Blacklist</span><textarea id="tg-brew-register-black" class="form-input" rows="3" placeholder="never alert these ISSIs"></textarea></label>
           </div>
-          <label class="sw-row"><span class="sw-text" data-i18n="tg_cat_logs">Critical log (warnings/errors)</span><span class="sw"><input type="checkbox" id="tg-logs"><i></i></span></label>
+          <label class="sw-row"><span class="sw-text" data-i18n="tg_cat_logs">Kritischer Protokolleintrag (Warnungen/Fehler)</span><span class="sw"><input type="checkbox" id="tg-logs"><i></i></span></label>
         </div>
       </div>
     </div>
@@ -4323,14 +4309,14 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
          attached to a nav button when /api/wifi/available reports true so
          we never tease functionality the host can't deliver. -->
     <div class="page" id="page-wifi">
-      <div class="section-label" data-i18n="integrations">Integrations</div>
+      <div class="section-label" data-i18n="integrations">Integrationen</div>
       <!-- Status card: who we're connected to right now, IP, signal -->
       <div class="card">
         <div class="card-head">
-          <div class="card-title" data-i18n="wifi_status">Current connection</div>
+          <div class="card-title" data-i18n="wifi_status">Aktuelle Verbindung</div>
           <div class="card-actions">
-            <button class="btn btn-sm" id="wifi-radio-btn" onclick="wifiToggleRadio()" data-i18n="wifi_radio_off">Disable WiFi</button>
-            <button class="btn btn-sm" onclick="wifiRefresh()"><span class="btn-icon" data-icon="restart"></span><span data-i18n="wifi_refresh">Refresh</span></button>
+            <button class="btn btn-sm" id="wifi-radio-btn" onclick="wifiToggleRadio()" data-i18n="wifi_radio_off">WLAN deaktivieren</button>
+            <button class="btn btn-sm" onclick="wifiRefresh()"><span class="btn-icon" data-icon="restart"></span><span data-i18n="wifi_refresh">Aktualisieren</span></button>
           </div>
         </div>
         <div class="card-body" style="padding:0">
@@ -4338,10 +4324,10 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
                it can lock the operator out of the dashboard. -->
           <div class="banner banner-warn">
             <span class="banner-ico" data-icon="alert"></span>
-            <div class="banner-body" data-i18n="wifi_warn_lose_access">If you're connected to the dashboard via WiFi, changing networks may temporarily disconnect you. Make sure you have a backup access path (Ethernet or known good network).</div>
+            <div class="banner-body" data-i18n="wifi_warn_lose_access">Wenn das Dashboard über WLAN geöffnet ist, kann ein Netzwerkwechsel die Verbindung vorübergehend trennen. Ein alternativer Zugang über Ethernet oder ein bekanntes Netzwerk sollte verfügbar sein.</div>
           </div>
           <div class="wifi-status-grid" id="wifi-status-grid" style="padding:16px 18px">
-            <div class="wifi-status-loading" data-i18n="wifi_loading">Loading…</div>
+            <div class="wifi-status-loading" data-i18n="wifi_loading">Wird geladen…</div>
           </div>
         </div>
       </div>
@@ -4350,14 +4336,14 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
            has Connect (bring up) and Forget (delete) buttons. -->
       <div class="card">
         <div class="card-head">
-          <div class="card-title" data-i18n="wifi_saved">Saved networks</div>
+          <div class="card-title" data-i18n="wifi_saved">Gespeicherte Netzwerke</div>
           <div class="card-actions">
             <span id="wifi-saved-count" class="card-sub"></span>
           </div>
         </div>
         <div class="card-body">
           <div id="wifi-saved-list" class="wifi-list">
-            <div class="wifi-list-empty" data-i18n="wifi_loading">Loading…</div>
+            <div class="wifi-list-empty" data-i18n="wifi_loading">Wird geladen…</div>
           </div>
         </div>
       </div>
@@ -4366,15 +4352,15 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
            "Add hidden network" button opens the manual SSID input modal. -->
       <div class="card">
         <div class="card-head">
-          <div class="card-title" data-i18n="wifi_visible">Available networks</div>
+          <div class="card-title" data-i18n="wifi_visible">Verfügbare Netzwerke</div>
           <div class="card-actions">
-            <button class="btn btn-sm" onclick="wifiShowHiddenModal()"><span class="btn-icon" data-icon="add"></span><span data-i18n="wifi_add_hidden">Hidden network</span></button>
-            <button class="btn btn-sm" onclick="wifiScan()"><span class="btn-icon" data-icon="restart"></span><span data-i18n="wifi_scan">Scan</span></button>
+            <button class="btn btn-sm" onclick="wifiShowHiddenModal()"><span class="btn-icon" data-icon="add"></span><span data-i18n="wifi_add_hidden">Verstecktes Netzwerk</span></button>
+            <button class="btn btn-sm" onclick="wifiScan()"><span class="btn-icon" data-icon="restart"></span><span data-i18n="wifi_scan">Suchen</span></button>
           </div>
         </div>
         <div class="card-body">
           <div id="wifi-scan-list" class="wifi-list">
-            <div class="wifi-list-empty" data-i18n="wifi_loading">Loading…</div>
+            <div class="wifi-list-empty" data-i18n="wifi_loading">Wird geladen…</div>
           </div>
         </div>
       </div>
@@ -4385,7 +4371,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
     <div id="wifi-modal" class="sheet-overlay">
       <div class="sheet">
         <div class="sheet-head">
-          <div class="sheet-title" id="wifi-modal-title">Connect</div>
+          <div class="sheet-title" id="wifi-modal-title">Verbinden</div>
           <button class="sheet-close" onclick="wifiCloseModal()"><span data-icon="close"></span></button>
         </div>
         <div class="sheet-body">
@@ -4394,18 +4380,18 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
             <input id="wifi-modal-ssid" type="text" autocomplete="off" spellcheck="false">
           </div>
           <div class="wifi-modal-row" id="wifi-modal-psk-row">
-            <label for="wifi-modal-psk" data-i18n="wifi_password">Password</label>
+            <label for="wifi-modal-psk" data-i18n="wifi_password">Passwort</label>
             <input id="wifi-modal-psk" type="password" autocomplete="new-password" spellcheck="false">
           </div>
           <div class="wifi-modal-row" id="wifi-modal-hidden-row" style="display:none">
             <label class="wifi-modal-check">
-              <input id="wifi-modal-hidden" type="checkbox"> <span data-i18n="wifi_hidden">Hidden network (SSID not broadcast)</span>
+              <input id="wifi-modal-hidden" type="checkbox"> <span data-i18n="wifi_hidden">Verstecktes Netzwerk (SSID wird nicht ausgestrahlt)</span>
             </label>
           </div>
           <div class="wifi-modal-msg" id="wifi-modal-msg"></div>
           <div class="wifi-modal-foot">
-            <button class="btn" onclick="wifiCloseModal()" data-i18n="cancel">Cancel</button>
-            <button class="btn btn-primary" id="wifi-modal-ok" onclick="wifiModalSubmit()" data-i18n="wifi_connect">Connect</button>
+            <button class="btn" onclick="wifiCloseModal()" data-i18n="cancel">Abbrechen</button>
+            <button class="btn btn-primary" id="wifi-modal-ok" onclick="wifiModalSubmit()" data-i18n="wifi_connect">Verbinden</button>
           </div>
         </div>
       </div>
@@ -4419,24 +4405,24 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
           </div>
           <div class="h-hero-txt">
-            <div id="health-hero-title" class="h-hero-title">Station health</div>
-            <div id="health-hero-sub" class="h-hero-sub">Waiting for the first health snapshot…</div>
+            <div id="health-hero-title" class="h-hero-title">Zustand der Basisstation</div>
+            <div id="health-hero-sub" class="h-hero-sub">Warte auf die erste Zustandsmeldung…</div>
           </div>
           <div class="h-hero-meta">
             <div id="health-uptime" class="hm-val">—</div>
             <div id="health-action" class="hm-sub"></div>
           </div>
         </div>
-        <div class="h-sec">System domains</div>
+        <div class="h-sec">Systembereiche</div>
         <div id="health-grid" class="h-grid"></div>
-        <div class="h-sec">Integrations</div>
+        <div class="h-sec">Integrationen</div>
         <div id="health-integrations-grid" class="h-grid">
-          <div class="sds-empty" style="padding:12px 0">Loading integration health…</div>
+          <div class="sds-empty" style="padding:12px 0">Zustand der Integrationen wird geladen…</div>
         </div>
         <div class="h-note">
-          Auto-refreshes every few seconds. Levels:
-          <b class="ok">OK</b> · <b class="warn">DEGRADED</b> · <b class="bad">CRITICAL</b>.
-          The software watchdog (auto-restart when the core loop stalls) is configured in the <code>[health]</code> section.
+          Automatische Aktualisierung alle paar Sekunden. Stufen:
+          <b class="ok">OK</b> · <b class="warn">EINGESCHRÄNKT</b> · <b class="bad">KRITISCH</b>.
+          Der Software-Watchdog für einen automatischen Neustart bei Stillstand der Hauptschleife wird im Abschnitt <code>[health]</code> konfiguriert.
         </div>
       </div>
     </div>
@@ -4451,11 +4437,11 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
         </div>
         <div class="hero-metrics">
           <div class="hero-metric">
-            <div class="hero-metric-label" data-i18n="sys_uptime">Uptime</div>
+            <div class="hero-metric-label" data-i18n="sys_uptime">Laufzeit</div>
             <div class="hero-metric-value" id="sysHeroUptime">—</div>
           </div>
           <div class="hero-metric">
-            <div class="hero-metric-label" data-i18n="sys_temp">CPU Temp</div>
+            <div class="hero-metric-label" data-i18n="sys_temp">CPU-Temperatur</div>
             <div class="hero-metric-value" id="sysHeroTemp">—</div>
           </div>
         </div>
@@ -4465,7 +4451,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
       <div class="section-label" data-i18n="sys_sec_status">Status</div>
       <div class="stat-grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr))">
         <div class="stat-card is-danger" id="sysBtsCard">
-          <div class="stat-label" data-i18n="sys_bts">BTS Connection</div>
+          <div class="stat-label" data-i18n="sys_bts">Verbindung zur Basisstation</div>
           <div class="stat-value is-text" id="sysBtsStatus">OFFLINE</div>
           <div class="stat-sub" id="sysBtsIp">—</div>
         </div>
@@ -4475,12 +4461,12 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
           <div class="stat-sub" id="sysBrewBadge">—</div>
         </div>
         <div class="stat-card is-idle">
-          <div class="stat-label" data-i18n="sys_uptime">Uptime</div>
+          <div class="stat-label" data-i18n="sys_uptime">Laufzeit</div>
           <div class="stat-value is-text" id="sysUptime">—</div>
           <div class="stat-sub" id="sysHostname">—</div>
         </div>
         <div class="stat-card is-warn" id="cpu-temp-card" style="display:none">
-          <div class="stat-label" data-i18n="sys_temp">CPU Temp</div>
+          <div class="stat-label" data-i18n="sys_temp">CPU-Temperatur</div>
           <div class="stat-value is-text" id="sysCpuTemp">—</div>
           <div class="stat-sub" id="sysCpuTempSub">—</div>
         </div>
@@ -4489,7 +4475,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
       <!-- Display brightness (FH-FEAT-008) — hidden unless a backlight panel exists -->
       <div class="card" id="brightness-card" style="display:none">
         <div class="card-head">
-          <div class="card-title">Display Brightness</div>
+          <div class="card-title">Displayhelligkeit</div>
           <div class="card-actions"><span id="brightness-val" style="font-family:var(--mono);font-size:13px;color:var(--text2)">—</span></div>
         </div>
         <div class="card-body" style="padding:16px 18px">
@@ -4501,22 +4487,22 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
       <div class="section-label" data-i18n="sys_sec_host">Host</div>
       <div class="card">
         <div class="card-head">
-          <div class="card-title" data-i18n="sys_info">System Info</div>
+          <div class="card-title" data-i18n="sys_info">Systeminformationen</div>
           <div class="card-actions" style="display:flex;align-items:center;gap:10px">
             <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text2);cursor:pointer">
               <input type="checkbox" id="sys-autorefresh" onchange="toggleSysAutoRefresh(this.checked)" style="cursor:pointer">
-              <span data-i18n="sys_autorefresh">Auto-refresh 5s</span>
+              <span data-i18n="sys_autorefresh">Automatische Aktualisierung: 5 s</span>
             </label>
-            <button class="btn btn-sm" onclick="loadSystemInfo()"><span class="btn-icon" data-icon="restart"></span><span data-i18n="sys_refresh">Refresh</span></button>
+            <button class="btn btn-sm" onclick="loadSystemInfo()"><span class="btn-icon" data-icon="restart"></span><span data-i18n="sys_refresh">Aktualisieren</span></button>
           </div>
         </div>
         <div class="card-body">
-          <div class="info-row"><div class="info-key" data-i18n="sys_version">FS Version</div><div class="info-val accent" id="sysVersion">—</div></div>
+          <div class="info-row"><div class="info-key" data-i18n="sys_version">NetCore-Version</div><div class="info-val accent" id="sysVersion">—</div></div>
           <div class="info-row"><div class="info-key" data-i18n="sys_os">OS</div><div class="info-val" id="sysOs">—</div></div>
-          <div class="info-row"><div class="info-key" data-i18n="sys_config">Active Config</div><div class="info-val" id="sysConfigPath">—</div></div>
+          <div class="info-row"><div class="info-key" data-i18n="sys_config">Aktive Konfiguration</div><div class="info-val" id="sysConfigPath">—</div></div>
           <div class="info-row"><div class="info-key" data-i18n="sys_cpu">CPU</div><div class="info-val" id="sysCpu">—</div></div>
           <div class="info-row">
-            <div class="info-key" data-i18n="sys_cpu_load">CPU Load</div>
+            <div class="info-key" data-i18n="sys_cpu_load">CPU-Auslastung</div>
             <div class="info-val" style="flex:1;max-width:220px">
               <div class="gauge" id="sysCpuGauge">
                 <div class="gauge-track"><div class="gauge-fill" id="sysCpuBar"></div></div>
@@ -4537,12 +4523,12 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
       </div>
 
       <!-- RF / SDR Hardware -->
-      <div class="section-label" data-i18n="sys_sec_radio">Radio Hardware</div>
+      <div class="section-label" data-i18n="sys_sec_radio">Funkhardware</div>
       <div class="card">
         <div class="card-head">
-          <div class="card-title" data-i18n="sys_rf">RF Hardware (SoapySDR)</div>
+          <div class="card-title" data-i18n="sys_rf">HF-Hardware (SoapySDR)</div>
           <div class="card-actions">
-            <button class="btn btn-sm" onclick="loadSystemInfo()"><span class="btn-icon" data-icon="search"></span><span data-i18n="sys_probe">Probe</span></button>
+            <button class="btn btn-sm" onclick="loadSystemInfo()"><span class="btn-icon" data-icon="search"></span><span data-i18n="sys_probe">Prüfen</span></button>
           </div>
         </div>
         <div class="card-body">
@@ -4553,27 +4539,27 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
       <!-- Host hardware sensors (temps, voltages, currents, power) -->
       <!-- Populated from /sys via sys_telemetry. Layout adapts: if no sensors are
            found (non-Linux, locked-down kernel) the whole card is hidden. -->
-      <div class="section-label" id="sys-sensors-label" data-i18n="sys_sec_sensors" style="display:none">Sensors</div>
+      <div class="section-label" id="sys-sensors-label" data-i18n="sys_sec_sensors" style="display:none">Sensoren</div>
       <div class="card" id="sys-sensors-card" style="display:none">
         <div class="card-head">
-          <div class="card-title" data-i18n="sys_sensors">Host Hardware Sensors</div>
+          <div class="card-title" data-i18n="sys_sensors">Hardware-Sensoren des Hosts</div>
           <div class="card-actions">
             <span id="sys-sensors-power-total" style="font-family:var(--mono);font-size:12px;color:var(--accent2);font-weight:600"></span>
           </div>
         </div>
         <div class="card-body" style="padding:14px 18px">
-          <div id="sys-sensors-empty" style="font-size:12px;color:var(--text3);font-style:italic;display:none" data-i18n="sys_sensors_empty">No sensors detected on this host.</div>
+          <div id="sys-sensors-empty" style="font-size:12px;color:var(--text3);font-style:italic;display:none" data-i18n="sys_sensors_empty">Auf diesem Host wurden keine Sensoren erkannt.</div>
           <div id="sys-sensors-grid" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(160px, 1fr));gap:8px"></div>
         </div>
       </div>
 
       <!-- Config profiles -->
-      <div class="section-label" data-i18n="sys_sec_profiles">Profiles</div>
+      <div class="section-label" data-i18n="sys_sec_profiles">Profile</div>
       <div class="card">
         <div class="card-head">
-          <div class="card-title" data-i18n="sys_profiles">Config Profiles</div>
+          <div class="card-title" data-i18n="sys_profiles">Konfigurationsprofile</div>
           <div class="card-actions">
-            <button class="btn btn-sm" onclick="loadConfigProfiles()"><span class="btn-icon" data-icon="restart"></span><span data-i18n="sys_refresh">Refresh</span></button>
+            <button class="btn btn-sm" onclick="loadConfigProfiles()"><span class="btn-icon" data-icon="restart"></span><span data-i18n="sys_refresh">Aktualisieren</span></button>
           </div>
         </div>
         <div class="card-body" style="padding:14px 18px">
@@ -4582,27 +4568,27 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
       </div>
 
       <!-- Live SDS Broadcast -->
-      <div class="section-label" data-i18n="sys_sec_sds">SDS Broadcast</div>
+      <div class="section-label" data-i18n="sys_sec_sds">SDS-Rundsendung</div>
       <div class="card">
         <div class="card-head">
-          <div class="card-title" style="display:flex;align-items:center;gap:7px"><span class="btn-icon" data-icon="broadcast" style="margin:0;width:14px;height:14px"></span>Live SDS Broadcast</div>
+          <div class="card-title" style="display:flex;align-items:center;gap:7px"><span class="btn-icon" data-icon="broadcast" style="margin:0;width:14px;height:14px"></span>Aktive SDS-Rundsendung</div>
           <div class="card-actions">
-            <button class="btn btn-sm" onclick="loadLiveSds()"><span class="btn-icon" data-icon="restart"></span><span data-i18n="sys_refresh">Refresh</span></button>
-            <button class="btn btn-sm btn-danger" onclick="clearAllLiveSds()" id="live-sds-clear-btn" style="display:none"><span class="btn-icon" data-icon="delete"></span><span data-i18n="live_sds_clear_all">Clear All</span></button>
+            <button class="btn btn-sm" onclick="loadLiveSds()"><span class="btn-icon" data-icon="restart"></span><span data-i18n="sys_refresh">Aktualisieren</span></button>
+            <button class="btn btn-sm btn-danger" onclick="clearAllLiveSds()" id="live-sds-clear-btn" style="display:none"><span class="btn-icon" data-icon="delete"></span><span data-i18n="live_sds_clear_all">Alle löschen</span></button>
           </div>
         </div>
         <div class="card-body" style="padding:14px 18px">
-          <p style="font-size:12px;color:var(--text2);margin-bottom:12px" data-i18n="live_sds_desc">Broadcast a text message to all radios on the cell, repeating at the Home Mode Display interval. Repeats until deleted or the repeat count is reached.</p>
+          <p style="font-size:12px;color:var(--text2);margin-bottom:12px" data-i18n="live_sds_desc">Sendet eine Textnachricht an alle Funkgeräte der Zelle und wiederholt sie im Home-Mode-Display-Intervall, bis sie gelöscht oder die Wiederholungszahl erreicht wurde.</p>
           <div class="form-row" style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
             <div style="flex:1;min-width:180px">
-              <label class="form-label" data-i18n="live_sds_text">Message text (max 251 chars)</label>
-              <input type="text" id="live-sds-text" class="form-input" maxlength="251" placeholder="e.g. Repeater test 18:00-20:00">
+              <label class="form-label" data-i18n="live_sds_text">Nachrichtentext (max. 251 Zeichen)</label>
+              <input type="text" id="live-sds-text" class="form-input" maxlength="251" placeholder="z. B. Repeater-Test 18:00–20:00">
             </div>
             <div style="width:90px">
-              <label class="form-label" data-i18n="live_sds_repeat">Repeat (0=∞)</label>
+              <label class="form-label" data-i18n="live_sds_repeat">Wiederholungen (0=∞)</label>
               <input type="number" id="live-sds-repeat" class="form-input" value="0" min="0" max="999" style="width:100%">
             </div>
-            <button class="btn btn-primary" onclick="addLiveSds()"><span class="btn-icon" data-icon="broadcast"></span><span data-i18n="live_sds_send">Broadcast</span></button>
+            <button class="btn btn-primary" onclick="addLiveSds()"><span class="btn-icon" data-icon="broadcast"></span><span data-i18n="live_sds_send">Senden</span></button>
           </div>
           <div id="live-sds-list" style="margin-top:14px"></div>
         </div>
@@ -4616,7 +4602,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
 <div class="modal-overlay" id="edit-profile-modal">
   <div class="modal" style="width:min(700px,95vw);max-height:90vh;display:flex;flex-direction:column">
     <div class="modal-title" style="display:flex;align-items:center;gap:7px">
-      <span class="btn-icon" data-icon="edit" style="margin:0"></span><span data-i18n="profile_edit_title">Edit Config Profile</span>:
+      <span class="btn-icon" data-icon="edit" style="margin:0"></span><span data-i18n="profile_edit_title">Konfigurationsprofil bearbeiten</span>:
       <span id="edit-profile-name" style="color:var(--accent);font-family:var(--mono);font-size:14px"></span>
     </div>
     <div style="flex:1;overflow:hidden;display:flex;flex-direction:column;gap:8px;min-height:0">
@@ -4628,8 +4614,8 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
       <div id="edit-profile-msg" style="font-size:12px;min-height:16px"></div>
     </div>
     <div class="modal-actions">
-      <button class="btn" onclick="closeEditProfileModal()" data-i18n="cancel">Cancel</button>
-      <button class="btn btn-primary" onclick="saveEditProfile()" data-i18n="save">Save</button>
+      <button class="btn" onclick="closeEditProfileModal()" data-i18n="cancel">Abbrechen</button>
+      <button class="btn btn-primary" onclick="saveEditProfile()" data-i18n="save">Speichern</button>
     </div>
   </div>
 </div>
@@ -4637,13 +4623,13 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
 <!-- ── SDS Modal ── -->
 <div class="modal-overlay" id="sds-modal">
   <div class="modal">
-    <div class="modal-title" data-i18n="sds_title">⬡ Send SDS Message</div>
+    <div class="modal-title" data-i18n="sds_title">⬡ SDS-Nachricht senden</div>
     <div class="form-row">
-      <label class="form-label" data-i18n="sds_dest">Destination ISSI</label>
-      <input type="number" id="sds-dest" class="form-input" placeholder="e.g. 2260571">
+      <label class="form-label" data-i18n="sds_dest">Ziel-ISSI</label>
+      <input type="number" id="sds-dest" class="form-input" placeholder="z. B. 2260571">
     </div>
     <div class="form-row">
-      <label class="form-label" data-i18n="sds_msg_label">Message</label>
+      <label class="form-label" data-i18n="sds_msg_label">Nachricht</label>
       <input type="text" id="sds-msg" class="form-input" placeholder="..." maxlength="160">
     </div>
     <div class="form-row">
@@ -4654,7 +4640,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
     </div>
     <div id="sds-callout-fields" style="display:none">
       <div class="form-row">
-        <label class="form-label" data-i18n="sds_callout_source">Source ISSI</label>
+        <label class="form-label" data-i18n="sds_callout_source">Quell-ISSI</label>
         <input type="number" id="sds-callout-source" class="form-input" value="9999" min="1">
       </div>
       <div class="form-row">
@@ -4678,12 +4664,12 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
         <input type="text" id="sds-callout-raw" class="form-input" placeholder="C3 00 09 0D 10 11 27 0F 02 30 8D 41 4C 41 52 4D">
       </div>
       <div class="form-row" style="font-size:12px;color:var(--muted);line-height:1.45" data-i18n="sds_callout_help">
-        TPG RIC is written into the Call-Out payload address bytes. Call-Out ID is the raw ID byte 0..255. Priority/Ton is the raw priority byte 0..15. Raw Hex overrides automatic payload generation.
+        Die TPG-RIC wird in die Adressbytes des Call-Out-Payloads geschrieben. Die Call-Out-ID ist das direkte ID-Byte von 0 bis 255. Priorität/Ton entspricht dem direkten Prioritätsbyte von 0 bis 15. Ein Raw-Hex-Payload überschreibt die automatische Erzeugung.
       </div>
     </div>
     <div class="modal-actions">
-      <button class="btn" onclick="closeSdsModal()" data-i18n="cancel">Cancel</button>
-      <button class="btn btn-primary" onclick="sendSds()" data-i18n="send">Send</button>
+      <button class="btn" onclick="closeSdsModal()" data-i18n="cancel">Abbrechen</button>
+      <button class="btn btn-primary" onclick="sendSds()" data-i18n="send">Senden</button>
     </div>
   </div>
 </div>
@@ -4693,21 +4679,21 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
   <div class="modal">
     <div class="modal-title" data-i18n="dgna_modal_title">⬡ Dynamic Group Assignment</div>
     <div class="form-row">
-      <label class="form-label" data-i18n="dgna_issi">Terminal ISSI</label>
+      <label class="form-label" data-i18n="dgna_issi">Funkgeräte-ISSI</label>
       <input type="number" id="dgna-issi" class="form-input" readonly>
     </div>
     <div class="form-row">
-      <label class="form-label" data-i18n="dgna_current">Current groups</label>
+      <label class="form-label" data-i18n="dgna_current">Aktuelle Gruppen</label>
       <div id="dgna-current" style="display:flex;flex-wrap:wrap;gap:4px;min-height:22px;align-items:center">—</div>
     </div>
     <div class="form-row">
-      <label class="form-label" data-i18n="dgna_gssi">Group (GSSI)</label>
+      <label class="form-label" data-i18n="dgna_gssi">Gruppe (GSSI)</label>
       <input type="number" id="dgna-gssi" class="form-input" placeholder="e.g. 100" min="1">
     </div>
     <div class="modal-actions">
-      <button class="btn" onclick="closeDgnaModal()" data-i18n="cancel">Cancel</button>
-      <button class="btn btn-danger" onclick="sendDgna(false)" data-i18n="dgna_deassign">Deassign</button>
-      <button class="btn btn-primary" onclick="sendDgna(true)" data-i18n="dgna_assign">Assign</button>
+      <button class="btn" onclick="closeDgnaModal()" data-i18n="cancel">Abbrechen</button>
+      <button class="btn btn-danger" onclick="sendDgna(false)" data-i18n="dgna_deassign">Entfernen</button>
+      <button class="btn btn-primary" onclick="sendDgna(true)" data-i18n="dgna_assign">Zuweisen</button>
     </div>
   </div>
 </div>
@@ -4715,11 +4701,11 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
 <!-- ── Update Modal ── -->
 <div class="modal-overlay" id="update-modal">
   <div class="modal">
-    <div class="modal-title" id="update-modal-title" data-i18n="update_title">⬆ OTA Update</div>
+    <div class="modal-title" id="update-modal-title" data-i18n="update_title">⬆ OTA-Aktualisierung</div>
     <div class="update-status running" id="update-status-msg"></div>
     <div class="update-terminal" id="update-terminal"></div>
     <div class="modal-actions">
-      <button class="btn" id="update-close-btn" onclick="closeUpdateModal()" data-i18n="update_close" disabled>Close</button>
+      <button class="btn" id="update-close-btn" onclick="closeUpdateModal()" data-i18n="update_close" disabled>Schließen</button>
     </div>
   </div>
 </div>
@@ -4801,528 +4787,360 @@ function paintIcons(root){
 
 // ── i18n ─────────────────────────────────────────────────────────────────
 const LANGS={
-  en:{
-    bts_ip:'BTS IP',offline:'OFFLINE',online:'ONLINE',
-    brew_online:'ONLINE',brew_offline:'OFFLINE',
-    stations:'Radios',calls:'Calls',recordings:'Recordings',audio:'Audio Centre',lastheard:'Last Heard',log:'Log',rf:'RF',health:'Health',asterisk:'Asterisk SIP',dapnet:'DAPNET',echolink:'EchoLink',echolink_title:'EchoLink',meshcom:'MeshCom',meshcom_title:'MeshCom',maps:'Maps',maps_title:'Maps',geoalarm:'GeoAlarm',geoalarm_title:'GeoAlarm',config:'Config',
-    sdslog:'SDS Log',th_dir:'Dir',th_from:'From',th_to:'To',th_message:'Message',no_sds:'No SDS messages yet',sds_refresh:'Refresh',
-    rf_freq:'Center freq',rf_rate:'Sample rate',rf_rms:'RMS',rf_peak:'Peak',rf_age:'Snapshot',
-    rf_waiting:'waiting…',rf_live:'live',rf_stale:'stale',
-    rf_visualizers:'Visualizers',rf_spectrum:'TX DSP Spectrum (pre-PA)',rf_constellation:'TX DSP Constellation',
-    rf_hint_spectrum:'live · 512-bin FFT',rf_hint_constellation:'π/4-DQPSK',
-    rf_waterfall:'TX Spectrum Waterfall',rf_hint_waterfall:'rolling · viridis',
-    rf_quality:'Signal Quality',rf_hint_quality:'measured pre-PA · derived from same DSP snapshot',
-    rf_evm:'EVM',rf_papr:'PAPR',rf_carrier:'Carrier leak',rf_obw:'Occupied BW (99%)',
-    rf_dc:'DC offset (I/Q)',rf_iqa:'IQ amplitude imbalance',rf_iqp:'IQ phase imbalance',
-    rf_hw_health:'Hardware Health',rf_hint_health:'polled every 5s',
-    rf_temp:'SDR Temperature',rf_tx_gain:'TX Gain Stages (actual)',rf_rx_gain:'RX Gain Stages (actual)',
-    rf_temp_cold:'cold',rf_temp_nominal:'nominal',rf_temp_warm:'warm',rf_temp_hot:'hot',rf_temp_na:'no sensor',
-    rf_no_gains:'unavailable',rf_just_now:'just now',
-
-    asterisk_title:'Asterisk SIP',ast_configured:'Configured',ast_register:'REGISTER',ast_sip_listen:'SIP listen',
-    ast_remote:'Remote Asterisk',ast_rtp:'RTP ports',ast_codec:'Codec',ast_last_rx:'Last RX',
-    ast_last_tx:'Last TX',ast_last_error:'Last error',
-    dapnet_title:'DAPNET',dapnet_log:'DAPNET Log',dapnet_routing:'Routing',dapnet_send:'Send DAPNET Message',dapnet_saved:'✓ Saved',
-    terminals:'Radios',registered:'registered',
-    active_calls:'Active Calls',circuits:'circuits in use',
-    registered_terminals:'Registered Radios',
-    bts_details:'TETRA BTS Details',bts_tx:'TX Freq',bts_rx:'RX Freq',bts_shift:'Duplex Shift',bts_rate:'Sample Rate',
-    bts_la:'Location Area',bts_cc:'Colour Code',bts_carrier:'Main Carrier',bts_band:'Band',
-    bts_access:'Registration Access',bts_wl_entries:'whitelisted ISSI',bts_wl_open:'Open — all ISSI may register',
-    readability:'Readability',size_small:'Small',size_small_d:'Compact · normal contrast',size_medium:'Medium',size_medium_d:'Default · comfortable',size_high:'High',size_high_d:'Larger · stronger contrast',size_ultra:'Ultra',size_ultra_d:'Largest · maximum contrast',sdr:'SDR',power:'Power',
-    no_terminals:'No radios registered',no_calls:'No active calls',
-    live_log:'Live Log',autoscroll:'Auto-scroll',filter_all:'All',
-    clear:'Clear',export:'Export',restart:'Restart',shutdown:'Shutdown',save:'Save',
-    cfg_sec_configuration:'Configuration',cfg_sec_access:'Access Control',cfg_sec_wx:'WX / METAR',whitelist_title:'ISSI Whitelist',whitelist_add:'Add ISSI',whitelist_empty:'List empty — open network (any radio may register).',
-    whitelist_help:'When the list is empty, any radio may register (open network). When non-empty, only the listed ISSIs are accepted; all others are rejected. Changes apply instantly and persist across restarts.',
-    whitelist_enforced:'ENFORCED',whitelist_open:'OPEN',whitelist_invalid:'Enter a valid ISSI (1–16777215).',
-    wx_title:'WX / METAR Service',wx_help:'Built-in weather service. Radios send an SDS like "METAR LROP" to the service ISSI to get a decoded report. Optionally auto-send a fixed station\'s METAR to an ISSI or talkgroup at a set interval. Data from aviationweather.gov.',
-    wx_enabled:'Enable on-demand METAR responder',wx_service_issi:'Service ISSI',wx_periodic_enabled:'Enable periodic auto-broadcast',
-    wx_periodic_icao:'Station ICAO',wx_periodic_dest:'Destination',wx_periodic_isgroup:'Destination is group',wx_periodic_isgroup_hint:'(GSSI instead of individual ISSI)',
-    wx_periodic_interval:'Interval (seconds)',wx_interval_hint:'Minimum 300 s (5 min) to avoid hammering the weather API.',wx_periodic_incomplete:'Set both station ICAO and destination for periodic mode.',
-    sds_title:'⬡ Send SDS Message',sds_dest:'Destination ISSI',
-    sds_callout_enable:'TPG2200 Call-Out / Send alarm',
-    sds_callout_source:'Source ISSI',
-    sds_callout_id:'Call-Out ID',
-    sds_callout_ric:'TPG RIC',
-    sds_callout_priority:'Priority / tone',
-    sds_callout_text:'Alarm text',
-    sds_callout_raw:'Raw Hex Payload optional',
-    sds_callout_help:'TPG RIC is written into the Call-Out payload address bytes. Call-Out ID is the raw ID byte 0..255. Priority/tone is the raw priority byte 0..15. Raw Hex overrides automatic payload generation.',
-    live_sds_desc:'Broadcast a text message to all radios on the cell, repeating at the Home Mode Display interval. Repeats until deleted or the repeat count is reached.',
-    live_sds_text:'Message text (max 251 chars)',live_sds_repeat:'Repeat (0=∞)',live_sds_send:'Broadcast',
-    live_sds_clear_all:'Clear All',live_sds_empty:'No active broadcasts.',
-    live_sds_sent:'sent',live_sds_times:'×',live_sds_forever:'∞',live_sds_delete:'✕',
-    fallback_title:'⚠ FALLBACK CONFIG ACTIVE — Primary config failed to load',
-    sds_msg_label:'Message',cancel:'Cancel',send:'Send',
-    th_issi:'ISSI',th_issi_cs:'ISSI / Callsign',th_groups:'Groups',th_ee:'Energy Economy',th_signal:'Signal',
-    tg_selected:'Selected talkgroup (last keyed up)',
-    tg_affiliated_short:'affiliated',tg_affiliated_hint:'Other talkgroups this radio is affiliated to (kept attached on the BS even when scan is off on the device)',
-    th_status:'Status',th_last_seen:'Last seen',th_actions:'Actions',
-    th_id:'ID',th_type:'Type',th_caller:'Caller',
-    th_dest:'Destination',th_speaker:'Speaker',th_duration:'Duration',
-    th_time:'Time',th_source:'Source',th_activity:'Activity',
-    last_heard_title:'Last Heard',no_activity:'No activity yet',
-    act_call_group:'Group Call',act_call_individual:'P2P Call',act_sds:'SDS',
-    online_badge:'ONLINE',kick:'Kick',sds:'SDS',
-    call_group:'GROUP',call_p2p_s:'P2P-S',call_p2p_d:'P2P-D',call_emergency:'EMERGENCY',
-    emg_banner_title:'EMERGENCY ACTIVE',integrations:'Integrations',integ_enabled:'Enabled',integ_disabled:'Disabled',integ_error:'Error',system_sec:'System',emg_chip:'EMERGENCY',bs_label:'BS',emg_clear:'Clear',confirm_clear_emergency:'Clear emergency for ISSI {issi}?',
-    confirm_kick:'Kick ISSI {issi}?\nTerminal will be deregistered and forced to re-attach.',
-    dgna:'DGNA',dgna_title:'Dynamic group assignment',dgna_modal_title:'⬡ Dynamic Group Assignment',dgna_issi:'Terminal ISSI',dgna_current:'Current groups',dgna_gssi:'Group (GSSI)',dgna_assign:'Assign',dgna_deassign:'Deassign',
-    confirm_restart:'Restart FlowStation?\nAll active calls will be dropped.',
-    confirm_shutdown:'Shutdown FlowStation?\nThe service will stop and must be restarted manually.',
-    confirm_logout:'Log out?',
-    saved:'✓ Saved — restart to apply.',save_fail:'✗ Save failed',conn_error:'Connection error.',
-    update:'Update',update_available:'Update available',update_title:'NetCore-Tetra Update — github.com/JanHG98/flowstation',
-    update_confirm:'Pull latest NetCore-Tetra main and rebuild?\nThe service will restart automatically.',
-    update_running:'Updating… do not close this window.',
-    update_done_ok:'✓ Update complete. Restarting…',
-    update_done_err:'✗ Update failed. See log below.',
-    update_close:'Close',
-    system:'System',sys_info:'System Info',sys_hostname:'Hostname',sys_uptime:'Uptime',
-    sys_version:'FS Version',sys_os:'OS',sys_config:'Active Config',
-    sys_cpu:'CPU',sys_cpu_load:'CPU Load',sys_ram:'RAM',sys_temp:'CPU Temp',
-    wifi:'WiFi',wifi_status:'Current connection',wifi_saved:'Saved networks',wifi_visible:'Available networks',wifi_loading:'Loading…',wifi_scanning:'Scanning…',wifi_no_device:'No WiFi device detected on this host.',wifi_radio_disabled:'WiFi radio is disabled.',wifi_not_connected:'Not connected to any network.',wifi_no_saved:'No saved networks.',wifi_no_networks:'No networks in range.',wifi_ssid:'Network',wifi_signal:'Signal',wifi_ip:'IP address',wifi_actions:'Actions',wifi_disconnect:'Disconnect',wifi_connect:'Connect',wifi_connect_to:'Connect to',wifi_connecting:'Connecting…',wifi_connected:'CONNECTED',wifi_connected_ok:'Connected.',wifi_saved_tag:'SAVED',wifi_open:'OPEN',wifi_forget:'Forget',wifi_confirm_forget:'Forget network',wifi_password:'Password',wifi_hidden:'Hidden network (SSID not broadcast)',wifi_add_hidden:'Hidden network',wifi_scan:'Scan',wifi_refresh:'Refresh',wifi_radio_off:'Disable WiFi',wifi_radio_on:'Enable WiFi',wifi_warn_lose_access:'If connected to the dashboard via WiFi, changing networks may temporarily disconnect you. Make sure you have a backup access path (Ethernet or known good network).',wifi_err_no_ssid:'SSID required',cancel:'Cancel',sys_sensors:'Host Hardware Sensors',sys_sensors_empty:'No sensors detected on this host.',sys_rf:'RF Hardware (SoapySDR)',sys_autorefresh:'Auto-refresh 5s',
-    profile_edit_title:'Edit Config Profile',profile_edit_btn:'Edit',
-    profile_edit_save_ok:'✓ Saved',profile_edit_save_fail:'✗ Save failed',
-    sys_os:'OS',sys_version:'FS Version',sys_config:'Active Config',
-    sys_profiles:'Config Profiles',sys_activate:'Activate & Restart',
-    sys_active_badge:'ACTIVE',sys_no_profiles:'No .toml profiles found in config directory.',
-    sys_activate_confirm:'Switch to profile "{name}" and restart?\nCurrent config will be backed up.',
-    sys_title:'System',sys_sec_status:'Status',sys_sec_host:'Host',sys_sec_radio:'Radio Hardware',sys_sec_sensors:'Sensors',sys_sec_profiles:'Profiles',sys_sec_sds:'SDS Broadcast',sys_refresh:'Refresh',sys_probe:'Probe',sys_temp_hot:'HOT',sys_temp_warm:'Warm',sys_temp_ok:'OK',
-    sys_bts:'BTS Connection',
-    telegram:'Telegram',tg_title:'Telegram Alerts',
-    tg_help:'Get instant Telegram messages when something happens on the station — a radio attaches or drops, the backhaul goes up or down, a position beacon arrives, or the stack logs a warning/error.',
-    tg_enabled:'Enable Telegram alerts',
-    tg_test:'Send test',tg_testing:'Sending test…',tg_test_ok:'✓ Test sent to {n} chat(s)',
-    tg_howto_title:'Setup — 4 steps',
-    tg_step1:'In Telegram, open @BotFather, send /newbot and follow the prompts. Copy the bot token it gives you.',
-    tg_step2:'Paste the token below and click Verify — you should see your bot\'s @username.',
-    tg_step3:'Open a chat with your new bot (or add it to a group) and send it any message, e.g. /start.',
-    tg_step4:'Click "Detect Chat ID", add your chat to the recipients, then Save. Use "Send test" to confirm.',
-    tg_bot_title:'Bot token',
-    tg_bot_help:'The token from @BotFather looks like 123456789:AAExampleTokenString. It is stored masked and never shown in full again.',
-    tg_verify:'Verify',tg_verifying:'Verifying…',
-    tg_recipients_title:'Recipients (Chat IDs)',
-    tg_recipients_help:'Every alert is sent to each recipient. A positive ID is a private chat; a negative ID is a group or channel.',
-    tg_detect:'Detect Chat ID',tg_detecting:'Reading recent messages…',
-    tg_detect_none:'No recent messages found. Send your bot a message first, then try again.',
-    tg_detect_found:'Chats that messaged your bot — click Add:',
-    tg_add:'Add',tg_no_recipients:'No recipients yet.',tg_invalid_chat:'Enter a valid Chat ID.',
-    tg_categories_title:'Alert categories',
-    tg_cat_connect:'Radio connected',tg_cat_disconnect:'Radio disconnected',
-    tg_cat_t351:'Radio dropped (no T351 response)',tg_cat_lip:'LIP/APRS position beacon',
-    tg_cat_backhaul:'Brew backhaul up/down',tg_cat_brew_register:'Brew ISSI REGISTER',
-    tg_brew_register_prefix:'Brew REGISTER prefix',tg_brew_register_white:'Brew REGISTER ISSI whitelist',tg_brew_register_black:'Brew REGISTER ISSI blacklist',
-    tg_cat_logs:'Critical log (warnings/errors)',
-  },
-  ro:{
-    bts_ip:'IP BTS',offline:'DECONECTAT',online:'CONECTAT',
-    brew_online:'ONLINE',brew_offline:'OFFLINE',
-    stations:'Radiouri',calls:'Apeluri',lastheard:'Ultima Activitate',log:'Log',rf:'RF',health:'Health',echolink:'EchoLink',echolink_title:'EchoLink',config:'Config',
-    sdslog:'Jurnal SDS',th_dir:'Dir',th_from:'De la',th_to:'Către',th_message:'Mesaj',no_sds:'Niciun mesaj SDS încă',sds_refresh:'Reîmprospătează',
-    rf_freq:'Frecvență centru',rf_rate:'Rată eșantion',rf_rms:'RMS',rf_peak:'Vârf',rf_age:'Captură',
-    rf_waiting:'în așteptare…',rf_live:'live',rf_stale:'expirat',
-    rf_visualizers:'Vizualizatoare',rf_spectrum:'Spectru TX DSP (pre-PA)',rf_constellation:'Constelație TX DSP',
-    rf_hint_spectrum:'live · FFT 512-bin',rf_hint_constellation:'π/4-DQPSK',
-    rf_waterfall:'Cascadă Spectru TX',rf_hint_waterfall:'derulant · viridis',
-    rf_quality:'Calitate Semnal',rf_hint_quality:'măsurat pre-PA · din același snapshot DSP',
-    rf_evm:'EVM',rf_papr:'PAPR',rf_carrier:'Scurgere portantă',rf_obw:'Bandă ocupată (99%)',
-    rf_dc:'Offset DC (I/Q)',rf_iqa:'Dezechilibru amplitudine IQ',rf_iqp:'Dezechilibru fază IQ',
-    rf_hw_health:'Stare Hardware',rf_hint_health:'citit la 5s',
-    rf_temp:'Temperatură SDR',rf_tx_gain:'Câștig TX (actual)',rf_rx_gain:'Câștig RX (actual)',
-    rf_temp_cold:'rece',rf_temp_nominal:'nominal',rf_temp_warm:'cald',rf_temp_hot:'fierbinte',rf_temp_na:'fără senzor',
-    rf_no_gains:'indisponibil',rf_just_now:'acum',
-
-    terminals:'Radiouri',registered:'înregistrate',
-    active_calls:'Apeluri Active',circuits:'circuite active',
-    registered_terminals:'Radiouri Înregistrate',
-    bts_details:'Detalii BTS TETRA',bts_tx:'Frecvență TX',bts_rx:'Frecvență RX',bts_shift:'Decalaj Duplex',bts_rate:'Rată Eșantionare',
-    bts_la:'Zonă (LA)',bts_cc:'Cod Culoare',bts_carrier:'Purtătoare Princ.',bts_band:'Bandă',
-    bts_access:'Acces Înregistrare',bts_wl_entries:'ISSI permise',bts_wl_open:'Deschis — orice ISSI se poate înregistra',
-    readability:'Lizibilitate',size_small:'Mic',size_small_d:'Compact · contrast normal',size_medium:'Mediu',size_medium_d:'Implicit · confortabil',size_high:'Mare',size_high_d:'Mai mare · contrast sporit',size_ultra:'Ultra',size_ultra_d:'Cel mai mare · contrast maxim',sdr:'SDR',power:'Consum',
-    no_terminals:'Niciun radio înregistrat',no_calls:'Niciun apel activ',
-    live_log:'Log Live',autoscroll:'Auto-scroll',filter_all:'Toate',
-    clear:'Șterge',export:'Export',restart:'Repornire',shutdown:'Oprire',save:'Salvează',
-    cfg_sec_configuration:'Configurație',cfg_sec_access:'Control acces',cfg_sec_wx:'WX / METAR',whitelist_title:'Listă albă ISSI',whitelist_add:'Adaugă ISSI',whitelist_empty:'Listă goală — rețea deschisă (orice radio se poate înregistra).',
-    whitelist_help:'Când lista e goală, orice radio se poate înregistra (rețea deschisă). Când are intrări, doar ISSI-urile listate sunt acceptate; restul sunt respinse. Modificările se aplică instant și persistă după repornire.',
-    whitelist_enforced:'ACTIVĂ',whitelist_open:'DESCHISĂ',whitelist_invalid:'Introdu un ISSI valid (1–16777215).',
-    wx_title:'Serviciu WX / METAR',wx_help:'Serviciu meteo integrat. Radiourile trimit un SDS de forma "METAR LROP" către ISSI-ul serviciului și primesc raportul decodat. Opțional, trimite automat METAR-ul unei stații fixe către un ISSI sau grup la interval. Date de la aviationweather.gov.',
-    wx_enabled:'Activează răspunsul METAR la cerere',wx_service_issi:'ISSI serviciu',wx_periodic_enabled:'Activează trimiterea periodică',
-    wx_periodic_icao:'Cod ICAO stație',wx_periodic_dest:'Destinație',wx_periodic_isgroup:'Destinația e grup',wx_periodic_isgroup_hint:'(GSSI în loc de ISSI individual)',
-    wx_periodic_interval:'Interval (secunde)',wx_interval_hint:'Minim 300 s (5 min) ca să nu suprasolicităm API-ul meteo.',wx_periodic_incomplete:'Setează și ICAO stație și destinație pentru modul periodic.',
-    live_sds_desc:'Transmite un mesaj text către toate radiourile din celulă, repetând la intervalul Home Mode Display.',
-    live_sds_text:'Text mesaj (max 251 caractere)',live_sds_repeat:'Repetări (0=∞)',live_sds_send:'Broadcast',
-    live_sds_clear_all:'Șterge Tot',live_sds_empty:'Niciun broadcast activ.',
-    live_sds_sent:'trimis',live_sds_times:'×',live_sds_forever:'∞',live_sds_delete:'✕',
-    fallback_title:'⚠ CONFIG DE REZERVĂ ACTIV — Config principal nu a putut fi încărcat',
-    sds_title:'⬡ Trimite Mesaj SDS',sds_dest:'ISSI Destinatar',
-    sds_msg_label:'Mesaj',cancel:'Anulează',send:'Trimite',
-    th_issi:'ISSI',th_issi_cs:'ISSI / Indicativ',th_groups:'Grupuri',th_ee:'Economie Energie',th_signal:'Semnal',
-    tg_selected:'Grup selectat (ultima transmisie)',
-    tg_affiliated_short:'afiliate',tg_affiliated_hint:'Alte grupuri la care radio-ul este afiliat (rămân atașate la BS chiar și când scan e oprit din statie)',
-    th_status:'Status',th_last_seen:'Văzut',th_actions:'Acțiuni',
-    th_id:'ID',th_type:'Tip',th_caller:'Apelant',
-    th_dest:'Destinatar',th_speaker:'Vorbitor',th_duration:'Durată',
-    th_time:'Oră',th_source:'Sursă',th_activity:'Activitate',
-    last_heard_title:'Ultima Activitate',no_activity:'Nicio activitate încă',
-    act_call_group:'Apel Grup',act_call_individual:'Apel P2P',act_sds:'SDS',
-    online_badge:'ONLINE',kick:'Kick',sds:'SDS',
-    call_group:'GRUP',call_p2p_s:'P2P-S',call_p2p_d:'P2P-D',call_emergency:'URGENȚĂ',
-    emg_banner_title:'URGENȚĂ ACTIVĂ',integrations:'Integrări',integ_enabled:'Activat',integ_disabled:'Dezactivat',integ_error:'Eroare',system_sec:'Sistem',emg_chip:'URGENȚĂ',bs_label:'BS',emg_clear:'Anulează',confirm_clear_emergency:'Anulezi urgența pentru ISSI {issi}?',
-    confirm_kick:'Kick ISSI {issi}?\nTerminalul va fi deînregistrat și forțat să se reconecteze.',
-    dgna:'DGNA',dgna_title:'Atribuire dinamică de grup',dgna_modal_title:'⬡ Atribuire dinamică de grup',dgna_issi:'ISSI terminal',dgna_current:'Grupuri curente',dgna_gssi:'Grup (GSSI)',dgna_assign:'Atribuie',dgna_deassign:'Retrage',
-    confirm_restart:'Repornire FlowStation?\nToate apelurile active vor fi întrerupte.',
-    confirm_shutdown:'Oprire FlowStation?\nServiciul se va opri și trebuie repornit manual.',
-    confirm_logout:'Deconectare?',
-    saved:'✓ Salvat — repornire pentru aplicare.',save_fail:'✗ Salvare eșuată',conn_error:'Eroare de conexiune.',
-    update:'Update',update_available:'Actualizare disponibilă',update_title:'Update OTA — github.com/JanHG98/flowstation',
-    update_confirm:'Descarcă ultima versiune din main și recompilează?\nServiciul va reporni automat.',
-    update_running:'Se actualizează… nu închide fereastra.',
-    update_done_ok:'✓ Update finalizat. Se repornește…',
-    update_done_err:'✗ Update eșuat. Vezi logul de mai jos.',
-    update_close:'Închide',
-    system:'Sistem',sys_info:'Info Sistem',sys_hostname:'Hostname',sys_uptime:'Uptime',
-    sys_os:'OS',sys_version:'Versiune FS',sys_config:'Config Activ',
-    sys_cpu:'CPU',sys_cpu_load:'Încărcare CPU',sys_ram:'RAM',sys_temp:'Temp CPU',
-    wifi:'WiFi',wifi_status:'Conexiunea curentă',wifi_saved:'Rețele salvate',wifi_visible:'Rețele disponibile',wifi_loading:'Se încarcă…',wifi_scanning:'Se scanează…',wifi_no_device:'Niciun dispozitiv WiFi detectat.',wifi_radio_disabled:'Radioul WiFi este dezactivat.',wifi_not_connected:'Neconectat la nicio rețea.',wifi_no_saved:'Nicio rețea salvată.',wifi_no_networks:'Nicio rețea în rază.',wifi_ssid:'Rețea',wifi_signal:'Semnal',wifi_ip:'Adresă IP',wifi_actions:'Acțiuni',wifi_disconnect:'Deconectează',wifi_connect:'Conectează',wifi_connect_to:'Conectează la',wifi_connecting:'Se conectează…',wifi_connected:'CONECTAT',wifi_connected_ok:'Conectat.',wifi_saved_tag:'SALVAT',wifi_open:'DESCHIS',wifi_forget:'Uită',wifi_confirm_forget:'Uită rețeaua',wifi_password:'Parolă',wifi_hidden:'Rețea ascunsă (SSID nedifuzat)',wifi_add_hidden:'Rețea ascunsă',wifi_scan:'Scanează',wifi_refresh:'Reîncarcă',wifi_radio_off:'Dezactivează WiFi',wifi_radio_on:'Activează WiFi',wifi_warn_lose_access:'Dacă ești conectat la dashboard prin WiFi, schimbarea rețelei te poate deconecta temporar. Asigură-te că ai o cale alternativă (Ethernet sau rețea de încredere).',wifi_err_no_ssid:'SSID necesar',cancel:'Anulează',sys_sensors:'Senzori Hardware Gazdă',sys_sensors_empty:'Niciun senzor detectat.',sys_rf:'Hardware RF (SoapySDR)',sys_autorefresh:'Auto-refresh 5s',
-    profile_edit_title:'Editare Profil Config',profile_edit_btn:'Editează',
-    profile_edit_save_ok:'✓ Salvat',profile_edit_save_fail:'✗ Salvare eșuată',
-    sys_profiles:'Profile Config',sys_activate:'Activează & Repornire',
-    sys_active_badge:'ACTIV',sys_no_profiles:'Niciun profil .toml găsit în directorul config.',
-    sys_activate_confirm:'Comutare la profilul "{name}" și repornire?\nConfig-ul curent va fi salvat.',
-    sys_title:'Sistem',sys_sec_status:'Stare',sys_sec_host:'Gazdă',sys_sec_radio:'Hardware radio',sys_sec_sensors:'Senzori',sys_sec_profiles:'Profiluri',sys_sec_sds:'Difuzare SDS',sys_refresh:'Reîncarcă',sys_probe:'Sondează',sys_temp_hot:'FIERBINTE',sys_temp_warm:'Cald',sys_temp_ok:'OK',
-    sys_bts:'Conexiune BTS',
-    telegram:'Telegram',tg_title:'Alerte Telegram',
-    tg_help:'Primește mesaje Telegram instant când se întâmplă ceva pe stație — un radio se conectează sau cade, backhaul-ul urcă/coboară, sosește o baliză de poziție, sau stack-ul logează un avertisment/eroare.',
-    tg_enabled:'Activează alertele Telegram',
-    tg_test:'Trimite test',tg_testing:'Se trimite testul…',tg_test_ok:'✓ Test trimis către {n} conversație(i)',
-    tg_howto_title:'Configurare — 4 pași',
-    tg_step1:'În Telegram, deschide @BotFather, trimite /newbot și urmează pașii. Copiază token-ul botului.',
-    tg_step2:'Lipește token-ul mai jos și apasă Verifică — ar trebui să vezi @username-ul botului tău.',
-    tg_step3:'Deschide o conversație cu botul (sau adaugă-l într-un grup) și trimite-i orice mesaj, ex. /start.',
-    tg_step4:'Apasă „Detectează Chat ID", adaugă conversația la destinatari, apoi Salvează. Folosește „Trimite test" pentru confirmare.',
-    tg_bot_title:'Token bot',
-    tg_bot_help:'Token-ul de la @BotFather arată ca 123456789:AAExempluToken. Este stocat mascat și nu mai e afișat integral.',
-    tg_verify:'Verifică',tg_verifying:'Se verifică…',
-    tg_recipients_title:'Destinatari (Chat ID-uri)',
-    tg_recipients_help:'Fiecare alertă e trimisă către toți destinatarii. Un ID pozitiv e o conversație privată; unul negativ e un grup sau canal.',
-    tg_detect:'Detectează Chat ID',tg_detecting:'Se citesc mesajele recente…',
-    tg_detect_none:'Niciun mesaj recent. Trimite întâi un mesaj botului, apoi încearcă din nou.',
-    tg_detect_found:'Conversații care au scris botului — apasă Adaugă:',
-    tg_add:'Adaugă',tg_no_recipients:'Niciun destinatar încă.',tg_invalid_chat:'Introdu un Chat ID valid.',
-    tg_categories_title:'Categorii de alerte',
-    tg_cat_connect:'Radio conectat',tg_cat_disconnect:'Radio deconectat',
-    tg_cat_t351:'Radio căzut (fără răspuns T351)',tg_cat_lip:'Baliză poziție LIP/APRS',
-    tg_cat_backhaul:'Backhaul Brew up/down',tg_cat_brew_register:'REGISTER ISSI prin Brew',
-    tg_brew_register_prefix:'Prefix REGISTER Brew',tg_brew_register_white:'Whitelist ISSI REGISTER Brew',tg_brew_register_black:'Blacklist ISSI REGISTER Brew',
-    tg_cat_logs:'Log critic (avertismente/erori)',
-  },
   de:{
-    bts_ip:'BTS-IP',offline:'OFFLINE',online:'ONLINE',
-    brew_online:'ONLINE',brew_offline:'OFFLINE',
-    stations:'Radios',calls:'Anrufe',recordings:'Aufzeichnungen',audio:'Audio-Zentrale',lastheard:'Zuletzt Gehört',log:'Log',rf:'RF',health:'Health',asterisk:'Asterisk SIP',dapnet:'DAPNET',echolink:'EchoLink',echolink_title:'EchoLink',meshcom:'MeshCom',meshcom_title:'MeshCom',maps:'Maps',maps_title:'Maps',geoalarm:'GeoAlarm',geoalarm_title:'GeoAlarm',config:'Config',
-    sdslog:'SDS-Log',th_dir:'Ri.',th_from:'Von',th_to:'An',th_message:'Nachricht',no_sds:'Noch keine SDS-Nachrichten',sds_refresh:'Aktualisieren',
-    rf_freq:'Mittenfrequenz',rf_rate:'Abtastrate',rf_rms:'RMS',rf_peak:'Spitze',rf_age:'Aufnahme',
-    rf_waiting:'wartet…',rf_live:'live',rf_stale:'veraltet',
-    rf_visualizers:'Visualisierungen',rf_spectrum:'TX-DSP-Spektrum (vor PA)',rf_constellation:'TX-DSP-Konstellation',
-    rf_hint_spectrum:'live · 512-bin FFT',rf_hint_constellation:'π/4-DQPSK',
-    rf_waterfall:'TX-Spektrum-Wasserfall',rf_hint_waterfall:'rollend · viridis',
-    rf_quality:'Signalqualität',rf_hint_quality:'gemessen vor PA · aus selbem DSP-Snapshot',
-    rf_evm:'EVM',rf_papr:'PAPR',rf_carrier:'Trägerleckage',rf_obw:'Belegte BW (99%)',
-    rf_dc:'DC-Offset (I/Q)',rf_iqa:'IQ-Amplitudenungleichgewicht',rf_iqp:'IQ-Phasenungleichgewicht',
-    rf_hw_health:'Hardware-Zustand',rf_hint_health:'alle 5s abgefragt',
-    rf_temp:'SDR-Temperatur',rf_tx_gain:'TX-Verstärkung (aktuell)',rf_rx_gain:'RX-Verstärkung (aktuell)',
-    rf_temp_cold:'kalt',rf_temp_nominal:'nominal',rf_temp_warm:'warm',rf_temp_hot:'heiß',rf_temp_na:'kein Sensor',
-    rf_no_gains:'nicht verfügbar',rf_just_now:'gerade eben',
-
-    asterisk_title:'Asterisk SIP',ast_configured:'Konfiguriert',ast_register:'REGISTER',ast_sip_listen:'SIP hört auf',
-    ast_remote:'Remote Asterisk',ast_rtp:'RTP-Ports',ast_codec:'Codec',ast_last_rx:'Letztes RX',
-    ast_last_tx:'Letztes TX',ast_last_error:'Letzter Fehler',
-    dapnet_title:'DAPNET',dapnet_log:'DAPNET-Log',dapnet_routing:'Routing',dapnet_send:'DAPNET-Nachricht senden',dapnet_saved:'✓ Gespeichert',
-    terminals:'Radios',registered:'registriert',
-    active_calls:'Aktive Anrufe',circuits:'Schaltkreise aktiv',
-    registered_terminals:'Registrierte Radios',
-    no_terminals:'Keine Radios registriert',no_calls:'Keine aktiven Anrufe',
-    live_log:'Live-Log',autoscroll:'Auto-Scroll',filter_all:'Alle',
-    clear:'Löschen',export:'Exportieren',restart:'Neustart',shutdown:'Herunterfahren',save:'Speichern',
-    cfg_sec_configuration:'Konfiguration',cfg_sec_access:'Zugriffskontrolle',cfg_sec_wx:'WX / METAR',whitelist_title:'ISSI-Whitelist',whitelist_add:'ISSI hinzufügen',whitelist_empty:'Liste leer — offenes Netz (jedes Funkgerät darf sich anmelden).',
-    whitelist_help:'Ist die Liste leer, darf sich jedes Funkgerät anmelden (offenes Netz). Bei Einträgen werden nur die gelisteten ISSIs akzeptiert; alle anderen werden abgewiesen. Änderungen wirken sofort und bleiben nach Neustart erhalten.',
-    whitelist_enforced:'AKTIV',whitelist_open:'OFFEN',whitelist_invalid:'Gültige ISSI eingeben (1–16777215).',
-    wx_title:'WX / METAR-Dienst',wx_help:'Integrierter Wetterdienst. Funkgeräte senden eine SDS wie "METAR LROP" an die Dienst-ISSI und erhalten einen dekodierten Bericht. Optional automatisches Senden des METAR einer festen Station an eine ISSI oder Gruppe in Intervallen. Daten von aviationweather.gov.',
-    wx_enabled:'METAR-Antwort auf Anfrage aktivieren',wx_service_issi:'Dienst-ISSI',wx_periodic_enabled:'Periodisches Senden aktivieren',
-    wx_periodic_icao:'Stations-ICAO',wx_periodic_dest:'Ziel',wx_periodic_isgroup:'Ziel ist Gruppe',wx_periodic_isgroup_hint:'(GSSI statt einzelner ISSI)',
-    wx_periodic_interval:'Intervall (Sekunden)',wx_interval_hint:'Mindestens 300 s (5 Min), um die Wetter-API nicht zu überlasten.',wx_periodic_incomplete:'Stations-ICAO und Ziel für den periodischen Modus setzen.',
-    live_sds_desc:'Sendet eine Textnachricht an alle Funkgeräte der Zelle, wiederholt im Home-Mode-Display-Intervall.',
-    live_sds_text:'Nachrichtentext (max. 251 Zeichen)',live_sds_repeat:'Wiederh. (0=∞)',live_sds_send:'Senden',
-    live_sds_clear_all:'Alle löschen',live_sds_empty:'Keine aktiven Broadcasts.',
-    live_sds_sent:'gesendet',live_sds_times:'×',live_sds_forever:'∞',live_sds_delete:'✕',
-    fallback_title:'⚠ FALLBACK-KONFIGURATION AKTIV — Primäre Konfiguration konnte nicht geladen werden',
-    sds_title:'⬡ SDS-Nachricht senden',sds_dest:'Ziel-ISSI',
-    sds_callout_enable:'TPG2200 Call-Out / Alarm senden',
-    sds_callout_source:'Source ISSI',
-    sds_callout_id:'Call-Out ID',
-    sds_callout_ric:'TPG RIC',
-    sds_callout_priority:'Priority / Ton',
-    sds_callout_text:'Alarmtext',
-    sds_callout_raw:'Raw Hex Payload optional',
-    sds_callout_help:'TPG RIC wird in die Call-Out-Adressbytes geschrieben. Call-Out ID ist das direkte ID-Byte 0..255. Priority/Ton ist das direkte Priority-Byte 0..15. Raw Hex überschreibt die automatische Payload.',
-    sds_msg_label:'Nachricht',cancel:'Abbrechen',send:'Senden',
-    th_issi:'ISSI',th_groups:'Gruppen',th_ee:'Energiesparen',th_signal:'Signal',
-    th_status:'Status',th_last_seen:'Zuletzt',th_actions:'Aktionen',
-    th_id:'ID',th_type:'Typ',th_caller:'Anrufer',
-    th_dest:'Ziel',th_speaker:'Sprecher',th_duration:'Dauer',
-    th_time:'Zeit',th_source:'Quelle',th_activity:'Aktivität',
-    last_heard_title:'Zuletzt Gehört',no_activity:'Noch keine Aktivität',
-    act_call_group:'Gruppenruf',act_call_individual:'P2P-Ruf',act_sds:'SDS',
-    online_badge:'ONLINE',kick:'Entfernen',sds:'SDS',
-    call_group:'GRUPPE',call_p2p_s:'P2P-S',call_p2p_d:'P2P-D',call_emergency:'NOTRUF',
-    emg_banner_title:'NOTFALL AKTIV',integrations:'Integrationen',integ_enabled:'Aktiviert',integ_disabled:'Deaktiviert',integ_error:'Fehler',system_sec:'System',emg_chip:'NOTFALL',bs_label:'BS',emg_clear:'Löschen',confirm_clear_emergency:'Notfall für ISSI {issi} löschen?',
-    confirm_kick:'ISSI {issi} entfernen?\nDas Terminal wird abgemeldet und zur Neuanmeldung gezwungen.',
-    dgna:'DGNA',dgna_title:'Dynamische Gruppenzuweisung',dgna_modal_title:'⬡ Dynamische Gruppenzuweisung',dgna_issi:'Terminal-ISSI',dgna_current:'Aktuelle Gruppen',dgna_gssi:'Gruppe (GSSI)',dgna_assign:'Zuweisen',dgna_deassign:'Entfernen',
-    confirm_restart:'FlowStation neu starten?\nAlle aktiven Anrufe werden beendet.',
-    confirm_shutdown:'FlowStation herunterfahren?\nDer Dienst wird gestoppt und muss manuell neu gestartet werden.',
-    confirm_logout:'Abmelden?',
-    saved:'✓ Gespeichert — Neustart zum Anwenden.',save_fail:'✗ Fehler beim Speichern',conn_error:'Verbindungsfehler.',
-    update:'Update',update_available:'Update verfügbar',update_title:'NetCore-Tetra Update — github.com/JanHG98/flowstation',
-    update_confirm:'Neueste NetCore-Tetra Version von main holen und neu bauen?\nDer Dienst startet automatisch neu.',
-    update_running:'Aktualisierung läuft… Fenster nicht schließen.',
-    update_done_ok:'✓ Update abgeschlossen. Neustart…',
-    update_done_err:'✗ Update fehlgeschlagen. Siehe Log unten.',
-    update_close:'Schließen',
-    system:'System',sys_info:'Systeminfo',sys_hostname:'Hostname',sys_uptime:'Laufzeit',
-    sys_os:'OS',sys_version:'FS-Version',sys_config:'Aktive Konfig',
-    sys_cpu:'CPU',sys_cpu_load:'CPU-Auslastung',sys_ram:'RAM',sys_temp:'CPU-Temp',
-    wifi:'WLAN',wifi_status:'Aktuelle Verbindung',wifi_saved:'Gespeicherte Netzwerke',wifi_visible:'Verfügbare Netzwerke',wifi_loading:'Wird geladen…',wifi_scanning:'Suche läuft…',wifi_no_device:'Kein WLAN-Gerät erkannt.',wifi_radio_disabled:'WLAN-Funk ist deaktiviert.',wifi_not_connected:'Mit keinem Netzwerk verbunden.',wifi_no_saved:'Keine gespeicherten Netzwerke.',wifi_no_networks:'Keine Netzwerke in Reichweite.',wifi_ssid:'Netzwerk',wifi_signal:'Signal',wifi_ip:'IP-Adresse',wifi_actions:'Aktionen',wifi_disconnect:'Trennen',wifi_connect:'Verbinden',wifi_connect_to:'Verbinden mit',wifi_connecting:'Verbinde…',wifi_connected:'VERBUNDEN',wifi_connected_ok:'Verbunden.',wifi_saved_tag:'GESPEICHERT',wifi_open:'OFFEN',wifi_forget:'Vergessen',wifi_confirm_forget:'Netzwerk vergessen',wifi_password:'Passwort',wifi_hidden:'Verstecktes Netzwerk (SSID nicht gesendet)',wifi_add_hidden:'Verstecktes Netzwerk',wifi_scan:'Suchen',wifi_refresh:'Aktualisieren',wifi_radio_off:'WLAN deaktivieren',wifi_radio_on:'WLAN aktivieren',wifi_warn_lose_access:'Wenn Sie über WLAN mit dem Dashboard verbunden sind, kann ein Netzwerkwechsel die Verbindung trennen. Stellen Sie sicher, dass Sie einen alternativen Zugang haben.',wifi_err_no_ssid:'SSID erforderlich',cancel:'Abbrechen',sys_sensors:'Host-Hardware-Sensoren',sys_sensors_empty:'Keine Sensoren erkannt.',sys_rf:'RF-Hardware (SoapySDR)',sys_autorefresh:'Auto-Aktualisierung 5s',
-    profile_edit_title:'Konfigprofil bearbeiten',profile_edit_btn:'Bearbeiten',
-    profile_edit_save_ok:'✓ Gespeichert',profile_edit_save_fail:'✗ Speichern fehlgeschlagen',
-    sys_profiles:'Konfigprofile',sys_activate:'Aktivieren & Neustart',
-    sys_active_badge:'AKTIV',sys_no_profiles:'Keine .toml-Profile im Konfigverzeichnis gefunden.',
-    sys_activate_confirm:'Zum Profil "{name}" wechseln und neu starten?\nAktuelle Konfig wird gesichert.',
-    sys_title:'System',sys_sec_status:'Status',sys_sec_host:'Host',sys_sec_radio:'Funk-Hardware',sys_sec_sensors:'Sensoren',sys_sec_profiles:'Profile',sys_sec_sds:'SDS-Rundsendung',sys_refresh:'Aktualisieren',sys_probe:'Prüfen',sys_temp_hot:'HEISS',sys_temp_warm:'Warm',sys_temp_ok:'OK',
-    sys_bts:'BTS-Verbindung',
-    tg_cat_brew_register:'Brew ISSI REGISTER',
-    tg_brew_register_prefix:'Brew REGISTER-Prefix',
-    tg_brew_register_white:'Brew REGISTER ISSI-Whitelist',
-    tg_brew_register_black:'Brew REGISTER ISSI-Blacklist',
-  },
-  es:{
-    bts_ip:'IP BTS',offline:'SIN CONEXIÓN',online:'EN LÍNEA',
-    brew_online:'EN LÍNEA',brew_offline:'SIN CONEXIÓN',
-    stations:'Radios',calls:'Llamadas',lastheard:'Última Actividad',log:'Log',rf:'RF',health:'Health',echolink:'EchoLink',echolink_title:'EchoLink',config:'Config',
-    sdslog:'Registro SDS',th_dir:'Dir',th_from:'De',th_to:'Para',th_message:'Mensaje',no_sds:'Aún no hay mensajes SDS',sds_refresh:'Actualizar',
-    rf_freq:'Frecuencia central',rf_rate:'Tasa de muestreo',rf_rms:'RMS',rf_peak:'Pico',rf_age:'Captura',
-    rf_waiting:'esperando…',rf_live:'en vivo',rf_stale:'obsoleto',
-    rf_visualizers:'Visualizadores',rf_spectrum:'Espectro TX DSP (pre-PA)',rf_constellation:'Constelación TX DSP',
-    rf_hint_spectrum:'en vivo · FFT 512-bin',rf_hint_constellation:'π/4-DQPSK',
-    rf_waterfall:'Cascada Espectro TX',rf_hint_waterfall:'desplazándose · viridis',
-    rf_quality:'Calidad de Señal',rf_hint_quality:'medido pre-PA · del mismo snapshot DSP',
-    rf_evm:'EVM',rf_papr:'PAPR',rf_carrier:'Fuga portadora',rf_obw:'BW ocupada (99%)',
-    rf_dc:'Offset DC (I/Q)',rf_iqa:'Desequilibrio amplitud IQ',rf_iqp:'Desequilibrio fase IQ',
-    rf_hw_health:'Estado Hardware',rf_hint_health:'consultado cada 5s',
-    rf_temp:'Temperatura SDR',rf_tx_gain:'Ganancia TX (real)',rf_rx_gain:'Ganancia RX (real)',
-    rf_temp_cold:'frío',rf_temp_nominal:'nominal',rf_temp_warm:'caliente',rf_temp_hot:'muy caliente',rf_temp_na:'sin sensor',
-    rf_no_gains:'no disponible',rf_just_now:'ahora',
-
-    terminals:'Radios',registered:'registrados',
-    active_calls:'Llamadas Activas',circuits:'circuitos en uso',
-    registered_terminals:'Radios Registrados',
-    no_terminals:'No hay radios registrados',no_calls:'No hay llamadas activas',
-    live_log:'Log en Vivo',autoscroll:'Auto-desplaz.',filter_all:'Todos',
-    clear:'Limpiar',export:'Exportar',restart:'Reiniciar',shutdown:'Apagar',save:'Guardar',
-    cfg_sec_configuration:'Configuración',cfg_sec_access:'Control de acceso',cfg_sec_wx:'WX / METAR',whitelist_title:'Lista blanca ISSI',whitelist_add:'Añadir ISSI',whitelist_empty:'Lista vacía — red abierta (cualquier radio puede registrarse).',
-    whitelist_help:'Cuando la lista está vacía, cualquier radio puede registrarse (red abierta). Con entradas, solo se aceptan los ISSI listados; el resto se rechazan. Los cambios se aplican al instante y persisten tras reiniciar.',
-    whitelist_enforced:'ACTIVA',whitelist_open:'ABIERTA',whitelist_invalid:'Introduce un ISSI válido (1–16777215).',
-    wx_title:'Servicio WX / METAR',wx_help:'Servicio meteorológico integrado. Las radios envían un SDS como "METAR LROP" al ISSI del servicio y reciben un informe decodificado. Opcionalmente envía automáticamente el METAR de una estación fija a un ISSI o grupo a intervalos. Datos de aviationweather.gov.',
-    wx_enabled:'Activar respuesta METAR a petición',wx_service_issi:'ISSI del servicio',wx_periodic_enabled:'Activar envío periódico',
-    wx_periodic_icao:'ICAO de estación',wx_periodic_dest:'Destino',wx_periodic_isgroup:'El destino es grupo',wx_periodic_isgroup_hint:'(GSSI en vez de ISSI individual)',
-    wx_periodic_interval:'Intervalo (segundos)',wx_interval_hint:'Mínimo 300 s (5 min) para no saturar la API meteorológica.',wx_periodic_incomplete:'Indica ICAO de estación y destino para el modo periódico.',
-    live_sds_desc:'Transmite un mensaje de texto a todos los radios de la celda, repitiéndose al intervalo de Home Mode Display.',
-    live_sds_text:'Texto del mensaje (máx. 251 caracteres)',live_sds_repeat:'Repetir (0=∞)',live_sds_send:'Difundir',
-    live_sds_clear_all:'Borrar Todo',live_sds_empty:'No hay difusiones activas.',
-    live_sds_sent:'enviado',live_sds_times:'×',live_sds_forever:'∞',live_sds_delete:'✕',
-    fallback_title:'⚠ CONFIGURACIÓN DE RESERVA ACTIVA — No se pudo cargar la configuración principal',
-    sds_title:'⬡ Enviar Mensaje SDS',sds_dest:'ISSI Destino',
-    sds_msg_label:'Mensaje',cancel:'Cancelar',send:'Enviar',
-    th_issi:'ISSI',th_groups:'Grupos',th_ee:'Ahorro Energía',th_signal:'Señal',
-    th_status:'Estado',th_last_seen:'Visto',th_actions:'Acciones',
-    th_id:'ID',th_type:'Tipo',th_caller:'Llamante',
-    th_dest:'Destino',th_speaker:'Hablante',th_duration:'Duración',
-    th_time:'Hora',th_source:'Origen',th_activity:'Actividad',
-    last_heard_title:'Última Actividad',no_activity:'Sin actividad aún',
-    act_call_group:'Llamada Grupo',act_call_individual:'Llamada P2P',act_sds:'SDS',
-    online_badge:'EN LÍNEA',kick:'Expulsar',sds:'SDS',
-    call_group:'GRUPO',call_p2p_s:'P2P-S',call_p2p_d:'P2P-D',call_emergency:'EMERGENCIA',
-    emg_banner_title:'EMERGENCIA ACTIVA',integrations:'Integraciones',integ_enabled:'Activado',integ_disabled:'Desactivado',integ_error:'Error',system_sec:'Sistema',emg_chip:'EMERGENCIA',bs_label:'BS',emg_clear:'Borrar',confirm_clear_emergency:'¿Borrar emergencia para ISSI {issi}?',
-    confirm_kick:'¿Expulsar ISSI {issi}?\nEl terminal será desregistrado y forzado a reconectarse.',
-    dgna:'DGNA',dgna_title:'Asignación dinámica de grupo',dgna_modal_title:'⬡ Asignación dinámica de grupo',dgna_issi:'ISSI del terminal',dgna_current:'Grupos actuales',dgna_gssi:'Grupo (GSSI)',dgna_assign:'Asignar',dgna_deassign:'Quitar',
-    confirm_restart:'¿Reiniciar FlowStation?\nTodas las llamadas activas se interrumpirán.',
-    confirm_shutdown:'¿Apagar FlowStation?\nEl servicio se detendrá y deberá reiniciarse manualmente.',
-    confirm_logout:'¿Cerrar sesión?',
-    saved:'✓ Guardado — reinicia para aplicar.',save_fail:'✗ Error al guardar',conn_error:'Error de conexión.',
-    update:'Update',update_available:'Actualización disponible',update_title:'Actualización OTA — github.com/JanHG98/flowstation',
-    update_confirm:'¿Obtener la última versión de main y recompilar?\nEl servicio se reiniciará automáticamente.',
-    update_running:'Actualizando… no cierres esta ventana.',
-    update_done_ok:'✓ Actualización completa. Reiniciando…',
-    update_done_err:'✗ Actualización fallida. Ver log abajo.',
-    update_close:'Cerrar',
-    system:'Sistema',sys_info:'Info del Sistema',sys_hostname:'Hostname',sys_uptime:'Tiempo activo',
-    sys_os:'OS',sys_version:'Versión FS',sys_config:'Config Activa',
-    sys_cpu:'CPU',sys_cpu_load:'Carga CPU',sys_ram:'RAM',sys_temp:'Temp CPU',
-    wifi:'WiFi',wifi_status:'Conexión actual',wifi_saved:'Redes guardadas',wifi_visible:'Redes disponibles',wifi_loading:'Cargando…',wifi_scanning:'Escaneando…',wifi_no_device:'No se detectó dispositivo WiFi.',wifi_radio_disabled:'Radio WiFi desactivada.',wifi_not_connected:'No conectado a ninguna red.',wifi_no_saved:'Sin redes guardadas.',wifi_no_networks:'Sin redes en rango.',wifi_ssid:'Red',wifi_signal:'Señal',wifi_ip:'Dirección IP',wifi_actions:'Acciones',wifi_disconnect:'Desconectar',wifi_connect:'Conectar',wifi_connect_to:'Conectar a',wifi_connecting:'Conectando…',wifi_connected:'CONECTADO',wifi_connected_ok:'Conectado.',wifi_saved_tag:'GUARDADO',wifi_open:'ABIERTO',wifi_forget:'Olvidar',wifi_confirm_forget:'Olvidar red',wifi_password:'Contraseña',wifi_hidden:'Red oculta (SSID no difundido)',wifi_add_hidden:'Red oculta',wifi_scan:'Escanear',wifi_refresh:'Actualizar',wifi_radio_off:'Desactivar WiFi',wifi_radio_on:'Activar WiFi',wifi_warn_lose_access:'Si estás conectado al dashboard vía WiFi, cambiar de red puede desconectarte temporalmente. Asegúrate de tener una vía de acceso alternativa.',wifi_err_no_ssid:'SSID requerido',cancel:'Cancelar',sys_sensors:'Sensores del Sistema',sys_sensors_empty:'No se detectaron sensores.',sys_rf:'Hardware RF (SoapySDR)',sys_autorefresh:'Auto-actualización 5s',
-    profile_edit_title:'Editar Perfil Config',profile_edit_btn:'Editar',
-    profile_edit_save_ok:'✓ Guardado',profile_edit_save_fail:'✗ Error al guardar',
-    sys_profiles:'Perfiles de Config',sys_activate:'Activar y Reiniciar',
-    sys_active_badge:'ACTIVO',sys_no_profiles:'No se encontraron perfiles .toml en el directorio.',
-    sys_activate_confirm:'¿Cambiar al perfil "{name}" y reiniciar?\nLa config actual será respaldada.',
-    sys_title:'Sistema',sys_sec_status:'Estado',sys_sec_host:'Host',sys_sec_radio:'Hardware de radio',sys_sec_sensors:'Sensores',sys_sec_profiles:'Perfiles',sys_sec_sds:'Difusión SDS',sys_refresh:'Actualizar',sys_probe:'Sondear',sys_temp_hot:'CALIENTE',sys_temp_warm:'Templado',sys_temp_ok:'OK',
-    sys_bts:'Conexión BTS',
-  },
-  hu:{
-    bts_ip:'BTS IP',offline:'OFFLINE',online:'ONLINE',
-    brew_online:'ONLINE',brew_offline:'OFFLINE',
-    stations:'Rádiók',calls:'Hívások',lastheard:'Utoljára Hallott',log:'Napló',rf:'RF',health:'Health',echolink:'EchoLink',echolink_title:'EchoLink',config:'Konfig',
-    sdslog:'SDS Napló',th_dir:'Irány',th_from:'Feladó',th_to:'Címzett',th_message:'Üzenet',no_sds:'Még nincs SDS üzenet',sds_refresh:'Frissítés',
-    rf_freq:'Központi frekvencia',rf_rate:'Mintavételezési ráta',rf_rms:'RMS',rf_peak:'Csúcs',rf_age:'Pillanatkép',
-    rf_waiting:'várakozás…',rf_live:'élő',rf_stale:'elavult',
-    rf_visualizers:'Vizualizációk',rf_spectrum:'TX DSP spektrum (PA előtt)',rf_constellation:'TX DSP konstelláció',
-    rf_hint_spectrum:'élő · 512-bin FFT',rf_hint_constellation:'π/4-DQPSK',
-    rf_waterfall:'TX Spektrum Vízesés',rf_hint_waterfall:'gördülő · viridis',
-    rf_quality:'Jelminőség',rf_hint_quality:'PA előtt mérve · ugyanazon DSP pillanatképből',
-    rf_evm:'EVM',rf_papr:'PAPR',rf_carrier:'Vivőszivárgás',rf_obw:'Foglalt sávszélesség (99%)',
-    rf_dc:'DC eltolás (I/Q)',rf_iqa:'IQ amplitúdó egyensúlytalanság',rf_iqp:'IQ fázis egyensúlytalanság',
-    rf_hw_health:'Hardver állapot',rf_hint_health:'5 másodpercenként',
-    rf_temp:'SDR hőmérséklet',rf_tx_gain:'TX erősítés (aktuális)',rf_rx_gain:'RX erősítés (aktuális)',
-    rf_temp_cold:'hideg',rf_temp_nominal:'normál',rf_temp_warm:'meleg',rf_temp_hot:'forró',rf_temp_na:'nincs szenzor',
-    rf_no_gains:'nem elérhető',rf_just_now:'most',
-
-    terminals:'Rádiók',registered:'regisztrált',
-    active_calls:'Aktív hívások',circuits:'aktív áramkör',
-    registered_terminals:'Regisztrált rádiók',
-    no_terminals:'Nincs regisztrált rádió',no_calls:'Nincs aktív hívás',
-    live_log:'Élő napló',autoscroll:'Automatikus görgetés',filter_all:'Mind',
-    clear:'Törlés',export:'Exportálás',restart:'Újraindítás',shutdown:'Leállítás',save:'Mentés',
-    cfg_sec_configuration:'Konfiguráció',cfg_sec_access:'Hozzáférés-vezérlés',cfg_sec_wx:'WX / METAR',whitelist_title:'ISSI engedélyezőlista',whitelist_add:'ISSI hozzáadása',whitelist_empty:'Üres lista — nyílt hálózat (bármely rádió regisztrálhat).',
-    whitelist_help:'Ha a lista üres, bármely rádió regisztrálhat (nyílt hálózat). Ha vannak elemek, csak a listázott ISSI-k engedélyezettek; a többit elutasítja. A módosítások azonnal érvénybe lépnek és újraindítás után is megmaradnak.',
-    whitelist_enforced:'AKTÍV',whitelist_open:'NYÍLT',whitelist_invalid:'Adjon meg érvényes ISSI-t (1–16777215).',
-    wx_title:'WX / METAR szolgáltatás',wx_help:'Beépített időjárás-szolgáltatás. A rádiók "METAR LROP" formájú SDS-t küldenek a szolgáltatás ISSI-jére, és dekódolt jelentést kapnak. Opcionálisan automatikusan elküldi egy rögzített állomás METAR-ját egy ISSI-re vagy csoportra adott időközönként. Adatok: aviationweather.gov.',
-    wx_enabled:'METAR válasz kérésre engedélyezése',wx_service_issi:'Szolgáltatás ISSI',wx_periodic_enabled:'Időszakos küldés engedélyezése',
-    wx_periodic_icao:'Állomás ICAO',wx_periodic_dest:'Cél',wx_periodic_isgroup:'A cél csoport',wx_periodic_isgroup_hint:'(GSSI egyedi ISSI helyett)',
-    wx_periodic_interval:'Időköz (másodperc)',wx_interval_hint:'Legalább 300 mp (5 perc), hogy ne terhelje túl az időjárás API-t.',wx_periodic_incomplete:'Add meg az állomás ICAO-t és a célt az időszakos módhoz.',
-    sds_title:'⬡ SDS üzenet küldése',sds_dest:'Cél ISSI',
-    sds_msg_label:'Üzenet',cancel:'Mégse',send:'Küldés',
-    th_issi:'ISSI',th_groups:'Csoportok',th_ee:'Energiatakarékos',th_signal:'Jelerősség',
-    th_status:'Állapot',th_last_seen:'Utoljára látva',th_actions:'Műveletek',
-    th_id:'ID',th_type:'Típus',th_caller:'Hívó',
-    th_dest:'Cél',th_speaker:'Beszélő',th_duration:'Időtartam',
-    th_time:'Idő',th_source:'Forrás',th_activity:'Tevékenység',
-    last_heard_title:'Utoljára hallott',no_activity:'Még nincs tevékenység',
-    act_call_group:'Csoportos hívás',act_call_individual:'P2P hívás',act_sds:'SDS',
-    online_badge:'ONLINE',kick:'Kizárás',sds:'SDS',
-    call_group:'CSOPORT',call_p2p_s:'P2P-S',call_p2p_d:'P2P-D',call_emergency:'VÉSZHÍVÁS',
-    emg_banner_title:'VÉSZHELYZET AKTÍV',integrations:'Integrációk',integ_enabled:'Engedélyezve',integ_disabled:'Letiltva',integ_error:'Hiba',system_sec:'Rendszer',emg_chip:'VÉSZHELYZET',bs_label:'BS',emg_clear:'Törlés',confirm_clear_emergency:'Vészhelyzet törlése ISSI {issi}?',
-    confirm_kick:'ISSI {issi} kizárása?\nA terminál törlésre kerül és újra kell csatlakoznia.',
-    dgna:'DGNA',dgna_title:'Dinamikus csoport-hozzárendelés',dgna_modal_title:'⬡ Dinamikus csoport-hozzárendelés',dgna_issi:'Terminál ISSI',dgna_current:'Jelenlegi csoportok',dgna_gssi:'Csoport (GSSI)',dgna_assign:'Hozzárendel',dgna_deassign:'Eltávolít',
-    confirm_restart:'Újraindítja a FlowStation-t?\nAz összes aktív hívás megszakad.',
-    confirm_shutdown:'Leállítja a FlowStation-t?\nA szolgáltatást kézzel kell újraindítani.',
-    confirm_logout:'Kijelentkezik?',
-    saved:'✓ Mentve — újraindítás szükséges az alkalmazáshoz.',save_fail:'✗ Mentési hiba',conn_error:'Kapcsolódási hiba.',
-    update:'Frissítés',update_available:'Elérhető frissítés',update_title:'OTA frissítés — github.com/JanHG98/flowstation',
-    update_confirm:'Letölti a legújabb verziót a main ágból és újraépíti?\nA szolgáltatás automatikusan újraindul.',
-    update_running:'Frissítés folyamatban… ne zárja be az ablakot.',
-    update_done_ok:'✓ Frissítés kész. Újraindul…',
-    update_done_err:'✗ Frissítés sikertelen. Lásd a naplót.',
-    update_close:'Bezárás',
-    system:'Rendszer',sys_info:'Rendszerinfó',sys_hostname:'Hostname',sys_uptime:'Üzemidő',
-    sys_os:'OS',sys_version:'FS verzió',sys_config:'Aktív konfig',
-    sys_profiles:'Konfig profilok',sys_activate:'Aktiválás és újraindítás',
-    sys_active_badge:'AKTÍV',sys_no_profiles:'Nem található .toml profil a könyvtárban.',
-    sys_activate_confirm:'Váltás a(z) "{name}" profilra és újraindítás?\nAz aktuális konfig mentésre kerül.',
-    sys_title:'Rendszer',sys_sec_status:'Állapot',sys_sec_host:'Gazda',sys_sec_radio:'Rádió hardver',sys_sec_sensors:'Szenzorok',sys_sec_profiles:'Profilok',sys_sec_sds:'SDS sugárzás',sys_refresh:'Frissítés',sys_probe:'Vizsgálat',sys_temp_hot:'FORRÓ',sys_temp_warm:'Meleg',sys_temp_ok:'OK',
-    sys_bts:'BTS kapcsolat',
-    wifi:'WiFi',wifi_status:'Jelenlegi kapcsolat',wifi_saved:'Mentett hálózatok',wifi_visible:'Elérhető hálózatok',wifi_loading:'Betöltés…',wifi_scanning:'Keresés…',wifi_no_device:'Nem észlelhető WiFi eszköz.',wifi_radio_disabled:'WiFi rádió letiltva.',wifi_not_connected:'Nincs kapcsolat hálózathoz.',wifi_no_saved:'Nincs mentett hálózat.',wifi_no_networks:'Nincs hálózat hatótávolságon belül.',wifi_ssid:'Hálózat',wifi_signal:'Jelerősség',wifi_ip:'IP-cím',wifi_actions:'Műveletek',wifi_disconnect:'Bontás',wifi_connect:'Csatlakozás',wifi_connect_to:'Csatlakozás:',wifi_connecting:'Csatlakozás…',wifi_connected:'KAPCSOLÓDVA',wifi_connected_ok:'Csatlakoztatva.',wifi_saved_tag:'MENTETT',wifi_open:'NYITOTT',wifi_forget:'Elfelejtés',wifi_confirm_forget:'Hálózat elfelejtése',wifi_password:'Jelszó',wifi_hidden:'Rejtett hálózat (SSID nem sugárzott)',wifi_add_hidden:'Rejtett hálózat',wifi_scan:'Keresés',wifi_refresh:'Frissítés',wifi_radio_off:'WiFi letiltása',wifi_radio_on:'WiFi engedélyezése',wifi_warn_lose_access:'Ha WiFi-n keresztül csatlakozol a vezérlőpulthoz, a hálózat módosítása lecsatlakoztathat. Biztosíts alternatív hozzáférést.',wifi_err_no_ssid:'SSID szükséges',cancel:'Mégse',sys_sensors:'Gazdagép szenzorok',sys_sensors_empty:'Nem észlelhetők szenzorok.',
-  },
-  zh:{
-    bts_ip:'BTS IP',offline:'离线',online:'在线',
-    brew_online:'在线',brew_offline:'离线',
-    stations:'终端',calls:'通话',lastheard:'最近通话',log:'日志',rf:'RF',health:'Health',echolink:'EchoLink',echolink_title:'EchoLink',config:'配置',
-    sdslog:'SDS日志',th_dir:'方向',th_from:'发件',th_to:'收件',th_message:'消息',no_sds:'暂无SDS消息',sds_refresh:'刷新',
-    rf_freq:'中心频率',rf_rate:'采样率',rf_rms:'RMS',rf_peak:'峰值',rf_age:'快照',
-    rf_waiting:'等待中…',rf_live:'实时',rf_stale:'已过期',
-    rf_visualizers:'可视化',rf_spectrum:'TX DSP 频谱（功放前）',rf_constellation:'TX DSP 星座图',
-    rf_hint_spectrum:'实时 · 512 点 FFT',rf_hint_constellation:'π/4-DQPSK',
-    rf_waterfall:'TX 频谱瀑布图',rf_hint_waterfall:'滚动 · viridis 配色',
-    rf_quality:'信号质量',rf_hint_quality:'功放前测量 · 来自同一 DSP 快照',
-    rf_evm:'EVM',rf_papr:'PAPR',rf_carrier:'载波泄漏',rf_obw:'占用带宽 (99%)',
-    rf_dc:'直流偏置 (I/Q)',rf_iqa:'IQ 幅度不平衡',rf_iqp:'IQ 相位不平衡',
-    rf_hw_health:'硬件状态',rf_hint_health:'每 5 秒轮询',
-    rf_temp:'SDR 温度',rf_tx_gain:'TX 增益（实际）',rf_rx_gain:'RX 增益（实际）',
-    rf_temp_cold:'冷',rf_temp_nominal:'正常',rf_temp_warm:'温',rf_temp_hot:'热',rf_temp_na:'无传感器',
-    rf_no_gains:'不可用',rf_just_now:'刚刚',
-
-    terminals:'终端',registered:'已注册',
-    active_calls:'活跃通话',circuits:'占用信道',
-    registered_terminals:'已注册终端',
-    no_terminals:'暂无终端注册',no_calls:'无活跃通话',
-    live_log:'实时日志',autoscroll:'自动滚动',filter_all:'全部',
-    clear:'清除',export:'导出',restart:'重启',shutdown:'关机',save:'保存',
-    cfg_sec_configuration:'配置',cfg_sec_access:'访问控制',cfg_sec_wx:'WX / METAR',whitelist_title:'ISSI 白名单',whitelist_add:'添加 ISSI',whitelist_empty:'列表为空 — 开放网络（任何电台均可注册）。',
-    whitelist_help:'列表为空时，任何电台均可注册（开放网络）。有条目时，仅接受列出的 ISSI，其余一律拒绝。更改即时生效并在重启后保留。',
-    whitelist_enforced:'已启用',whitelist_open:'开放',whitelist_invalid:'请输入有效的 ISSI（1–16777215）。',
-    wx_title:'WX / METAR 服务',wx_help:'内置气象服务。电台向服务 ISSI 发送如 "METAR LROP" 的 SDS 即可获得解码报告。可选择按间隔自动向 ISSI 或群组发送固定台站的 METAR。数据来自 aviationweather.gov。',
-    wx_enabled:'启用按需 METAR 响应',wx_service_issi:'服务 ISSI',wx_periodic_enabled:'启用定时广播',
-    wx_periodic_icao:'台站 ICAO',wx_periodic_dest:'目标',wx_periodic_isgroup:'目标为群组',wx_periodic_isgroup_hint:'（GSSI 而非单个 ISSI）',
-    wx_periodic_interval:'间隔（秒）',wx_interval_hint:'最少 300 秒（5 分钟），以免频繁请求气象 API。',wx_periodic_incomplete:'定时模式需同时设置台站 ICAO 和目标。',
-    sds_title:'⬡ 发送 SDS 短消息',sds_dest:'目标 ISSI',
-    live_sds_desc:'向本小区所有终端广播文本消息，按 Home Mode Display 间隔重复发送。直到删除或达到重复次数为止。',
-    live_sds_text:'消息内容（最多 251 字符）',live_sds_repeat:'重复次数 (0=无限)',live_sds_send:'广播',
-    live_sds_clear_all:'清除全部',live_sds_empty:'暂无广播任务。',
-    live_sds_sent:'已发送',live_sds_times:'次',live_sds_forever:'∞',live_sds_delete:'删除',
-    fallback_title:'⚠ 正在使用后备配置 — 主配置加载失败',
-    sds_msg_label:'消息内容',cancel:'取消',send:'发送',
-    th_issi:'ISSI',th_groups:'群组',th_ee:'节能',th_signal:'信号',
-    th_status:'状态',th_last_seen:'最后在线',th_actions:'操作',
-    th_id:'ID',th_type:'类型',th_caller:'主叫',
-    th_dest:'被叫',th_speaker:'讲话者',th_duration:'时长',
-    th_time:'时间',th_source:'来源',th_activity:'活动',
-    last_heard_title:'最近通话记录',no_activity:'暂无活动记录',
-    act_call_group:'组呼',act_call_individual:'点对点',act_sds:'SDS',
-    online_badge:'在线',kick:'踢下线',sds:'SDS',
-    call_group:'组呼',call_p2p_s:'P2P-S',call_p2p_d:'P2P-D',call_emergency:'紧急呼叫',
-    emg_banner_title:'紧急状态激活',integrations:'集成',integ_enabled:'已启用',integ_disabled:'已禁用',integ_error:'错误',system_sec:'系统',emg_chip:'紧急',bs_label:'BS',emg_clear:'清除',confirm_clear_emergency:'清除 ISSI {issi} 的紧急状态？',
-    confirm_kick:'确定踢下 ISSI {issi}？\n终端将被注销并强制重新注册。',
-    dgna:'DGNA',dgna_title:'动态组分配',dgna_modal_title:'⬡ 动态组分配',dgna_issi:'终端 ISSI',dgna_current:'当前组',dgna_gssi:'组 (GSSI)',dgna_assign:'分配',dgna_deassign:'移除',
-    confirm_restart:'确定重启 FlowStation？\n所有正在进行的通话将被中断。',
-    confirm_shutdown:'确定关闭 FlowStation？\n服务将停止，需要手动重启。',
-    confirm_logout:'确定注销吗？',
-    saved:'✓ 已保存 — 重启后生效',save_fail:'✗ 保存失败',conn_error:'连接错误',
-    update:'更新',update_available:'有可用更新',update_title:'OTA 在线更新 — github.com/JanHG98/flowstation',
-    update_confirm:'是否从 main 分支拉取最新代码并重新构建？\n服务将自动重启。',
-    update_running:'正在更新… 请不要关闭此窗口',
-    update_done_ok:'✓ 更新完成，正在重启…',
-    update_done_err:'✗ 更新失败，请查看下方日志',
-    update_close:'关闭',
-    system:'系统',sys_info:'系统信息',sys_hostname:'主机名',sys_uptime:'运行时间',
-    sys_version:'FS 版本',sys_os:'操作系统',sys_config:'当前配置',
-    sys_cpu:'CPU',sys_cpu_load:'CPU 负载',sys_ram:'内存',sys_temp:'CPU 温度',
-    wifi:'WiFi',wifi_status:'当前连接',wifi_saved:'已保存的网络',wifi_visible:'可用网络',wifi_loading:'加载中…',wifi_scanning:'扫描中…',wifi_no_device:'未检测到 WiFi 设备。',wifi_radio_disabled:'WiFi 已禁用。',wifi_not_connected:'未连接任何网络。',wifi_no_saved:'无已保存的网络。',wifi_no_networks:'范围内无可用网络。',wifi_ssid:'网络',wifi_signal:'信号',wifi_ip:'IP 地址',wifi_actions:'操作',wifi_disconnect:'断开',wifi_connect:'连接',wifi_connect_to:'连接到',wifi_connecting:'连接中…',wifi_connected:'已连接',wifi_connected_ok:'已连接。',wifi_saved_tag:'已保存',wifi_open:'开放',wifi_forget:'忘记',wifi_confirm_forget:'忘记网络',wifi_password:'密码',wifi_hidden:'隐藏网络 (SSID 不广播)',wifi_add_hidden:'隐藏网络',wifi_scan:'扫描',wifi_refresh:'刷新',wifi_radio_off:'禁用 WiFi',wifi_radio_on:'启用 WiFi',wifi_warn_lose_access:'如果您通过 WiFi 连接到仪表板,更换网络可能会暂时断开您的连接。请确保有备用访问方式。',wifi_err_no_ssid:'需要 SSID',cancel:'取消',sys_sensors:'主机硬件传感器',sys_sensors_empty:'未检测到传感器。',sys_rf:'RF 硬件 (SoapySDR)',sys_autorefresh:'自动刷新 5秒',
-    profile_edit_title:'编辑配置文件',profile_edit_btn:'编辑',
-    profile_edit_save_ok:'✓ 已保存',profile_edit_save_fail:'✗ 保存失败',
-    sys_profiles:'配置文件',sys_activate:'激活并重启',
-    sys_active_badge:'当前使用',sys_no_profiles:'配置目录中未找到 .toml 配置文件。',
-    sys_activate_confirm:'切换到配置文件 "{name}" 并重启？\n当前配置将被备份。',
-    sys_title:'系统',sys_sec_status:'状态',sys_sec_host:'主机',sys_sec_radio:'射频硬件',sys_sec_sensors:'传感器',sys_sec_profiles:'配置档案',sys_sec_sds:'SDS 广播',sys_refresh:'刷新',sys_probe:'探测',sys_temp_hot:'过热',sys_temp_warm:'温热',sys_temp_ok:'正常',
-    sys_bts:'BTS 连接',
+    "act_call_group":"Gruppenruf",
+    "act_call_individual":"P2P-Ruf",
+    "act_sds":"SDS",
+    "active_calls":"Aktive Rufe",
+    "ast_codec":"Codec",
+    "ast_configured":"Konfiguriert",
+    "ast_last_error":"Letzter Fehler",
+    "ast_last_rx":"Letzter Empfang",
+    "ast_last_tx":"Letzte Sendung",
+    "ast_register":"REGISTER",
+    "ast_remote":"Asterisk-Gegenstelle",
+    "ast_rtp":"RTP-Ports",
+    "ast_sip_listen":"SIP-Listener",
+    "asterisk":"Asterisk SIP",
+    "asterisk_title":"Asterisk SIP",
+    "audio":"Audio-Zentrale",
+    "autoscroll":"Automatisch scrollen",
+    "brew_offline":"OFFLINE",
+    "brew_online":"ONLINE",
+    "bs_label":"BS",
+    "bts_access":"Registrierungszugang",
+    "bts_band":"Band",
+    "bts_carrier":"Hauptträger",
+    "bts_cc":"Farbcode",
+    "bts_details":"Details der TETRA-Basisstation",
+    "bts_ip":"BTS-IP",
+    "bts_la":"Location Area",
+    "bts_rate":"Abtastrate",
+    "bts_rx":"RX-Frequenz",
+    "bts_shift":"Duplexabstand",
+    "bts_tx":"TX-Frequenz",
+    "bts_wl_entries":"freigegebene ISSI",
+    "bts_wl_open":"Offen — alle ISSI dürfen sich registrieren",
+    "call_emergency":"NOTRUF",
+    "call_group":"GRUPPE",
+    "call_p2p_d":"P2P-D",
+    "call_p2p_s":"P2P-S",
+    "calls":"Rufe",
+    "cancel":"Abbrechen",
+    "cfg_sec_access":"Zugriffskontrolle",
+    "cfg_sec_configuration":"Konfiguration",
+    "cfg_sec_wx":"WX / METAR",
+    "circuits":"belegte Rufkanäle",
+    "clear":"Löschen",
+    "config":"Konfiguration",
+    "confirm_clear_emergency":"Notfall für ISSI {issi} löschen?",
+    "confirm_kick":"ISSI {issi} entfernen?\nDas Terminal wird abgemeldet und zur Neuanmeldung gezwungen.",
+    "confirm_logout":"Abmelden?",
+    "confirm_restart":"NetCore-Basisstation neu starten?\nAlle aktiven Rufe werden beendet.",
+    "confirm_shutdown":"NetCore-Basisstation herunterfahren?\nDer Dienst wird gestoppt und muss manuell neu gestartet werden.",
+    "conn_error":"Verbindungsfehler.",
+    "dapnet":"DAPNET",
+    "dapnet_log":"DAPNET-Log",
+    "dapnet_routing":"Routing",
+    "dapnet_saved":"✓ Gespeichert",
+    "dapnet_send":"DAPNET-Nachricht senden",
+    "dapnet_title":"DAPNET",
+    "dgna":"DGNA",
+    "dgna_assign":"Zuweisen",
+    "dgna_current":"Aktuelle Gruppen",
+    "dgna_deassign":"Entfernen",
+    "dgna_gssi":"Gruppe (GSSI)",
+    "dgna_issi":"Terminal-ISSI",
+    "dgna_modal_title":"⬡ Dynamische Gruppenzuweisung",
+    "dgna_title":"Dynamische Gruppenzuweisung",
+    "echolink":"EchoLink",
+    "echolink_routing":"Weiterleitung",
+    "echolink_title":"EchoLink",
+    "emg_banner_title":"NOTFALL AKTIV",
+    "emg_chip":"NOTFALL",
+    "emg_clear":"Löschen",
+    "export":"Exportieren",
+    "fallback_title":"⚠ FALLBACK-KONFIGURATION AKTIV — Primäre Konfiguration konnte nicht geladen werden",
+    "filter_all":"Alle",
+    "geoalarm":"GeoAlarm",
+    "geoalarm_title":"GeoAlarm",
+    "health":"Systemzustand",
+    "integ_disabled":"Deaktiviert",
+    "integ_enabled":"Aktiviert",
+    "integ_error":"Fehler",
+    "integrations":"Integrationen",
+    "kick":"Entfernen",
+    "last_heard_title":"Zuletzt gehört",
+    "lastheard":"Zuletzt gehört",
+    "live_log":"Live-Protokoll",
+    "live_sds_clear_all":"Alle löschen",
+    "live_sds_delete":"✕",
+    "live_sds_desc":"Sendet eine Textnachricht an alle Funkgeräte der Zelle, wiederholt im Home-Mode-Display-Intervall.",
+    "live_sds_empty":"Keine aktiven Broadcasts.",
+    "live_sds_forever":"∞",
+    "live_sds_repeat":"Wiederh. (0=∞)",
+    "live_sds_send":"Senden",
+    "live_sds_sent":"gesendet",
+    "live_sds_text":"Nachrichtentext (max. 251 Zeichen)",
+    "live_sds_times":"×",
+    "log":"Log",
+    "maps":"Karte",
+    "maps_title":"Karte",
+    "meshcom":"MeshCom",
+    "meshcom_title":"MeshCom",
+    "monitor":"Überwachung",
+    "no_activity":"Noch keine Aktivität",
+    "no_calls":"Keine aktiven Rufe",
+    "no_sds":"Noch keine SDS-Nachrichten",
+    "no_terminals":"Keine Funkgeräte registriert",
+    "offline":"OFFLINE",
+    "online":"ONLINE",
+    "online_badge":"ONLINE",
+    "power":"Leistung",
+    "profile_edit_btn":"Bearbeiten",
+    "profile_edit_save_fail":"✗ Speichern fehlgeschlagen",
+    "profile_edit_save_ok":"✓ Gespeichert",
+    "profile_edit_title":"Konfigprofil bearbeiten",
+    "readability":"Lesbarkeit",
+    "recordings":"Aufzeichnungen",
+    "refresh":"Aktualisieren",
+    "registered":"registriert",
+    "registered_terminals":"Registrierte Funkgeräte",
+    "restart":"Neustarten",
+    "rf":"RF",
+    "rf_age":"Momentaufnahme",
+    "rf_carrier":"Trägerrest",
+    "rf_constellation":"TX-DSP-Konstellationsdiagramm",
+    "rf_dc":"DC-Offset (I/Q)",
+    "rf_evm":"EVM",
+    "rf_freq":"Mittenfrequenz",
+    "rf_hint_constellation":"π/4-DQPSK",
+    "rf_hint_health":"Abfrage alle 5 s",
+    "rf_hint_quality":"vor dem Leistungsverstärker gemessen · aus derselben DSP-Momentaufnahme",
+    "rf_hint_spectrum":"live · 512-Bin-FFT",
+    "rf_hint_waterfall":"laufend · Viridis",
+    "rf_hw_health":"Hardwarezustand",
+    "rf_iqa":"IQ-Amplitudenungleichgewicht",
+    "rf_iqp":"IQ-Phasenungleichgewicht",
+    "rf_just_now":"gerade eben",
+    "rf_live":"live",
+    "rf_no_gains":"nicht verfügbar",
+    "rf_obw":"Belegte Bandbreite (99 %)",
+    "rf_papr":"PAPR",
+    "rf_peak":"Spitzenwert",
+    "rf_quality":"Signalqualität",
+    "rf_rate":"Abtastrate",
+    "rf_rms":"RMS",
+    "rf_rx_gain":"RX-Verstärkungsstufen (Istwert)",
+    "rf_spectrum":"TX-DSP-Spektrum (vor Leistungsverstärker)",
+    "rf_stale":"veraltet",
+    "rf_temp":"SDR-Temperatur",
+    "rf_temp_cold":"kalt",
+    "rf_temp_hot":"heiß",
+    "rf_temp_na":"kein Sensor",
+    "rf_temp_nominal":"normal",
+    "rf_temp_warm":"warm",
+    "rf_tx_gain":"TX-Verstärkungsstufen (Istwert)",
+    "rf_visualizers":"Darstellungen",
+    "rf_waiting":"Warte auf Daten…",
+    "rf_waterfall":"TX-Spektrum-Wasserfalldiagramm",
+    "save":"Speichern",
+    "save_fail":"✗ Fehler beim Speichern",
+    "saved":"✓ Gespeichert — Neustart zum Anwenden.",
+    "sdr":"SDR",
+    "sds":"SDS",
+    "sds_callout_enable":"TPG2200 Call-Out / Alarm senden",
+    "sds_callout_help":"TPG RIC wird in die Call-Out-Adressbytes geschrieben. Call-Out ID ist das direkte ID-Byte 0..255. Priority/Ton ist das direkte Priority-Byte 0..15. Raw Hex überschreibt die automatische Payload.",
+    "sds_callout_id":"Call-Out ID",
+    "sds_callout_priority":"Priority / Ton",
+    "sds_callout_raw":"Raw Hex Payload optional",
+    "sds_callout_ric":"TPG RIC",
+    "sds_callout_source":"Source ISSI",
+    "sds_callout_text":"Alarmtext",
+    "sds_dest":"Ziel-ISSI",
+    "sds_msg_label":"Nachricht",
+    "sds_refresh":"Aktualisieren",
+    "sds_title":"⬡ SDS-Nachricht senden",
+    "sdslog":"SDS-Log",
+    "send":"Senden",
+    "shutdown":"Herunterfahren",
+    "size_high":"Groß",
+    "size_high_d":"Größer · stärkerer Kontrast",
+    "size_medium":"Mittel",
+    "size_medium_d":"Standard · angenehm",
+    "size_small":"Klein",
+    "size_small_d":"Kompakt · normaler Kontrast",
+    "size_ultra":"Sehr groß",
+    "size_ultra_d":"Maximale Größe · maximaler Kontrast",
+    "stations":"Funkgeräte",
+    "sys_activate":"Aktivieren & Neustart",
+    "sys_activate_confirm":"Zum Profil \"{name}\" wechseln und neu starten?\nAktuelle Konfig wird gesichert.",
+    "sys_active_badge":"AKTIV",
+    "sys_autorefresh":"Auto-Aktualisierung 5s",
+    "sys_bts":"BTS-Verbindung",
+    "sys_config":"Aktive Konfiguration",
+    "sys_cpu":"CPU",
+    "sys_cpu_load":"CPU-Auslastung",
+    "sys_hostname":"Hostname",
+    "sys_info":"Systeminfo",
+    "sys_no_profiles":"Keine .toml-Profile im Konfigverzeichnis gefunden.",
+    "sys_os":"OS",
+    "sys_probe":"Prüfen",
+    "sys_profiles":"Konfigprofile",
+    "sys_ram":"RAM",
+    "sys_refresh":"Aktualisieren",
+    "sys_rf":"RF-Hardware (SoapySDR)",
+    "sys_sec_host":"Host",
+    "sys_sec_profiles":"Profile",
+    "sys_sec_radio":"Funk-Hardware",
+    "sys_sec_sds":"SDS-Rundsendung",
+    "sys_sec_sensors":"Sensoren",
+    "sys_sec_status":"Status",
+    "sys_sensors":"Host-Hardware-Sensoren",
+    "sys_sensors_empty":"Keine Sensoren erkannt.",
+    "sys_temp":"CPU-Temp",
+    "sys_temp_hot":"HEISS",
+    "sys_temp_ok":"OK",
+    "sys_temp_warm":"Warm",
+    "sys_title":"System",
+    "sys_uptime":"Laufzeit",
+    "sys_version":"NetCore-Version",
+    "system":"System",
+    "system_sec":"System",
+    "telegram":"Telegram",
+    "terminals":"Funkgeräte",
+    "tg_add":"Hinzufügen",
+    "tg_affiliated_hint":"Weitere Rufgruppen, denen dieses Funkgerät zugeordnet ist. Die Zuordnung bleibt an der Basisstation bestehen, auch wenn der Suchlauf am Endgerät deaktiviert ist.",
+    "tg_affiliated_short":"zugeordnet",
+    "tg_bot_help":"Das Token von @BotFather sieht beispielsweise so aus: 123456789:AAExampleTokenString. Es wird maskiert gespeichert und später nicht mehr vollständig angezeigt.",
+    "tg_bot_title":"Bot-Token",
+    "tg_brew_register_black":"Brew REGISTER ISSI-Blacklist",
+    "tg_brew_register_prefix":"Brew REGISTER-Prefix",
+    "tg_brew_register_white":"Brew REGISTER ISSI-Whitelist",
+    "tg_cat_backhaul":"Brew-Netzanbindung aktiv/inaktiv",
+    "tg_cat_brew_register":"Brew ISSI REGISTER",
+    "tg_cat_connect":"Funkgerät registriert",
+    "tg_cat_disconnect":"Funkgerät abgemeldet",
+    "tg_cat_lip":"LIP-/APRS-Positionsmeldung",
+    "tg_cat_logs":"Kritischer Protokolleintrag (Warnungen/Fehler)",
+    "tg_cat_t351":"Funkgerät verworfen (keine T351-Antwort)",
+    "tg_categories_title":"Benachrichtigungskategorien",
+    "tg_detect":"Chat-ID ermitteln",
+    "tg_detect_found":"Chats, die dem Bot geschrieben haben — zum Übernehmen auf „Hinzufügen“ klicken:",
+    "tg_detect_none":"Keine aktuellen Nachrichten gefunden. Zuerst dem Bot eine Nachricht senden und danach erneut versuchen.",
+    "tg_detecting":"Letzte Nachrichten werden gelesen…",
+    "tg_enabled":"Telegram-Benachrichtigungen aktivieren",
+    "tg_help":"Sofortige Telegram-Nachrichten bei wichtigen Ereignissen der Basisstation, etwa Registrierung oder Abmeldung eines Funkgeräts, Ausfall der Netzanbindung, Positionsmeldung oder Warnung im Systemprotokoll.",
+    "tg_howto_title":"Einrichtung — 4 Schritte",
+    "tg_invalid_chat":"Gültige Chat-ID eingeben.",
+    "tg_no_recipients":"Noch keine Empfänger eingetragen.",
+    "tg_recipients_help":"Jede Benachrichtigung wird an alle Empfänger gesendet. Positive IDs stehen für private Chats, negative IDs für Gruppen oder Kanäle.",
+    "tg_recipients_title":"Empfänger (Chat-IDs)",
+    "tg_selected":"Ausgewählte Rufgruppe (zuletzt gesendet)",
+    "tg_step1":"In Telegram @BotFather öffnen, /newbot senden und den Anweisungen folgen. Anschließend das Bot-Token kopieren.",
+    "tg_step2":"Das Token unten einfügen und auf „Prüfen“ klicken. Danach sollte der @Benutzername des Bots erscheinen.",
+    "tg_step3":"Einen Chat mit dem neuen Bot öffnen oder ihn einer Gruppe hinzufügen und eine Nachricht senden, zum Beispiel /start.",
+    "tg_step4":"Auf „Chat-ID ermitteln“ klicken, den Chat als Empfänger hinzufügen, speichern und anschließend mit „Test senden“ prüfen.",
+    "tg_test":"Test senden",
+    "tg_test_ok":"✓ Test an {n} Chat(s) gesendet",
+    "tg_testing":"Test wird gesendet…",
+    "tg_title":"Telegram-Benachrichtigungen",
+    "tg_verify":"Prüfen",
+    "tg_verifying":"Prüfung läuft…",
+    "th_actions":"Aktionen",
+    "th_activity":"Aktivität",
+    "th_caller":"Rufquelle",
+    "th_dest":"Ziel",
+    "th_dir":"Ri.",
+    "th_duration":"Dauer",
+    "th_ee":"Energiesparmodus",
+    "th_from":"Von",
+    "th_groups":"Gruppen",
+    "th_id":"ID",
+    "th_issi":"ISSI",
+    "th_issi_cs":"ISSI / Rufzeichen",
+    "th_last_seen":"Zuletzt gesehen",
+    "th_message":"Nachricht",
+    "th_signal":"Signal",
+    "th_source":"Quelle",
+    "th_speaker":"Sprecher",
+    "th_status":"Status",
+    "th_time":"Zeit",
+    "th_to":"An",
+    "th_type":"Typ",
+    "update":"Update",
+    "update_available":"Update verfügbar",
+    "update_close":"Schließen",
+    "update_confirm":"Neueste NetCore-Tetra Version von main holen und neu bauen?\nDer Dienst startet automatisch neu.",
+    "update_done_err":"✗ Update fehlgeschlagen. Siehe Log unten.",
+    "update_done_ok":"✓ Update abgeschlossen. Neustart…",
+    "update_running":"Aktualisierung läuft… Fenster nicht schließen.",
+    "update_title":"NetCore-Tetra-Update — github.com/JanHG98/flowstation",
+    "whitelist_add":"ISSI hinzufügen",
+    "whitelist_empty":"Liste leer — offenes Netz (jedes Funkgerät darf sich anmelden).",
+    "whitelist_enforced":"AKTIV",
+    "whitelist_help":"Ist die Liste leer, darf sich jedes Funkgerät anmelden (offenes Netz). Bei Einträgen werden nur die gelisteten ISSIs akzeptiert; alle anderen werden abgewiesen. Änderungen wirken sofort und bleiben nach Neustart erhalten.",
+    "whitelist_invalid":"Gültige ISSI eingeben (1–16777215).",
+    "whitelist_open":"OFFEN",
+    "whitelist_title":"ISSI-Whitelist",
+    "wifi":"WLAN",
+    "wifi_actions":"Aktionen",
+    "wifi_add_hidden":"Verstecktes Netzwerk",
+    "wifi_confirm_forget":"Netzwerk vergessen",
+    "wifi_connect":"Verbinden",
+    "wifi_connect_to":"Verbinden mit",
+    "wifi_connected":"VERBUNDEN",
+    "wifi_connected_ok":"Verbunden.",
+    "wifi_connecting":"Verbinde…",
+    "wifi_disconnect":"Trennen",
+    "wifi_err_no_ssid":"SSID erforderlich",
+    "wifi_forget":"Vergessen",
+    "wifi_hidden":"Verstecktes Netzwerk (SSID nicht gesendet)",
+    "wifi_ip":"IP-Adresse",
+    "wifi_loading":"Wird geladen…",
+    "wifi_no_device":"Kein WLAN-Gerät erkannt.",
+    "wifi_no_networks":"Keine Netzwerke in Reichweite.",
+    "wifi_no_saved":"Keine gespeicherten Netzwerke.",
+    "wifi_not_connected":"Mit keinem Netzwerk verbunden.",
+    "wifi_open":"OFFEN",
+    "wifi_password":"Passwort",
+    "wifi_radio_disabled":"WLAN-Funk ist deaktiviert.",
+    "wifi_radio_off":"WLAN deaktivieren",
+    "wifi_radio_on":"WLAN aktivieren",
+    "wifi_refresh":"Aktualisieren",
+    "wifi_saved":"Gespeicherte Netzwerke",
+    "wifi_saved_tag":"GESPEICHERT",
+    "wifi_scan":"Suchen",
+    "wifi_scanning":"Suche läuft…",
+    "wifi_signal":"Signal",
+    "wifi_ssid":"Netzwerk",
+    "wifi_status":"Aktuelle Verbindung",
+    "wifi_visible":"Verfügbare Netzwerke",
+    "wifi_warn_lose_access":"Wenn Sie über WLAN mit dem Dashboard verbunden sind, kann ein Netzwerkwechsel die Verbindung trennen. Stellen Sie sicher, dass Sie einen alternativen Zugang haben.",
+    "wx_enabled":"METAR-Antwort auf Anfrage aktivieren",
+    "wx_help":"Integrierter Wetterdienst. Funkgeräte senden eine SDS wie \"METAR LROP\" an die Dienst-ISSI und erhalten einen dekodierten Bericht. Optional automatisches Senden des METAR einer festen Station an eine ISSI oder Gruppe in Intervallen. Daten von aviationweather.gov.",
+    "wx_interval_hint":"Mindestens 300 s (5 Min), um die Wetter-API nicht zu überlasten.",
+    "wx_periodic_dest":"Ziel",
+    "wx_periodic_enabled":"Periodisches Senden aktivieren",
+    "wx_periodic_icao":"Stations-ICAO",
+    "wx_periodic_incomplete":"Stations-ICAO und Ziel für den periodischen Modus setzen.",
+    "wx_periodic_interval":"Intervall (Sekunden)",
+    "wx_periodic_isgroup":"Ziel ist Gruppe",
+    "wx_periodic_isgroup_hint":"(GSSI statt einzelner ISSI)",
+    "wx_service_issi":"Dienst-ISSI",
+    "wx_title":"WX / METAR-Dienst",
   },
 };
 
 const currentLang='de';
 localStorage.removeItem('fs_lang');
 document.documentElement.lang='de';
-function t(k,v){let s=(LANGS.de||LANGS.en)[k]||(LANGS.en[k]||k);if(v)Object.keys(v).forEach(x=>{s=s.replace('{'+x+'}',v[x]);});return s;}
+// German-only dashboard: the former English table intentionally mirrors German.
+function t(k,v){let s=LANGS.de[k]||k;if(v)Object.keys(v).forEach(x=>{s=s.replace('{'+x+'}',v[x]);});return s;}
 function applyLang(){
   document.querySelectorAll('[data-i18n]').forEach(el=>el.textContent=t(el.getAttribute('data-i18n')));
   document.querySelectorAll('[data-i18n-tab]').forEach(el=>el.textContent=t(el.getAttribute('data-i18n-tab')));
+  document.querySelectorAll('[data-i18n-section]').forEach(el=>el.textContent=t(el.getAttribute('data-i18n-section')));
   // Update nav labels
   ['stations','calls','lastheard','log','config','telegram','system'].forEach(p=>{
     const el=document.querySelector(`#nav-${p} .nav-label`);
@@ -5552,7 +5370,7 @@ function wifiRenderStatus(){
 function wifiRenderStatusError(err){
   const el = document.getElementById('wifi-status-grid');
   if(!el) return;
-  const msg = err && err.msg ? err.msg : (typeof err === 'string' ? err : 'Error');
+  const msg = err && err.msg ? err.msg : (typeof err === 'string' ? err : 'Fehler');
   el.innerHTML = `<div class="wifi-status-loading" style="color:var(--danger)">${escHtml(msg)}</div>`;
 }
 
@@ -5563,7 +5381,7 @@ async function wifiLoadSaved(){
   try{
     const r = await fetch('/api/wifi/saved');
     const j = await r.json();
-    if(!j.ok){ el.innerHTML = `<div class="wifi-list-empty" style="color:var(--danger)">${escHtml(j.error&&j.error.msg||'Error')}</div>`; return; }
+    if(!j.ok){ el.innerHTML = `<div class="wifi-list-empty" style="color:var(--danger)">${escHtml(j.error&&j.error.msg||'Fehler')}</div>`; return; }
     wifiState.saved = j.profiles || [];
     if(cnt) cnt.textContent = wifiState.saved.length ? `${wifiState.saved.length}` : '';
     if(wifiState.saved.length === 0){
@@ -5596,7 +5414,7 @@ async function wifiScan(){
   try{
     const r = await fetch('/api/wifi/scan');
     const j = await r.json();
-    if(!j.ok){ el.innerHTML = `<div class="wifi-list-empty" style="color:var(--danger)">${escHtml(j.error&&j.error.msg||'Error')}</div>`; return; }
+    if(!j.ok){ el.innerHTML = `<div class="wifi-list-empty" style="color:var(--danger)">${escHtml(j.error&&j.error.msg||'Fehler')}</div>`; return; }
     wifiState.scan = j.networks || [];
     if(wifiState.scan.length === 0){
       el.innerHTML = `<div class="wifi-list-empty">${t('wifi_no_networks')||'No networks in range.'}</div>`;
@@ -5748,7 +5566,7 @@ async function wifiDisconnect(){
 }
 
 async function wifiForget(uuid, name){
-  if(!confirm(`${t('wifi_confirm_forget')||'Forget network'} "${name}"?`)) return;
+  if(!confirm(`${t('wifi_confirm_forget')||'Netzwerk vergessen'} "${name}"?`)) return;
   await wifiCall('/api/wifi/forget', { uuid });
   await wifiRefresh();
 }
@@ -6340,7 +6158,7 @@ function lastHeardFiltered(){
   const broken=[issiRe,destRe].find(re=>re&&re.error);
   if(broken){
     updateLastHeardSourceButtons();
-    if(status){status.textContent=`Regex error: ${broken.error}`;status.classList.add('is-error');}
+    if(status){status.textContent=`RegEx-Fehler: ${broken.error}`;status.classList.add('is-error');}
     return [];
   }
   const rows=(state.lastHeard||[]).filter(e=>{
@@ -6447,19 +6265,19 @@ function tsAllCarriers(){
   const main=tsMainCarrier();
   const sec=tsSecondaryCarrierFromActivity();
   const showSec=tsHasSecondaryActivity()&&sec!=null;
-  out.push({carrier:main,label:'MAIN',secondary:false,slots:[1,2,3,4]});
-  if(showSec)out.push({carrier:sec,label:'CTRL + TRAFFIC',secondary:true,slots:[1,5,6,7]});
+  out.push({carrier:main,label:'HAUPTTRÄGER',secondary:false,slots:[1,2,3,4]});
+  if(showSec)out.push({carrier:sec,label:'STEUERUNG + VERKEHR',secondary:true,slots:[1,5,6,7]});
   return out;
 }
 function tsBlockMarkup(carrier,ts,kind,secondary){
   const id=tsDomId(carrier,ts);
   const cls=(kind==='main-control'||kind==='secondary-control')?'ts-block mcch':'ts-block';
   const air=tsAirTs(ts);
-  const label=kind==='main-control'?'MCCH':(kind==='secondary-control'?'CTRL':'—');
-  let sub=(kind==='main-control'||kind==='secondary-control')?'ACTIVE':'Idle';
+  const label=kind==='main-control'?'MCCH':(kind==='secondary-control'?'STEUERUNG':'—');
+  let sub=(kind==='main-control'||kind==='secondary-control')?'AKTIV':'Frei';
   const title=secondary
-    ?`Logical TS ${ts} · carrier ${carrier??'—'} · air TS ${air??'—'}`
-    :`TS ${ts} · carrier ${carrier??'—'}`;
+    ?`Logischer TS ${ts} · Träger ${carrier??'—'} · Funk-TS ${air??'—'}`
+    :`TS ${ts} · Träger ${carrier??'—'}`;
   return `<div class="${cls}" id="${id}" data-carrier="${carrier??''}" data-ts="${ts}" data-air-ts="${air??''}" title="${title}">
     <div class="ts-num">TS ${ts}</div>
     ${(kind==='main-control'||kind==='secondary-control')?'':'<div class="ts-timer"></div>'}
@@ -6472,7 +6290,7 @@ function tsBlockMarkup(carrier,ts,kind,secondary){
   </div>`;
 }
 function renderTsCarrier(carrier,label,secondary,slots){
-  const head=(state.dualCarrierRunning||secondary)?`<div class="ts-carrier-head ${secondary?'secondary':'main'}">Carrier ${carrier??'—'} <span class="ts-carrier-tag">${label}</span></div>`:'';
+  const head=(state.dualCarrierRunning||secondary)?`<div class="ts-carrier-head ${secondary?'secondary':'main'}">Träger ${carrier??'—'} <span class="ts-carrier-tag">${label}</span></div>`:'';
   return head+(slots||[1,2,3,4]).map(ts=>tsBlockMarkup(carrier,ts,(!secondary&&ts===1)?'main-control':((secondary&&ts===1)?'secondary-control':'idle'),secondary)).join('');
 }
 function renderTsGrid(){
@@ -6519,8 +6337,8 @@ function updateTsBlocks(){
 
       if(ts===1){
         block.className='ts-block mcch';
-        label.textContent=carrierInfo.secondary?'CTRL':'MCCH';
-        sub.textContent='ACTIVE';
+        label.textContent=carrierInfo.secondary?'STEUERUNG':'MCCH';
+        sub.textContent='AKTIV';
         tsApplyWave(carrier,1,true);
         if(dur)dur.style.width='0%';
         continue;
@@ -6531,7 +6349,7 @@ function updateTsBlocks(){
       if(!st){
         block.className='ts-block';
         label.textContent='—';
-        sub.textContent='Idle';
+        sub.textContent='Frei';
         tsApplyWave(carrier,ts,false);
         if(timer)timer.textContent='';
         if(dur)dur.style.width='0%';
@@ -6547,7 +6365,7 @@ function updateTsBlocks(){
         sub.textContent=lines.bottom?('▶ '+lines.bottom):'▶ TX';
       } else {
         block.className='ts-block call';
-        sub.textContent=lines.bottom||(st.sub||'Alloc');
+        sub.textContent=lines.bottom||(st.sub||'Zugewiesen');
       }
       if((st.priority||0)>=15)block.classList.add('emergency');
       if(timer){
@@ -6577,9 +6395,9 @@ function tsIssiText(issi){
 function tsLines(st){
   const speaker=st.speaker_issi||st.caller_issi;
   if(st.call_type==='group'){
-    return {top: st.gssi!=null?('GSSI '+st.gssi):'GROUP', bottom: tsIssiText(speaker)};
+    return {top: st.gssi!=null?('GSSI '+st.gssi):'GRUPPE', bottom: tsIssiText(speaker)};
   }
-  return {top:'PRIVATE', bottom: tsIssiText(speaker)};
+  return {top:'EINZELRUF', bottom: tsIssiText(speaker)};
 }
 function tsSetCall(carrier,ts,call){
   const logicalTs=tsNormalizeLogicalTs(carrier,ts);
@@ -6714,7 +6532,7 @@ function renderLastHeard(){
   if(!tb)return;
   const total=(state.lastHeard||[]).length;
   const rows=lastHeardFiltered();
-  if(!rows.length){tb.innerHTML=`<tr><td colspan="6"><div class="empty-state"><span class="empty-ico">${svgIcon('lastheard')}</span><div class="empty-msg">${total?'No matching activity':t('no_activity')}</div></div></td></tr>`;return;}
+  if(!rows.length){tb.innerHTML=`<tr><td colspan="6"><div class="empty-state"><span class="empty-ico">${svgIcon('lastheard')}</span><div class="empty-msg">${total?'Keine passenden Aktivitäten':t('no_activity')}</div></div></td></tr>`;return;}
   tb.innerHTML=rows.map(e=>{
     const destStr=e.dest?`<code>${e.dest}</code>`:'<span class="muted">—</span>';
     const isOnline=!!state.ms[e.issi];
@@ -6737,9 +6555,9 @@ let sdsLogPageIndex=0,dapnetLogPageIndex=0,echolinkDirectoryPageIndex=0,meshNode
 let meshMsgShowUdp=true,meshMsgShowLora=true,meshMsgShowNode=true,meshMsgShowPos=true,meshMsgShowTime=true;
 function setLogPager(id,page,total){
   const el=document.getElementById(id);if(!el)return;
-  if(!total){el.textContent='Page 0 / 0 · 0';return;}
+  if(!total){el.textContent='Seite 0 / 0 · 0';return;}
   const pages=Math.max(1,Math.ceil(total/LOG_PAGE_SIZE));
-  el.textContent=`Page ${page+1} / ${pages} · ${total}`;
+  el.textContent=`Seite ${page+1} / ${pages} · ${total}`;
 }
 function clampLogPage(page,total){
   const pages=Math.max(1,Math.ceil(total/LOG_PAGE_SIZE));
@@ -6773,7 +6591,7 @@ function lipPositionFromText(text){
   return {lat,lon};
 }
 const MAP_SOURCE_KEYS=['sds','meshcom','geoalarm','station'];
-const MAP_SOURCE_LABELS={sds:'SDS/LIP',meshcom:'MeshCom',geoalarm:'GeoAlarm',station:'FlowStation'};
+const MAP_SOURCE_LABELS={sds:'SDS/LIP',meshcom:'MeshCom',geoalarm:'GeoAlarm',station:'Basisstation'};
 function mapsLoadSourceFilters(){
   const defaults={sds:true,meshcom:true,geoalarm:true,station:true};
   try{
@@ -6868,7 +6686,7 @@ function mapsRawCountsText(c){
 function mapsCollect(){
   const station=[],items=[];
   const fsPos=mapsStationPosition();
-  const fs=fsPos?mapsMarker('station','FlowStation',fsPos.lat,fsPos.lon,'Station position from GeoAlarm FlowStation latitude/longitude','GeoAlarm config','','station:flowstation'):null;
+  const fs=fsPos?mapsMarker('station','Basisstation',fsPos.lat,fsPos.lon,'Stationsposition aus den GeoAlarm-Koordinaten der Basisstation','GeoAlarm config','','station:flowstation'):null;
   if(fs)station.push(fs);
   if(mapsFocusMarker)station.push(mapsFocusMarker);
   (state.sdsLog||[]).forEach(e=>{
@@ -7324,7 +7142,7 @@ function sdsLogFiltered(){
   const tgRe=sdsLogRegex('sdslog-tg-filter','TG');
   const broken=[fromRe,tgRe].find(re=>re&&re.error);
   if(broken){
-    if(status){status.textContent=`Regex error: ${broken.error}`;status.classList.add('is-error');}
+    if(status){status.textContent=`RegEx-Fehler: ${broken.error}`;status.classList.add('is-error');}
     return [];
   }
   const rows=(state.sdsLog||[]).filter(e=>{
@@ -7346,7 +7164,7 @@ function renderSdsLog(){
   const rows=sdsLogFiltered();
   sdsLogPageIndex=clampLogPage(sdsLogPageIndex,rows.length);
   setLogPager('sdslog-page',sdsLogPageIndex,rows.length);
-  if(!rows.length){tb.innerHTML=`<tr><td colspan="5" class="sds-empty" style="text-align:center;padding:24px">${total?'No matching SDS messages':t('no_sds')}</td></tr>`;return;}
+  if(!rows.length){tb.innerHTML=`<tr><td colspan="5" class="sds-empty" style="text-align:center;padding:24px">${total?'Keine passenden SDS-Nachrichten':t('no_sds')}</td></tr>`;return;}
   const start=sdsLogPageIndex*LOG_PAGE_SIZE;
   tb.innerHTML=rows.slice(start,start+LOG_PAGE_SIZE).map(sdsRow).join('');
 }
@@ -7356,7 +7174,7 @@ async function loadSdsLog(){
 function sdsLogPrevPage(){sdsLogPageIndex--;renderSdsLog();}
 function sdsLogNextPage(){sdsLogPageIndex++;renderSdsLog();}
 async function clearSdsLog(){
-  if(!confirm('Clear SDS Log?'))return;
+  if(!confirm('SDS-Protokoll löschen?'))return;
   try{const r=await fetch('/api/sds-log',{method:'DELETE'});if(!r.ok)return;state.sdsLog=[];sdsLogPageIndex=0;renderSdsLog();renderStations();renderMapsIfActive();}catch{}
 }
 function exportSdsLog(){
@@ -7374,7 +7192,7 @@ function exportSdsLog(){
       logExportCell(e.text||pidLabel(e.protocol_id))
     ].map(logExportCell).join('\t'));
   }
-  downloadTextFile(`flowstation-sds-log-${logExportStamp()}.txt`,lines.join('\n')+'\n');
+  downloadTextFile(`netcore-sds-log-${logExportStamp()}.txt`,lines.join('\n')+'\n');
 }
 
 // ── DAPNET ────────────────────────────────────────────────────────────────
@@ -7490,7 +7308,7 @@ function dapnetLogFiltered(){
   ];
   const broken=filters.find(f=>f.re&&f.re.error);
   if(broken){
-    if(status){status.textContent=`Regex error: ${broken.re.error}`;status.classList.add('is-error');}
+    if(status){status.textContent=`RegEx-Fehler: ${broken.re.error}`;status.classList.add('is-error');}
     return [];
   }
   const rows=(state.dapnetLog||[]).filter(e=>filters.every(f=>!f.re||f.re.test(String(f.value(e)))));
@@ -7510,7 +7328,7 @@ function renderDapnetLog(){
   const rows=dapnetLogFiltered();
   dapnetLogPageIndex=clampLogPage(dapnetLogPageIndex,rows.length);
   setLogPager('dapnetlog-page',dapnetLogPageIndex,rows.length);
-  if(!rows.length){tb.innerHTML=`<tr><td colspan="6" class="sds-empty" style="text-align:center;padding:24px">No matching DAPNET messages</td></tr>`;return;}
+  if(!rows.length){tb.innerHTML=`<tr><td colspan="6" class="sds-empty" style="text-align:center;padding:24px">Keine passenden DAPNET-Nachrichten</td></tr>`;return;}
   const start=dapnetLogPageIndex*LOG_PAGE_SIZE;
   tb.innerHTML=rows.slice(start,start+LOG_PAGE_SIZE).map(dapnetRow).join('');
 }
@@ -7520,7 +7338,7 @@ async function loadDapnetLog(){
 function dapnetLogPrevPage(){dapnetLogPageIndex--;renderDapnetLog();}
 function dapnetLogNextPage(){dapnetLogPageIndex++;renderDapnetLog();}
 async function clearDapnetLog(){
-  if(!confirm('Clear DAPNET Log?'))return;
+  if(!confirm('DAPNET-Protokoll löschen?'))return;
   try{const r=await fetch('/api/dapnet-log',{method:'DELETE'});if(!r.ok)return;state.dapnetLog=[];dapnetLogPageIndex=0;renderDapnetLog();}catch{}
 }
 function exportDapnetLog(){
@@ -7537,7 +7355,7 @@ function exportDapnetLog(){
       e.text||''
     ].map(logExportCell).join('\t'));
   }
-  downloadTextFile(`flowstation-dapnet-log-${logExportStamp()}.txt`,lines.join('\n')+'\n');
+  downloadTextFile(`netcore-dapnet-log-${logExportStamp()}.txt`,lines.join('\n')+'\n');
 }
 async function loadDapnet(){
   try{
@@ -7554,7 +7372,7 @@ async function loadDapnet(){
     dapPasswordDirty=false;
     dapSet('dap-rwth-host',d.rwth_core_host||'');
     dapSet('dap-rwth-port',d.rwth_core_port||43434);
-    dapSet('dap-rwth-device',d.rwth_core_device||'FlowStation');
+    dapSet('dap-rwth-device',d.rwth_core_device||'NetCore');
     dapSet('dap-rwth-version',d.rwth_core_version||'1.0');
     dapSet('dap-rwth-callsign',d.rwth_core_callsign||'');
     dapSet('dap-rwth-authkey',d.rwth_core_authkey_set?(d.rwth_core_authkey_masked||''):'');
@@ -7610,7 +7428,7 @@ async function saveDapnet(){
     username:dapVal('dap-username'),
     rwth_core_host:dapVal('dap-rwth-host'),
     rwth_core_port:dapNum('dap-rwth-port',43434,1,65535),
-    rwth_core_device:dapVal('dap-rwth-device')||'FlowStation',
+    rwth_core_device:dapVal('dap-rwth-device')||'NetCore',
     rwth_core_version:dapVal('dap-rwth-version')||'1.0',
     rwth_core_callsign:dapVal('dap-rwth-callsign').toUpperCase(),
     forward_sds:document.getElementById('dap-forward-sds').checked,
@@ -7725,7 +7543,7 @@ function renderEcholinkDirectory(){
     const status=state.echolinkDirectoryStatus||'Directory';
     summary.textContent=total?`${status} · ${rows.length} shown · ${total} total`:'Directory not loaded yet.';
   }
-  if(!rows.length){tb.innerHTML=`<tr><td colspan="4" class="sds-empty" style="text-align:center;padding:24px">No directory entries</td></tr>`;return;}
+  if(!rows.length){tb.innerHTML=`<tr><td colspan="4" class="sds-empty" style="text-align:center;padding:24px">Keine Verzeichniseinträge</td></tr>`;return;}
   const start=echolinkDirectoryPageIndex*LOG_PAGE_SIZE;
   tb.innerHTML=rows.slice(start,start+LOG_PAGE_SIZE).map(echolinkDirectoryRow).join('');
 }
@@ -7755,8 +7573,8 @@ async function loadEcholink(){
     dapSet('el-callsign',d.callsign||'');
     dapSet('el-password',d.password_set?(d.password_masked||''):'');
     echolinkPasswordDirty=false;
-    dapSet('el-location',d.location||'FlowStation');
-    dapSet('el-status-text',d.status_text||'FlowStation EchoLink bridge');
+    dapSet('el-location',d.location||'NetCore');
+    dapSet('el-status-text',d.status_text||'NetCore EchoLink-Bridge');
     dapSet('el-directory-servers',echolinkListText(d.directory_servers));
     dapSet('el-directory-port',d.directory_port||5200);
     dapSet('el-bind-addr',d.bind_addr||'0.0.0.0');
@@ -7796,8 +7614,8 @@ async function saveEcholink(){
   const body={
     enabled:document.getElementById('el-enabled').checked,
     callsign:dapVal('el-callsign').toUpperCase(),
-    location:dapVal('el-location')||'FlowStation',
-    status_text:dapVal('el-status-text')||'FlowStation EchoLink bridge',
+    location:dapVal('el-location')||'NetCore',
+    status_text:dapVal('el-status-text')||'NetCore EchoLink-Bridge',
     directory_servers:echolinkListBody('el-directory-servers'),
     directory_port:dapNum('el-directory-port',5200,1,65535),
     bind_addr:dapVal('el-bind-addr')||'0.0.0.0',
@@ -7950,7 +7768,7 @@ function renderMeshcomNodes(){
   const rows=meshNodeFiltered();
   meshNodePageIndex=clampLogPage(meshNodePageIndex,rows.length);
   setLogPager('mesh-nodes-page',meshNodePageIndex,rows.length);
-  if(!rows.length){tb.innerHTML=`<tr><td colspan="8" class="sds-empty" style="text-align:center;padding:24px">No MeshCom nodes yet</td></tr>`;return;}
+  if(!rows.length){tb.innerHTML=`<tr><td colspan="8" class="sds-empty" style="text-align:center;padding:24px">Noch keine MeshCom-Nodes</td></tr>`;return;}
   const start=meshNodePageIndex*LOG_PAGE_SIZE;
   tb.innerHTML=rows.slice(start,start+LOG_PAGE_SIZE).map(meshNodeRow).join('');
 }
@@ -7960,7 +7778,7 @@ async function loadMeshcomNodes(){
   try{const r=await fetch('/api/meshcom-nodes');if(!r.ok)return;state.meshcomNodes=(await r.json()).map(meshNormalizeRouteItem);meshNodePageIndex=0;renderMeshcomNodes();renderMapsIfActive();}catch{}
 }
 async function clearMeshcomNodes(){
-  if(!confirm('Clear MeshCom Nodes?'))return;
+  if(!confirm('MeshCom-Nodes löschen?'))return;
   try{const r=await fetch('/api/meshcom-nodes',{method:'DELETE'});if(!r.ok)return;state.meshcomNodes=[];meshNodePageIndex=0;renderMeshcomNodes();renderMapsIfActive();}catch{}
 }
 function exportMeshcomNodes(){
@@ -7971,7 +7789,7 @@ function exportMeshcomNodes(){
     const fw=[n.firmware,n.fw_sub].filter(Boolean).join(' / ');
     lines.push([n.last_seen||'',meshOrigin(n)||'',meshRouteParts(n).via.join(','),n.last_type||'',pos,meshBatteryText(n.batt),meshRfText(n),fw,n.hw_id||''].join('\t'));
   });
-  downloadTextFile(`flowstation-meshcom-nodes-${logExportStamp()}.txt`,lines.join('\n')+'\n');
+  downloadTextFile(`netcore-meshcom-nodes-${logExportStamp()}.txt`,lines.join('\n')+'\n');
 }
 function meshMsgRow(m){
   const msgText=m.msg?escHtml(m.msg):(m.lat!==null&&m.lat!==undefined&&m.lon!==null&&m.lon!==undefined?'<span class="sds-empty">[position]</span>':'');
@@ -8068,7 +7886,7 @@ function renderMeshcomMessages(){
   const rows=meshMsgFiltered();
   meshMsgPageIndex=clampLogPage(meshMsgPageIndex,rows.length);
   setLogPager('mesh-msgs-page',meshMsgPageIndex,rows.length);
-  if(!rows.length){tb.innerHTML=`<tr><td colspan="9" class="sds-empty" style="text-align:center;padding:24px">No matching MeshCom packets</td></tr>`;return;}
+  if(!rows.length){tb.innerHTML=`<tr><td colspan="9" class="sds-empty" style="text-align:center;padding:24px">Keine passenden MeshCom-Pakete</td></tr>`;return;}
   const start=meshMsgPageIndex*LOG_PAGE_SIZE;
   tb.innerHTML=rows.slice(start,start+LOG_PAGE_SIZE).map(meshMsgRow).join('');
 }
@@ -8078,7 +7896,7 @@ async function loadMeshcomMessages(){
   try{const r=await fetch('/api/meshcom-messages');if(!r.ok)return;state.meshcomMessages=(await r.json()).map(meshNormalizeRouteItem);meshMsgPageIndex=0;renderMeshcomMessages();renderMapsIfActive();}catch{}
 }
 async function clearMeshcomMessages(){
-  if(!confirm('Clear MeshCom Messages?'))return;
+  if(!confirm('MeshCom-Nachrichten löschen?'))return;
   try{const r=await fetch('/api/meshcom-messages',{method:'DELETE'});if(!r.ok)return;state.meshcomMessages=[];meshMsgPageIndex=0;renderMeshcomMessages();renderMapsIfActive();}catch{}
 }
 function exportMeshcomMessages(){
@@ -8099,7 +7917,7 @@ function exportMeshcomMessages(){
       meshRfText(m)
     ].join('\t'));
   });
-  downloadTextFile(`flowstation-meshcom-messages-${logExportStamp()}.txt`,lines.join('\n')+'\n');
+  downloadTextFile(`netcore-meshcom-messages-${logExportStamp()}.txt`,lines.join('\n')+'\n');
 }
 async function loadMeshcom(){
   try{
@@ -8207,7 +8025,7 @@ function renderGeoalarmEvents(){
   const rows=state.geoalarmEvents||[];
   geoalarmPageIndex=clampLogPage(geoalarmPageIndex,rows.length);
   setLogPager('geo-events-page',geoalarmPageIndex,rows.length);
-  if(!rows.length){tb.innerHTML=`<tr><td colspan="8" class="sds-empty" style="text-align:center;padding:24px">No GeoAlarm events yet</td></tr>`;return;}
+  if(!rows.length){tb.innerHTML=`<tr><td colspan="8" class="sds-empty" style="text-align:center;padding:24px">Noch keine GeoAlarm-Ereignisse</td></tr>`;return;}
   const start=geoalarmPageIndex*LOG_PAGE_SIZE;
   tb.innerHTML=rows.slice(start,start+LOG_PAGE_SIZE).map(geoEventRow).join('');
 }
@@ -8373,7 +8191,7 @@ function exportLog(){
   const blob=new Blob([lines.join('\n')+'\n'],{type:'text/plain;charset=utf-8'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
-  a.download=`flowstation-log-${stamp}.log`;
+  a.download=`netcore-log-${stamp}.log`;
   document.body.appendChild(a);a.click();
   setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},0);
 }
@@ -8387,7 +8205,7 @@ async function loadAsteriskStatus(){
     const d=await r.json();
     const c=d.config||{}, rt=d.runtime||{};
     set('ast-configured', (c.configured||rt.configured)?'YES':'NO');
-    set('ast-enabled', (c.enabled||rt.enabled)?'enabled':'disabled');
+    set('ast-enabled', (c.enabled||rt.enabled)?'enabled':'deaktiviert');
     set('ast-register', rt.register_status||'—');
     set('ast-dialogs', (rt.active_dialogs??0)+' active dialogs');
     set('ast-sip-listen', rt.sip_listen||c.sip_listen);
@@ -8402,14 +8220,14 @@ async function loadAsteriskStatus(){
     const enabled=!!(c.enabled||rt.enabled);
     const reg=(rt.register_status||'').toLowerCase();
     const registered=/regist|ok|online|200/.test(reg)&&!/fail|error|unreach|timeout/.test(reg);
-    setIntegrationHero('ast', enabled, registered, rt.register_status||(enabled?t('offline'):'disabled'),
+    setIntegrationHero('ast', enabled, registered, rt.register_status||(enabled?t('offline'):'deaktiviert'),
       (c.configured||rt.configured)?(rt.sip_listen||c.sip_listen||''):'');
     const cc=document.getElementById('ast-configured-card');
     if(cc){cc.classList.remove('is-ok','is-danger','is-idle');cc.classList.add((c.configured||rt.configured)?'is-ok':'is-idle');}
     const rc=document.getElementById('ast-register-card');
     if(rc){rc.classList.remove('is-ok','is-warn','is-danger','is-idle');rc.classList.add(registered?'is-ok':enabled?'is-warn':'is-idle');}
   }catch(e){
-    set('ast-configured','—');set('ast-enabled','status unavailable');set('ast-register','—');
+    set('ast-configured','—');set('ast-enabled','Status nicht verfügbar');set('ast-register','—');
     set('ast-last-error',t('conn_error'));
     setIntegrationHero('ast', false, false, t('conn_error'), '');
   }
@@ -8495,7 +8313,7 @@ async function loadSnomNotify(){
     snomSetDirections(d.sds_directions);
     dapSet('snom-dapnet-rics',dapRicListText(d.dapnet_allowed_rics));
     dapSet('snom-sds-issis',snomListText(d.sds_allowed_issis));
-    dapSet('snom-title-prefix',d.title_prefix||'FlowStation');
+    dapSet('snom-title-prefix',d.title_prefix||'NetCore');
     dapSet('snom-max-text',d.max_text_chars||240);
     dapSet('snom-timeout',d.connect_timeout_secs||3);
     setSnomMsg('',true);
@@ -8518,7 +8336,7 @@ async function saveSnomNotify(){
     sds_directions:snomDirectionsBody(),
     dapnet_allowed_rics:dapnetRics,
     sds_allowed_issis:sdsIssis,
-    title_prefix:dapVal('snom-title-prefix')||'FlowStation',
+    title_prefix:dapVal('snom-title-prefix')||'NetCore',
     max_text_chars:dapNum('snom-max-text',240,40,2000),
     connect_timeout_secs:dapNum('snom-timeout',3,1,30)
   };
@@ -8837,18 +8655,18 @@ async function loadBtsInfo(){
     const nb=document.getElementById('bts-neighbor');
     if(nb){
       const n=d.neighbor_count||0;
-      nb.innerHTML=BTS_TOWER_ICON+'Neighbor Cell · '+(n>0?('ON ('+n+' '+(n===1?'neighbor':'neighbors')+')'):'OFF');
+      nb.innerHTML=BTS_TOWER_ICON+'Nachbarzelle · '+(n>0?('ON ('+n+' '+(n===1?'Nachbar':'Nachbarn')+')'):'OFF');
       nb.className='bts-chip '+(n>0?'on':'off');
     }
     const hg=document.getElementById('bts-hang');
     if(hg){
-      hg.innerHTML=BTS_CLOCK_ICON+'HangTime · '+(d.hangtime_secs!=null?d.hangtime_secs:'—')+' sec';
+      hg.innerHTML=BTS_CLOCK_ICON+'Nachlaufzeit · '+(d.hangtime_secs!=null?d.hangtime_secs:'—')+' s';
       hg.className='bts-chip time';
     }
     const acc=document.getElementById('bts-access');
     if(acc){
       const restricted=!!d.whitelist_restricted;
-      acc.textContent=restricted?'RESTRICTED':'OPEN';
+      acc.textContent=restricted?'BESCHRÄNKT':'OFFEN';
       acc.className='bts-access '+(restricted?'restricted':'open');
     }
     const sub=document.getElementById('bts-access-sub');
@@ -8876,13 +8694,13 @@ async function loadDualCarrierInfo(){
     if(inp&&d.secondary_carrier!=null)inp.value=d.secondary_carrier;
     const sub=document.getElementById('bts-dual-sub');
     if(sub){
-      const cfg=d.active?'configured ON':'configured OFF';
-      const run=d.running_active?'running ON':'running OFF';
-      sub.textContent=cfg+' · '+run+(d.main_carrier!=null?' · main '+d.main_carrier:'');
+      const cfg=d.active?'konfiguriert EIN':'konfiguriert AUS';
+      const run=d.running_active?'in Betrieb EIN':'in Betrieb AUS';
+      sub.textContent=cfg+' · '+run+(d.main_carrier!=null?' · Hauptträger '+d.main_carrier:'');
     }
     const btn=document.getElementById('dual-carrier-toggle');
     if(btn){
-      btn.textContent=d.active?'Disable':'Enable';
+      btn.textContent=d.active?'Deaktivieren':'Aktivieren';
       btn.classList.toggle('btn-primary',!d.active);
       btn.dataset.enabled=d.active?'1':'0';
     }
@@ -8898,12 +8716,12 @@ async function toggleDualCarrier(){
   if(enabled){
     const n=parseInt(inp&&inp.value?inp.value:'',10);
     if(!Number.isFinite(n)||n<0||n>4095){
-      alert('Secondary carrier must be 0..4095');
+      alert('Der Sekundärträger muss zwischen 0 und 4095 liegen.');
       return;
     }
     body.secondary_carrier=n;
   }
-  if(btn){btn.disabled=true;btn.textContent=enabled?'Enabling…':'Disabling…';}
+  if(btn){btn.disabled=true;btn.textContent=enabled?'Wird aktiviert…':'Wird deaktiviert…';}
   try{
     const r=await fetch('/api/dualcarrier',{
       method:'POST',
@@ -8913,14 +8731,14 @@ async function toggleDualCarrier(){
     });
     const txt=await r.text();
     if(!r.ok){
-      alert(txt||'Dual carrier update failed');
+      alert(txt||'Änderung des Dual-Carriers fehlgeschlagen');
       return;
     }
     const sub=document.getElementById('bts-dual-sub');
-    if(sub)sub.textContent=txt||'Restart scheduled';
+    if(sub)sub.textContent=txt||'Neustart wurde eingeplant';
     setTimeout(loadDualCarrierInfo,2500);
   }catch(e){
-    alert('Dual carrier update failed: '+e);
+    alert('Änderung des Dual-Carriers fehlgeschlagen: '+e);
   }finally{
     if(btn)btn.disabled=false;
   }
@@ -8944,7 +8762,7 @@ async function loadSystemInfo(){
       if (name && name !== 'unknown' && name.length > 0) {
         sdrLabel.textContent = name;
         sdrBadge.style.display = 'flex';
-        sdrBadge.title = 'Detected SDR hardware: ' + name;
+        sdrBadge.title = 'Erkannte SDR-Hardware: ' + name;
       } else {
         sdrBadge.style.display = 'none';
       }
@@ -8952,7 +8770,7 @@ async function loadSystemInfo(){
 
     // CPU — gauge fill width + threshold state class on the .gauge wrapper.
     const cpuEl=document.getElementById('sysCpu');
-    if(cpuEl) cpuEl.textContent=(sysData.cpu_model||'—')+(sysData.cpu_cores?` (${sysData.cpu_cores} cores)`:'');
+    if(cpuEl) cpuEl.textContent=(sysData.cpu_model||'—')+(sysData.cpu_cores?` (${sysData.cpu_cores} Kerne)`:'');
     const cpuPct=sysData.cpu_pct||0;
     const cpuBarEl=document.getElementById('sysCpuBar');
     const cpuPctEl=document.getElementById('sysCpuPct');
@@ -9025,7 +8843,7 @@ function updateSysHero(){
 async function loadConfigProfiles(){
   const list=document.getElementById('profileList');
   try{
-    const r=await fetch('/api/configs');if(!r.ok){list.innerHTML='<div style="color:var(--danger);font-family:var(--mono);font-size:12px;">Failed to load profiles</div>';return;}
+    const r=await fetch('/api/configs');if(!r.ok){list.innerHTML='<div style="color:var(--danger);font-family:var(--mono);font-size:12px;">Konfigurationsprofile konnten nicht geladen werden</div>';return;}
     const profiles=await r.json();
     if(!profiles||!profiles.length){list.innerHTML=`<div style="color:var(--text3);font-family:var(--mono);font-size:12px;">${t('sys_no_profiles')}</div>`;return;}
     list.innerHTML='';
@@ -9054,7 +8872,7 @@ async function activateProfile(name){
     const r=await fetch('/api/configs/activate',{method:'POST',body:name});
     if(r.ok){wsSend({type:'restart'});}
     else alert('Failed: '+await r.text());
-  }catch(e){alert('Error: '+e.message);}
+  }catch(e){alert('Fehler: '+e.message);}
 }
 
 function updateSysBtsPanel(online,brewOnline,brewVer){
@@ -9088,12 +8906,12 @@ async function openEditProfile(name) {
       document.getElementById('edit-profile-editor').value = await r.text();
     } else {
       document.getElementById('edit-profile-editor').value = '';
-      document.getElementById('edit-profile-msg').textContent = 'Failed to load: ' + await r.text();
+      document.getElementById('edit-profile-msg').textContent = 'Laden fehlgeschlagen: ' + await r.text();
       document.getElementById('edit-profile-msg').style.color = 'var(--danger)';
     }
   } catch(e) {
     document.getElementById('edit-profile-editor').value = '';
-    document.getElementById('edit-profile-msg').textContent = 'Error: ' + e.message;
+    document.getElementById('edit-profile-msg').textContent = 'Fehler: ' + e.message;
     document.getElementById('edit-profile-msg').style.color = 'var(--danger)';
   }
 }
@@ -9121,7 +8939,7 @@ async function saveEditProfile() {
       msgEl.style.color = 'var(--danger)';
     }
   } catch(e) {
-    msgEl.textContent = 'Error: ' + e.message;
+    msgEl.textContent = 'Fehler: ' + e.message;
     msgEl.style.color = 'var(--danger)';
   }
 }
@@ -9177,16 +8995,16 @@ async function addLiveSds() {
       document.getElementById('live-sds-repeat').value = '0';
       await loadLiveSds();
     } else {
-      alert('Error: ' + await r.text());
+      alert('Fehler: ' + await r.text());
     }
-  } catch(e) { alert('Error: ' + e.message); }
+  } catch(e) { alert('Fehler: ' + e.message); }
 }
 
 async function deleteLiveSds(id) {
   try {
     const r = await fetch(`/api/live-sds/${id}`, { method: 'DELETE' });
     if (r.ok) await loadLiveSds();
-  } catch(e) { alert('Error: ' + e.message); }
+  } catch(e) { alert('Fehler: ' + e.message); }
 }
 
 async function clearAllLiveSds() {
@@ -9194,7 +9012,7 @@ async function clearAllLiveSds() {
   try {
     const r = await fetch('/api/live-sds', { method: 'DELETE' });
     if (r.ok) await loadLiveSds();
-  } catch(e) { alert('Error: ' + e.message); }
+  } catch(e) { alert('Fehler: ' + e.message); }
 }
 
 // ── Tick ──────────────────────────────────────────────────────────────────
@@ -9241,7 +9059,7 @@ applyTouchMode();
 // to /login. We surface the button only when auth is actually in effect — detected
 // by whether the fs_session cookie is present.
 function doLogout(){
-  if(!confirm(t('confirm_logout')||'Log out?'))return;
+  if(!confirm(t('confirm_logout')||'Abmelden?'))return;
   fetch('/api/logout',{method:'POST',credentials:'same-origin'})
     .finally(()=>{ window.location='/login'; });
 }
@@ -9381,7 +9199,7 @@ function handleTxQuality(msg){
 
 function handleSdrHealth(msg){
   rfState.lastHwTs = Date.now();
-  setText('rf-hw-age', t('rf_just_now')||'just now');
+  setText('rf-hw-age', t('rf_just_now')||'gerade eben');
 
   // Temperature with named state. Thresholds chosen so a typical LimeSDR running
   // at room temp (~45-55°C) reads "nominal", >65 is "warm", >80 is "hot".
@@ -9392,16 +9210,16 @@ function handleSdrHealth(msg){
   if(tempEl && stateEl){
     if(msg.temperature_c == null){
       tempEl.textContent = '—';
-      stateEl.textContent = t('rf_temp_na')||'no sensor';
+      stateEl.textContent = t('rf_temp_na')||'kein Sensor';
       stateEl.className = 'rf-hw-temp-state';
       if(tempGauge){ tempGauge.classList.remove('is-warn','is-danger','is-info'); tempGauge.classList.add('is-idle'); }
       if(tempBar) tempBar.style.width = '0%';
     } else {
       const tc = msg.temperature_c;
       tempEl.textContent = tc.toFixed(1) + ' °C';
-      let cls = 'nominal', label = t('rf_temp_nominal')||'nominal', gcls='';
-      if(tc < 20){ cls='cold'; label = t('rf_temp_cold')||'cold'; gcls='is-info'; }
-      else if(tc > 80){ cls='hot'; label = t('rf_temp_hot')||'hot'; gcls='is-danger'; }
+      let cls = 'nominal', label = t('rf_temp_nominal')||'normal', gcls='';
+      if(tc < 20){ cls='cold'; label = t('rf_temp_cold')||'kalt'; gcls='is-info'; }
+      else if(tc > 80){ cls='hot'; label = t('rf_temp_hot')||'heiß'; gcls='is-danger'; }
       else if(tc > 65){ cls='warm'; label = t('rf_temp_warm')||'warm'; gcls='is-warn'; }
       stateEl.textContent = label;
       stateEl.className = 'rf-hw-temp-state ' + cls;
@@ -9420,7 +9238,7 @@ function handleSdrHealth(msg){
 function renderGainList(id, gains){
   const el = document.getElementById(id);
   if(!el) return;
-  if(!gains.length){ el.innerHTML = '<span style="color:var(--text3)">'+(t('rf_no_gains')||'unavailable')+'</span>'; return; }
+  if(!gains.length){ el.innerHTML = '<span style="color:var(--text3)">'+(t('rf_no_gains')||'nicht verfügbar')+'</span>'; return; }
   el.innerHTML = gains.map(([name, db]) =>
     `<div class="rf-hw-gain-row"><span class="stage">${name}</span><span class="val">${db.toFixed(1)} dB</span></div>`
   ).join('');
@@ -9434,46 +9252,46 @@ function renderGainList(id, gains){
 // Plain-English diagnosis + remediation per (domain, level) — the "Looking Glass" advice.
 const HEALTH_ADVICE = {
   service: {
-    ok: { why: 'The TETRA core loop is processing TDMA frames in real time.', do: [] },
-    degraded: { why: 'Time between TDMA ticks is higher than expected — the SDR/USB link or the CPU is lagging behind real time. Calls still work but timing is tight.',
-      do: ['Check CPU load & temperature on the System tab (or `top`).',
-           'Look for "Too late to produce TX block" / SDR underrun lines in the Log.',
-           'Make sure no other heavy process is starving the BTS (it runs at FIFO priority).'] },
-    critical: { why: 'The stack stopped processing TDMA frames. Calls and SDS will fail and radios may drop. This is the most serious state.',
-      do: ['Check the Log for a panic or repeated SDR errors.',
-           'Restart the service: `systemctl restart <unit>`.',
-           'Enable the software watchdog so this auto-recovers: `[health] restart_on_core_stall = true`.'] },
+    ok: { why: 'Die TETRA-Hauptschleife verarbeitet die TDMA-Rahmen in Echtzeit.', do: [] },
+    degraded: { why: 'Der Abstand zwischen den TDMA-Takten ist größer als erwartet. Die SDR-/USB-Verbindung oder die CPU bleibt hinter der Echtzeit zurück. Rufe funktionieren noch, aber die Zeitreserve ist knapp.',
+      do: ['CPU-Auslastung und Temperatur im Reiter „System“ oder mit `top` prüfen.',
+           'Im Protokoll nach „Too late to produce TX block“ oder SDR-Underruns suchen.',
+           'Sicherstellen, dass kein anderer rechenintensiver Prozess der Basisstation CPU-Zeit entzieht. Der Dienst läuft mit FIFO-Priorität.'] },
+    critical: { why: 'Die Verarbeitung der TDMA-Rahmen ist stehen geblieben. Rufe und SDS schlagen fehl; Funkgeräte können die Registrierung verlieren. Dies ist der kritischste Zustand.',
+      do: ['Das Protokoll auf einen Panic oder wiederholte SDR-Fehler prüfen.',
+           'Den Dienst neu starten: `systemctl restart <unit>`.',
+           'Den Software-Watchdog aktivieren, damit der Dienst automatisch wiederhergestellt wird: `[health] restart_on_core_stall = true`.'] },
   },
   backhaul: {
-    ok: { why: 'The Brew/TetraPack interconnect is up — calls/SDS route to other cells & BrandMeister.', do: [] },
-    degraded: { why: 'The Brew/TetraPack backhaul is DOWN. The cell still works locally, but calls and SDS to/from other cells or BrandMeister will not route.',
-      do: ['Check network/internet connectivity from the Pi to the Brew server.',
-           'Verify the [brew] host / port / credentials on the Config tab.',
-           'Confirm the Brew server is reachable. The station auto-reconnects when it comes back.'] },
+    ok: { why: 'Die Brew-/TetraPack-Verbindung ist aktiv. Rufe und SDS werden zu anderen Zellen und BrandMeister weitergeleitet.', do: [] },
+    degraded: { why: 'Die Brew-/TetraPack-Netzanbindung ist ausgefallen. Die Zelle arbeitet lokal weiter, Rufe und SDS zu oder von anderen Zellen beziehungsweise BrandMeister werden jedoch nicht weitergeleitet.',
+      do: ['Netzwerk- und Internetverbindung vom Pi zum Brew-Server prüfen.',
+           'Host, Port und Zugangsdaten im Abschnitt [brew] der Konfiguration prüfen.',
+           'Erreichbarkeit des Brew-Servers prüfen. Die Basisstation verbindet sich automatisch erneut, sobald er wieder verfügbar ist.'] },
   },
   radios: {
-    ok: { why: 'Attached radios are being heard on the air.', do: [] },
-    degraded: { why: 'Registered radios have not transmitted for a while. They may have left coverage without de-registering, or RX has degraded.',
-      do: ['Check the antenna / feedline and the RX gain.',
-           'Confirm the radios are actually in range and powered on.',
-           'Truly-gone radios are pruned automatically at the T351 interval.'] },
+    ok: { why: 'Die registrierten Funkgeräte werden über Funk empfangen.', do: [] },
+    degraded: { why: 'Registrierte Funkgeräte haben längere Zeit nicht gesendet. Sie könnten den Versorgungsbereich ohne Abmeldung verlassen haben oder der Empfang hat sich verschlechtert.',
+      do: ['Antenne, Speiseleitung und RX-Verstärkung prüfen.',
+           'Prüfen, ob die Funkgeräte eingeschaltet und tatsächlich in Reichweite sind.',
+           'Tatsächlich nicht mehr erreichbare Funkgeräte werden nach Ablauf des T351-Intervalls automatisch entfernt.'] },
   },
   congestion: {
-    ok: { why: 'Downlink (MCCH) and SDS queues are draining normally.', do: [] },
-    degraded: { why: 'The downlink or SDS queue is filling faster than it drains — too much signalling/SDS, a flapping radio, or the SDR dropping TX blocks.',
-      do: ['Check the SDS Log for a radio spamming retransmits or a flood of broadcasts.',
-           'Reduce Home-Mode-Display / broadcast-SDS rate if it is heavy.',
-           'Check SDR TX health on the RF tab for dropped blocks.'] },
-    critical: { why: 'The downlink/SDS backlog is severe — grants, signalling and messages will be delayed or dropped.',
-      do: ['Act urgently: identify and kick a misbehaving radio from the Radios tab.',
-           'Check the Log for "Too late to produce TX block" (the SDR can\'t keep up).',
-           'Reduce broadcast/SDS load until the queues drain.'] },
+    ok: { why: 'Downlink-, MCCH- und SDS-Warteschlangen werden normal abgearbeitet.', do: [] },
+    degraded: { why: 'Die Downlink- oder SDS-Warteschlange füllt sich schneller als sie abgearbeitet wird. Mögliche Ursachen sind zu viel Signalisierung, eine SDS-Flut, ein instabiles Funkgerät oder verworfene TX-Blöcke des SDR.',
+      do: ['Das SDS-Protokoll auf wiederholte Sendungen eines Funkgeräts oder eine Broadcast-Flut prüfen.',
+           'Bei hoher Last das Intervall für Home-Mode-Display beziehungsweise Broadcast-SDS erhöhen.',
+           'Im HF-Reiter den SDR-TX-Zustand auf verworfene Blöcke prüfen.'] },
+    critical: { why: 'Der Rückstau im Downlink beziehungsweise bei SDS ist kritisch. Zuweisungen, Signalisierung und Nachrichten werden verzögert oder verworfen.',
+      do: ['Zeitnah handeln: Das auffällige Funkgerät im Reiter „Funkgeräte“ identifizieren und entfernen.',
+           'Das Protokoll auf „Too late to produce TX block“ prüfen. In diesem Fall kann das SDR nicht mithalten.',
+           'Broadcast- und SDS-Last reduzieren, bis die Warteschlangen abgearbeitet sind.'] },
   },
 };
 function healthColor(lvl){ return lvl==='critical' ? 'var(--danger)' : (lvl==='degraded' ? 'var(--warn)' : 'var(--ok)'); }
 // Map a health level to the premium status class suffix used by .h-pill / .h-ring / .h-ico.
 function healthLevelClass(lvl){ return lvl==='critical' ? 'bad' : (lvl==='degraded' ? 'warn' : 'ok'); }
-function healthDomainLabel(d){ return ({service:'Core loop',backhaul:'Backhaul (Brew)',radios:'Radios',congestion:'Congestion'})[d] || d; }
+function healthDomainLabel(d){ return ({service:'Hauptschleife',backhaul:'Netzanbindung (Brew)',radios:'Funkgeräte',congestion:'Überlastung'})[d] || d; }
 // Clean inline SVGs replace the old emoji domain icons. {svg, accent} where accent
 // drives the tinted .h-ico colour (default accent / blue / purple for domain variety).
 const HEALTH_SVG = {
@@ -9514,13 +9332,13 @@ function renderHealthTab(h){
   const act   = document.getElementById('health-action');
   // Hero ring: status-tinted via class (was a bg colour) — keeps the SVG check inside.
   if(dot)   dot.className = 'h-ring ' + healthLevelClass(overall);
-  if(title) title.textContent = 'Station health: ' + overall.toUpperCase();
+  if(title) title.textContent = 'Zustand der Basisstation: ' + overall.toUpperCase();
   const bad = (h.domains||[]).filter(function(d){return d.level!=='ok';});
   if(sub) sub.textContent = bad.length
-      ? (bad.length+' domain(s) need attention: '+bad.map(function(d){return healthDomainLabel(d.domain);}).join(', '))
-      : 'All systems nominal.';
-  if(up)  up.textContent  = (typeof h.uptime_secs==='number') ? ('Uptime '+healthDur(h.uptime_secs)) : '';
-  if(act) act.textContent = h.last_action ? ('Last action: '+h.last_action) : '';
+      ? (bad.length+' Bereich(e) benötigen Aufmerksamkeit: '+bad.map(function(d){return healthDomainLabel(d.domain);}).join(', '))
+      : 'Alle Systeme arbeiten normal.';
+  if(up)  up.textContent  = (typeof h.uptime_secs==='number') ? ('Laufzeit '+healthDur(h.uptime_secs)) : '';
+  if(act) act.textContent = h.last_action ? ('Letzte Aktion: '+h.last_action) : '';
 
   grid.innerHTML = '';
   (h.domains||[]).forEach(function(d){
@@ -9571,7 +9389,7 @@ function integrationHealthCard(title,iconKey,accent,level,detail,extra){
   return card;
 }
 function classifyBrewHealth(server){
-  if(!server||!server.configured)return {level:'ok',detail:'not configured',extra:'No config section for this Brew server.'};
+  if(!server||!server.configured)return {level:'ok',detail:'nicht konfiguriert',extra:'No config section for this Brew server.'};
   const allow=(server.local_issi_allowlist||[]).filter(function(v){return v!==null&&v!==undefined;});
   const block=(server.local_issi_blocklist||[]).filter(function(v){return v!==null&&v!==undefined;});
   let level=server.connected?'ok':'degraded';
@@ -9588,7 +9406,7 @@ function classifyBrewHealth(server){
 function classifyAsteriskHealth(data){
   const c=(data&&data.config)||{},rt=(data&&data.runtime)||{};
   const enabled=!!(c.enabled||rt.enabled);
-  if(!enabled)return {level:'ok',detail:'disabled',extra:'SIP bridge is configured but not active.'};
+  if(!enabled)return {level:'ok',detail:'deaktiviert',extra:'SIP bridge is configured but not active.'};
   const reg=String(rt.register_status||'').toLowerCase();
   const dialogs=rt.active_dialogs??0;
   const err=rt.last_error||'';
@@ -9600,7 +9418,7 @@ function classifyAsteriskHealth(data){
   return {level,detail,extra};
 }
 function classifyDapnetHealth(data){
-  if(!data||!data.enabled)return {level:'ok',detail:'disabled',extra:'DAPNET worker is not active.'};
+  if(!data||!data.enabled)return {level:'ok',detail:'deaktiviert',extra:'DAPNET worker is not active.'};
   const rt=data.runtime||{};
   const paths=[];
   if(data.forward_sds||rt.forward_sds)paths.push('SDS');
@@ -9619,13 +9437,13 @@ function classifyDapnetHealth(data){
     notes.push('RWTH receive feed disabled');
   }
   if(notes.length)level='degraded';
-  const status=rt.rwth_core_status||(data.rwth_core_enabled?'enabled':'disabled');
+  const status=rt.rwth_core_status||(data.rwth_core_enabled?'enabled':'deaktiviert');
   const detail='RWTH '+status+' · '+(paths.length?paths.join(', '):'no forwarding');
   const extra=notes.length?notes.join(' · '):('Host '+(rt.endpoint||((data.rwth_core_host||'—')+':'+(data.rwth_core_port||'—')))+' · seen '+(rt.seen_messages??0)+(rt.last_rx?' · last RX '+rt.last_rx:''));
   return {level,detail,extra};
 }
 function classifyEcholinkHealth(data){
-  if(!data||!data.enabled)return {level:'ok',detail:'disabled',extra:'EchoLink bridge is not active.'};
+  if(!data||!data.enabled)return {level:'ok',detail:'deaktiviert',extra:'EchoLink bridge is not active.'};
   const rt=data.runtime||{};
   const status=String(rt.directory_status||'').toLowerCase();
   const err=rt.last_error||'';
@@ -9641,7 +9459,7 @@ function classifyEcholinkHealth(data){
   return {level,detail,extra};
 }
 function classifyMeshcomHealth(data){
-  if(!data||!data.enabled)return {level:'ok',detail:'disabled',extra:'MeshCom UDP bridge is not active.'};
+  if(!data||!data.enabled)return {level:'ok',detail:'deaktiviert',extra:'MeshCom UDP bridge is not active.'};
   const rt=data.runtime||{};
   const err=rt.last_error||'';
   const level=err?'degraded':'ok';
@@ -9654,7 +9472,7 @@ function classifyMeshcomHealth(data){
   return {level,detail,extra};
 }
 function classifyGeoalarmHealth(data){
-  if(!data||!data.enabled)return {level:'ok',detail:'disabled',extra:'GeoAlarm is not active.'};
+  if(!data||!data.enabled)return {level:'ok',detail:'deaktiviert',extra:'GeoAlarm is not active.'};
   const rt=data.runtime||{};
   const err=rt.last_error||'';
   const paths=[];
@@ -9683,41 +9501,41 @@ function renderHealthIntegrations(){
         grid.appendChild(integrationHealthCard(server.title||server.entity||'Brew','brew','blue',b.level,b.detail,b.extra));
       });
     } else {
-      grid.appendChild(integrationHealthCard('Brew','brew','blue','ok','not configured','No Brew backhaul section is active.'));
+      grid.appendChild(integrationHealthCard('Brew','brew','blue','ok','nicht konfiguriert','Kein Brew-Netzanbindungsabschnitt ist aktiv.'));
     }
   } else {
-    grid.appendChild(integrationHealthCard('Brew','brew','blue','degraded','status unavailable','Wait for the next refresh.'));
+    grid.appendChild(integrationHealthCard('Brew','brew','blue','degraded','Status nicht verfügbar','Auf die nächste Aktualisierung warten.'));
   }
   if(healthIntegrationState.asterisk){
     const a=classifyAsteriskHealth(healthIntegrationState.asterisk);
     grid.appendChild(integrationHealthCard('Asterisk SIP','asterisk','',a.level,a.detail,a.extra));
   } else {
-    grid.appendChild(integrationHealthCard('Asterisk SIP','asterisk','','degraded','status unavailable','Open the Asterisk SIP page or wait for the next refresh.'));
+    grid.appendChild(integrationHealthCard('Asterisk SIP','asterisk','','degraded','Status nicht verfügbar','Den Asterisk-SIP-Reiter öffnen oder auf die nächste Aktualisierung warten.'));
   }
   if(hiddenIntegrationsVisible){
     if(healthIntegrationState.dapnet){
       const d=classifyDapnetHealth(healthIntegrationState.dapnet);
       grid.appendChild(integrationHealthCard('DAPNET','dapnet','blue',d.level,d.detail,d.extra));
     } else {
-      grid.appendChild(integrationHealthCard('DAPNET','dapnet','blue','degraded','status unavailable','Open the DAPNET page or wait for the next refresh.'));
+      grid.appendChild(integrationHealthCard('DAPNET','dapnet','blue','degraded','Status nicht verfügbar','Den DAPNET-Reiter öffnen oder auf die nächste Aktualisierung warten.'));
     }
     if(healthIntegrationState.echolink){
       const e=classifyEcholinkHealth(healthIntegrationState.echolink);
       grid.appendChild(integrationHealthCard('EchoLink','echolink','blue',e.level,e.detail,e.extra));
     } else {
-      grid.appendChild(integrationHealthCard('EchoLink','echolink','blue','degraded','status unavailable','Open the EchoLink page or wait for the next refresh.'));
+      grid.appendChild(integrationHealthCard('EchoLink','echolink','blue','degraded','Status nicht verfügbar','Den EchoLink-Reiter öffnen oder auf die nächste Aktualisierung warten.'));
     }
     if(healthIntegrationState.meshcom){
       const m=classifyMeshcomHealth(healthIntegrationState.meshcom);
       grid.appendChild(integrationHealthCard('MeshCom','meshcom','purple',m.level,m.detail,m.extra));
     } else {
-      grid.appendChild(integrationHealthCard('MeshCom','meshcom','purple','degraded','status unavailable','Open the MeshCom page or wait for the next refresh.'));
+      grid.appendChild(integrationHealthCard('MeshCom','meshcom','purple','degraded','Status nicht verfügbar','Den MeshCom-Reiter öffnen oder auf die nächste Aktualisierung warten.'));
     }
     if(healthIntegrationState.geoalarm){
       const g=classifyGeoalarmHealth(healthIntegrationState.geoalarm);
       grid.appendChild(integrationHealthCard('GeoAlarm','geoalarm','purple',g.level,g.detail,g.extra));
     } else {
-      grid.appendChild(integrationHealthCard('GeoAlarm','geoalarm','purple','degraded','status unavailable','Open the GeoAlarm page or wait for the next refresh.'));
+      grid.appendChild(integrationHealthCard('GeoAlarm','geoalarm','purple','degraded','Status nicht verfügbar','Den GeoAlarm-Reiter öffnen oder auf die nächste Aktualisierung warten.'));
     }
   }
 }
@@ -9763,7 +9581,7 @@ function handleHealth(h){
   badge.style.display = 'flex';
   const bad = (h.domains||[]).filter(function(d){return d.level!=='ok';})
                              .map(function(d){return '• '+d.domain+': '+d.level+' ('+d.detail+')';});
-  let tip = 'Station health: '+lvl.toUpperCase();
+  let tip = 'Zustand der Basisstation: '+lvl.toUpperCase();
   tip += bad.length ? '\n'+bad.join('\n') : '\nAll domains nominal';
   if(h.last_action) tip += '\nAction: '+h.last_action;
   if(typeof h.uptime_secs==='number') tip += '\nUptime: '+h.uptime_secs+'s';
@@ -9783,7 +9601,7 @@ function handleSysHealth(msg){
     if(msg && typeof msg.total_power_w === 'number' && isFinite(msg.total_power_w) && msg.total_power_w > 0){
       lbl.textContent = msg.total_power_w.toFixed(1) + ' W';
       badge.style.display = 'flex';
-      badge.title = 'Host power draw — '+(msg.sensors||[]).length+' sensor(s) reporting';
+      badge.title = 'Leistungsaufnahme des Hosts — '+(msg.sensors||[]).length+' Sensor(en) melden Werte';
     } else {
       badge.style.display = 'none';
     }
@@ -10690,7 +10508,7 @@ async function pollPublic(){
     setT('pub-ms', d.registered_ms ?? '—');
     setT('pub-calls', (d.active_calls ?? 0) + (d.active_calls ? ' ('+d.group_calls+'G / '+d.individual_calls+'I)' : ''));
     setT('pub-freq', d.center_freq_hz ? (d.center_freq_hz/1e6).toFixed(4)+' MHz' : '—');
-    setT('pub-rf', d.rf_active ? 'Active' : 'Idle');
+    setT('pub-rf', d.rf_active ? 'Aktiv' : 'Frei');
     setT('pub-brew', d.brew_online ? 'Online' : 'Offline');
     setT('pub-ver', d.stack_version || '—');
     const STAT_STATES=['is-ok','is-idle','is-info','is-warn','is-danger'];
@@ -10716,7 +10534,7 @@ pub const LOGIN_HTML: &str = r##"<!DOCTYPE html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <meta name="theme-color" content="#eceff4">
-<title>FlowStation — Anmeldung</title>
+<title>NetCore — Anmeldung</title>
 <style>
 :root{
   --bg:#eceff4;--bg2:#ffffff;--bg3:#e6eaf1;--bg4:#d6dde7;
@@ -10867,7 +10685,7 @@ input:focus{border-color:var(--accent2);background:var(--bg4);}
       </svg>
     </div>
     <div style="text-align:center">
-      <div class="logo-title"><span>Flow</span><span class="accent">Station</span></div>
+      <div class="logo-title"><span>Net</span><span class="accent">Core</span></div>
       <div class="logo-sub">TETRA-Basisstation</div>
     </div>
   </div>
@@ -10889,7 +10707,7 @@ input:focus{border-color:var(--accent2);background:var(--bg4);}
   </form>
 
   <div class="footer">
-    github.com/JanHG98/<a href="https://github.com/JanHG98/flowstation" target="_blank">flowstation</a>
+    <a href="https://github.com/JanHG98/flowstation" target="_blank">NetCore-Quellcode auf GitHub</a>
   </div>
 </div>
 
