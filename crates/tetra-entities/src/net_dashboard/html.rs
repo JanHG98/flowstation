@@ -1,5 +1,5 @@
 pub const DASHBOARD_HTML: &str = r#"<!DOCTYPE html>
-<html lang="en" data-uisize="m">
+<html lang="de" data-uisize="m">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
@@ -2409,19 +2409,19 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
       <span class="nav-icon" data-icon="audio"></span>
       <span class="nav-label" data-i18n="audio">AUDIO-ZENTRALE</span>
     </div>
-    <div class="nav-item" onclick="showPage('dapnet',this)" id="nav-dapnet">
+    <div class="nav-item hidden-integration-nav" onclick="showPage('dapnet',this)" id="nav-dapnet" style="display:none">
       <span class="nav-icon" data-icon="dapnet"></span>
       <span class="nav-label" data-i18n="dapnet">DAPNET</span>
     </div>
-    <div class="nav-item" onclick="showPage('echolink',this)" id="nav-echolink">
+    <div class="nav-item hidden-integration-nav" onclick="showPage('echolink',this)" id="nav-echolink" style="display:none">
       <span class="nav-icon" data-icon="dapnet"></span>
       <span class="nav-label" data-i18n="echolink">EchoLink</span>
     </div>
-    <div class="nav-item" onclick="showPage('meshcom',this)" id="nav-meshcom">
+    <div class="nav-item hidden-integration-nav" onclick="showPage('meshcom',this)" id="nav-meshcom" style="display:none">
       <span class="nav-icon" data-icon="dapnet"></span>
       <span class="nav-label" data-i18n="meshcom">MeshCom</span>
     </div>
-    <div class="nav-item" onclick="showPage('geoalarm',this)" id="nav-geoalarm">
+    <div class="nav-item hidden-integration-nav" onclick="showPage('geoalarm',this)" id="nav-geoalarm" style="display:none">
       <span class="nav-icon" data-icon="geoalarm"></span>
       <span class="nav-label" data-i18n="geoalarm">GeoAlarm</span>
     </div>
@@ -2548,14 +2548,6 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
         <button class="theme-btn" data-t="dark" onclick="setTheme('dark',this)">Dark</button>
         <button class="theme-btn active" data-t="light" onclick="setTheme('light',this)">Light</button>
         <button class="theme-btn" data-t="blue" onclick="setTheme('blue',this)">Blue</button>
-      </div>
-      <div class="lang-picker">
-        <button class="lang-btn active" onclick="setLang('en',this)">EN</button>
-        <button class="lang-btn" onclick="setLang('ro',this)">RO</button>
-        <button class="lang-btn" onclick="setLang('de',this)">DE</button>
-        <button class="lang-btn" onclick="setLang('es',this)">ES</button>
-        <button class="lang-btn" onclick="setLang('hu',this)">HU</button>
-        <button class="lang-btn" onclick="setLang('zh',this)">CN</button>
       </div>
       <!-- Logout: clears session cookie and redirects to /login. Hidden when auth is off. -->
       <button class="logout-btn" id="logout-btn" onclick="doLogout()" title="Log out" aria-label="Log out" style="display:none"><span class="ico18" data-icon="shutdown"></span></button>
@@ -5324,8 +5316,10 @@ const LANGS={
   },
 };
 
-let currentLang=localStorage.getItem('fs_lang')||'en';
-function t(k,v){let s=(LANGS[currentLang]||LANGS.en)[k]||(LANGS.en[k]||k);if(v)Object.keys(v).forEach(x=>{s=s.replace('{'+x+'}',v[x]);});return s;}
+const currentLang='de';
+localStorage.removeItem('fs_lang');
+document.documentElement.lang='de';
+function t(k,v){let s=(LANGS.de||LANGS.en)[k]||(LANGS.en[k]||k);if(v)Object.keys(v).forEach(x=>{s=s.replace('{'+x+'}',v[x]);});return s;}
 function applyLang(){
   document.querySelectorAll('[data-i18n]').forEach(el=>el.textContent=t(el.getAttribute('data-i18n')));
   document.querySelectorAll('[data-i18n-tab]').forEach(el=>el.textContent=t(el.getAttribute('data-i18n-tab')));
@@ -5336,11 +5330,8 @@ function applyLang(){
   });
   renderStations();renderCalls();renderLastHeard();renderEmergencyBanner();
 }
-function setLang(l,btn){
-  currentLang=l;localStorage.setItem('fs_lang',l);
-  document.querySelectorAll('.lang-btn').forEach(b=>b.classList.remove('active'));
-  if(btn)btn.classList.add('active');
-  else document.querySelectorAll('.lang-btn').forEach(b=>{if(b.textContent.toLowerCase()===l)b.classList.add('active');});
+function setLang(){
+  document.documentElement.lang='de';
   applyLang();
 }
 
@@ -5420,7 +5411,35 @@ function closeMobileSidebar(){
 
 // ── Page navigation ───────────────────────────────────────────────────────
 const PAGE_TITLES={stations:'stations',calls:'calls',lastheard:'lastheard',log:'log',sdslog:'sdslog',rf:'rf',health:'health',asterisk:'asterisk',dapnet:'dapnet',echolink:'echolink',meshcom:'meshcom',maps:'maps',geoalarm:'geoalarm',audio:'audio',config:'config',system:'system'};
+
+// Hidden laboratory integrations. They stay compiled and fully functional, but are omitted from
+// the normal dashboard. Access is deliberately session-scoped and undocumented in the UI:
+//   ?intern=netcore&modul=dapnet|echolink|meshcom|geoalarm
+// Disable again for the current tab with ?intern=off. This is UI obscurity, not authorization.
+const HIDDEN_INTEGRATIONS=['dapnet','echolink','meshcom','geoalarm'];
+const hiddenAccessParams=new URLSearchParams(window.location.search);
+const hiddenAccessCommand=hiddenAccessParams.get('intern');
+const requestedHiddenPage=hiddenAccessParams.get('modul');
+if(hiddenAccessCommand==='netcore')sessionStorage.setItem('fs_hidden_integrations','1');
+if(hiddenAccessCommand==='off')sessionStorage.removeItem('fs_hidden_integrations');
+const hiddenIntegrationsVisible=sessionStorage.getItem('fs_hidden_integrations')==='1';
+if(hiddenAccessParams.has('intern')||hiddenAccessParams.has('modul')){
+  hiddenAccessParams.delete('intern');
+  hiddenAccessParams.delete('modul');
+  const cleanQuery=hiddenAccessParams.toString();
+  history.replaceState(null,'',window.location.pathname+(cleanQuery?'?'+cleanQuery:'')+window.location.hash);
+}
+function applyHiddenIntegrationVisibility(){
+  HIDDEN_INTEGRATIONS.forEach(name=>{
+    const nav=document.getElementById('nav-'+name);
+    if(nav)nav.style.display=hiddenIntegrationsVisible?'':'none';
+  });
+}
 function showPage(name,el){
+  if(HIDDEN_INTEGRATIONS.includes(name)&&!hiddenIntegrationsVisible){
+    name='stations';
+    el=document.getElementById('nav-stations');
+  }
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   document.getElementById('page-'+name).classList.add('active');
@@ -9212,7 +9231,8 @@ setInterval(()=>{
 })();
 if(sidebarCollapsed)document.getElementById('sidebar').classList.add('collapsed');
 paintIcons();
-setLang(currentLang);
+applyHiddenIntegrationVisibility();
+setLang();
 setTheme(currentTheme);
 applyUiSize();
 applyTouchMode();
@@ -9674,48 +9694,58 @@ function renderHealthIntegrations(){
   } else {
     grid.appendChild(integrationHealthCard('Asterisk SIP','asterisk','','degraded','status unavailable','Open the Asterisk SIP page or wait for the next refresh.'));
   }
-  if(healthIntegrationState.dapnet){
-    const d=classifyDapnetHealth(healthIntegrationState.dapnet);
-    grid.appendChild(integrationHealthCard('DAPNET','dapnet','blue',d.level,d.detail,d.extra));
-  } else {
-    grid.appendChild(integrationHealthCard('DAPNET','dapnet','blue','degraded','status unavailable','Open the DAPNET page or wait for the next refresh.'));
-  }
-  if(healthIntegrationState.echolink){
-    const e=classifyEcholinkHealth(healthIntegrationState.echolink);
-    grid.appendChild(integrationHealthCard('EchoLink','echolink','blue',e.level,e.detail,e.extra));
-  } else {
-    grid.appendChild(integrationHealthCard('EchoLink','echolink','blue','degraded','status unavailable','Open the EchoLink page or wait for the next refresh.'));
-  }
-  if(healthIntegrationState.meshcom){
-    const m=classifyMeshcomHealth(healthIntegrationState.meshcom);
-    grid.appendChild(integrationHealthCard('MeshCom','meshcom','purple',m.level,m.detail,m.extra));
-  } else {
-    grid.appendChild(integrationHealthCard('MeshCom','meshcom','purple','degraded','status unavailable','Open the MeshCom page or wait for the next refresh.'));
-  }
-  if(healthIntegrationState.geoalarm){
-    const g=classifyGeoalarmHealth(healthIntegrationState.geoalarm);
-    grid.appendChild(integrationHealthCard('GeoAlarm','geoalarm','purple',g.level,g.detail,g.extra));
-  } else {
-    grid.appendChild(integrationHealthCard('GeoAlarm','geoalarm','purple','degraded','status unavailable','Open the GeoAlarm page or wait for the next refresh.'));
+  if(hiddenIntegrationsVisible){
+    if(healthIntegrationState.dapnet){
+      const d=classifyDapnetHealth(healthIntegrationState.dapnet);
+      grid.appendChild(integrationHealthCard('DAPNET','dapnet','blue',d.level,d.detail,d.extra));
+    } else {
+      grid.appendChild(integrationHealthCard('DAPNET','dapnet','blue','degraded','status unavailable','Open the DAPNET page or wait for the next refresh.'));
+    }
+    if(healthIntegrationState.echolink){
+      const e=classifyEcholinkHealth(healthIntegrationState.echolink);
+      grid.appendChild(integrationHealthCard('EchoLink','echolink','blue',e.level,e.detail,e.extra));
+    } else {
+      grid.appendChild(integrationHealthCard('EchoLink','echolink','blue','degraded','status unavailable','Open the EchoLink page or wait for the next refresh.'));
+    }
+    if(healthIntegrationState.meshcom){
+      const m=classifyMeshcomHealth(healthIntegrationState.meshcom);
+      grid.appendChild(integrationHealthCard('MeshCom','meshcom','purple',m.level,m.detail,m.extra));
+    } else {
+      grid.appendChild(integrationHealthCard('MeshCom','meshcom','purple','degraded','status unavailable','Open the MeshCom page or wait for the next refresh.'));
+    }
+    if(healthIntegrationState.geoalarm){
+      const g=classifyGeoalarmHealth(healthIntegrationState.geoalarm);
+      grid.appendChild(integrationHealthCard('GeoAlarm','geoalarm','purple',g.level,g.detail,g.extra));
+    } else {
+      grid.appendChild(integrationHealthCard('GeoAlarm','geoalarm','purple','degraded','status unavailable','Open the GeoAlarm page or wait for the next refresh.'));
+    }
   }
 }
 async function loadHealthIntegrations(){
   healthIntegrationState.lastLoad=Date.now();
   try{
-    const [brew,ast,dap,el,mesh,geo]=await Promise.all([
+    const [brew,ast]=await Promise.all([
       fetch('/api/brew/status').then(r=>r.ok?r.json():null).catch(()=>null),
-      fetch('/api/asterisk/status').then(r=>r.ok?r.json():null).catch(()=>null),
-      fetch('/api/dapnet').then(r=>r.ok?r.json():null).catch(()=>null),
-      fetch('/api/echolink').then(r=>r.ok?r.json():null).catch(()=>null),
-      fetch('/api/meshcom').then(r=>r.ok?r.json():null).catch(()=>null),
-      fetch('/api/geoalarm').then(r=>r.ok?r.json():null).catch(()=>null)
+      fetch('/api/asterisk/status').then(r=>r.ok?r.json():null).catch(()=>null)
     ]);
     healthIntegrationState.brew=brew;
     healthIntegrationState.asterisk=ast;
-    healthIntegrationState.dapnet=dap;
-    healthIntegrationState.echolink=el;
-    healthIntegrationState.meshcom=mesh;
-    healthIntegrationState.geoalarm=geo;
+    healthIntegrationState.dapnet=null;
+    healthIntegrationState.echolink=null;
+    healthIntegrationState.meshcom=null;
+    healthIntegrationState.geoalarm=null;
+    if(hiddenIntegrationsVisible){
+      const [dap,el,mesh,geo]=await Promise.all([
+        fetch('/api/dapnet').then(r=>r.ok?r.json():null).catch(()=>null),
+        fetch('/api/echolink').then(r=>r.ok?r.json():null).catch(()=>null),
+        fetch('/api/meshcom').then(r=>r.ok?r.json():null).catch(()=>null),
+        fetch('/api/geoalarm').then(r=>r.ok?r.json():null).catch(()=>null)
+      ]);
+      healthIntegrationState.dapnet=dap;
+      healthIntegrationState.echolink=el;
+      healthIntegrationState.meshcom=mesh;
+      healthIntegrationState.geoalarm=geo;
+    }
   }catch{}
   renderHealthIntegrations();
 }
@@ -10627,6 +10657,9 @@ async function boot(){
   }
   if(anonymous){ enterPublicMode(); return; }
   connect();
+  if(hiddenIntegrationsVisible&&HIDDEN_INTEGRATIONS.includes(requestedHiddenPage)){
+    showPage(requestedHiddenPage,document.getElementById('nav-'+requestedHiddenPage));
+  }
   // Populate the topbar SDR badge (and prime system data) immediately on load,
   // instead of waiting for the user to open the System tab.
   loadSystemInfo();
@@ -10678,12 +10711,12 @@ boot();
 /// title type) but is self-contained: a single document, no external deps, no
 /// font downloads. Form posts to POST /api/login as JSON via fetch().
 pub const LOGIN_HTML: &str = r##"<!DOCTYPE html>
-<html lang="en">
+<html lang="de">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <meta name="theme-color" content="#eceff4">
-<title>FlowStation — Login</title>
+<title>FlowStation — Anmeldung</title>
 <style>
 :root{
   --bg:#eceff4;--bg2:#ffffff;--bg3:#e6eaf1;--bg4:#d6dde7;
@@ -10835,23 +10868,23 @@ input:focus{border-color:var(--accent2);background:var(--bg4);}
     </div>
     <div style="text-align:center">
       <div class="logo-title"><span>Flow</span><span class="accent">Station</span></div>
-      <div class="logo-sub">TETRA Base Station</div>
+      <div class="logo-sub">TETRA-Basisstation</div>
     </div>
   </div>
 
   <form id="login-form" autocomplete="on">
     <div>
-      <label class="field-label" for="username">Username</label>
+      <label class="field-label" for="username">Benutzername</label>
       <input type="text" id="username" name="username" autocomplete="username"
              autocapitalize="none" autocorrect="off" spellcheck="false"
              required>
     </div>
     <div>
-      <label class="field-label" for="password">Password</label>
+      <label class="field-label" for="password">Passwort</label>
       <input type="password" id="password" name="password" autocomplete="current-password"
              required>
     </div>
-    <button type="submit" class="btn-login" id="submit-btn">Sign In</button>
+    <button type="submit" class="btn-login" id="submit-btn">Anmelden</button>
     <div class="err" id="err"></div>
   </form>
 
@@ -10869,7 +10902,7 @@ form.addEventListener('submit', async (e) => {
   e.preventDefault();
   errBox.textContent = '';
   btn.disabled = true;
-  btn.textContent = 'Signing in…';
+  btn.textContent = 'Anmeldung läuft…';
 
   const user = document.getElementById('username').value;
   const password = document.getElementById('password').value;
@@ -10887,15 +10920,15 @@ form.addEventListener('submit', async (e) => {
       return;
     }
     if (r.status === 401) {
-      errBox.textContent = 'Invalid credentials';
+      errBox.textContent = 'Benutzername oder Passwort ist falsch';
     } else {
-      errBox.textContent = 'Login failed (' + r.status + ')';
+      errBox.textContent = 'Anmeldung fehlgeschlagen (' + r.status + ')';
     }
   } catch (e) {
-    errBox.textContent = 'Network error: ' + e.message;
+    errBox.textContent = 'Netzwerkfehler: ' + e.message;
   }
   btn.disabled = false;
-  btn.textContent = 'Sign In';
+  btn.textContent = 'Anmelden';
 });
 
 // Auto-focus username on desktop; mobile keyboards open virtually so we don't on small screens.
