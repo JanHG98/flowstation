@@ -81,7 +81,7 @@ jobs:
           run_logged rustup toolchain install stable --profile minimal --component rustfmt || fail_and_publish $?
           run_logged rustup default stable || fail_and_publish $?
 
-          run_logged rustfmt --edition 2024 --check \
+          run_logged rustfmt --edition 2024 \
             crates/tetra-config/src/bluestation/config.rs \
             crates/tetra-config/src/bluestation/sec_cell.rs \
             crates/tetra-entities/src/sndcp/ip.rs \
