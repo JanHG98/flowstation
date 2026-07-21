@@ -1,0 +1,104 @@
+name: Apply and verify WAP port
+
+on:
+  push:
+    branches:
+      - feature/wap-sndcp
+
+permissions:
+  contents: write
+
+concurrency:
+  group: wap-port-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  apply-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: feature/wap-sndcp
+          fetch-depth: 0
+
+      - name: Detect staged payload
+        id: payload
+        shell: bash
+        run: |
+          if compgen -G '.github/wap-port-payload/part-*' > /dev/null; then
+            echo 'present=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'present=false' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Reconstruct and verify patch
+        if: steps.payload.outputs.present == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .github/wap-port-payload/part-* > /tmp/wap-port.patch.gz.b64
+          echo '4d009326fa12702828325d590387d0978ae11ef68e75ab4d92ca28b10423fac9  /tmp/wap-port.patch.gz.b64' | sha256sum -c -
+          base64 --decode /tmp/wap-port.patch.gz.b64 > /tmp/wap-port.patch.gz
+          echo 'c33cdfa4efadfbbe83b4b2fe1e8a274ca18fd1ba62b2df594837cabcfdff085e  /tmp/wap-port.patch.gz' | sha256sum -c -
+          gzip --decompress --stdout /tmp/wap-port.patch.gz > /tmp/wap-port.patch
+          echo 'e298d91e7bac44013aae87aff72b9338c19f7c568a2a11c2c8319fdd971e1d75  /tmp/wap-port.patch' | sha256sum -c -
+          git apply --check /tmp/wap-port.patch
+          git apply --index /tmp/wap-port.patch
+
+      - name: Install native build dependencies
+        if: steps.payload.outputs.present == 'true'
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes pkg-config libsoapysdr-dev
+
+      - name: Ensure Rust toolchain
+        if: steps.payload.outputs.present == 'true'
+        shell: bash
+        run: |
+          rustup toolchain install stable --profile minimal --component rustfmt
+          rustup default stable
+
+      - name: Check formatting of changed Rust files
+        if: steps.payload.outputs.present == 'true'
+        shell: bash
+        run: |
+          rustfmt --edition 2024 --check \
+            crates/tetra-config/src/bluestation/config.rs \
+            crates/tetra-config/src/bluestation/sec_cell.rs \
+            crates/tetra-entities/src/sndcp/ip.rs \
+            crates/tetra-entities/src/sndcp/mod.rs \
+            crates/tetra-entities/src/sndcp/sndcp_bs.rs \
+            crates/tetra-entities/src/sndcp/wap.rs \
+            crates/tetra-entities/src/umac/subcomp/bs_sched.rs \
+            crates/tetra-entities/src/umac/umac_bs.rs \
+            crates/tetra-entities/tests/common/default_stack.rs
+
+      - name: Check configuration crate
+        if: steps.payload.outputs.present == 'true'
+        run: cargo check --locked -p tetra-config
+
+      - name: Check runtime entities
+        if: steps.payload.outputs.present == 'true'
+        run: cargo check --locked -p tetra-entities
+
+      - name: Run SNDCP and WAP tests
+        if: steps.payload.outputs.present == 'true'
+        run: cargo test --locked -p tetra-entities --lib sndcp
+
+      - name: Run assigned-PDCH test
+        if: steps.payload.outputs.present == 'true'
+        run: cargo test --locked -p tetra-entities --lib packet_data_assignment_owns_ts2_until_quit_and_go
+
+      - name: Commit verified implementation
+        if: steps.payload.outputs.present == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .github/wap-port-payload
+          git add --all
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Implement SNDCP WAP/IP service'
+          git push origin HEAD:feature/wap-sndcp
