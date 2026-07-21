@@ -4,12 +4,19 @@ on:
   push:
     branches:
       - feature/wap-sndcp
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.github/wap-port-payload/**'
+      - '.github/workflows/apply-wap-port.yml'
 
 permissions:
   contents: write
+  pull-requests: read
 
 concurrency:
-  group: wap-port-${{ github.ref }}
+  group: wap-port-${{ github.event.pull_request.head.ref || github.ref_name }}
   cancel-in-progress: false
 
 jobs:
