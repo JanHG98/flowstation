@@ -10707,7 +10707,7 @@ input:focus{border-color:var(--accent2);background:var(--bg4);}
   </form>
 
   <div class="footer">
-    <a href="https://github.com/JanHG98/flowstation" target="_blank">NetCore-Quellcode auf GitHub</a>
+    <a href="https://github.com/JanHG98/netcore" target="_blank">NetCore-Quellcode auf GitHub</a>
   </div>
 </div>
 
