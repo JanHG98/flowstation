@@ -1,26 +1,36 @@
-<html><body>
-<!--StartFragment--><html><head></head><body><h1>NetCore-Tetra Wiki</h1><p>Willkommen im NetCore-Tetra Wiki.</p><p>NetCore-Tetra ist ein softwarebasiertes TETRA-System für private, lokale und experimentelle Funknetze. Ziel ist eine übersichtliche, betreiberfreundliche und modulare Plattform für TETRA-Basisstationen, Funkgeräteverwaltung, Statuslogik, SDS, Dashboard, Directory und optionale Schnittstellen zu weiteren Diensten.</p><p>Dieses Wiki beschreibt Aufbau, Betrieb, Konfiguration und Weiterentwicklung des Systems.</p><blockquote><p><strong>Hinweis:</strong> Der Betrieb von Funkanlagen ist nur innerhalb der jeweils gültigen gesetzlichen und regulatorischen Rahmenbedingungen zulässig. Frequenzen, Sendeleistung, Antennen, Netzdaten und Betriebsart müssen vor Inbetriebnahme geprüft und korrekt konfiguriert werden.</p></blockquote><hr><h2>Was ist NetCore-Tetra?</h2><p>NetCore-Tetra besteht aus mehreren Komponenten, die zusammen ein lokales TETRA-System bilden:</p><ul><li><p>einer softwarebasierten TETRA-Basisstation,</p></li><li><p>einem Web-Dashboard zur Bedienung und Überwachung,</p></li><li><p>dem NetCore Directory zur Verwaltung von Geräten, Gruppen, Statusmeldungen und Fahrzeug-/Gerätegruppen,</p></li><li><p>SDS- und Statuslogik für Rückmeldungen an Funkgeräte,</p></li><li><p>optionalen Schnittstellen zu Telefonie, Gateways, Karten- und Betriebsdiensten.</p></li></ul><p>Das System ist darauf ausgelegt, lokale Netze eigenständig zu betreiben und typische Betriebsfunk-Funktionen nachvollziehbar, transparent und erweiterbar abzubilden.</p><hr><h2>Kernfunktionen</h2><h3>Basisstation</h3><p>Die Basisstation stellt die lokale TETRA-Zelle bereit. Sie verarbeitet Registrierung, Gruppenanbindung, Sprache, SDS, Statusmeldungen und weitere Steuerfunktionen.</p><p>Wichtige Funktionen:</p><ul><li><p>lokale TETRA-Zelle,</p></li><li><p>Registrierung von Endgeräten,</p></li><li><p>Gruppenrufe,</p></li><li><p>Einzelrufe,</p></li><li><p>SDS-Nachrichten,</p></li><li><p>U-STATUS-Verarbeitung,</p></li><li><p>LIP-/GPS-Auswertung,</p></li><li><p>Statusrückmeldungen an Endgeräte,</p></li><li><p>Dashboard- und Directory-Anbindung.</p></li></ul><hr><h3>Dashboard</h3><p>Das Dashboard ist die zentrale Weboberfläche für Betrieb und Überwachung.</p><p>Es zeigt unter anderem:</p><ul><li><p>registrierte Geräte,</p></li><li><p>Online-/Ruhezustand,</p></li><li><p>aktuelle Statusmeldungen,</p></li><li><p>SDS-Log,</p></li><li><p>GPS-/LIP-Positionen,</p></li><li><p>Rufe und Aktivitäten,</p></li><li><p>Systemzustand,</p></li><li><p>Verbindungsstatus zu externen Komponenten.</p></li></ul><p>Das Dashboard dient nicht nur der Anzeige, sondern auch der Bedienung einzelner Funktionen wie SDS-Versand, Statusübersicht, Gruppenlogik und Systemsteuerung.</p><hr><h3>NetCore Directory</h3><p>Das NetCore Directory ist die lokale Verwaltungsstelle für Stammdaten.</p><p>Dort werden gepflegt:</p><ul><li><p>Funkgeräte,</p></li><li><p>Basisstationen,</p></li><li><p>GSSI-Gruppen,</p></li><li><p>Statusmeldungen,</p></li><li><p>Gerätegruppen,</p></li><li><p>Fahrzeug-/OPTA-ähnliche Statusgruppen.</p></li></ul><p>Die Basisstation nutzt das Directory, um technische IDs in lesbare Informationen aufzulösen. Dadurch werden aus reinen Nummern verständliche Namen, Rollen, Gruppen und Statusanzeigen.</p><p>Beispiel:</p><pre><code class="language-text">2020001 → HRT Fahrer
-2020002 → MRT Fahrzeug
-Status 1 → Frei auf Funk
-</code></pre><hr><h2>Statuslogik</h2><p>Ein zentraler Bestandteil von NetCore-Tetra ist die Statusverarbeitung.</p><p>Wenn ein Funkgerät eine Statusmeldung sendet, kann die Basisstation:</p><ol><li><p>den Statuscode auswerten,</p></li><li><p>den passenden Text im Directory suchen,</p></li><li><p>den Status im Dashboard anzeigen,</p></li><li><p>dem sendenden Funkgerät den lesbaren Statustext zurückmelden,</p></li><li><p>den Status bei Bedarf auf alle Geräte einer Fahrzeug-/Statusgruppe übertragen,</p></li><li><p>den Status beim erneuten Registrieren eines Geräts automatisch wieder zustellen.</p></li></ol><p>Dadurch entsteht eine BOS-ähnliche Fahrzeuglogik:</p><pre><code class="language-text">Ein Gerät sendet Status
-→ Fahrzeug-/Gerätegruppe übernimmt Status
-→ alle zugehörigen Geräte zeigen denselben Status
-→ Dashboard zeigt den Status parallel bei allen Gruppenmitgliedern
-</code></pre><hr><h2>Gerätegruppen und Fahrzeuglogik</h2><p>Mehrere Funkgeräte können logisch zu einer Einheit zusammengefasst werden.</p><p>Beispiele:</p><ul><li><p>MRT im Fahrzeug,</p></li><li><p>HRT Fahrer,</p></li><li><p>HRT Beifahrer,</p></li><li><p>weiteres Handfunkgerät,</p></li><li><p>Gateway oder Bediengerät.</p></li></ul><p>Diese Geräte können im Directory einer gemeinsamen Statusgruppe zugeordnet werden. Sendet eines dieser Geräte einen Status, wird der Status für die ganze Gruppe übernommen.</p><p>Typischer Ablauf:</p><pre><code class="language-text">2020001 sendet Status „Frei auf Funk“
-→ Directory erkennt zugehörige Statusgruppe
-→ 2020001, 2020002, 2020003 erhalten denselben Status
-→ Dashboard zeigt bei allen Gruppenmitgliedern denselben Status
-</code></pre><p>Wenn ein Gerät später neu registriert, bekommt es den letzten bekannten Gruppenstatus automatisch wieder zugestellt.</p><hr><h2>SDS und Home Mode Display</h2><p>NetCore-Tetra verarbeitet SDS-Nachrichten für Text, Steuerung und Statusrückmeldungen.</p><p>Für Statusrückmeldungen an Funkgeräte kann ein spezieller Display-Text erzeugt werden. Dadurch sieht das Gerät nicht nur eine Statusnummer, sondern einen lesbaren Text.</p><p>Beispiel:</p><pre><code class="language-text">Status: Frei auf Funk
-</code></pre><p>Diese Rückmeldung ist besonders nützlich, wenn Statusnummern im Funkgerät nur technisch oder verkürzt dargestellt werden.</p><hr><h2>GPS / LIP</h2><p>Positionsdaten können über LIP ausgewertet und im Dashboard dargestellt werden.</p><p>Unterstützte Grundlogik:</p><ul><li><p>Empfang von Positionsdaten,</p></li><li><p>Zuordnung zur ISSI,</p></li><li><p>Anzeige im Dashboard,</p></li><li><p>Aktualisierung vorhandener Gerätepositionen,</p></li><li><p>Kombination mit Gerätedaten aus dem Directory.</p></li></ul><p>Die Karte dient der schnellen Lageübersicht und kann später um weitere Layer, Filter und Alarmzonen erweitert werden.</p><hr><h2>Telefonie und Schnittstellen</h2><p>NetCore-Tetra kann optional mit weiteren Diensten verbunden werden.</p><p>Beispiele:</p><ul><li><p>Telefonie über SIP/Asterisk,</p></li><li><p>Funkgerät zu Telefon,</p></li><li><p>Telefon zu Funkgerät,</p></li><li><p>Service-Nummern,</p></li><li><p>externe Gateways,</p></li><li><p>Status- und Alarmweiterleitungen.</p></li></ul><p>Diese Funktionen sind optional und können je nach Betriebsumgebung aktiviert oder deaktiviert werden.</p><hr><h2>Typische Komponenten</h2>
-Komponente | Aufgabe
--- | --
-Basisstation | TETRA-Zelle, Funklogik, SDS, Status, Sprache
-Dashboard | Weboberfläche für Betrieb und Überwachung
-NetCore Directory | Geräte, Gruppen, Statusmeldungen, Fahrzeuglogik
-Funkgeräte | HRT, MRT, Gateways oder Testgeräte
-Telefonie-Gateway | optionale Verbindung zu SIP/Telefonanlagen
-Karten-/GPS-Logik | Anzeige von LIP-/Positionsdaten
+# NetCore-Basisstation
 
-<p>Geplante nächste Themen:</p><ul><li><p>Fahrzeug-/OPTA-Ansicht im Dashboard,</p></li><li><p>persistenter Statuscache,</p></li><li><p>verbesserte Directory-Bedienung,</p></li><li><p>Push-Events zwischen Directory und Basisstation,</p></li><li><p>erweitertes Troubleshooting,</p></li><li><p>vollständiger Branding-Sweep,</p></li><li><p>stabilisierter Release-Prozess.</p></li></ul><hr><h2>Betriebsphilosophie</h2><p>NetCore-Tetra soll nachvollziehbar, lokal betreibbar und kontrollierbar bleiben.</p><p>Daher gelten folgende Grundsätze:</p><ul><li><p>lokale Betreiberhoheit,</p></li><li><p>klare Konfiguration,</p></li><li><p>verständliche Logs,</p></li><li><p>offene Datenstrukturen,</p></li><li><p>modulare Erweiterbarkeit,</p></li><li><p>robuste Fallbacks,</p></li><li><p>keine unnötigen Abhängigkeiten,</p></li><li><p>Bedienbarkeit auch ohne Internetverbindung.</p></li></ul><p>Das System soll im Alltag praktisch nutzbar sein, aber gleichzeitig transparent genug bleiben, um Funklogik, Statusverarbeitung und Netzverhalten nachvollziehen zu können.</p><hr><h2>Nächste Schritte</h2><p>Empfohlene Reihenfolge zum Lesen:</p><ol><li><p>[[Architecture]]</p></li><li><p>[[Installation]]</p></li><li><p>[[Configuration]]</p></li><li><p>[[NetCore-Directory]]</p></li><li><p>[[Status-Feedback]]</p></li><li><p>[[Status-Groups]]</p></li><li><p>[[Troubleshooting]]</p></li></ol><p>Wer das System betreiben möchte, startet mit Installation und Konfiguration.</p><p>Wer die Logik verstehen möchte, beginnt mit Architektur, SDS, U-STATUS und Statusgruppen.</p><p>Wer Fehler sucht, geht direkt zu Troubleshooting und Journalctl-Filtern.</p></body></html><!--EndFragment-->
-</body>
-</html>
+Dieses Wiki beschreibt den aktuellen Stand der **NetCore-Basisstation** und der zugehörigen Dienste. Es richtet sich an Betrieb, Entwicklung und Fehlersuche im eigenen TETRA-Labornetz.
+
+> **Dokumentationsstand:** NetCore 1.3.0 · Konfigurationsformat 0.6 · NetCore Directory 0.2.0
+
+## Was gehört zum System?
+
+Die Basisstation besteht nicht nur aus dem RF-Prozess. Im aktuellen Ausbau gehören mehrere Bausteine zusammen:
+
+- **Basisstation (`bluestation-bs`)** – TETRA-Luftschnittstelle, Registrierung, Gruppen- und Einzelrufe, SDS, U-STATUS und RF-Verarbeitung.
+- **Web-Dashboard** – Bedienung, Überwachung, Konfiguration, Updates, Audio-Zentrale und Systemfunktionen.
+- **NetCore Directory** – zentrale Bezeichnungen für Geräte, Basisstationen, Gruppen, Statusmeldungen und Statusgruppen.
+- **NetCore Control Room** – optionale zentrale Leitstelle für mehrere Basisstationen.
+- **NetCore Piper** – optionaler lokaler TTS-Dienst für deutschsprachige Sprachdateien.
+- **Asterisk/Brew/Telegram/WX** – optionale Integrationen für Telefonie, Netzkopplung, Alarmierung und Wetterdaten.
+
+## Schnellstart
+
+1. [[Installation]] lesen und Systemabhängigkeiten installieren.
+2. Eine geprüfte `config.toml` anlegen; siehe [[Configuration]].
+3. Die Basisstation einmal manuell starten und RF-/SDR-Erkennung prüfen.
+4. Anschließend den [[Systemd-Service]] einrichten.
+5. Dashboard aufrufen und [[Backup-and-Fallback]] kontrollieren.
+
+## Wichtige Betriebsregeln
+
+- Frequenzen, Sendeleistung und Antennenaufbau müssen zum zulässigen Versuchsaufbau passen.
+- Zugangsdaten, Tokens und Passwörter gehören nicht ins Repository oder Wiki.
+- Vor Updates immer Konfiguration, Fallback-Datei, Directory-Datenbank und Medien sichern.
+- Nach Änderungen an RF, Carrier oder Audio immer einen vollständigen Clean-Build durchführen.
+- Dual Carrier benötigt passende RF-Bandbreite, Center-Frequenzen und Endgeräte-Konfiguration; siehe [[Dual-Carrier]].
+
+## Begriffe
+
+Im Wiki bezeichnet **NetCore** die gesamte Software- und Dienstlandschaft. **Basisstation** meint den konkreten TETRA-RF-Dienst bzw. das dazugehörige Gerät. Der technische Binärname `bluestation-bs` bleibt aus Kompatibilitätsgründen bestehen.
