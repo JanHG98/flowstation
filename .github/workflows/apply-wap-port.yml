@@ -53,15 +53,15 @@ jobs:
           git apply --check /tmp/wap-port.patch
           git apply --index /tmp/wap-port.patch
 
-      - name: Adapt to NetCore LLC surface
+      - name: Adapt to NetCore protocol surface
         if: steps.payload.outputs.present == 'true'
         shell: bash
         run: |
           python3 - <<'PY'
           from pathlib import Path
 
-          path = Path('crates/tetra-entities/src/umac/umac_bs.rs')
-          source = path.read_text()
+          umac_path = Path('crates/tetra-entities/src/umac/umac_bs.rs')
+          source = umac_path.read_text()
           source = source.replace(
               'use tetra_pdus::llc::pdus::{al_data::AlData, bl_adata::BlAdata, bl_data::BlData, bl_udata::BlUdata};',
               'use tetra_pdus::llc::pdus::{bl_adata::BlAdata, bl_data::BlData, bl_udata::BlUdata};',
@@ -70,7 +70,15 @@ jobs:
               '            Some(LlcPduType::AlDataAlFinal) => AlData::from_bitbuf(&mut wrapped).is_ok(),\n',
               '',
           )
-          path.write_text(source)
+          umac_path.write_text(source)
+
+          sndcp_path = Path('crates/tetra-entities/src/sndcp/sndcp_bs.rs')
+          source = sndcp_path.read_text()
+          source = source.replace(
+              '1000100010000001111000001100001000100011000001000000001100000101',
+              '1000100010000011110000001100001000100011000001000000001100000101',
+          )
+          sndcp_path.write_text(source)
           PY
 
       - name: Install native build dependencies
