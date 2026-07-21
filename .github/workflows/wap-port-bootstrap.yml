@@ -1,0 +1,97 @@
+name: One-shot WAP port bootstrap
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/wap-port-bootstrap.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  build-feature-branch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out WAP feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: feature/wap-sndcp
+          fetch-depth: 0
+
+      - name: Apply, build and publish result
+        shell: bash
+        run: |
+          set -uo pipefail
+          LOG=/tmp/wap-build.log
+          : > "$LOG"
+
+          run_logged() {
+            echo ">>> $*" | tee -a "$LOG"
+            "$@" 2>&1 | tee -a "$LOG"
+            return ${PIPESTATUS[0]}
+          }
+
+          fail_and_publish() {
+            status=$1
+            git reset --hard HEAD
+            mkdir -p Docs
+            {
+              echo '# WAP-Port Buildfehler'
+              echo
+              echo "Workflow-Exitcode: $status"
+              echo
+              echo '```text'
+              cat "$LOG"
+              echo '```'
+            } > Docs/WAP_BUILD_FAILURE.md
+            git add Docs/WAP_BUILD_FAILURE.md
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git commit -m 'Record WAP port build failure' || true
+            git push origin HEAD:feature/wap-sndcp
+            exit "$status"
+          }
+
+          {
+            cat .github/wap-port-payload/part-* > /tmp/wap-port.patch.gz.b64
+            echo '4d009326fa12702828325d590387d0978ae11ef68e75ab4d92ca28b10423fac9  /tmp/wap-port.patch.gz.b64' | sha256sum -c -
+            base64 --decode /tmp/wap-port.patch.gz.b64 > /tmp/wap-port.patch.gz
+            echo 'c33cdfa4efadfbbe83b4b2fe1e8a274ca18fd1ba62b2df594837cabcfdff085e  /tmp/wap-port.patch.gz' | sha256sum -c -
+            gzip --decompress --stdout /tmp/wap-port.patch.gz > /tmp/wap-port.patch
+            echo 'e298d91e7bac44013aae87aff72b9338c19f7c568a2a11c2c8319fdd971e1d75  /tmp/wap-port.patch' | sha256sum -c -
+            git apply --check /tmp/wap-port.patch
+            git apply --index /tmp/wap-port.patch
+          } 2>&1 | tee -a "$LOG"
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then fail_and_publish "$status"; fi
+
+          run_logged sudo apt-get update || fail_and_publish $?
+          run_logged sudo apt-get install --yes pkg-config libsoapysdr-dev || fail_and_publish $?
+          run_logged rustup toolchain install stable --profile minimal --component rustfmt || fail_and_publish $?
+          run_logged rustup default stable || fail_and_publish $?
+
+          run_logged rustfmt --edition 2024 --check \
+            crates/tetra-config/src/bluestation/config.rs \
+            crates/tetra-config/src/bluestation/sec_cell.rs \
+            crates/tetra-entities/src/sndcp/ip.rs \
+            crates/tetra-entities/src/sndcp/mod.rs \
+            crates/tetra-entities/src/sndcp/sndcp_bs.rs \
+            crates/tetra-entities/src/sndcp/wap.rs \
+            crates/tetra-entities/src/umac/subcomp/bs_sched.rs \
+            crates/tetra-entities/src/umac/umac_bs.rs \
+            crates/tetra-entities/tests/common/default_stack.rs || fail_and_publish $?
+
+          run_logged cargo check --locked -p tetra-config || fail_and_publish $?
+          run_logged cargo check --locked -p tetra-entities || fail_and_publish $?
+          run_logged cargo test --locked -p tetra-entities --lib sndcp || fail_and_publish $?
+          run_logged cargo test --locked -p tetra-entities --lib packet_data_assignment_owns_ts2_until_quit_and_go || fail_and_publish $?
+
+          rm -rf .github/wap-port-payload
+          rm -f .github/workflows/apply-wap-port.yml Docs/WAP_BUILD_FAILURE.md
+          git add --all
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Implement SNDCP WAP/IP service'
+          git push origin HEAD:feature/wap-sndcp
