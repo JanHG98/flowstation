@@ -53,6 +53,26 @@ jobs:
           git apply --check /tmp/wap-port.patch
           git apply --index /tmp/wap-port.patch
 
+      - name: Adapt to NetCore LLC surface
+        if: steps.payload.outputs.present == 'true'
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('crates/tetra-entities/src/umac/umac_bs.rs')
+          source = path.read_text()
+          source = source.replace(
+              'use tetra_pdus::llc::pdus::{al_data::AlData, bl_adata::BlAdata, bl_data::BlData, bl_udata::BlUdata};',
+              'use tetra_pdus::llc::pdus::{bl_adata::BlAdata, bl_data::BlData, bl_udata::BlUdata};',
+          )
+          source = source.replace(
+              '            Some(LlcPduType::AlDataAlFinal) => AlData::from_bitbuf(&mut wrapped).is_ok(),\n',
+              '',
+          )
+          path.write_text(source)
+          PY
+
       - name: Install native build dependencies
         if: steps.payload.outputs.present == 'true'
         shell: bash
