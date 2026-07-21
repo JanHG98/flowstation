@@ -6,12 +6,21 @@ on:
       - main
     paths:
       - '.github/workflows/wap-port-bootstrap.yml'
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: write
+  pull-requests: read
+
+concurrency:
+  group: one-shot-wap-port-bootstrap
+  cancel-in-progress: true
 
 jobs:
   build-feature-branch:
+    if: github.event_name == 'push' || github.event.pull_request.head.ref == 'feature/wap-sndcp'
     runs-on: ubuntu-latest
     steps:
       - name: Check out WAP feature branch
