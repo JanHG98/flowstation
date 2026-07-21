@@ -315,7 +315,7 @@ body{
 
 /* Brew status in sidebar footer */
 .brew-status-row{
-  display:flex;align-items:center;gap:8px;
+  display:flex;align-items:center;gap:0;
   padding:6px 8px;border-radius:6px;
   background:var(--bg3);
   border:1px solid var(--border);
