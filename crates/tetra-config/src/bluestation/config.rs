@@ -255,6 +255,32 @@ impl StackConfig {
         if self.cell.wap_ip.max_request_payload_bytes == 0 || self.cell.wap_ip.max_request_payload_bytes > 1024 {
             return Err("cell_info.wap_ip.max_request_payload_bytes must be 1-1024");
         }
+        if self.cell.wap_ip.pdu_priority_max > 7 {
+            return Err("cell_info.wap_ip.pdu_priority_max must be 0-7");
+        }
+        if !(1..=14).contains(&self.cell.wap_ip.ready_timer_code) {
+            return Err("cell_info.wap_ip.ready_timer_code must be 1-14");
+        }
+        if !(1..=15).contains(&self.cell.wap_ip.standby_timer_code) {
+            return Err("cell_info.wap_ip.standby_timer_code must be 1-15");
+        }
+        if self.cell.wap_ip.response_wait_timer_code > 14 {
+            return Err("cell_info.wap_ip.response_wait_timer_code must be 0-14");
+        }
+        if !(1..=5).contains(&self.cell.wap_ip.mtu_code) {
+            return Err("cell_info.wap_ip.mtu_code must be 1-5");
+        }
+        if self.cell.wap_ip.network_default_data_priority > 7 {
+            return Err("cell_info.wap_ip.network_default_data_priority must be 0-7");
+        }
+        if self.cell.wap_ip.max_contexts_per_issi == 0 || self.cell.wap_ip.max_contexts_per_issi > 14 {
+            return Err("cell_info.wap_ip.max_contexts_per_issi must be 1-14");
+        }
+        if self.cell.wap_ip.max_total_contexts == 0
+            || self.cell.wap_ip.max_total_contexts < self.cell.wap_ip.max_contexts_per_issi
+        {
+            return Err("cell_info.wap_ip.max_total_contexts must be non-zero and >= max_contexts_per_issi");
+        }
         if self.cell.wap_ip.dynamic_pool_first_host == 0
             || self.cell.wap_ip.dynamic_pool_last_host == 255
             || self.cell.wap_ip.dynamic_pool_first_host > self.cell.wap_ip.dynamic_pool_last_host

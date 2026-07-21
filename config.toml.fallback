@@ -333,6 +333,16 @@ accept_status_path = true
 accept_status_wml_path = true
 max_request_payload_bytes = 1024
 assume_pdch_ready_after_data_transmit = false
+# ETSI SNDCP profile (ACTIVATE ACCEPT and runtime limits)
+pdu_priority_max = 4
+ready_timer_code = 8
+standby_timer_code = 4
+response_wait_timer_code = 7
+mtu_code = 2
+network_default_data_priority = 4
+max_contexts_per_issi = 4
+max_total_contexts = 64
+strict_source_address = true
 
 ###############################################################################
 # OPTIONAL: Remote control via U-STATUS (FlowStation)

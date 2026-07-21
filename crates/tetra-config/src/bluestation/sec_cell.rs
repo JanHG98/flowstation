@@ -58,6 +58,18 @@ pub struct CfgWapIp {
     pub accept_status_wml_path: bool,
     pub max_request_payload_bytes: usize,
     pub assume_pdch_ready_after_data_transmit: bool,
+    /// SNDCP timer/priority profile advertised in ACTIVATE ACCEPT.
+    pub pdu_priority_max: u8,
+    pub ready_timer_code: u8,
+    pub standby_timer_code: u8,
+    pub response_wait_timer_code: u8,
+    pub mtu_code: u8,
+    pub network_default_data_priority: u8,
+    /// Resource bounds for all primary and secondary PDP contexts.
+    pub max_contexts_per_issi: usize,
+    pub max_total_contexts: usize,
+    /// Reject source-address spoofing inside the local packet-data profile.
+    pub strict_source_address: bool,
 }
 
 impl Default for CfgWapIp {
@@ -77,6 +89,15 @@ impl Default for CfgWapIp {
             accept_status_wml_path: true,
             max_request_payload_bytes: 1024,
             assume_pdch_ready_after_data_transmit: false,
+            pdu_priority_max: 4,
+            ready_timer_code: 8,
+            standby_timer_code: 4,
+            response_wait_timer_code: 7,
+            mtu_code: 2,
+            network_default_data_priority: 4,
+            max_contexts_per_issi: 4,
+            max_total_contexts: 64,
+            strict_source_address: true,
         }
     }
 }
@@ -111,6 +132,15 @@ pub struct WapIpDto {
     pub accept_status_wml_path: Option<bool>,
     pub max_request_payload_bytes: Option<usize>,
     pub assume_pdch_ready_after_data_transmit: Option<bool>,
+    pub pdu_priority_max: Option<u8>,
+    pub ready_timer_code: Option<u8>,
+    pub standby_timer_code: Option<u8>,
+    pub response_wait_timer_code: Option<u8>,
+    pub mtu_code: Option<u8>,
+    pub network_default_data_priority: Option<u8>,
+    pub max_contexts_per_issi: Option<usize>,
+    pub max_total_contexts: Option<usize>,
+    pub strict_source_address: Option<bool>,
 }
 
 /// Service details for a neighbor cell — mirrors BsServiceDetails but for config parsing.
@@ -422,6 +452,17 @@ pub fn cell_dto_to_cfg(ci: CellInfoDto) -> CfgCellInfo {
                 assume_pdch_ready_after_data_transmit: dto
                     .assume_pdch_ready_after_data_transmit
                     .unwrap_or(defaults.assume_pdch_ready_after_data_transmit),
+                pdu_priority_max: dto.pdu_priority_max.unwrap_or(defaults.pdu_priority_max),
+                ready_timer_code: dto.ready_timer_code.unwrap_or(defaults.ready_timer_code),
+                standby_timer_code: dto.standby_timer_code.unwrap_or(defaults.standby_timer_code),
+                response_wait_timer_code: dto.response_wait_timer_code.unwrap_or(defaults.response_wait_timer_code),
+                mtu_code: dto.mtu_code.unwrap_or(defaults.mtu_code),
+                network_default_data_priority: dto
+                    .network_default_data_priority
+                    .unwrap_or(defaults.network_default_data_priority),
+                max_contexts_per_issi: dto.max_contexts_per_issi.unwrap_or(defaults.max_contexts_per_issi),
+                max_total_contexts: dto.max_total_contexts.unwrap_or(defaults.max_total_contexts),
+                strict_source_address: dto.strict_source_address.unwrap_or(defaults.strict_source_address),
             }
         },
         system_code: ci.system_code.unwrap_or(3), // 3 = ETSI EN 300 392-2 V3.1.1

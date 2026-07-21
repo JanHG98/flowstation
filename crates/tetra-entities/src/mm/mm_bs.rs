@@ -366,15 +366,28 @@ impl MmBs {
             }
         }
 
-        // Always emit an update to the Cmce entity
-        let mm_update = MmSubscriberUpdate { issi, groups, action };
-        let msg = SapMsg {
+        // Always emit an update to the CMCE entity.
+        let mm_update = MmSubscriberUpdate { issi, groups: groups.clone(), action };
+        queue.push_back(SapMsg {
             sap: Sap::Control,
             src: TetraEntity::Mm,
             dest: TetraEntity::Cmce,
             msg: SapMsgInner::MmSubscriberUpdate(mm_update),
-        };
-        queue.push_back(msg);
+        });
+
+        // SNDCP owns subscriber-scoped PDP contexts and radio resources. Forward
+        // registration lifecycle events so an explicit detach/T351 drop releases
+        // those resources immediately instead of waiting for the STANDBY timer.
+        if self.config.config().cell.sndcp_service
+            && matches!(action, BrewSubscriberAction::Register | BrewSubscriberAction::Deregister)
+        {
+            queue.push_back(SapMsg {
+                sap: Sap::Control,
+                src: TetraEntity::Mm,
+                dest: TetraEntity::Sndcp,
+                msg: SapMsgInner::MmSubscriberUpdate(MmSubscriberUpdate { issi, groups, action }),
+            });
+        }
     }
 
     fn rx_u_itsi_detach(&mut self, _queue: &mut MessageQueue, mut message: SapMsg) {
