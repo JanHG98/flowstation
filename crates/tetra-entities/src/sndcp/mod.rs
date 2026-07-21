@@ -7,3 +7,6 @@ pub mod wap_status;
 pub mod state;
 pub mod qos;
 pub mod resource;
+
+pub mod fragment;
+pub mod packet_gateway;

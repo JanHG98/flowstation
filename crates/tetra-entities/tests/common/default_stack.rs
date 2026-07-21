@@ -1,6 +1,6 @@
 use tetra_config::bluestation::{
     CfgAsterisk, CfgAudioPlayer, CfgCellInfo, CfgDapnet, CfgEcholink, CfgEmergency, CfgGeoalarm, CfgHealth, CfgMeshcom, CfgNetInfo, CfgPhyIo, CfgRecording, CfgRecovery,
-    CfgSecurity, CfgSnomNotify, CfgWapIp, CfgTpg2200Action, CfgTts, CfgWxService, PhyBackend, StackConfig, StackMode,
+    CfgSecurity, CfgSnomNotify, CfgWapIp, CfgPacketDataGateway, CfgTpg2200Action, CfgTts, CfgWxService, PhyBackend, StackConfig, StackMode,
 };
 use tetra_core::{freqs::FreqInfo, ranges::SortedDisjointSsiRanges};
 
@@ -86,6 +86,7 @@ pub fn default_cell_info(freq_info: FreqInfo) -> CfgCellInfo {
         aie_service: false,
         advanced_link: false,
         wap_ip: CfgWapIp::default(),
+        packet_data_gateway: CfgPacketDataGateway::default(),
         system_code: 3, // 3 = ETSI EN 300 392-2 V3.1.1
         sharing_mode: 0,
         ts_reserved_frames: 0,

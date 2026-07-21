@@ -288,6 +288,16 @@ impl ContextTable {
         self.contexts.values().map(|context| context.address)
     }
 
+    pub fn iter(&self) -> impl Iterator<Item = (&ContextKey, &PdpContext)> {
+        self.contexts.iter()
+    }
+
+    pub fn keys_for_address(&self, address: [u8; 4]) -> impl Iterator<Item = ContextKey> + '_ {
+        self.contexts
+            .iter()
+            .filter_map(move |(key, context)| (context.address == address).then_some(*key))
+    }
+
     pub fn address_in_use_by_other(&self, key: ContextKey, address: [u8; 4]) -> bool {
         self.contexts.iter().any(|(other_key, context)| {
             if *other_key == key || context.address != address {

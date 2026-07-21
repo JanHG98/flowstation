@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::net::Ipv4Addr;
 use std::time::{Duration, Instant};
 
@@ -14,7 +14,12 @@ use tetra_saps::tla::{TlaTlDataReqBl, TlaTlUnitdataReqBl};
 use tetra_saps::control::brew::BrewSubscriberAction;
 use tetra_saps::{SapMsg, SapMsgInner};
 
-use super::ip::parse_ipv4_packet;
+use super::fragment::{fragment_ipv4_packet, Ipv4Reassembler};
+use super::ip::{
+    parse_ipv4_packet, parse_ipv4_packet_any, parse_udp_datagram, transport_ports, Ipv4Packet,
+    IPV4_PROTOCOL_TCP, IPV4_PROTOCOL_UDP,
+};
+use super::packet_gateway::{PacketGateway, PacketGatewayConfig};
 use super::protocol::{
     self, ActivateAccept, ActivateAddressAccept, ActivateAddressDemand, ActivateDemand, ActivateReject, DataPriority,
     DataPriorityDetails, DataTransmitRequest, DataTransmitResponse, Deactivate, EndOfData, Modify, RawBits, Reconnect,
@@ -76,13 +81,22 @@ const MODIFY_REJECT_FILTER_FOR_PRIMARY: u8 = 33;
 const MODIFY_REJECT_TEMPORARILY_UNAVAILABLE: u8 = 34;
 
 const PCO_TYPE34_ID: u64 = 1;
-const PPP_PROTO_CHAP: u64 = 0xC223;
-const PPP_CONFIG_PROTOCOL_PPP: u64 = 0;
-const CHAP_CODE_SUCCESS: u64 = 3;
-const PCO_CHAP_SUCCESS_BITS: u64 = 60;
+const PPP_PROTO_CHAP: u16 = 0xC223;
+const PPP_PROTO_IPCP: u16 = 0x8021;
+const PPP_CONFIG_PROTOCOL_PPP: u8 = 0;
+const CHAP_CODE_SUCCESS: u8 = 3;
+const IPCP_CODE_CONFIGURE_REQUEST: u8 = 1;
+const IPCP_CODE_CONFIGURE_ACK: u8 = 2;
+const IPCP_CODE_CONFIGURE_NAK: u8 = 3;
+const IPCP_PRIMARY_DNS_OPTION: u8 = 129;
+const IPCP_SECONDARY_DNS_OPTION: u8 = 131;
 
 #[derive(Debug, Clone, Copy)]
 struct RuntimeProfile {
+    wap_enabled: bool,
+    gateway_enabled: bool,
+    gateway_prefix_len: u8,
+    dns_servers: [Option<[u8; 4]>; 2],
     endpoint: [u8; 4],
     port: u16,
     ttl: u8,
@@ -129,6 +143,27 @@ struct CachedExchange {
     replies: Vec<CachedReply>,
 }
 
+#[derive(Debug, Clone)]
+struct PendingPacket {
+    queued_at: Instant,
+    octets: Vec<u8>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+struct AutomaticFlowKey {
+    protocol: u8,
+    mobile_address: [u8; 4],
+    mobile_port: u16,
+    remote_address: [u8; 4],
+    remote_port: u16,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct AutomaticBinding {
+    context: ContextKey,
+    expires_at: Instant,
+}
+
 pub struct Sndcp {
     config: SharedConfig,
     contexts: ContextTable,
@@ -137,12 +172,24 @@ pub struct Sndcp {
     pdch_reserved: bool,
     response_cache: HashMap<(u32, String), CachedExchange>,
     routes: HashMap<u32, SubscriberRoute>,
+    gateway: Option<PacketGateway>,
+    gateway_config: Option<PacketGatewayConfig>,
+    gateway_retry_at: Instant,
+    pending_downlink: HashMap<ContextKey, VecDeque<PendingPacket>>,
+    page_inflight: HashMap<ContextKey, Instant>,
+    automatic_bindings: HashMap<AutomaticFlowKey, AutomaticBinding>,
+    uplink_reassembler: Ipv4Reassembler,
+    downlink_reassembler: Ipv4Reassembler,
     last_timer_sweep: Instant,
 }
 
 impl Sndcp {
     pub fn new(config: SharedConfig) -> Self {
         let now = Instant::now();
+        let packet = config.config().cell.packet_data_gateway.clone();
+        let reassembly_timeout = Duration::from_secs(packet.fragment_reassembly_timeout_secs);
+        let reassembly_datagrams = packet.fragment_reassembly_max_datagrams;
+        let reassembly_bytes = packet.fragment_reassembly_max_bytes;
         Self {
             config,
             contexts: ContextTable::default(),
@@ -151,6 +198,14 @@ impl Sndcp {
             pdch_reserved: false,
             response_cache: HashMap::new(),
             routes: HashMap::new(),
+            gateway: None,
+            gateway_config: None,
+            gateway_retry_at: now,
+            pending_downlink: HashMap::new(),
+            page_inflight: HashMap::new(),
+            automatic_bindings: HashMap::new(),
+            uplink_reassembler: Ipv4Reassembler::new(reassembly_timeout, reassembly_datagrams, reassembly_bytes),
+            downlink_reassembler: Ipv4Reassembler::new(reassembly_timeout, reassembly_datagrams, reassembly_bytes),
             last_timer_sweep: now,
         }
     }
@@ -164,7 +219,16 @@ impl Sndcp {
         let wap = &cfg.cell.wap_ip;
         let pool_prefix = wap.pool_prefix_octets()?;
         let mtu_octets = mtu_octets(wap.mtu_code)?;
+        let gateway = &cfg.cell.packet_data_gateway;
+        let mut dns_servers = [None, None];
+        for (slot, address) in dns_servers.iter_mut().zip(gateway.dns_servers.iter().copied()) {
+            *slot = Some(address.octets());
+        }
         Some(RuntimeProfile {
+            wap_enabled: wap.enabled,
+            gateway_enabled: gateway.enabled,
+            gateway_prefix_len: gateway.prefix_len,
+            dns_servers,
             endpoint: wap.address.octets(),
             port: wap.port,
             ttl: wap.response_ttl,
@@ -290,6 +354,36 @@ impl Sndcp {
                 data_class_info: None,
                 req_handle: 0,
                 graceful_degradation: None,
+                chan_alloc,
+                tx_reporter: None,
+            }),
+        });
+    }
+
+    fn queue_unacked_to(
+        &self,
+        queue: &mut MessageQueue,
+        route: SubscriberRoute,
+        sn_pdu: &BitBuffer,
+        chan_alloc: Option<CmceChanAllocReq>,
+    ) {
+        queue.push_back(SapMsg {
+            sap: Sap::TlaSap,
+            src: TetraEntity::Sndcp,
+            dest: TetraEntity::Llc,
+            msg: SapMsgInner::TlaTlUnitdataReqBl(TlaTlUnitdataReqBl {
+                main_address: route.main_address,
+                link_id: route.link_id,
+                endpoint_id: route.endpoint_id,
+                tl_sdu: Self::wrap_sndcp(sn_pdu),
+                stealing_permission: false,
+                subscriber_class: 0,
+                fcs_flag: false,
+                air_interface_encryption: None,
+                packet_data_flag: true,
+                n_tlsdu_repeats: 0,
+                data_class_info: None,
+                req_handle: 0,
                 chan_alloc,
                 tx_reporter: None,
             }),
@@ -586,12 +680,314 @@ impl Sndcp {
             .find(|address| !used.contains(address))
     }
 
-    fn valid_static_address(address: [u8; 4], endpoint: [u8; 4]) -> bool {
+    fn valid_static_address(address: [u8; 4], endpoint: [u8; 4], prefix_len: u8, routed: bool) -> bool {
         let ip = Ipv4Addr::from(address);
-        !ip.is_unspecified()
-            && !ip.is_multicast()
-            && address != Ipv4Addr::BROADCAST.octets()
-            && address != endpoint
+        if ip.is_unspecified() || ip.is_multicast() || address == Ipv4Addr::BROADCAST.octets() || address == endpoint {
+            return false;
+        }
+        if !routed {
+            return true;
+        }
+        let mask = u32::MAX << (32 - prefix_len);
+        let network = u32::from(Ipv4Addr::from(endpoint)) & mask;
+        let candidate = u32::from(ip);
+        let broadcast = network | !mask;
+        candidate & mask == network && candidate != network && candidate != broadcast
+    }
+
+    fn ensure_gateway(&mut self, profile: RuntimeProfile) {
+        if !profile.gateway_enabled {
+            self.gateway = None;
+            self.gateway_config = None;
+            return;
+        }
+        let cfg = self.config.config().cell.packet_data_gateway.clone();
+        let desired = PacketGatewayConfig::from_cell(&cfg, Ipv4Addr::from(profile.endpoint), profile.mtu_octets);
+        if self.gateway.is_some() && self.gateway_config.as_ref() == Some(&desired) {
+            return;
+        }
+        if self.gateway_config.as_ref().is_some_and(|current| current != &desired) {
+            self.gateway = None;
+            self.gateway_config = None;
+        }
+        let now = Instant::now();
+        if now < self.gateway_retry_at {
+            return;
+        }
+        match PacketGateway::spawn(desired.clone()) {
+            Ok(gateway) => {
+                tracing::info!(
+                    "SNDCP: packet gateway up interface={} subnet={} NAT={:?}",
+                    desired.interface_name,
+                    desired.network_cidr(),
+                    desired.nat_mode
+                );
+                self.gateway = Some(gateway);
+                self.gateway_config = Some(desired);
+            }
+            Err(error) => {
+                tracing::error!("SNDCP: packet gateway startup failed: {:?}", error);
+                self.gateway_retry_at = now + Duration::from_secs(30);
+            }
+        }
+    }
+
+    fn automatic_flow_key_uplink(ip: &Ipv4Packet<'_>) -> Option<AutomaticFlowKey> {
+        let ports = transport_ports(ip)?;
+        Some(AutomaticFlowKey {
+            protocol: ip.protocol,
+            mobile_address: ip.source,
+            mobile_port: ports.source,
+            remote_address: ip.destination,
+            remote_port: ports.destination,
+        })
+    }
+
+    fn automatic_flow_key_downlink(ip: &Ipv4Packet<'_>) -> Option<AutomaticFlowKey> {
+        let ports = transport_ports(ip)?;
+        Some(AutomaticFlowKey {
+            protocol: ip.protocol,
+            mobile_address: ip.destination,
+            mobile_port: ports.destination,
+            remote_address: ip.source,
+            remote_port: ports.source,
+        })
+    }
+
+    fn static_filter_matches(ip: &Ipv4Packet<'_>, filter: super::qos::QosFilter) -> bool {
+        if filter.operation == 2 {
+            return false;
+        }
+        if filter.filter_type == 7 {
+            return filter.first.is_some_and(|value| (value & 0x3f) as u8 == ip.dscp());
+        }
+        let Some(ports) = transport_ports(ip) else { return false; };
+        let protocol_matches = match filter.filter_type {
+            1 | 4 => matches!(ip.protocol, IPV4_PROTOCOL_TCP | IPV4_PROTOCOL_UDP),
+            2 | 5 => ip.protocol == IPV4_PROTOCOL_UDP,
+            3 | 6 => ip.protocol == IPV4_PROTOCOL_TCP,
+            _ => false,
+        };
+        if !protocol_matches {
+            return false;
+        }
+        match filter.filter_type {
+            1..=3 => filter.first == Some(ports.destination),
+            4..=6 => filter
+                .first
+                .zip(filter.second)
+                .is_some_and(|(low, high)| low <= ports.destination && ports.destination <= high),
+            _ => false,
+        }
+    }
+
+    fn learn_automatic_binding(&mut self, key: ContextKey, ip: &Ipv4Packet<'_>) {
+        let filter = self.contexts.get(key).and_then(|context| context.qos.filter());
+        let Some(filter) = filter else { return; };
+        if !filter.is_automatic() || filter.operation == 2 {
+            return;
+        }
+        let Some(flow) = Self::automatic_flow_key_uplink(ip) else { return; };
+        let cfg = self.config.config().cell.packet_data_gateway.clone();
+        let now = Instant::now();
+        self.automatic_bindings.retain(|_, binding| binding.expires_at > now);
+        if !self.automatic_bindings.contains_key(&flow)
+            && self.automatic_bindings.len() >= cfg.automatic_filter_max_bindings
+        {
+            if let Some(oldest) = self.automatic_bindings.iter().min_by_key(|(_, binding)| binding.expires_at).map(|(flow, _)| *flow) {
+                self.automatic_bindings.remove(&oldest);
+            }
+        }
+        self.automatic_bindings.insert(flow, AutomaticBinding {
+            context: key,
+            expires_at: now + Duration::from_secs(cfg.automatic_filter_ttl_secs),
+        });
+    }
+
+    fn select_downlink_context(&self, packet: &Ipv4Packet<'_>) -> Option<ContextKey> {
+        if let Some(flow) = Self::automatic_flow_key_downlink(packet)
+            && let Some(binding) = self.automatic_bindings.get(&flow)
+            && binding.expires_at > Instant::now()
+            && self.contexts.get(binding.context).is_some_and(|context| {
+                context.address == packet.destination
+                    && context.availability == ContextAvailability::Available
+                    && context.usage == ContextUsage::Active
+            })
+        {
+            return Some(binding.context);
+        }
+        self.contexts
+            .keys_for_address(packet.destination)
+            .filter_map(|key| {
+                let context = self.contexts.get(key)?;
+                if context.availability != ContextAvailability::Available || context.usage != ContextUsage::Active {
+                    return None;
+                }
+                let filter_rank = match context.qos.filter() {
+                    Some(filter) if filter.is_automatic() => return None,
+                    Some(filter) if Self::static_filter_matches(packet, filter) => 0u8,
+                    Some(_) => return None,
+                    None if context.primary_nsapi.is_none() => 1,
+                    None => 2,
+                };
+                let state_rank = match context.state {
+                    PdpState::Ready => 0u8,
+                    PdpState::Quiescent => 1,
+                    PdpState::Standby => 2,
+                    PdpState::Suspended => 3,
+                };
+                Some(((filter_rank, state_rank, key.nsapi), key))
+            })
+            .min_by_key(|(rank, _)| *rank)
+            .map(|(_, key)| key)
+    }
+
+    fn enqueue_pending_packet(&mut self, key: ContextKey, packet: Vec<u8>) {
+        let cfg = self.config.config().cell.packet_data_gateway.clone();
+        let now = Instant::now();
+        let queue = self.pending_downlink.entry(key).or_default();
+        let mut bytes = queue.iter().map(|item| item.octets.len()).sum::<usize>();
+        while !queue.is_empty()
+            && (queue.len() >= cfg.downlink_queue_packets_per_context
+                || bytes.saturating_add(packet.len()) > cfg.downlink_queue_bytes_per_context)
+        {
+            if let Some(dropped) = queue.pop_front() {
+                bytes = bytes.saturating_sub(dropped.octets.len());
+            }
+        }
+        if packet.len() <= cfg.downlink_queue_bytes_per_context {
+            queue.push_back(PendingPacket { queued_at: now, octets: packet });
+        }
+    }
+
+    fn pending_replies(&mut self, key: ContextKey, mtu: usize) -> Vec<CachedReply> {
+        let Some(mut queue) = self.pending_downlink.remove(&key) else { return Vec::new(); };
+        let mut replies = Vec::new();
+        while let Some(packet) = queue.pop_front() {
+            match fragment_ipv4_packet(&packet.octets, mtu) {
+                Ok(fragments) => replies.extend(fragments.into_iter().map(|fragment| Self::reply(
+                    SnPdu::Unitdata(UserData {
+                        acknowledged: false,
+                        nsapi: key.nsapi,
+                        pcomp: 0,
+                        dcomp: 0,
+                        n_pdu: protocol::raw_octets(fragment),
+                    }),
+                    false,
+                    false,
+                ))),
+                Err(error) => tracing::warn!("SNDCP: queued downlink fragmentation failed: {:?}", error),
+            }
+        }
+        self.page_inflight.remove(&key);
+        replies
+    }
+
+    fn page_context(&mut self, queue: &mut MessageQueue, key: ContextKey) {
+        let cfg = self.config.config().cell.packet_data_gateway.clone();
+        let now = Instant::now();
+        if self.page_inflight.get(&key).is_some_and(|last| now.duration_since(*last) < Duration::from_secs(cfg.page_retry_secs)) {
+            return;
+        }
+        let Some(route) = self.routes.get(&key.issi).copied() else { return; };
+        let optional = Self::raw_bits_from_string(&snei_optional_section(self.contexts.network_endpoint_id(key.issi)));
+        let pdu = Self::encoded(SnPdu::PageRequest(protocol::PageRequest {
+            nsapi: key.nsapi,
+            reply_requested: true,
+            optional,
+        }));
+        self.queue_acked_to(queue, route, &pdu, None);
+        self.page_inflight.insert(key, now);
+        tracing::debug!("SNDCP: paged ISSI={} NSAPI={} for queued downlink", key.issi, key.nsapi);
+    }
+
+    fn flush_pending_to_queue(&mut self, queue: &mut MessageQueue, key: ContextKey) {
+        let Some(context) = self.contexts.get(key).cloned() else { return; };
+        let Some(route) = self.routes.get(&key.issi).copied() else { return; };
+        for reply in self.pending_replies(key, context.mtu_octets) {
+            self.queue_unacked_to(queue, route, &reply.sn_pdu, None);
+        }
+    }
+
+    fn route_gateway_downlink(&mut self, queue: &mut MessageQueue, packet: Vec<u8>) {
+        let now = Instant::now();
+        let parsed = match parse_ipv4_packet_any(&packet) {
+            Ok(value) => value,
+            Err(error) => {
+                tracing::warn!("SNDCP: kernel emitted invalid IPv4 packet: {:?}", error);
+                return;
+            }
+        };
+        let packet = if parsed.is_fragmented() {
+            match self.downlink_reassembler.push(&packet[..parsed.total_len], now) {
+                Ok(Some(value)) => value,
+                Ok(None) => return,
+                Err(error) => {
+                    tracing::warn!("SNDCP: downlink IPv4 reassembly failed: {:?}", error);
+                    return;
+                }
+            }
+        } else {
+            packet[..parsed.total_len].to_vec()
+        };
+        let parsed = match parse_ipv4_packet(&packet) {
+            Ok(value) => value,
+            Err(error) => {
+                tracing::warn!("SNDCP: reassembled downlink packet invalid: {:?}", error);
+                return;
+            }
+        };
+        let Some(key) = self.select_downlink_context(&parsed) else {
+            tracing::debug!("SNDCP: no active PDP context for downlink destination={}", Ipv4Addr::from(parsed.destination));
+            return;
+        };
+        let direct = self.contexts.bearer_owner() == Some(key.issi)
+            && self.contexts.get(key).is_some_and(|context| context.state == PdpState::Ready);
+        if direct {
+            self.enqueue_pending_packet(key, packet);
+            self.flush_pending_to_queue(queue, key);
+        } else {
+            self.enqueue_pending_packet(key, packet);
+            self.page_context(queue, key);
+        }
+    }
+
+    fn poll_gateway(&mut self, queue: &mut MessageQueue, profile: RuntimeProfile) {
+        self.ensure_gateway(profile);
+        for _ in 0..64 {
+            let result = match self.gateway.as_ref() {
+                Some(gateway) => gateway.try_packet_to_mobile(),
+                None => break,
+            };
+            match result {
+                Ok(Some(packet)) => self.route_gateway_downlink(queue, packet),
+                Ok(None) => break,
+                Err(error) => {
+                    tracing::warn!("SNDCP: packet gateway receive failed: {:?}", error);
+                    self.gateway = None;
+                    self.gateway_config = None;
+                    self.gateway_retry_at = Instant::now() + Duration::from_secs(30);
+                    break;
+                }
+            }
+        }
+        let cfg = self.config.config().cell.packet_data_gateway.clone();
+        let now = Instant::now();
+        let ttl = Duration::from_secs(cfg.downlink_queue_ttl_secs);
+        self.pending_downlink.retain(|_, packets| {
+            packets.retain(|packet| now.duration_since(packet.queued_at) < ttl);
+            !packets.is_empty()
+        });
+        let keys = self.pending_downlink.keys().copied().collect::<Vec<_>>();
+        for key in keys {
+            if self.contexts.bearer_owner() == Some(key.issi)
+                && self.contexts.get(key).is_some_and(|context| context.state == PdpState::Ready)
+            {
+                self.flush_pending_to_queue(queue, key);
+            } else {
+                self.page_context(queue, key);
+            }
+        }
     }
 
     fn handle_activate(
@@ -627,7 +1023,7 @@ impl Sndcp {
 
         let (address, accepted_address, primary_nsapi) = match demand.address {
             ActivateAddressDemand::Ipv4Static(address) if profile.allow_static => {
-                if !Self::valid_static_address(address, profile.endpoint) {
+                if !Self::valid_static_address(address, profile.endpoint, profile.gateway_prefix_len, profile.gateway_enabled) {
                     return vec![Self::activation_reject(demand.nsapi, ACT_REJECT_STATIC_NOT_CORRECT)];
                 }
                 if self.contexts.address_in_use_by_other(key, address) {
@@ -678,6 +1074,11 @@ impl Sndcp {
         // SwMI must accept. NetCore-Tetra answers PCOMP=0 and later rejects compressed
         // user PDUs rather than falsely advertising algorithms it does not implement.
         let now = Instant::now();
+        if replacing {
+            self.pending_downlink.remove(&key);
+            self.page_inflight.remove(&key);
+            self.automatic_bindings.retain(|_, binding| binding.context != key);
+        }
         if replacing && self.contexts.release_bearer_nsapis(issi, &[demand.nsapi]) {
             self.release_pdch();
         }
@@ -702,7 +1103,12 @@ impl Sndcp {
 
         let request_bits = raw_request.to_bitstr();
         let chap_id = find_chap_response_id(&request_bits);
-        let optional = Self::raw_bits_from_string(&activation_accept_optional_section(snei, chap_id));
+        let ipcp_response = build_ipcp_dns_response(&request_bits, profile.dns_servers);
+        let optional = Self::raw_bits_from_string(&activation_accept_optional_section(
+            snei,
+            chap_id,
+            ipcp_response.as_deref(),
+        ));
         let accept = SnPdu::ActivateAccept(ActivateAccept {
             nsapi: demand.nsapi,
             pdu_priority_max: profile.pdu_priority_max,
@@ -718,14 +1124,15 @@ impl Sndcp {
         });
         self.last_activity = format!("PDP {} NSAPI{}", issi, demand.nsapi);
         tracing::info!(
-            "SNDCP: PDP accepted ISSI={} NSAPI={} primary={:?} SNEI={} IPv4={} requested_pcomp={:#04x} CHAP={}",
+            "SNDCP: PDP accepted ISSI={} NSAPI={} primary={:?} SNEI={} IPv4={} requested_pcomp={:#04x} CHAP={} IPCP_DNS={}",
             issi,
             demand.nsapi,
             primary_nsapi,
             snei,
             Ipv4Addr::from(address),
             demand.pcomp_negotiation,
-            chap_id.is_some()
+            chap_id.is_some(),
+            ipcp_response.is_some()
         );
         vec![Self::reply(accept, true, false)]
     }
@@ -790,7 +1197,17 @@ impl Sndcp {
         match self.activate_requested_nsapis(issi, &request.nsapis, profile) {
             Ok(_) => {
                 self.last_activity = format!("PDCH {} NSAPI{:?}", issi, request.nsapis);
-                vec![Self::transmit_response_nsapis(request.nsapis, true, None, true, self.contexts.network_endpoint_id(issi))]
+                let nsapis = request.nsapis;
+                let mut replies = vec![Self::transmit_response_nsapis(
+                    nsapis.clone(), true, None, true, self.contexts.network_endpoint_id(issi),
+                )];
+                for nsapi in nsapis {
+                    let key = ContextKey { issi, nsapi };
+                    if let Some(mtu) = self.contexts.get(key).map(|context| context.mtu_octets) {
+                        replies.extend(self.pending_replies(key, mtu));
+                    }
+                }
+                replies
             }
             Err(cause) => vec![Self::transmit_response(primary, false, Some(cause), false, self.contexts.network_endpoint_id(issi))],
         }
@@ -828,7 +1245,18 @@ impl Sndcp {
             return vec![Self::transmit_response(primary, false, Some(cause), false, self.contexts.network_endpoint_id(issi))];
         }
         match self.activate_requested_nsapis(issi, &nsapis, profile) {
-            Ok(_) => vec![Self::transmit_response_nsapis(nsapis, true, None, true, self.contexts.network_endpoint_id(issi))],
+            Ok(_) => {
+                let mut replies = vec![Self::transmit_response_nsapis(
+                    nsapis.clone(), true, None, true, self.contexts.network_endpoint_id(issi),
+                )];
+                for nsapi in nsapis {
+                    let key = ContextKey { issi, nsapi };
+                    if let Some(mtu) = self.contexts.get(key).map(|context| context.mtu_octets) {
+                        replies.extend(self.pending_replies(key, mtu));
+                    }
+                }
+                replies
+            }
             Err(cause) => vec![Self::transmit_response(primary, false, Some(cause), false, self.contexts.network_endpoint_id(issi))],
         }
     }
@@ -856,31 +1284,29 @@ impl Sndcp {
             tracing::warn!("SNDCP: compressed N-PDU rejected PCOMP={} DCOMP={}", data.pcomp, data.dcomp);
             return Vec::new();
         }
-        let Some(npdu) = Self::user_data_octets(&data) else {
-            return Vec::new();
-        };
-        if npdu.len() > context.mtu_octets {
-            tracing::warn!("SNDCP: N-PDU {} exceeds negotiated MTU {}", npdu.len(), context.mtu_octets);
+        let Some(raw_npdu) = Self::user_data_octets(&data) else { return Vec::new(); };
+        if raw_npdu.len() > context.mtu_octets {
+            tracing::warn!("SNDCP: N-PDU {} exceeds negotiated MTU {}", raw_npdu.len(), context.mtu_octets);
             return Vec::new();
         }
-        let ip = match parse_ipv4_packet(&npdu) {
+        let raw_ip = match parse_ipv4_packet_any(&raw_npdu) {
             Ok(ip) => ip,
             Err(error) => {
                 tracing::warn!("SNDCP: invalid IPv4 N-PDU from ISSI {}: {:?}", issi, error);
                 return Vec::new();
             }
         };
-        if profile.strict_source_address && ip.source != context.address {
+        if profile.strict_source_address && raw_ip.source != context.address {
             tracing::warn!(
                 "SNDCP: source-address mismatch ISSI={} NSAPI={} expected={} actual={}",
                 issi,
                 data.nsapi,
                 Ipv4Addr::from(context.address),
-                Ipv4Addr::from(ip.source)
+                Ipv4Addr::from(raw_ip.source)
             );
             return Vec::new();
         }
-        if context.availability != ContextAvailability::Available {
+        if context.availability != ContextAvailability::Available || context.usage != ContextUsage::Active {
             return Vec::new();
         }
         if context.state != PdpState::Ready && !profile.assume_ready {
@@ -893,44 +1319,93 @@ impl Sndcp {
         }
         let _ = self.contexts.refresh_bearer_ready(issi, profile.ready_timer_code, activity_now);
 
-        let endpoint = WapEndpoint { address: profile.endpoint, port: profile.port, ttl: profile.ttl };
-        let policy = WapPolicy {
-            accept_empty_probe: profile.accept_empty_probe,
-            accept_root_path: profile.accept_root_path,
-            accept_status_path: profile.accept_status_path,
-            accept_status_wml_path: profile.accept_status_wml_path,
-            max_request_payload_bytes: profile.max_request_payload_bytes,
+        let npdu = if raw_ip.is_fragmented() {
+            match self.uplink_reassembler.push(&raw_npdu[..raw_ip.total_len], activity_now) {
+                Ok(Some(packet)) => packet,
+                Ok(None) => return Vec::new(),
+                Err(error) => {
+                    tracing::warn!("SNDCP: IPv4 reassembly failed ISSI={} error={:?}", issi, error);
+                    return Vec::new();
+                }
+            }
+        } else {
+            raw_npdu[..raw_ip.total_len].to_vec()
         };
-        let snapshot = self.snapshot();
-        let response = match build_response_npdu(&npdu, endpoint, policy, &snapshot) {
-            Ok(Some(response)) => response,
-            Ok(None) => return Vec::new(),
+        let ip = match parse_ipv4_packet(&npdu) {
+            Ok(ip) => ip,
             Err(error) => {
-                tracing::warn!("SNDCP WAP/IP request rejected from ISSI {}: {:?}", issi, error);
+                tracing::warn!("SNDCP: routed IPv4 N-PDU became invalid ISSI={} error={:?}", issi, error);
                 return Vec::new();
             }
         };
-        if response.len() > context.mtu_octets {
-            tracing::warn!("SNDCP: generated response exceeds negotiated MTU");
+        self.learn_automatic_binding(key, &ip);
+
+        let is_wap_request = profile.wap_enabled
+            && ip.destination == profile.endpoint
+            && ip.protocol == IPV4_PROTOCOL_UDP
+            && parse_udp_datagram(ip.payload).is_ok_and(|udp| udp.destination_port == profile.port);
+        if is_wap_request {
+            let endpoint = WapEndpoint { address: profile.endpoint, port: profile.port, ttl: profile.ttl };
+            let policy = WapPolicy {
+                accept_empty_probe: profile.accept_empty_probe,
+                accept_root_path: profile.accept_root_path,
+                accept_status_path: profile.accept_status_path,
+                accept_status_wml_path: profile.accept_status_wml_path,
+                max_request_payload_bytes: profile.max_request_payload_bytes,
+            };
+            let snapshot = self.snapshot();
+            let response = match build_response_npdu(&npdu, endpoint, policy, &snapshot) {
+                Ok(Some(response)) => response,
+                Ok(None) => return Vec::new(),
+                Err(error) => {
+                    tracing::warn!("SNDCP WAP/IP request rejected from ISSI {}: {:?}", issi, error);
+                    return Vec::new();
+                }
+            };
+            let fragments = match fragment_ipv4_packet(&response, context.mtu_octets) {
+                Ok(fragments) => fragments,
+                Err(error) => {
+                    tracing::warn!("SNDCP: generated WAP response cannot fit negotiated MTU: {:?}", error);
+                    return Vec::new();
+                }
+            };
+            let response_now = Instant::now();
+            if let Some(context) = self.contexts.get_mut(key) { context.refresh_ready(profile.ready_timer_code, response_now); }
+            let _ = self.contexts.refresh_bearer_ready(issi, profile.ready_timer_code, response_now);
+            self.last_activity = format!("WAP {}", issi);
+            return fragments.into_iter().map(|fragment| Self::reply(
+                SnPdu::Unitdata(UserData {
+                    acknowledged: false,
+                    nsapi: data.nsapi,
+                    pcomp: 0,
+                    dcomp: 0,
+                    n_pdu: protocol::raw_octets(fragment),
+                }),
+                false,
+                false,
+            )).collect();
+        }
+
+        if profile.gateway_enabled {
+            self.ensure_gateway(profile);
+            let Some(gateway) = self.gateway.as_ref() else {
+                tracing::warn!("SNDCP: general packet gateway unavailable; dropping N-PDU ISSI={}", issi);
+                return Vec::new();
+            };
+            if let Err(error) = gateway.inject_from_mobile(npdu[..ip.total_len].to_vec()) {
+                tracing::warn!("SNDCP: TUN injection failed ISSI={} error={:?}", issi, error);
+                return Vec::new();
+            }
+            self.last_activity = format!("IP uplink {} NSAPI{}", issi, data.nsapi);
             return Vec::new();
         }
-        let response_now = Instant::now();
-        if let Some(context) = self.contexts.get_mut(key) {
-            context.refresh_ready(profile.ready_timer_code, response_now);
-        }
-        let _ = self.contexts.refresh_bearer_ready(issi, profile.ready_timer_code, response_now);
-        self.last_activity = format!("WAP {}", issi);
-        // The terminal WAP profile uses connectionless SN-UNITDATA for the
-        // application response even when the request arrived as acknowledged
-        // SN-DATA. Reliability above SNDCP is provided by WTP retransmission.
-        let response_data = UserData {
-            acknowledged: false,
-            nsapi: data.nsapi,
-            pcomp: 0,
-            dcomp: 0,
-            n_pdu: protocol::raw_octets(response),
-        };
-        vec![Self::reply(SnPdu::Unitdata(response_data), false, false)]
+
+        tracing::debug!(
+            "SNDCP: IPv4 packet has no enabled local service destination={} protocol={}",
+            Ipv4Addr::from(ip.destination),
+            ip.protocol
+        );
+        Vec::new()
     }
 
     fn handle_deactivate(
@@ -945,11 +1420,18 @@ impl Sndcp {
             (0, _) => {
                 self.contexts.remove_all_for_issi(issi);
                 self.contexts.release_bearer_for_issi(issi);
+                self.pending_downlink.retain(|key, _| key.issi != issi);
+                self.page_inflight.retain(|key, _| key.issi != issi);
+                self.automatic_bindings.retain(|_, binding| binding.context.issi != issi);
             }
             (1, Some(nsapi)) => {
                 let family = self.contexts.family_nsapis(issi, nsapi);
                 for family_nsapi in &family {
-                    self.contexts.remove(ContextKey { issi, nsapi: *family_nsapi });
+                    let key = ContextKey { issi, nsapi: *family_nsapi };
+                    self.contexts.remove(key);
+                    self.pending_downlink.remove(&key);
+                    self.page_inflight.remove(&key);
+                    self.automatic_bindings.retain(|_, binding| binding.context != key);
                 }
                 self.contexts.release_bearer_nsapis(issi, &family);
             }
@@ -1027,25 +1509,42 @@ impl Sndcp {
         profile: RuntimeProfile,
     ) -> Vec<CachedReply> {
         let key = ContextKey { issi: ind.received_tetra_address.ssi, nsapi: response.nsapi };
+        self.page_inflight.remove(&key);
         self.check_network_endpoint_id(key.issi, response.network_endpoint_id(), "SN-PAGE RESPONSE");
         if self.contexts.get(key).is_none() {
+            self.pending_downlink.remove(&key);
             return vec![Self::not_supported(protocol::SN_PAGE)];
         }
         if !response.pd_service_available {
             if let Some(context) = self.contexts.get_mut(key) {
                 context.suspend(profile.standby_timer_code, Instant::now());
             }
-            if self.contexts.release_bearer_nsapis(key.issi, &[key.nsapi]) {
-                self.release_pdch();
-            }
+            if self.contexts.release_bearer_nsapis(key.issi, &[key.nsapi]) { self.release_pdch(); }
+            self.pending_downlink.remove(&key);
             return Vec::new();
         }
         if let Err(cause) = Self::validate_resource_request(response.resource_request) {
-            return vec![Self::transmit_response(key.nsapi, false, Some(cause), false, self.contexts.network_endpoint_id(key.issi))];
+            self.page_inflight.insert(key, Instant::now());
+            return vec![Self::transmit_response(
+                key.nsapi, false, Some(cause), false, self.contexts.network_endpoint_id(key.issi),
+            )];
         }
         match self.activate_requested_nsapis(key.issi, &[key.nsapi], profile) {
-            Ok(_) => vec![Self::transmit_response(key.nsapi, true, None, true, self.contexts.network_endpoint_id(key.issi))],
-            Err(cause) => vec![Self::transmit_response(key.nsapi, false, Some(cause), false, self.contexts.network_endpoint_id(key.issi))],
+            Ok(_) => {
+                let mut replies = vec![Self::transmit_response(
+                    key.nsapi, true, None, true, self.contexts.network_endpoint_id(key.issi),
+                )];
+                if let Some(mtu) = self.contexts.get(key).map(|context| context.mtu_octets) {
+                    replies.extend(self.pending_replies(key, mtu));
+                }
+                replies
+            }
+            Err(cause) => {
+                self.page_inflight.insert(key, Instant::now());
+                vec![Self::transmit_response(
+                    key.nsapi, false, Some(cause), false, self.contexts.network_endpoint_id(key.issi),
+                )]
+            }
         }
     }
 
@@ -1140,6 +1639,7 @@ impl Sndcp {
                         false,
                     )];
                 }
+                self.automatic_bindings.retain(|_, binding| binding.context != key);
                 if let Some(context) = self.contexts.get_mut(key) {
                     context.qos = decoded_qos;
                     if context.state == PdpState::Ready {
@@ -1183,6 +1683,9 @@ impl Sndcp {
                         ContextAvailability::Reserved(_) => unreachable!(),
                     }
                 };
+                if should_release {
+                    self.automatic_bindings.retain(|_, binding| binding.context != key);
+                }
                 if should_release && self.contexts.release_bearer_nsapis(issi, &[nsapi]) {
                     self.release_pdch();
                 }
@@ -1200,6 +1703,9 @@ impl Sndcp {
                     };
                     context.enter_standby(profile.standby_timer_code, Instant::now());
                     context.usage = requested;
+                }
+                if requested != ContextUsage::Active {
+                    self.automatic_bindings.retain(|_, binding| binding.context != key);
                 }
                 if self.contexts.release_bearer_nsapis(issi, &[nsapi]) {
                     self.release_pdch();
@@ -1243,6 +1749,8 @@ impl Sndcp {
     fn snapshot(&self) -> WapStatusSnapshot {
         let state = self.config.state_read();
         let active_calls = state.active_call_ts.values().copied().collect::<HashSet<_>>().len();
+        let gateway = self.gateway.as_ref().map(PacketGateway::stats);
+        let queued_packets = self.pending_downlink.values().map(|queue| queue.len()).sum::<usize>();
         WapStatusSnapshot {
             title: "NetCore-Tetra".to_string(),
             state: if state.network_connected { "ONLINE" } else { "STANDALONE" }.to_string(),
@@ -1254,9 +1762,15 @@ impl Sndcp {
             uptime_secs: self.started_at.elapsed().as_secs(),
             last_activity: self.last_activity.clone(),
             health: format!(
-                "OK PDP={} PDCH={}",
+                "OK PDP={} PDCH={} GW={} UL={}/{} DL={}/{} Q={}",
                 self.contexts.len(),
-                self.contexts.bearer_owner().map(|issi| issi.to_string()).unwrap_or_else(|| "free".to_string())
+                self.contexts.bearer_owner().map(|issi| issi.to_string()).unwrap_or_else(|| "free".to_string()),
+                gateway.map(|stats| if stats.running { "UP" } else { "DOWN" }).unwrap_or("OFF"),
+                gateway.map(|stats| stats.packets_from_mobile).unwrap_or(0),
+                gateway.map(|stats| stats.bytes_from_mobile).unwrap_or(0),
+                gateway.map(|stats| stats.packets_to_mobile).unwrap_or(0),
+                gateway.map(|stats| stats.bytes_to_mobile).unwrap_or(0),
+                queued_packets,
             ),
         }
     }
@@ -1266,6 +1780,9 @@ impl Sndcp {
         self.contexts.remove_all_for_issi(issi);
         self.routes.remove(&issi);
         self.response_cache.retain(|(cached_issi, _), _| *cached_issi != issi);
+        self.pending_downlink.retain(|key, _| key.issi != issi);
+        self.page_inflight.retain(|key, _| key.issi != issi);
+        self.automatic_bindings.retain(|_, binding| binding.context.issi != issi);
         if owned_bearer {
             self.release_pdch();
         }
@@ -1319,11 +1836,17 @@ impl Sndcp {
         for issi in expired_issis {
             self.routes.remove(&issi);
             self.response_cache.retain(|(cached_issi, _), _| *cached_issi != issi);
+            self.pending_downlink.retain(|key, _| key.issi != issi);
+            self.page_inflight.retain(|key, _| key.issi != issi);
+            self.automatic_bindings.retain(|_, binding| binding.context.issi != issi);
         }
         if had_bearer && self.contexts.bearer_owner().is_none() {
             self.release_pdch();
         }
         self.response_cache.retain(|_, exchange| exchange.expires_at > now);
+        self.automatic_bindings.retain(|_, binding| binding.expires_at > now);
+        self.uplink_reassembler.sweep(now);
+        self.downlink_reassembler.sweep(now);
     }
 
 }
@@ -1367,28 +1890,109 @@ fn data_transmit_response_optional_section(snei: Option<u16>, additional_nsapis:
     s
 }
 
-fn activation_accept_optional_section(snei: u16, chap_id: Option<u8>) -> String {
-    let mut s = String::with_capacity(if chap_id.is_some() { 97 } else { 20 });
+fn pco_ppp_element(protocol: u16, payload: &[u8]) -> String {
+    let mut contents = String::new();
+    contents.push_str(&format!("{PPP_CONFIG_PROTOCOL_PPP:04b}"));
+    contents.push_str(&format!("{protocol:016b}"));
+    contents.push_str(&format!("{:08b}", payload.len().min(255)));
+    for byte in payload.iter().copied().take(255) {
+        contents.push_str(&format!("{byte:08b}"));
+    }
+    let mut element = String::new();
+    element.push_str(&format!("{PCO_TYPE34_ID:04b}"));
+    element.push_str(&format!("{:011b}", contents.len()));
+    element.push_str(&contents);
+    element
+}
+
+fn activation_accept_optional_section(snei: u16, chap_id: Option<u8>, ipcp_response: Option<&[u8]>) -> String {
+    let mut s = String::new();
     s.push('1'); // O-bit
     s.push('1'); // SNEI Type-2 element present
     s.push_str(&format!("{snei:016b}"));
     s.push('0'); // SwMI IPv6 information absent
     s.push('0'); // SwMI Mobile IPv4 information absent
+    let mut pco = Vec::new();
     if let Some(chap_id) = chap_id {
-        s.push('1'); // Type-3/4 element follows
-        s.push_str(&format!("{PCO_TYPE34_ID:04b}"));
-        s.push_str(&format!("{PCO_CHAP_SUCCESS_BITS:011b}"));
-        s.push_str(&format!("{PPP_CONFIG_PROTOCOL_PPP:04b}"));
-        s.push_str(&format!("{PPP_PROTO_CHAP:016b}"));
-        s.push_str(&format!("{:08b}", 4));
-        s.push_str(&format!("{CHAP_CODE_SUCCESS:08b}"));
-        s.push_str(&format!("{chap_id:08b}"));
-        s.push_str(&format!("{:016b}", 4));
-        s.push('0'); // no further Type-3/4 element
-    } else {
-        s.push('0');
+        pco.push(pco_ppp_element(PPP_PROTO_CHAP, &[CHAP_CODE_SUCCESS, chap_id, 0, 4]));
     }
+    if let Some(ipcp) = ipcp_response {
+        pco.push(pco_ppp_element(PPP_PROTO_IPCP, ipcp));
+    }
+    for element in pco {
+        s.push('1'); // another Type-3/4 element follows
+        s.push_str(&element);
+    }
+    s.push('0');
     s
+}
+
+fn bits_to_u8(bits: &str, offset: usize) -> Option<u8> {
+    bits.get(offset..offset + 8).and_then(|value| u8::from_str_radix(value, 2).ok())
+}
+
+fn find_ppp_payload(demand: &str, protocol: u16) -> Option<Vec<u8>> {
+    let marker = format!("{protocol:016b}");
+    let mut from = 0usize;
+    while let Some(relative) = demand.get(from..)?.find(&marker) {
+        let start = from + relative + 16;
+        let payload_len = usize::from(bits_to_u8(demand, start)?);
+        let payload_start = start + 8;
+        let payload_end = payload_start.checked_add(payload_len.checked_mul(8)?)?;
+        if payload_end <= demand.len() {
+            let mut payload = Vec::with_capacity(payload_len);
+            for offset in (payload_start..payload_end).step_by(8) {
+                payload.push(bits_to_u8(demand, offset)?);
+            }
+            return Some(payload);
+        }
+        from = start;
+    }
+    None
+}
+
+fn build_ipcp_dns_response(demand: &str, configured: [Option<[u8; 4]>; 2]) -> Option<Vec<u8>> {
+    let request = find_ppp_payload(demand, PPP_PROTO_IPCP)?;
+    if request.len() < 4 || request[0] != IPCP_CODE_CONFIGURE_REQUEST {
+        return None;
+    }
+    let declared_len = usize::from(u16::from_be_bytes([request[2], request[3]]));
+    if declared_len < 4 || declared_len > request.len() {
+        return None;
+    }
+    let mut requested = [None, None];
+    let mut offset = 4usize;
+    while offset + 2 <= declared_len {
+        let option = request[offset];
+        let length = usize::from(request[offset + 1]);
+        if length < 2 || offset + length > declared_len {
+            return None;
+        }
+        if length == 6 && matches!(option, IPCP_PRIMARY_DNS_OPTION | IPCP_SECONDARY_DNS_OPTION) {
+            let address = [request[offset + 2], request[offset + 3], request[offset + 4], request[offset + 5]];
+            requested[usize::from(option == IPCP_SECONDARY_DNS_OPTION)] = Some(address);
+        }
+        offset += length;
+    }
+    if configured.iter().all(Option::is_none) || requested.iter().all(Option::is_none) {
+        return None;
+    }
+    let matches = configured.iter().zip(requested).all(|(configured, requested)| requested.is_none() || *configured == requested);
+    let mut response = vec![if matches { IPCP_CODE_CONFIGURE_ACK } else { IPCP_CODE_CONFIGURE_NAK }, request[1], 0, 0];
+    if matches {
+        response.extend_from_slice(&request[4..declared_len]);
+    } else {
+        for (index, address) in configured.into_iter().enumerate() {
+            if let Some(address) = address {
+                response.push(if index == 0 { IPCP_PRIMARY_DNS_OPTION } else { IPCP_SECONDARY_DNS_OPTION });
+                response.push(6);
+                response.extend_from_slice(&address);
+            }
+        }
+    }
+    let length = response.len() as u16;
+    response[2..4].copy_from_slice(&length.to_be_bytes());
+    Some(response)
 }
 
 fn find_chap_response_id(demand: &str) -> Option<u8> {
@@ -1470,6 +2074,12 @@ impl TetraEntityTrait for Sndcp {
 
     fn tick_start(&mut self, queue: &mut MessageQueue, _ts: TdmaTime) {
         if let Some(profile) = self.profile() {
+            if profile.gateway_enabled {
+                self.poll_gateway(queue, profile);
+            } else {
+                self.gateway = None;
+                self.gateway_config = None;
+            }
             self.sweep_timers(queue, profile);
         }
     }
@@ -1497,7 +2107,7 @@ mod tests {
 
     #[test]
     fn optional_section_layout_matches_motorola_profile() {
-        let sec = activation_accept_optional_section(0x1234, Some(5));
+        let sec = activation_accept_optional_section(0x1234, Some(5), None);
         assert_eq!(sec.len(), 97);
         assert_eq!(&sec[0..2], "11");
         assert_eq!(&sec[2..18], "0001001000110100");
@@ -1507,6 +2117,15 @@ mod tests {
         assert_eq!(&sec[64..72], "00000011");
         assert_eq!(&sec[72..80], "00000101");
         assert_eq!(&sec[96..97], "0");
+    }
+
+    #[test]
+    fn ipcp_dns_request_receives_configure_nak() {
+        let payload = [1u8, 7, 0, 10, IPCP_PRIMARY_DNS_OPTION, 6, 0, 0, 0, 0];
+        let mut bits = format!("{PPP_PROTO_IPCP:016b}{:08b}", payload.len());
+        for byte in payload { bits.push_str(&format!("{byte:08b}")); }
+        let response = build_ipcp_dns_response(&bits, [Some([1, 1, 1, 1]), Some([9, 9, 9, 9])]).unwrap();
+        assert_eq!(response, vec![3, 7, 0, 16, 129, 6, 1, 1, 1, 1, 131, 6, 9, 9, 9, 9]);
     }
 
     #[test]
@@ -1522,6 +2141,30 @@ mod tests {
         assert_eq!(already_routed.read_bits(3), Some(MLE_DISCRIMINATOR_SNDCP));
         let from_cursor = Sndcp::rebase_sndcp_pdu(&already_routed);
         assert_eq!(from_cursor.peek_bits(8), Some(0x42));
+    }
+
+    #[test]
+    fn qos_port_filter_matches_downlink_mobile_port() {
+        let packet = crate::sndcp::ip::build_ipv4_udp_npdu(
+            [198, 51, 100, 7], [10, 0, 0, 2], 443, 4711, 1, 32, b"x",
+        ).unwrap();
+        let ip = parse_ipv4_packet(&packet).unwrap();
+        let filter = super::super::qos::QosFilter { operation: 0, filter_type: 2, first: Some(4711), second: None };
+        assert!(Sndcp::static_filter_matches(&ip, filter));
+    }
+
+    #[test]
+    fn automatic_flow_key_is_symmetric_across_direction() {
+        let uplink = crate::sndcp::ip::build_ipv4_udp_npdu(
+            [10, 0, 0, 2], [198, 51, 100, 7], 4711, 443, 1, 32, b"x",
+        ).unwrap();
+        let downlink = crate::sndcp::ip::build_ipv4_udp_npdu(
+            [198, 51, 100, 7], [10, 0, 0, 2], 443, 4711, 2, 32, b"y",
+        ).unwrap();
+        assert_eq!(
+            Sndcp::automatic_flow_key_uplink(&parse_ipv4_packet(&uplink).unwrap()),
+            Sndcp::automatic_flow_key_downlink(&parse_ipv4_packet(&downlink).unwrap()),
+        );
     }
 
     #[test]

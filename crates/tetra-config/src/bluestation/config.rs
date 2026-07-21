@@ -235,21 +235,22 @@ impl StackConfig {
             return Err("ms_txpwr_max_cell must be 0-7 (3 bits)");
         }
 
-        // WAP/IP is a single, opt-in packet-data profile. Advertising and runtime enablement
-        // must agree, otherwise terminals start a PDP procedure that the BS cannot complete.
-        if self.cell.sndcp_service && !self.cell.wap_ip.enabled {
-            return Err("cell.sndcp_service=true requires cell_info.wap_ip.enabled=true");
+        // SNDCP can expose the local WAP endpoint, the general Linux IP gateway,
+        // or both. Capability advertisement and runtime enablement must agree.
+        let packet_profile_enabled = self.cell.wap_ip.enabled || self.cell.packet_data_gateway.enabled;
+        if self.cell.sndcp_service && !packet_profile_enabled {
+            return Err("cell.sndcp_service=true requires WAP/IP or packet_data_gateway");
         }
-        if self.cell.wap_ip.enabled && !self.cell.sndcp_service {
-            return Err("cell_info.wap_ip.enabled=true requires cell.sndcp_service=true");
+        if packet_profile_enabled && !self.cell.sndcp_service {
+            return Err("packet-data services require cell.sndcp_service=true");
         }
-        if self.cell.wap_ip.enabled && !self.cell.advanced_link {
-            return Err("cell_info.wap_ip.enabled=true requires cell.advanced_link=true");
+        if packet_profile_enabled && !self.cell.advanced_link {
+            return Err("packet-data services require cell.advanced_link=true");
         }
-        if self.cell.wap_ip.port == 0 {
+        if self.cell.wap_ip.enabled && self.cell.wap_ip.port == 0 {
             return Err("cell_info.wap_ip.port must be non-zero");
         }
-        if self.cell.wap_ip.response_ttl == 0 {
+        if self.cell.wap_ip.enabled && self.cell.wap_ip.response_ttl == 0 {
             return Err("cell_info.wap_ip.response_ttl must be non-zero");
         }
         if self.cell.wap_ip.max_request_payload_bytes == 0 || self.cell.wap_ip.max_request_payload_bytes > 1024 {
@@ -295,6 +296,102 @@ impl StackConfig {
             && (self.cell.wap_ip.dynamic_pool_first_host..=self.cell.wap_ip.dynamic_pool_last_host).contains(&endpoint[3])
         {
             return Err("cell_info.wap_ip.address must not be inside the dynamic client pool");
+        }
+
+        let gateway = &self.cell.packet_data_gateway;
+        let valid_interface_name = |value: &str| {
+            !value.is_empty()
+                && value.len() <= 15
+                && value
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-' | b'.'))
+        };
+        if !valid_interface_name(&gateway.interface_name) {
+            return Err("cell_info.packet_data_gateway.interface_name must be 1-15 safe interface characters");
+        }
+        if let Some(external) = &gateway.external_interface {
+            if !valid_interface_name(external) {
+                return Err("cell_info.packet_data_gateway.external_interface is invalid");
+            }
+            if external == &gateway.interface_name {
+                return Err("packet-data TUN and external interfaces must differ");
+            }
+        }
+        if !(1..=30).contains(&gateway.prefix_len) {
+            return Err("cell_info.packet_data_gateway.prefix_len must be 1-30");
+        }
+        if gateway.mtu.is_some_and(|mtu| mtu < 68) {
+            return Err("cell_info.packet_data_gateway.mtu must be at least 68");
+        }
+        if gateway.channel_capacity < 16 || gateway.channel_capacity > 65_536 {
+            return Err("cell_info.packet_data_gateway.channel_capacity must be 16-65536");
+        }
+        if gateway.downlink_queue_packets_per_context == 0
+            || gateway.downlink_queue_bytes_per_context < 576
+            || gateway.downlink_queue_ttl_secs == 0
+            || gateway.page_retry_secs == 0
+        {
+            return Err("packet-data downlink queue and paging limits must be non-zero");
+        }
+        if gateway.fragment_reassembly_timeout_secs == 0
+            || gateway.fragment_reassembly_max_datagrams == 0
+            || gateway.fragment_reassembly_max_bytes < 65_535
+        {
+            return Err("packet-data fragment reassembly limits are invalid");
+        }
+        if gateway.automatic_filter_ttl_secs == 0 || gateway.automatic_filter_max_bindings == 0 {
+            return Err("packet-data automatic filter limits must be non-zero");
+        }
+        if gateway.dns_servers.len() > 2 {
+            return Err("cell_info.packet_data_gateway.dns_servers supports at most two IPv4 addresses");
+        }
+        for address in &gateway.dns_servers {
+            if address.is_unspecified() || address.is_multicast() || *address == std::net::Ipv4Addr::BROADCAST {
+                return Err("packet-data DNS addresses must be unicast IPv4 addresses");
+            }
+        }
+        if (gateway.managed_forwarding
+            || gateway.nat_mode == crate::bluestation::PacketGatewayNatMode::Masquerade)
+            && !gateway.enable_ipv4_forwarding
+        {
+            return Err("managed forwarding/NAT requires enable_ipv4_forwarding=true");
+        }
+        if gateway.managed_forwarding
+            && gateway.firewall_backend == crate::bluestation::PacketGatewayFirewallBackend::None
+        {
+            return Err("managed_forwarding=true requires nftables, iptables or auto firewall backend");
+        }
+        if gateway.allow_unsolicited_inbound && !gateway.managed_forwarding {
+            return Err("allow_unsolicited_inbound=true requires managed_forwarding=true");
+        }
+        if gateway.nat_mode == crate::bluestation::PacketGatewayNatMode::Masquerade
+            && gateway.firewall_backend == crate::bluestation::PacketGatewayFirewallBackend::None
+        {
+            return Err("NAT masquerade requires nftables, iptables or auto firewall backend");
+        }
+        if !gateway.auto_configure
+            && (gateway.managed_forwarding
+                || gateway.nat_mode == crate::bluestation::PacketGatewayNatMode::Masquerade)
+        {
+            return Err("managed forwarding/NAT requires packet_data_gateway.auto_configure=true");
+        }
+        if gateway.enabled {
+            let gateway_u32 = u32::from(self.cell.wap_ip.address);
+            let mask = u32::MAX << (32 - gateway.prefix_len);
+            let network = gateway_u32 & mask;
+            let broadcast = network | !mask;
+            if gateway_u32 == network || gateway_u32 == broadcast {
+                return Err("WAP/gateway address must not be the packet-data subnet network or broadcast address");
+            }
+            let first = u32::from(std::net::Ipv4Addr::new(
+                pool_prefix[0], pool_prefix[1], pool_prefix[2], self.cell.wap_ip.dynamic_pool_first_host,
+            ));
+            let last = u32::from(std::net::Ipv4Addr::new(
+                pool_prefix[0], pool_prefix[1], pool_prefix[2], self.cell.wap_ip.dynamic_pool_last_host,
+            ));
+            if first & mask != network || last & mask != network || first == network || last == broadcast {
+                return Err("dynamic PDP address pool must fit completely inside packet-data subnet");
+            }
         }
 
         // Validate timezone if configured

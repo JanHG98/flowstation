@@ -1,0 +1,38 @@
+#!/bin/sh
+set -u
+
+IFACE=${1:-ntetra0}
+
+echo "== TUN interface =="
+ip -details address show dev "$IFACE" 2>/dev/null || echo "$IFACE is not present"
+
+echo
+echo "== Routes =="
+ip -4 route show dev "$IFACE" 2>/dev/null || true
+
+echo
+echo "== Forwarding =="
+printf 'net.ipv4.ip_forward='; cat /proc/sys/net/ipv4/ip_forward 2>/dev/null || echo unknown
+
+if command -v nft >/dev/null 2>&1 && nft list table ip netcore_tetra >/dev/null 2>&1; then
+    echo
+echo "== nftables =="
+    nft list table ip netcore_tetra
+elif command -v iptables >/dev/null 2>&1; then
+    echo
+echo "== iptables filter chain =="
+    iptables -S NETCORE_TETRA_FWD 2>/dev/null || echo "NETCORE_TETRA_FWD is not installed"
+    echo
+echo "== iptables NAT chain =="
+    iptables -t nat -S NETCORE_TETRA_NAT 2>/dev/null || echo "NETCORE_TETRA_NAT is not installed"
+else
+    echo "No nftables/iptables command available."
+fi
+
+echo
+echo "== Crash-recovery state =="
+if [ -r /run/netcore-tetra/packet-gateway-sysctls ]; then
+    cat /run/netcore-tetra/packet-gateway-sysctls
+else
+    echo "No persisted sysctl state (gateway stopped or no values changed)."
+fi

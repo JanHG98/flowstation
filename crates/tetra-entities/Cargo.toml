@@ -32,6 +32,7 @@ runtime = [
     "dep:md5",
     "dep:base64",
     "dep:uuid",
+    "dep:libc",
 ]
 
 # Link the native TETRA speech codec for any media feature.
