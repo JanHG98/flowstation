@@ -5716,6 +5716,62 @@ function mapsDeviceMeta(source,device){
   return parts.filter(Boolean).join(' · ');
 }
 
+// ── Local group labels (groups directory) ─────────────────────────────────────
+let stationGroupRegistry={};
+
+function normalizeStationGroups(raw){
+  const out={};
+  const put=(id,entry)=>{
+    const key=String(id??'').trim();
+    if(!key)return;
+    if(typeof entry==='string'){
+      const name=entry.trim();
+      if(name)out[key]=name;
+      return;
+    }
+    if(entry&&typeof entry==='object'){
+      const name=String(entry.name||entry.label||entry.title||entry.callsign||'').trim();
+      if(name)out[key]=name;
+    }
+  };
+  if(Array.isArray(raw)){
+    raw.forEach(entry=>put(entry&&(entry.gssi??entry.id??entry.ssi),entry));
+    return out;
+  }
+  if(raw&&Array.isArray(raw.groups)){
+    raw.groups.forEach(entry=>put(entry&&(entry.gssi??entry.id??entry.ssi),entry));
+    return out;
+  }
+  if(raw&&Array.isArray(raw.results)){
+    raw.results.forEach(entry=>put(entry&&(entry.gssi??entry.id??entry.ssi),entry));
+    return out;
+  }
+  if(raw&&typeof raw==='object')Object.entries(raw).forEach(([id,entry])=>put(id,entry));
+  return out;
+}
+
+function stationGroupName(gssi){
+  const key=String(gssi??'').trim();
+  return stationGroupRegistry[key]||('GSSI '+key);
+}
+
+function stationGroupFullLabel(gssi){
+  const key=String(gssi??'').trim();
+  const name=stationGroupRegistry[key]||'';
+  return name?(name+' · GSSI '+key):('GSSI '+key);
+}
+
+async function loadStationGroupRegistry(){
+  try{
+    const response=await fetch('/api/groups',{cache:'no-store',credentials:'same-origin'});
+    if(!response.ok)throw new Error('HTTP '+response.status);
+    stationGroupRegistry=normalizeStationGroups(await response.json());
+  }catch(_){
+    stationGroupRegistry={};
+  }
+  renderStations();
+}
+
 // ── Local device labels (devices.json) ────────────────────────────────────────
 // External callsign lookup is disabled. ISSI labels come from the local NetCore Directory API.
 // Keeping the old function names as no-op compatibility hooks avoids touching every
@@ -6468,29 +6524,34 @@ function renderStations(){
   tb.innerHTML=ms.sort((a,b)=>a.issi-b.issi).map(m=>{
     const r=m.rssi_dbfs,rL=r!=null?`${r.toFixed(1)} dBFS`:'—',pct=rssiPct(r),gcls=rssiGaugeClass(r);
     let grps;
-    const gl=m.groups||[],sel=m.selected_group;
-    // The selected/active TG (the one the MS last keyed up on) is rendered as a solid blue
-    // badge with a ▶ marker; the merely scanned/affiliated TGs are dim. Until the MS is heard
-    // on a call sel is null — so right after a restart all groups show dim (scanned), without
-    // implying the station is actively on any of them.
-    const gBadge=g=>g===sel
-      ?`<span class="badge badge-blue" style="font-weight:700;font-size:9px" title="${t('tg_selected')}"><span class="tg-marker">${ICON_MARKER}</span>${g}</span>`
-      :`<span class="badge badge-dim" style="font-size:9px">${g}</span>`;
-    if(gl.length>1){
-      const gList=gl.slice().sort((a,b)=>(b===sel)-(a===sel)||a-b).map(gBadge).join(' ');
-      // Always show a neutral "+N affiliated" badge — never "⚡ SCAN" (FH-BUG-032). On the BS
-      // side we have NO signal that the radio is actively scanning; we only have the static set
-      // of affiliated groups, which the radio keeps re-attaching with lifetime=0 even after scan
-      // is turned off on the device (intentional — see FH-BUG-022). "⚡ SCAN" was read by
-      // operators as a live "this radio is scanning" claim, which we cannot back up. "+N
-      // affiliated" is honest: these N groups are affiliated alongside the selected one (if any).
-      // With a selected TG, the selected one is marked ▶ and N excludes it; with none selected
-      // yet (e.g. before the first PTT), N counts them all.
-      const others=sel!=null?gl.filter(g=>g!==sel).length:gl.length;
-      const extraBadge=`<span class="badge badge-dim" style="font-size:9px;margin-right:4px" title="${t('tg_affiliated_hint')}">+${others} ${t('tg_affiliated_short')}</span>`;
-      grps=`${extraBadge}${gList}`;
-    } else if(gl.length===1){
-      grps=`<span class="badge badge-blue">${gl[0]}</span>`;
+    const gl=[...new Set((m.groups||[]).map(Number).filter(g=>Number.isInteger(g)&&g>0))];
+    const selectedRaw=Number(m.selected_group);
+    const sel=Number.isInteger(selectedRaw)&&selectedRaw>0?selectedRaw:null;
+
+    // Show names from the NetCore group directory. The active/selected group is
+    // kept first and highlighted. At most two groups are shown directly; all
+    // remaining groups are available on hover via the "+N weitere" badge.
+    const sortedGroups=gl.slice().sort((a,b)=>{
+      if(a===sel&&b!==sel)return -1;
+      if(b===sel&&a!==sel)return 1;
+      return stationGroupName(a).localeCompare(stationGroupName(b),'de',{numeric:true,sensitivity:'base'})||a-b;
+    });
+    const gBadge=g=>{
+      const name=escHtml(stationGroupName(g));
+      const full=escAttr(stationGroupFullLabel(g)+(g===sel?' · '+t('tg_selected'):''));
+      return g===sel
+        ?`<span class="badge badge-blue" style="font-weight:700;font-size:9px" title="${full}"><span class="tg-marker">${ICON_MARKER}</span>${name}</span>`
+        :`<span class="badge badge-dim" style="font-size:9px" title="${full}">${name}</span>`;
+    };
+
+    if(sortedGroups.length){
+      const visible=sortedGroups.slice(0,2);
+      const hidden=sortedGroups.slice(2);
+      grps=visible.map(gBadge).join(' ');
+      if(hidden.length){
+        const hoverText=escAttr('Weitere Gruppen:\n'+hidden.map(stationGroupFullLabel).join('\n'));
+        grps+=` <span class="badge badge-dim" style="font-size:9px;cursor:help" title="${hoverText}">+${hidden.length} weitere</span>`;
+      }
     } else {
       grps='<span class="badge badge-dim">—</span>';
     }
@@ -10467,6 +10528,7 @@ async function checkUpdate(){
 async function boot(){
   bindMapsControls();
   loadDeviceRegistry();
+  loadStationGroupRegistry();
   const hasAuthMarker = document.cookie.split(';').some(c=>c.trim().startsWith('fs_auth='));
   let anonymous = false;
   if(!hasAuthMarker){
