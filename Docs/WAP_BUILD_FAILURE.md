@@ -8,37 +8,37 @@ Workflow-Exitcode: 101
 /tmp/wap-port.patch: OK
 >>> sudo apt-get update
 Get:1 file:/etc/apt/apt-mirrors.txt Mirrorlist [144 B]
+Hit:6 https://packages.microsoft.com/repos/azure-cli noble InRelease
 Hit:2 http://azure.archive.ubuntu.com/ubuntu noble InRelease
+Get:7 https://packages.microsoft.com/ubuntu/24.04/prod noble InRelease [3600 B]
 Get:3 http://azure.archive.ubuntu.com/ubuntu noble-updates InRelease [126 kB]
 Get:4 http://azure.archive.ubuntu.com/ubuntu noble-backports InRelease [126 kB]
 Get:5 http://azure.archive.ubuntu.com/ubuntu noble-security InRelease [126 kB]
-Get:6 https://dl.google.com/linux/chrome-stable/deb stable InRelease [1825 B]
-Get:7 http://azure.archive.ubuntu.com/ubuntu noble-updates/main amd64 Packages [1122 kB]
-Get:8 http://azure.archive.ubuntu.com/ubuntu noble-updates/main Translation-en [274 kB]
-Get:9 http://azure.archive.ubuntu.com/ubuntu noble-updates/main amd64 Components [180 kB]
-Get:10 http://azure.archive.ubuntu.com/ubuntu noble-updates/universe amd64 Packages [1666 kB]
-Get:11 http://azure.archive.ubuntu.com/ubuntu noble-updates/universe Translation-en [329 kB]
-Get:12 http://azure.archive.ubuntu.com/ubuntu noble-updates/universe amd64 Components [388 kB]
-Get:13 http://azure.archive.ubuntu.com/ubuntu noble-updates/restricted amd64 Packages [1274 kB]
-Get:14 http://azure.archive.ubuntu.com/ubuntu noble-updates/restricted Translation-en [291 kB]
-Get:15 http://azure.archive.ubuntu.com/ubuntu noble-updates/multiverse amd64 Components [940 B]
-Hit:16 https://packages.microsoft.com/repos/azure-cli noble InRelease
-Get:17 https://packages.microsoft.com/ubuntu/24.04/prod noble InRelease [3600 B]
-Get:18 http://azure.archive.ubuntu.com/ubuntu noble-backports/main amd64 Components [5752 B]
-Get:19 http://azure.archive.ubuntu.com/ubuntu noble-backports/universe amd64 Components [10.5 kB]
-Get:20 http://azure.archive.ubuntu.com/ubuntu noble-security/main amd64 Packages [861 kB]
-Get:21 http://azure.archive.ubuntu.com/ubuntu noble-security/main Translation-en [192 kB]
-Get:22 http://azure.archive.ubuntu.com/ubuntu noble-security/main amd64 Components [46.3 kB]
-Get:23 http://azure.archive.ubuntu.com/ubuntu noble-security/universe amd64 Packages [1180 kB]
-Get:24 http://azure.archive.ubuntu.com/ubuntu noble-security/universe Translation-en [233 kB]
-Get:25 http://azure.archive.ubuntu.com/ubuntu noble-security/universe amd64 Components [76.3 kB]
-Get:26 http://azure.archive.ubuntu.com/ubuntu noble-security/restricted amd64 Packages [1178 kB]
-Get:27 http://azure.archive.ubuntu.com/ubuntu noble-security/restricted Translation-en [272 kB]
-Get:28 https://dl.google.com/linux/chrome-stable/deb stable/main amd64 Packages [1414 B]
-Get:29 https://packages.microsoft.com/ubuntu/24.04/prod noble/main armhf Packages [11.7 kB]
-Get:30 https://packages.microsoft.com/ubuntu/24.04/prod noble/main amd64 Packages [233 kB]
-Get:31 https://packages.microsoft.com/ubuntu/24.04/prod noble/main arm64 Packages [200 kB]
-Fetched 10.4 MB in 1s (8593 kB/s)
+Get:8 https://dl.google.com/linux/chrome-stable/deb stable InRelease [1825 B]
+Get:9 https://packages.microsoft.com/ubuntu/24.04/prod noble/main amd64 Packages [233 kB]
+Get:10 https://packages.microsoft.com/ubuntu/24.04/prod noble/main armhf Packages [11.7 kB]
+Get:11 https://packages.microsoft.com/ubuntu/24.04/prod noble/main arm64 Packages [200 kB]
+Get:12 http://azure.archive.ubuntu.com/ubuntu noble-updates/main amd64 Packages [1122 kB]
+Get:13 http://azure.archive.ubuntu.com/ubuntu noble-updates/main Translation-en [274 kB]
+Get:14 http://azure.archive.ubuntu.com/ubuntu noble-updates/main amd64 Components [180 kB]
+Get:15 http://azure.archive.ubuntu.com/ubuntu noble-updates/universe amd64 Packages [1666 kB]
+Get:16 http://azure.archive.ubuntu.com/ubuntu noble-updates/universe Translation-en [329 kB]
+Get:17 http://azure.archive.ubuntu.com/ubuntu noble-updates/universe amd64 Components [388 kB]
+Get:18 http://azure.archive.ubuntu.com/ubuntu noble-updates/restricted amd64 Packages [1274 kB]
+Get:19 http://azure.archive.ubuntu.com/ubuntu noble-updates/restricted Translation-en [291 kB]
+Get:20 http://azure.archive.ubuntu.com/ubuntu noble-updates/multiverse amd64 Components [940 B]
+Get:21 http://azure.archive.ubuntu.com/ubuntu noble-backports/main amd64 Components [5752 B]
+Get:22 http://azure.archive.ubuntu.com/ubuntu noble-backports/universe amd64 Components [10.5 kB]
+Get:23 http://azure.archive.ubuntu.com/ubuntu noble-security/main amd64 Packages [861 kB]
+Get:24 http://azure.archive.ubuntu.com/ubuntu noble-security/main Translation-en [192 kB]
+Get:25 http://azure.archive.ubuntu.com/ubuntu noble-security/main amd64 Components [46.3 kB]
+Get:26 http://azure.archive.ubuntu.com/ubuntu noble-security/universe amd64 Packages [1180 kB]
+Get:27 http://azure.archive.ubuntu.com/ubuntu noble-security/universe Translation-en [233 kB]
+Get:28 http://azure.archive.ubuntu.com/ubuntu noble-security/universe amd64 Components [76.3 kB]
+Get:29 http://azure.archive.ubuntu.com/ubuntu noble-security/restricted amd64 Packages [1178 kB]
+Get:30 http://azure.archive.ubuntu.com/ubuntu noble-security/restricted Translation-en [272 kB]
+Get:31 https://dl.google.com/linux/chrome-stable/deb stable/main amd64 Packages [1418 B]
+Fetched 10.4 MB in 1s (8350 kB/s)
 Reading package lists...
 >>> sudo apt-get install --yes pkg-config libsoapysdr-dev
 Reading package lists...
@@ -124,7 +124,7 @@ Get:44 http://azure.archive.ubuntu.com/ubuntu noble/universe amd64 soapysdr0.8-m
 Get:45 http://azure.archive.ubuntu.com/ubuntu noble/universe amd64 soapysdr0.8-module-uhd amd64 0.4.1-4build4 [63.8 kB]
 Get:46 http://azure.archive.ubuntu.com/ubuntu noble/universe amd64 soapysdr0.8-module-all amd64 0.8.1-4build1 [4096 B]
 Get:47 http://azure.archive.ubuntu.com/ubuntu noble/universe amd64 bladerf amd64 0.2023.02-4build1 [128 kB]
-Fetched 11.2 MB in 15s (750 kB/s)
+Fetched 11.2 MB in 4s (2924 kB/s)
 Selecting previously unselected package libasyncns0:amd64.
 (Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 202507 files and directories currently installed.)
 Preparing to unpack .../00-libasyncns0_0.8-6build4_amd64.deb ...
@@ -355,123 +355,123 @@ info: default toolchain set to stable-x86_64-unknown-linux-gnu
     Updating crates.io index
  Downloading crates ...
   Downloaded arrayvec v0.7.6
-  Downloaded bytemuck v1.25.0
-  Downloaded aho-corasick v1.1.4
-  Downloaded cfg-if v1.0.4
-  Downloaded const_format_proc_macros v0.2.34
-  Downloaded lazy_static v1.5.0
-  Downloaded chrono v0.4.44
-  Downloaded iana-time-zone v0.1.65
-  Downloaded crossbeam-channel v0.5.15
-  Downloaded log v0.4.29
-  Downloaded indexmap v2.13.0
-  Downloaded num-traits v0.2.19
-  Downloaded serde_spanned v0.6.9
-  Downloaded toml_datetime v0.6.11
-  Downloaded nu-ansi-term v0.50.3
-  Downloaded phf v0.12.1
-  Downloaded git-version-macro v0.3.9
-  Downloaded num-conv v0.2.1
-  Downloaded equivalent v1.0.2
-  Downloaded tracing-core v0.1.36
-  Downloaded serde_derive v1.0.228
-  Downloaded unicode-xid v0.2.6
   Downloaded autocfg v1.5.0
-  Downloaded hashbrown v0.16.1
-  Downloaded pin-project-lite v0.2.17
-  Downloaded thread_local v1.1.9
-  Downloaded time-macros v0.2.27
-  Downloaded smallvec v1.15.1
-  Downloaded bitcode v0.6.9
-  Downloaded memchr v2.8.0
-  Downloaded tracing-appender v0.2.4
-  Downloaded const_format v0.2.35
-  Downloaded regex-syntax v0.8.10
-  Downloaded serde_core v1.0.228
-  Downloaded unicode-ident v1.0.24
   Downloaded bitcode_derive v0.6.9
-  Downloaded matchers v0.2.0
-  Downloaded thiserror-impl v2.0.18
-  Downloaded deranged v0.5.8
-  Downloaded crossbeam-utils v0.8.21
+  Downloaded aho-corasick v1.1.4
+  Downloaded bitcode v0.6.9
+  Downloaded chrono v0.4.44
+  Downloaded memchr v2.8.0
+  Downloaded bytemuck v1.25.0
   Downloaded itoa v1.0.18
-  Downloaded proc-macro2 v1.0.106
-  Downloaded toml v0.8.23
+  Downloaded matchers v0.2.0
+  Downloaded nu-ansi-term v0.50.3
+  Downloaded crossbeam-channel v0.5.15
+  Downloaded num-conv v0.2.1
   Downloaded once_cell v1.21.4
-  Downloaded serde v1.0.228
-  Downloaded toml_edit v0.22.27
-  Downloaded sharded-slab v0.1.7
-  Downloaded winnow v0.7.15
-  Downloaded tracing v0.1.44
-  Downloaded chrono-tz v0.10.4
-  Downloaded regex-automata v0.4.14
+  Downloaded crossbeam-utils v0.8.21
+  Downloaded deranged v0.5.8
+  Downloaded log v0.4.29
+  Downloaded phf v0.12.1
+  Downloaded pin-project-lite v0.2.17
+  Downloaded num-traits v0.2.19
   Downloaded siphasher v1.0.2
-  Downloaded powerfmt v0.2.0
-  Downloaded quote v1.0.45
-  Downloaded tracing-attributes v0.1.31
-  Downloaded phf_shared v0.12.1
-  Downloaded git-version v0.3.9
-  Downloaded time v0.3.47
-  Downloaded tracing-log v0.2.0
+  Downloaded indexmap v2.13.0
+  Downloaded smallvec v1.15.1
+  Downloaded toml_datetime v0.6.11
   Downloaded toml_write v0.1.2
+  Downloaded tracing-attributes v0.1.31
+  Downloaded tracing-core v0.1.36
+  Downloaded tracing-log v0.2.0
+  Downloaded const_format_proc_macros v0.2.34
+  Downloaded equivalent v1.0.2
+  Downloaded lazy_static v1.5.0
+  Downloaded phf_shared v0.12.1
+  Downloaded serde v1.0.228
+  Downloaded thiserror-impl v2.0.18
+  Downloaded iana-time-zone v0.1.65
+  Downloaded tracing-appender v0.2.4
+  Downloaded git-version v0.3.9
+  Downloaded git-version-macro v0.3.9
+  Downloaded serde_spanned v0.6.9
+  Downloaded winnow v0.7.15
+  Downloaded powerfmt v0.2.0
+  Downloaded unicode-ident v1.0.24
+  Downloaded const_format v0.2.35
+  Downloaded hashbrown v0.16.1
+  Downloaded sharded-slab v0.1.7
+  Downloaded toml v0.8.23
+  Downloaded cfg-if v1.0.4
+  Downloaded serde_core v1.0.228
+  Downloaded toml_edit v0.22.27
+  Downloaded unicode-xid v0.2.6
   Downloaded thiserror v2.0.18
   Downloaded time-core v0.1.8
+  Downloaded time-macros v0.2.27
+  Downloaded proc-macro2 v1.0.106
+  Downloaded quote v1.0.45
+  Downloaded time v0.3.47
   Downloaded syn v2.0.117
+  Downloaded serde_derive v1.0.228
+  Downloaded regex-syntax v0.8.10
+  Downloaded chrono-tz v0.10.4
+  Downloaded thread_local v1.1.9
   Downloaded tracing-subscriber v0.3.23
+  Downloaded tracing v0.1.44
+  Downloaded regex-automata v0.4.14
   Downloaded glam v0.32.1
    Compiling proc-macro2 v1.0.106
-   Compiling unicode-ident v1.0.24
    Compiling quote v1.0.45
+   Compiling unicode-ident v1.0.24
    Compiling serde_core v1.0.228
    Compiling serde v1.0.228
-   Compiling autocfg v1.5.0
     Checking once_cell v1.21.4
+   Compiling autocfg v1.5.0
     Checking tracing-core v0.1.36
-   Compiling num-traits v0.2.19
     Checking regex-syntax v0.8.10
+   Compiling num-traits v0.2.19
    Compiling syn v2.0.117
     Checking powerfmt v0.2.0
    Compiling crossbeam-utils v0.8.21
     Checking deranged v0.5.8
     Checking regex-automata v0.4.14
-    Checking siphasher v1.0.2
-    Checking log v0.4.29
-    Checking time-core v0.1.8
-    Checking num-conv v0.2.1
-    Checking itoa v1.0.18
     Checking cfg-if v1.0.4
-    Checking lazy_static v1.5.0
-   Compiling thiserror v2.0.18
     Checking pin-project-lite v0.2.17
-    Checking sharded-slab v0.1.7
-    Checking time v0.3.47
-    Checking matchers v0.2.0
-    Checking thread_local v1.1.9
-    Checking tracing-log v0.2.0
+   Compiling thiserror v2.0.18
+    Checking log v0.4.29
+    Checking lazy_static v1.5.0
+    Checking itoa v1.0.18
+    Checking num-conv v0.2.1
+    Checking siphasher v1.0.2
+    Checking time-core v0.1.8
     Checking phf_shared v0.12.1
-   Compiling chrono-tz v0.10.4
-    Checking iana-time-zone v0.1.65
+    Checking time v0.3.47
+    Checking sharded-slab v0.1.7
+    Checking matchers v0.2.0
+    Checking tracing-log v0.2.0
+    Checking thread_local v1.1.9
+    Checking equivalent v1.0.2
     Checking hashbrown v0.16.1
     Checking smallvec v1.15.1
-    Checking equivalent v1.0.2
    Compiling unicode-xid v0.2.6
+    Checking iana-time-zone v0.1.65
     Checking nu-ansi-term v0.50.3
-   Compiling const_format_proc_macros v0.2.34
+   Compiling chrono-tz v0.10.4
     Checking chrono v0.4.44
     Checking indexmap v2.13.0
+   Compiling const_format_proc_macros v0.2.34
     Checking crossbeam-channel v0.5.15
     Checking phf v0.12.1
-    Checking winnow v0.7.15
     Checking toml_write v0.1.2
     Checking bytemuck v1.25.0
+    Checking winnow v0.7.15
     Checking const_format v0.2.35
    Compiling serde_derive v1.0.228
    Compiling tracing-attributes v0.1.31
    Compiling thiserror-impl v2.0.18
     Checking tracing v0.1.44
     Checking tracing-subscriber v0.3.23
-   Compiling bitcode_derive v0.6.9
    Compiling git-version-macro v0.3.9
+   Compiling bitcode_derive v0.6.9
     Checking git-version v0.3.9
     Checking tracing-appender v0.2.4
     Checking bitcode v0.6.9
@@ -481,232 +481,232 @@ info: default toolchain set to stable-x86_64-unknown-linux-gnu
     Checking tetra-core v1.3.0 (/home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-core)
     Checking toml v0.8.23
     Checking tetra-config v1.3.0 (/home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-config)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 12.45s
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 12.13s
 >>> cargo check --locked -p tetra-entities
  Downloading crates ...
-  Downloaded atomic-waker v1.1.2
-  Downloaded futures-core v0.3.32
-  Downloaded as-any v0.3.2
-  Downloaded find-msvc-tools v0.1.9
-  Downloaded futures-io v0.3.32
-  Downloaded form_urlencoded v1.2.2
-  Downloaded block-buffer v0.10.4
-  Downloaded fastbloom v0.14.1
-  Downloaded httparse v1.10.1
-  Downloaded subtle v2.6.1
-  Downloaded hyper-rustls v0.27.9
-  Downloaded num-rational v0.4.2
-  Downloaded bitflags v2.11.0
-  Downloaded byteorder v1.5.0
-  Downloaded crypto-common v0.1.7
-  Downloaded futures-channel v0.3.32
+  Downloaded futures-sink v0.3.32
+  Downloaded generic-array v0.14.7
+  Downloaded cpufeatures v0.2.17
   Downloaded tinyvec_macros v0.1.1
-  Downloaded rustls-pki-types v1.14.0
-  Downloaded lru-slab v0.1.2
-  Downloaded icu_properties v2.2.0
-  Downloaded rand_chacha v0.9.0
-  Downloaded ryu v1.0.23
-  Downloaded try-lock v0.2.5
-  Downloaded bytes v1.11.1
-  Downloaded http-body-util v0.1.3
-  Downloaded ipnet v2.12.0
-  Downloaded tinyvec v1.11.0
-  Downloaded base64 v0.22.1
-  Downloaded cc v1.2.58
-  Downloaded icu_collections v2.2.0
-  Downloaded utf-8 v0.7.6
-  Downloaded data-encoding v2.10.0
+  Downloaded as-any v0.3.2
+  Downloaded atomic-waker v1.1.2
+  Downloaded cfg_aliases v0.2.1
+  Downloaded futures-io v0.3.32
+  Downloaded futures-task v0.3.32
   Downloaded tower-layer v0.3.3
+  Downloaded byteorder v1.5.0
+  Downloaded block-buffer v0.10.4
+  Downloaded http-body v1.0.1
+  Downloaded synstructure v0.13.2
+  Downloaded http-body-util v0.1.3
+  Downloaded bitflags v2.11.0
   Downloaded tower-service v0.3.3
-  Downloaded want v0.3.1
-  Downloaded getrandom v0.4.2
-  Downloaded idna_adapter v1.2.2
-  Downloaded num-complex v0.4.6
+  Downloaded tower v0.5.3
+  Downloaded tokio-rustls v0.26.4
+  Downloaded form_urlencoded v1.2.2
+  Downloaded untrusted v0.9.0
+  Downloaded futures-core v0.3.32
   Downloaded transpose v0.2.3
   Downloaded utf8_iter v1.0.4
-  Downloaded zerovec-derive v0.11.3
-  Downloaded icu_normalizer_data v2.2.0
-  Downloaded icu_properties_data v2.2.0
-  Downloaded md5 v0.7.0
-  Downloaded num v0.4.3
-  Downloaded quinn-proto v0.11.14
-  Downloaded thiserror v1.0.69
-  Downloaded untrusted v0.9.0
-  Downloaded url v2.5.8
-  Downloaded zerofrom v0.1.8
-  Downloaded zerotrie v0.2.4
-  Downloaded zerovec v0.11.6
-  Downloaded zmij v1.0.21
-  Downloaded cfg_aliases v0.2.1
-  Downloaded getrandom v0.3.4
-  Downloaded icu_locale_core v2.2.0
-  Downloaded icu_provider v2.2.0
-  Downloaded litemap v0.8.2
-  Downloaded zeroize v1.8.2
-  Downloaded cpufeatures v0.2.17
-  Downloaded digest v0.10.7
-  Downloaded icu_normalizer v2.2.0
-  Downloaded idna v1.1.0
-  Downloaded mio v1.2.0
-  Downloaded pkg-config v0.3.32
-  Downloaded rand_core v0.9.5
-  Downloaded rustls-pemfile v2.2.0
-  Downloaded tower v0.5.3
-  Downloaded displaydoc v0.2.6
-  Downloaded futures-sink v0.3.32
-  Downloaded num-bigint v0.4.6
-  Downloaded webpki-roots v1.0.7
-  Downloaded yoke v0.8.2
-  Downloaded potential_utf v0.1.5
-  Downloaded rand v0.8.5
-  Downloaded rustls-native-certs v0.8.3
-  Downloaded serde_json v1.0.149
-  Downloaded sync_wrapper v1.0.2
-  Downloaded synstructure v0.13.2
-  Downloaded tungstenite v0.24.0
-  Downloaded version_check v0.9.5
-  Downloaded generic-array v0.14.7
-  Downloaded getrandom v0.2.17
-  Downloaded hyper v1.10.1
-  Downloaded rand v0.9.2
-  Downloaded num-iter v0.1.45
-  Downloaded rand_chacha v0.3.1
-  Downloaded tokio v1.50.0
-  Downloaded zerocopy v0.8.48
-  Downloaded http-body v1.0.1
-  Downloaded openssl-probe v0.1.6
-  Downloaded ppv-lite86 v0.2.21
-  Downloaded tokio-rustls v0.26.4
-  Downloaded uuid v1.23.0
   Downloaded zerofrom-derive v0.1.7
-  Downloaded typenum v1.19.0
-  Downloaded writeable v0.6.3
+  Downloaded futures-channel v0.3.32
+  Downloaded httparse v1.10.1
+  Downloaded potential_utf v0.1.5
+  Downloaded hyper-rustls v0.27.9
+  Downloaded find-msvc-tools v0.1.9
   Downloaded stable_deref_trait v1.2.1
-  Downloaded rustls-platform-verifier v0.6.2
-  Downloaded socket2 v0.6.3
-  Downloaded strength_reduce v0.2.4
-  Downloaded tower-http v0.6.11
+  Downloaded tinyvec v1.11.0
+  Downloaded zerofrom v0.1.8
+  Downloaded md5 v0.7.0
+  Downloaded rand_chacha v0.3.1
+  Downloaded rustc-hash v2.1.2
+  Downloaded utf-8 v0.7.6
+  Downloaded base64 v0.22.1
+  Downloaded bytes v1.11.1
+  Downloaded num v0.4.3
+  Downloaded serde_urlencoded v0.7.1
+  Downloaded try-lock v0.2.5
+  Downloaded writeable v0.6.3
+  Downloaded crypto-common v0.1.7
+  Downloaded want v0.3.1
+  Downloaded cc v1.2.58
+  Downloaded getrandom v0.2.17
   Downloaded yoke-derive v0.8.2
-  Downloaded quinn-udp v0.5.14
-  Downloaded hyper-util v0.1.20
+  Downloaded lru-slab v0.1.2
+  Downloaded openssl-probe v0.1.6
   Downloaded openssl-probe v0.2.1
   Downloaded percent-encoding v2.3.2
-  Downloaded rustc-hash v2.1.2
-  Downloaded rustls-webpki v0.103.10
-  Downloaded slab v0.4.12
-  Downloaded http v1.4.0
-  Downloaded quinn v0.11.9
-  Downloaded libm v0.2.16
-  Downloaded rustfft v6.4.1
-  Downloaded primal-check v0.3.4
-  Downloaded futures-task v0.3.32
-  Downloaded rustls-native-certs v0.7.3
-  Downloaded rand_core v0.6.4
-  Downloaded reqwest v0.12.28
-  Downloaded ring v0.17.14
-  Downloaded serde_urlencoded v0.7.1
-  Downloaded tinystr v0.8.3
-  Downloaded futures-util v0.3.32
-  Downloaded libc v0.2.183
-  Downloaded num-integer v0.1.46
+  Downloaded sync_wrapper v1.0.2
   Downloaded sha1 v0.10.6
-  Downloaded shlex v1.3.0
-  Downloaded thiserror-impl v1.0.69
-  Downloaded rustls v0.23.37
-  Downloaded soapysdr v0.5.0
+  Downloaded subtle v2.6.1
+  Downloaded zeroize v1.8.2
+  Downloaded zerovec-derive v0.11.3
+  Downloaded rustls-native-certs v0.8.3
+  Downloaded data-encoding v2.10.0
+  Downloaded num-iter v0.1.45
+  Downloaded primal-check v0.3.4
+  Downloaded displaydoc v0.2.6
+  Downloaded idna_adapter v1.2.2
+  Downloaded num-integer v0.1.46
+  Downloaded rustls-pki-types v1.14.0
+  Downloaded tinystr v0.8.3
+  Downloaded fastbloom v0.14.1
+  Downloaded getrandom v0.4.2
+  Downloaded num-rational v0.4.2
+  Downloaded ppv-lite86 v0.2.21
+  Downloaded rand_chacha v0.9.0
+  Downloaded digest v0.10.7
+  Downloaded quinn-udp v0.5.14
+  Downloaded rand_core v0.9.5
+  Downloaded rustls-pemfile v2.2.0
   Downloaded soapysdr-sys v0.8.1
+  Downloaded strength_reduce v0.2.4
+  Downloaded thiserror v1.0.69
+  Downloaded thiserror-impl v1.0.69
+  Downloaded num-complex v0.4.6
+  Downloaded rand_core v0.6.4
+  Downloaded rustls-native-certs v0.7.3
+  Downloaded soapysdr v0.5.0
+  Downloaded version_check v0.9.5
+  Downloaded ryu v1.0.23
+  Downloaded zmij v1.0.21
+  Downloaded litemap v0.8.2
+  Downloaded ipnet v2.12.0
+  Downloaded pkg-config v0.3.32
+  Downloaded shlex v1.3.0
+  Downloaded slab v0.4.12
+  Downloaded yoke v0.8.2
+  Downloaded getrandom v0.3.4
+  Downloaded http v1.4.0
+  Downloaded icu_collections v2.2.0
+  Downloaded socket2 v0.6.3
+  Downloaded icu_properties v2.2.0
+  Downloaded icu_provider v2.2.0
+  Downloaded rustls-platform-verifier v0.6.2
+  Downloaded icu_normalizer_data v2.2.0
+  Downloaded rand v0.8.5
+  Downloaded uuid v1.23.0
+  Downloaded hyper-util v0.1.20
+  Downloaded icu_locale_core v2.2.0
+  Downloaded rustls-webpki v0.103.10
+  Downloaded mio v1.2.0
+  Downloaded quinn v0.11.9
+  Downloaded tungstenite v0.24.0
+  Downloaded typenum v1.19.0
+  Downloaded hyper v1.10.1
+  Downloaded icu_normalizer v2.2.0
+  Downloaded num-bigint v0.4.6
+  Downloaded rand v0.9.2
+  Downloaded zerotrie v0.2.4
+  Downloaded futures-util v0.3.32
+  Downloaded reqwest v0.12.28
+  Downloaded tower-http v0.6.11
+  Downloaded url v2.5.8
+  Downloaded idna v1.1.0
+  Downloaded libm v0.2.16
+  Downloaded serde_json v1.0.149
+  Downloaded webpki-roots v1.0.7
+  Downloaded icu_properties_data v2.2.0
+  Downloaded zerovec v0.11.6
+  Downloaded quinn-proto v0.11.14
+  Downloaded rustfft v6.4.1
+  Downloaded rustls v0.23.37
+  Downloaded zerocopy v0.8.48
+  Downloaded libc v0.2.183
+  Downloaded tokio v1.50.0
+  Downloaded ring v0.17.14
    Compiling libc v0.2.183
    Compiling syn v2.0.117
    Compiling num-traits v0.2.19
     Checking smallvec v1.15.1
     Checking stable_deref_trait v1.2.1
     Checking bytes v1.11.1
-   Compiling find-msvc-tools v0.1.9
    Compiling shlex v1.3.0
+   Compiling find-msvc-tools v0.1.9
     Checking zeroize v1.8.2
     Checking rustls-pki-types v1.14.0
    Compiling cc v1.2.58
-    Checking getrandom v0.2.17
    Compiling zerocopy v0.8.48
+    Checking getrandom v0.2.17
     Checking socket2 v0.6.3
-    Checking untrusted v0.9.0
     Checking futures-core v0.3.32
+    Checking untrusted v0.9.0
     Checking mio v1.2.0
-   Compiling rustls v0.23.37
     Checking writeable v0.6.3
     Checking litemap v0.8.2
+   Compiling rustls v0.23.37
     Checking tokio v1.50.0
    Compiling ring v0.17.14
    Compiling synstructure v0.13.2
     Checking ppv-lite86 v0.2.21
    Compiling zerovec-derive v0.11.3
+   Compiling tracing-attributes v0.1.31
    Compiling zerofrom-derive v0.1.7
    Compiling yoke-derive v0.8.2
-   Compiling tracing-attributes v0.1.31
    Compiling displaydoc v0.2.6
+    Checking tracing v0.1.44
    Compiling serde_derive v1.0.228
     Checking zerofrom v0.1.8
     Checking yoke v0.8.2
-    Checking zerovec v0.11.6
-    Checking tracing v0.1.44
-    Checking tinystr v0.8.3
-    Checking potential_utf v0.1.5
-    Checking icu_locale_core v2.2.0
-    Checking zerotrie v0.2.4
    Compiling thiserror-impl v2.0.18
-    Checking http v1.4.0
+    Checking zerovec v0.11.6
+    Checking tinystr v0.8.3
+    Checking icu_locale_core v2.2.0
     Checking rustls-webpki v0.103.10
-   Compiling typenum v1.19.0
-    Checking subtle v2.6.1
-   Compiling icu_normalizer_data v2.2.0
+    Checking potential_utf v0.1.5
+    Checking zerotrie v0.2.4
+    Checking http v1.4.0
     Checking slab v0.4.12
-   Compiling getrandom v0.3.4
-    Checking utf8_iter v1.0.4
    Compiling icu_properties_data v2.2.0
-    Checking futures-sink v0.3.32
+   Compiling icu_normalizer_data v2.2.0
+   Compiling typenum v1.19.0
+   Compiling getrandom v0.3.4
+    Checking subtle v2.6.1
+    Checking utf8_iter v1.0.4
    Compiling version_check v0.9.5
+    Checking futures-sink v0.3.32
     Checking icu_collections v2.2.0
-    Checking thiserror v2.0.18
    Compiling generic-array v0.14.7
     Checking icu_provider v2.2.0
+    Checking thiserror v2.0.18
     Checking num-integer v0.1.46
-   Compiling httparse v1.10.1
-    Checking memchr v2.8.0
     Checking percent-encoding v2.3.2
-    Checking serde v1.0.228
+    Checking memchr v2.8.0
+   Compiling httparse v1.10.1
     Checking http-body v1.0.1
+    Checking serde v1.0.228
     Checking futures-task v0.3.32
    Compiling cfg_aliases v0.2.1
     Checking futures-io v0.3.32
     Checking chrono v0.4.44
-    Checking tracing-subscriber v0.3.23
     Checking futures-util v0.3.32
-    Checking icu_properties v2.2.0
+    Checking tracing-subscriber v0.3.23
     Checking rand_core v0.9.5
     Checking icu_normalizer v2.2.0
+    Checking icu_properties v2.2.0
    Compiling git-version-macro v0.3.9
    Compiling bitcode_derive v0.6.9
     Checking try-lock v0.2.5
-   Compiling libm v0.2.16
-   Compiling getrandom v0.4.2
     Checking tower-service v0.3.3
+   Compiling getrandom v0.4.2
+   Compiling libm v0.2.16
     Checking idna_adapter v1.2.2
     Checking want v0.3.1
-    Checking git-version v0.3.9
     Checking tracing-appender v0.2.4
+    Checking git-version v0.3.9
     Checking rand_chacha v0.9.0
     Checking chrono-tz v0.10.4
     Checking serde_spanned v0.6.9
     Checking toml_datetime v0.6.11
     Checking form_urlencoded v1.2.2
     Checking futures-channel v0.3.32
-    Checking openssl-probe v0.2.1
-    Checking atomic-waker v1.1.2
-   Compiling zmij v1.0.21
-    Checking bitcode v0.6.9
    Compiling pkg-config v0.3.32
+    Checking openssl-probe v0.2.1
+   Compiling zmij v1.0.21
+    Checking atomic-waker v1.1.2
     Checking toml_edit v0.22.27
    Compiling soapysdr-sys v0.8.1
+    Checking bitcode v0.6.9
     Checking hyper v1.10.1
     Checking rustls-native-certs v0.8.3
     Checking rand v0.9.2
@@ -717,47 +717,47 @@ info: default toolchain set to stable-x86_64-unknown-linux-gnu
     Checking sync_wrapper v1.0.2
     Checking rand_core v0.6.4
     Checking num-complex v0.4.6
-    Checking tinyvec_macros v0.1.1
    Compiling serde_json v1.0.149
    Compiling thiserror v1.0.69
     Checking tower-layer v0.3.3
-    Checking base64 v0.22.1
+    Checking tinyvec_macros v0.1.1
     Checking ipnet v2.12.0
+    Checking base64 v0.22.1
     Checking tower v0.5.3
     Checking fastbloom v0.14.1
     Checking hyper-util v0.1.20
     Checking tinyvec v1.11.0
     Checking rand_chacha v0.3.1
     Checking digest v0.10.7
-    Checking uuid v1.23.0
     Checking toml v0.8.23
+    Checking uuid v1.23.0
     Checking url v2.5.8
     Checking rustls-platform-verifier v0.6.2
     Checking tokio-rustls v0.26.4
    Compiling quinn v0.11.9
     Checking num-bigint v0.4.6
    Compiling thiserror-impl v1.0.69
-    Checking rustls-pemfile v2.2.0
     Checking webpki-roots v1.0.7
+    Checking rustls-pemfile v2.2.0
     Checking strength_reduce v0.2.4
-    Checking ryu v1.0.23
-    Checking cpufeatures v0.2.17
     Checking rustc-hash v2.1.2
-    Checking lru-slab v0.1.2
+    Checking ryu v1.0.23
     Checking bitflags v2.11.0
+    Checking cpufeatures v0.2.17
+    Checking lru-slab v0.1.2
     Checking openssl-probe v0.1.6
     Checking rustls-native-certs v0.7.3
-    Checking tower-http v0.6.11
     Checking quinn-proto v0.11.14
     Checking num-rational v0.4.2
     Checking sha1 v0.10.6
+    Checking tower-http v0.6.11
+    Checking tetra-core v1.3.0 (/home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-core)
     Checking serde_urlencoded v0.7.1
     Checking transpose v0.2.3
-    Checking tetra-core v1.3.0 (/home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-core)
     Checking hyper-rustls v0.27.9
     Checking rand v0.8.5
-    Checking tetra-saps v1.3.0 (/home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-saps)
     Checking tetra-config v1.3.0 (/home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-config)
+    Checking tetra-saps v1.3.0 (/home/runner/work/netcore-tetra/netcore-tetra/crates/tetra-saps)
     Checking http-body-util v0.1.3
     Checking primal-check v0.3.4
     Checking num-iter v0.1.45
