@@ -2455,7 +2455,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
     </div>
     <!-- Copyright + client info -->
     <div class="sidebar-copyright">
-      <div class="cr-line">© 2026 Razvan Zeces — YO6RZV</div>
+      <div class="cr-line">© 2026 NetCore-Systems</div>
       <div class="cr-line" id="cr-ua">—</div>
     </div>
     <!-- Collapse toggle -->
@@ -2772,7 +2772,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
             </div>
             <label class="mesh-msg-filter-field">
               <span class="mesh-msg-filter-label">ISSI-RegEx</span>
-              <input type="search" id="lastheard-issi-filter" class="form-input" placeholder="2632585|DJ2TH" oninput="lastHeardFilterChanged()" spellcheck="false">
+              <input type="search" id="lastheard-issi-filter" class="form-input" placeholder="12345678" oninput="lastHeardFilterChanged()" spellcheck="false">
             </label>
             <label class="mesh-msg-filter-field">
               <span class="mesh-msg-filter-label">Ziel-RegEx</span>
@@ -3040,11 +3040,11 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
             </div>
           </div>
           <div class="info-grid">
-            <div class="info-row"><div class="info-key" data-i18n="ast_sip_listen">SIP-Listener</div><div class="info-val" id="ast-sip-listen">—</div></div>
+            <div class="info-row"><div class="info-key" data-i18n="ast_sip_listen">SIP-Client</div><div class="info-val" id="ast-sip-listen">—</div></div>
             <div class="info-row"><div class="info-key" data-i18n="ast_remote">Asterisk-Gegenstelle</div><div class="info-val" id="ast-remote">—</div></div>
             <div class="info-row"><div class="info-key" data-i18n="ast_rtp">RTP-Ports</div><div class="info-val" id="ast-rtp">—</div></div>
             <div class="info-row"><div class="info-key" data-i18n="ast_codec">Codec</div><div class="info-val" id="ast-codec">—</div></div>
-            <div class="info-row"><div class="info-key">Zeitlimit für eingehenden Rufaufbau</div><div class="info-val" id="ast-setup-timeout">—</div></div>
+            <div class="info-row"><div class="info-key">Zeitlimit Eingehend</div><div class="info-val" id="ast-setup-timeout">—</div></div>
             <div class="info-row"><div class="info-key" data-i18n="ast_last_rx">Letzter Empfang</div><div class="info-val" id="ast-last-rx">—</div></div>
             <div class="info-row"><div class="info-key" data-i18n="ast_last_tx">Letzte Sendung</div><div class="info-val" id="ast-last-tx">—</div></div>
             <div class="info-row"><div class="info-key" data-i18n="ast_last_error">Letzter Fehler</div><div class="info-val" id="ast-last-error">—</div></div>
@@ -5693,7 +5693,7 @@ function mapsRegisteredDeviceCount(){
 function mapsRegisteredOnlyInfo(rawTotal,visibleCount){
   if(visibleCount)return '';
   const reg=mapsRegisteredDeviceCount();
-  if(rawTotal&&reg===0)return 'No radios registered at BS';
+  if(rawTotal&&reg===0)return 'Keine Funkgeräte registriert';
   if(rawTotal)return `No registered radios with positions (${reg} registered)`;
   return '';
 }
@@ -7002,7 +7002,7 @@ function updateMapsLatestButton(){
   if(!btn)return;
   btn.classList.toggle('btn-primary',mapsLatestOnly);
   btn.setAttribute('aria-pressed',mapsLatestOnly?'true':'false');
-  btn.textContent=mapsLatestOnly?'Latest only: ON':'Latest only: OFF';
+  btn.textContent=mapsLatestOnly?'Nur Aktuelle: ON':'Nur Aktuelle: OFF';
 }
 function bindMapsControls(){
   const btn=document.getElementById('maps-latest-btn');
@@ -7053,7 +7053,7 @@ function renderMapsPage(){
   updateMapsLatestButton();
   if(count)count.textContent=markers.length
     ? (mapsLatestOnly?`${markers.length} latest · ${sourceMarkers.length} enabled entries`:`${visibleMarkers.length} positions · ${markers.length} enabled entries`)
-    : `${rawTotal} records · 0 positions`;
+    : `${rawTotal} Datensätze · 0 Positionen`;
   if(sub)sub.innerHTML=mapsSourceButtonsHtml(mapsSourceMessage(markers.length,rawTotal));
   if(dot){dot.classList.toggle('is-ok',markers.length>0);dot.classList.toggle('is-idle',!markers.length);}
   if(layer&&mapsCurrentView){
@@ -7073,7 +7073,7 @@ function renderMapsPage(){
         ${m.device?mapsDeviceCardHtml(m.device):''}
         ${m.detail?`<div class="maps-list-detail">${escHtml(m.detail)}</div>`:''}
       </div>
-    </div>`).join(''):'<div class="maps-empty">No positions yet</div>';
+    </div>`).join(''):'<div class="maps-empty">Noch keine Positionen</div>';
   }
   const focusIdx=mapsNearestIndex(markers,mapsFocus);
   const idx=focusIdx>=0?focusIdx:(markers.length?Math.max(0,Math.min(mapsSelectedIndex,markers.length-1)):-1);
@@ -8204,10 +8204,10 @@ async function loadAsteriskStatus(){
     if(!r.ok)throw new Error('http '+r.status);
     const d=await r.json();
     const c=d.config||{}, rt=d.runtime||{};
-    set('ast-configured', (c.configured||rt.configured)?'YES':'NO');
-    set('ast-enabled', (c.enabled||rt.enabled)?'enabled':'deaktiviert');
+    set('ast-configured', (c.configured||rt.configured)?'Ja':'Nein');
+    set('ast-enabled', (c.enabled||rt.enabled)?'aktiviert':'deaktiviert');
     set('ast-register', rt.register_status||'—');
-    set('ast-dialogs', (rt.active_dialogs??0)+' active dialogs');
+    set('ast-dialogs', (rt.active_dialogs??0)+' Aktive Rufe');
     set('ast-sip-listen', rt.sip_listen||c.sip_listen);
     set('ast-remote', rt.remote||c.remote);
     set('ast-rtp', rt.rtp_port_range||c.rtp_port_range);
