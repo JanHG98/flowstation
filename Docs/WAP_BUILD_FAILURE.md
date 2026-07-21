@@ -8,37 +8,37 @@ Workflow-Exitcode: 1
 /tmp/wap-port.patch: OK
 >>> sudo apt-get update
 Get:1 file:/etc/apt/apt-mirrors.txt Mirrorlist [144 B]
+Hit:6 https://packages.microsoft.com/repos/azure-cli noble InRelease
 Hit:2 http://azure.archive.ubuntu.com/ubuntu noble InRelease
+Get:7 https://packages.microsoft.com/ubuntu/24.04/prod noble InRelease [3600 B]
 Get:3 http://azure.archive.ubuntu.com/ubuntu noble-updates InRelease [126 kB]
+Get:8 https://dl.google.com/linux/chrome-stable/deb stable InRelease [1825 B]
 Get:4 http://azure.archive.ubuntu.com/ubuntu noble-backports InRelease [126 kB]
 Get:5 http://azure.archive.ubuntu.com/ubuntu noble-security InRelease [126 kB]
-Hit:6 https://packages.microsoft.com/repos/azure-cli noble InRelease
-Get:7 https://packages.microsoft.com/ubuntu/24.04/prod noble InRelease [3600 B]
-Get:8 https://dl.google.com/linux/chrome-stable/deb stable InRelease [1825 B]
-Get:9 http://azure.archive.ubuntu.com/ubuntu noble-updates/main amd64 Packages [1122 kB]
-Get:10 http://azure.archive.ubuntu.com/ubuntu noble-updates/main Translation-en [274 kB]
-Get:11 http://azure.archive.ubuntu.com/ubuntu noble-updates/main amd64 Components [180 kB]
-Get:12 http://azure.archive.ubuntu.com/ubuntu noble-updates/universe amd64 Packages [1666 kB]
-Get:13 http://azure.archive.ubuntu.com/ubuntu noble-updates/universe Translation-en [329 kB]
-Get:14 http://azure.archive.ubuntu.com/ubuntu noble-updates/universe amd64 Components [388 kB]
-Get:15 http://azure.archive.ubuntu.com/ubuntu noble-updates/restricted amd64 Packages [1274 kB]
-Get:16 http://azure.archive.ubuntu.com/ubuntu noble-updates/restricted Translation-en [291 kB]
-Get:17 http://azure.archive.ubuntu.com/ubuntu noble-updates/multiverse amd64 Components [940 B]
-Get:18 http://azure.archive.ubuntu.com/ubuntu noble-backports/main amd64 Components [5752 B]
-Get:19 http://azure.archive.ubuntu.com/ubuntu noble-backports/universe amd64 Components [10.5 kB]
-Get:20 http://azure.archive.ubuntu.com/ubuntu noble-security/main amd64 Packages [861 kB]
-Get:21 http://azure.archive.ubuntu.com/ubuntu noble-security/main Translation-en [192 kB]
-Get:22 http://azure.archive.ubuntu.com/ubuntu noble-security/main amd64 Components [46.3 kB]
-Get:23 http://azure.archive.ubuntu.com/ubuntu noble-security/universe amd64 Packages [1180 kB]
-Get:24 http://azure.archive.ubuntu.com/ubuntu noble-security/universe Translation-en [233 kB]
-Get:25 http://azure.archive.ubuntu.com/ubuntu noble-security/universe amd64 Components [76.3 kB]
-Get:26 http://azure.archive.ubuntu.com/ubuntu noble-security/restricted amd64 Packages [1178 kB]
-Get:27 http://azure.archive.ubuntu.com/ubuntu noble-security/restricted Translation-en [272 kB]
-Get:28 https://packages.microsoft.com/ubuntu/24.04/prod noble/main arm64 Packages [200 kB]
-Get:29 https://packages.microsoft.com/ubuntu/24.04/prod noble/main armhf Packages [11.7 kB]
-Get:30 https://packages.microsoft.com/ubuntu/24.04/prod noble/main amd64 Packages [233 kB]
-Get:31 https://dl.google.com/linux/chrome-stable/deb stable/main amd64 Packages [1414 B]
-Fetched 10.4 MB in 1s (8115 kB/s)
+Get:9 https://packages.microsoft.com/ubuntu/24.04/prod noble/main arm64 Packages [200 kB]
+Get:10 https://packages.microsoft.com/ubuntu/24.04/prod noble/main amd64 Packages [233 kB]
+Get:11 https://packages.microsoft.com/ubuntu/24.04/prod noble/main armhf Packages [11.7 kB]
+Get:12 http://azure.archive.ubuntu.com/ubuntu noble-updates/main amd64 Packages [1122 kB]
+Get:21 https://dl.google.com/linux/chrome-stable/deb stable/main amd64 Packages [1414 B]
+Get:13 http://azure.archive.ubuntu.com/ubuntu noble-updates/main Translation-en [274 kB]
+Get:14 http://azure.archive.ubuntu.com/ubuntu noble-updates/main amd64 Components [180 kB]
+Get:15 http://azure.archive.ubuntu.com/ubuntu noble-updates/universe amd64 Packages [1666 kB]
+Get:16 http://azure.archive.ubuntu.com/ubuntu noble-updates/universe Translation-en [329 kB]
+Get:17 http://azure.archive.ubuntu.com/ubuntu noble-updates/universe amd64 Components [388 kB]
+Get:18 http://azure.archive.ubuntu.com/ubuntu noble-updates/restricted amd64 Packages [1274 kB]
+Get:19 http://azure.archive.ubuntu.com/ubuntu noble-updates/restricted Translation-en [291 kB]
+Get:20 http://azure.archive.ubuntu.com/ubuntu noble-updates/multiverse amd64 Components [940 B]
+Get:22 http://azure.archive.ubuntu.com/ubuntu noble-backports/main amd64 Components [5752 B]
+Get:23 http://azure.archive.ubuntu.com/ubuntu noble-backports/universe amd64 Components [10.5 kB]
+Get:24 http://azure.archive.ubuntu.com/ubuntu noble-security/main amd64 Packages [861 kB]
+Get:25 http://azure.archive.ubuntu.com/ubuntu noble-security/main Translation-en [192 kB]
+Get:26 http://azure.archive.ubuntu.com/ubuntu noble-security/main amd64 Components [46.3 kB]
+Get:27 http://azure.archive.ubuntu.com/ubuntu noble-security/universe amd64 Packages [1180 kB]
+Get:28 http://azure.archive.ubuntu.com/ubuntu noble-security/universe Translation-en [233 kB]
+Get:29 http://azure.archive.ubuntu.com/ubuntu noble-security/universe amd64 Components [76.3 kB]
+Get:30 http://azure.archive.ubuntu.com/ubuntu noble-security/restricted amd64 Packages [1178 kB]
+Get:31 http://azure.archive.ubuntu.com/ubuntu noble-security/restricted Translation-en [272 kB]
+Fetched 10.4 MB in 1s (7589 kB/s)
 Reading package lists...
 >>> sudo apt-get install --yes pkg-config libsoapysdr-dev
 Reading package lists...
@@ -124,7 +124,7 @@ Get:44 http://azure.archive.ubuntu.com/ubuntu noble/universe amd64 soapysdr0.8-m
 Get:45 http://azure.archive.ubuntu.com/ubuntu noble/universe amd64 soapysdr0.8-module-uhd amd64 0.4.1-4build4 [63.8 kB]
 Get:46 http://azure.archive.ubuntu.com/ubuntu noble/universe amd64 soapysdr0.8-module-all amd64 0.8.1-4build1 [4096 B]
 Get:47 http://azure.archive.ubuntu.com/ubuntu noble/universe amd64 bladerf amd64 0.2023.02-4build1 [128 kB]
-Fetched 11.2 MB in 0s (41.2 MB/s)
+Fetched 11.2 MB in 1s (19.2 MB/s)
 Selecting previously unselected package libasyncns0:amd64.
 (Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 202507 files and directories currently installed.)
 Preparing to unpack .../00-libasyncns0_0.8-6build4_amd64.deb ...
