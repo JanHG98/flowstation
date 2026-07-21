@@ -17,7 +17,7 @@ permissions:
 
 concurrency:
   group: wap-port-${{ github.event.pull_request.head.ref || github.ref_name }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   apply-and-test:
@@ -67,11 +67,11 @@ jobs:
           rustup toolchain install stable --profile minimal --component rustfmt
           rustup default stable
 
-      - name: Check formatting of changed Rust files
+      - name: Format changed Rust files
         if: steps.payload.outputs.present == 'true'
         shell: bash
         run: |
-          rustfmt --edition 2024 --check \
+          rustfmt --edition 2024 \
             crates/tetra-config/src/bluestation/config.rs \
             crates/tetra-config/src/bluestation/sec_cell.rs \
             crates/tetra-entities/src/sndcp/ip.rs \
@@ -109,5 +109,3 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git commit -m 'Implement SNDCP WAP/IP service'
           git push origin HEAD:feature/wap-sndcp
-
-# Updated to trigger the base-branch observable bootstrap workflow.
