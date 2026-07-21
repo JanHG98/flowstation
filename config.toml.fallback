@@ -207,7 +207,7 @@ migration                 = true  # cell supports inter-network migration
 circuit_mode_data_service = true  # advertise circuit-mode data service
 # aie_service               = false  # advertise Air Interface Encryption (AIE) service
 sndcp_service             = true  # advertise TETRA packet-data (SNDCP) service
-# advanced_link             = false  # advertise the advanced (enhanced data) link
+advanced_link             = true   # required for the built-in SNDCP WAP/IP profile
 
 # ─────────────────────────────────────────────────────────────────────────────
 # OPTIONAL: SYNC / low-level cell parameters. Defaults are fine for nearly all
@@ -221,6 +221,21 @@ system_code             = 1       # SYNC system code; 3 = ETSI EN 300 392-2 V3.1
 # frame_18_ext            = false   # frame-18 extension flag in SYNC (default false)
 # ms_txpwr_max_cell       = 4       # max MS TX power index (Table 18.57; 4 = 30 dBm / 1 W; default 4)
 # subscriber_class        = 0xFFFF  # 16-bit mask of subscriber classes allowed on this cell (default all)
+
+# Built-in WAP/IP service carried over TETRA SNDCP packet data.
+# Motorola/Dimetra terminals may request PPP CHAP during PDP activation; the BS answers
+# with CHAP Success and serves the status page through WTP/WSP over UDP port 9200.
+[cell_info.wap_ip]
+enabled = true
+address = "10.0.0.1"
+port = 9200
+response_ttl = 32
+dynamic_pool_prefix = "10.0.0"
+dynamic_pool_first_host = 2
+dynamic_pool_last_host = 254
+allow_static_ipv4 = true
+max_request_payload_bytes = 1024
+title = "NetCore-TETRA"
 
 ###############################################################################
 # OPTIONAL: Neighbor Cell Broadcast (NCB)

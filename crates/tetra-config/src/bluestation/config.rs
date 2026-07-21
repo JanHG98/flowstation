@@ -3,8 +3,9 @@ use std::sync::{Arc, RwLock};
 use tetra_core::freqs::FreqInfo;
 
 use crate::bluestation::{
-    CfgAsterisk, CfgCellInfo, CfgControl, CfgControlRoom, CfgDapnet, CfgEcholink, CfgEmergency, CfgGeoalarm, CfgHealth, CfgMeshcom, CfgNetInfo, CfgPhyIo,
-    CfgAudioPlayer, CfgRecording, CfgRecovery, CfgTts, CfgSecurity, CfgSnomNotify, CfgTpg2200Action, CfgWxService, PhyBackend, StackState,
+    CfgAsterisk, CfgAudioPlayer, CfgCellInfo, CfgControl, CfgControlRoom, CfgDapnet, CfgEcholink, CfgEmergency, CfgGeoalarm, CfgHealth,
+    CfgMeshcom, CfgNetInfo, CfgPhyIo, CfgRecording, CfgRecovery, CfgSecurity, CfgSnomNotify, CfgTpg2200Action, CfgTts, CfgWxService,
+    PhyBackend, StackState,
 };
 
 use super::sec_brew::CfgBrew;
@@ -233,6 +234,29 @@ impl StackConfig {
 
         if self.cell.ms_txpwr_max_cell > 7 {
             return Err("ms_txpwr_max_cell must be 0-7 (3 bits)");
+        }
+
+        if self.cell.wap_ip.enabled && !self.cell.sndcp_service {
+            return Err("cell_info.wap_ip.enabled=true requires cell_info.sndcp_service=true");
+        }
+        if self.cell.wap_ip.enabled && !self.cell.advanced_link {
+            return Err("cell_info.wap_ip.enabled=true requires cell_info.advanced_link=true");
+        }
+        if self.cell.wap_ip.enabled && self.cell.wap_ip.port == 0 {
+            return Err("cell_info.wap_ip.port must be 1..65535");
+        }
+        if self.cell.wap_ip.enabled && self.cell.wap_ip.response_ttl == 0 {
+            return Err("cell_info.wap_ip.response_ttl must be 1..255");
+        }
+        if self.cell.wap_ip.enabled && !(1..=1024).contains(&self.cell.wap_ip.max_request_payload_bytes) {
+            return Err("cell_info.wap_ip.max_request_payload_bytes must be 1..1024");
+        }
+        if self.cell.wap_ip.enabled
+            && (self.cell.wap_ip.dynamic_pool_first_host == 0
+                || self.cell.wap_ip.dynamic_pool_last_host == 255
+                || self.cell.wap_ip.dynamic_pool_first_host > self.cell.wap_ip.dynamic_pool_last_host)
+        {
+            return Err("cell_info.wap_ip dynamic pool must stay within host range 1..254");
         }
 
         // Validate timezone if configured

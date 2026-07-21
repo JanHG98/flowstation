@@ -1,6 +1,7 @@
 use tetra_config::bluestation::{
-    CfgAsterisk, CfgAudioPlayer, CfgCellInfo, CfgDapnet, CfgEcholink, CfgEmergency, CfgGeoalarm, CfgHealth, CfgMeshcom, CfgNetInfo, CfgPhyIo, CfgRecording, CfgRecovery,
-    CfgSecurity, CfgSnomNotify, CfgTpg2200Action, CfgTts, CfgWxService, PhyBackend, StackConfig, StackMode,
+    CfgAsterisk, CfgAudioPlayer, CfgCellInfo, CfgDapnet, CfgEcholink, CfgEmergency, CfgGeoalarm, CfgHealth, CfgMeshcom, CfgNetInfo,
+    CfgPhyIo, CfgRecording, CfgRecovery, CfgSecurity, CfgSnomNotify, CfgTpg2200Action, CfgTts, CfgWapIp, CfgWxService, PhyBackend,
+    StackConfig, StackMode,
 };
 use tetra_core::{freqs::FreqInfo, ranges::SortedDisjointSsiRanges};
 
@@ -65,6 +66,7 @@ pub fn default_cell_info(freq_info: FreqInfo) -> CfgCellInfo {
         colour_code: 1,
         location_area: 2,
         main_carrier: freq_info.carrier,
+        secondary_carrier: None,
         freq_band: freq_info.band,
         freq_offset_hz: freq_info.freq_offset_hz,
         duplex_spacing_id: freq_info.duplex_spacing_id,
@@ -84,6 +86,7 @@ pub fn default_cell_info(freq_info: FreqInfo) -> CfgCellInfo {
         sndcp_service: false,
         aie_service: false,
         advanced_link: false,
+        wap_ip: CfgWapIp::default(),
         system_code: 3, // 3 = ETSI EN 300 392-2 V3.1.1
         sharing_mode: 0,
         ts_reserved_frames: 0,

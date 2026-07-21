@@ -39,6 +39,89 @@ pub struct HomeModeDisplayDto {
     pub text: Option<String>,
 }
 
+/// Built-in SNDCP WAP/IP endpoint configuration.
+#[derive(Debug, Clone)]
+pub struct CfgWapIp {
+    pub enabled: bool,
+    pub address: [u8; 4],
+    pub port: u16,
+    pub response_ttl: u8,
+    pub dynamic_pool_prefix: [u8; 3],
+    pub dynamic_pool_first_host: u8,
+    pub dynamic_pool_last_host: u8,
+    pub allow_static_ipv4: bool,
+    pub max_request_payload_bytes: usize,
+    pub title: String,
+}
+
+impl Default for CfgWapIp {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            address: [10, 0, 0, 1],
+            port: 9200,
+            response_ttl: 32,
+            dynamic_pool_prefix: [10, 0, 0],
+            dynamic_pool_first_host: 2,
+            dynamic_pool_last_host: 254,
+            allow_static_ipv4: true,
+            max_request_payload_bytes: 1024,
+            title: "NetCore-TETRA".to_string(),
+        }
+    }
+}
+
+#[derive(Default, Deserialize)]
+pub struct WapIpDto {
+    pub enabled: Option<bool>,
+    pub address: Option<String>,
+    pub port: Option<u16>,
+    pub response_ttl: Option<u8>,
+    pub dynamic_pool_prefix: Option<String>,
+    pub dynamic_pool_first_host: Option<u8>,
+    pub dynamic_pool_last_host: Option<u8>,
+    pub allow_static_ipv4: Option<bool>,
+    pub max_request_payload_bytes: Option<usize>,
+    pub title: Option<String>,
+}
+
+fn parse_ipv4(value: Option<String>, default: [u8; 4]) -> [u8; 4] {
+    value
+        .and_then(|value| value.parse::<std::net::Ipv4Addr>().ok())
+        .map(|addr| addr.octets())
+        .unwrap_or(default)
+}
+
+fn parse_ipv4_prefix(value: Option<String>, default: [u8; 3]) -> [u8; 3] {
+    let Some(value) = value else {
+        return default;
+    };
+    let mut parts = value.split('.').filter_map(|part| part.parse::<u8>().ok());
+    match (parts.next(), parts.next(), parts.next(), parts.next()) {
+        (Some(a), Some(b), Some(c), None) => [a, b, c],
+        _ => default,
+    }
+}
+
+fn wap_ip_dto_to_cfg(dto: Option<WapIpDto>) -> CfgWapIp {
+    let Some(dto) = dto else {
+        return CfgWapIp::default();
+    };
+    let defaults = CfgWapIp::default();
+    CfgWapIp {
+        enabled: dto.enabled.unwrap_or(false),
+        address: parse_ipv4(dto.address, defaults.address),
+        port: dto.port.unwrap_or(defaults.port),
+        response_ttl: dto.response_ttl.unwrap_or(defaults.response_ttl),
+        dynamic_pool_prefix: parse_ipv4_prefix(dto.dynamic_pool_prefix, defaults.dynamic_pool_prefix),
+        dynamic_pool_first_host: dto.dynamic_pool_first_host.unwrap_or(defaults.dynamic_pool_first_host),
+        dynamic_pool_last_host: dto.dynamic_pool_last_host.unwrap_or(defaults.dynamic_pool_last_host),
+        allow_static_ipv4: dto.allow_static_ipv4.unwrap_or(defaults.allow_static_ipv4),
+        max_request_payload_bytes: dto.max_request_payload_bytes.unwrap_or(defaults.max_request_payload_bytes),
+        title: dto.title.filter(|value| !value.trim().is_empty()).unwrap_or(defaults.title),
+    }
+}
+
 /// Service details for a neighbor cell — mirrors BsServiceDetails but for config parsing.
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct CfgBsServiceDetails {
@@ -145,6 +228,9 @@ pub struct CfgCellInfo {
     pub aie_service: bool,
     pub advanced_link: bool,
 
+    /// Built-in packet-data WAP/IP endpoint.
+    pub wap_ip: CfgWapIp,
+
     // From SYNC
     pub system_code: u8,
     pub colour_code: u8,
@@ -242,6 +328,9 @@ pub struct CellInfoDto {
     pub aie_service: Option<bool>,
     pub advanced_link: Option<bool>,
 
+    /// Optional `[cell_info.wap_ip]` block.
+    pub wap_ip: Option<WapIpDto>,
+
     pub system_code: Option<u8>,
     pub colour_code: Option<u8>,
     pub sharing_mode: Option<u8>,
@@ -317,6 +406,7 @@ pub fn cell_dto_to_cfg(ci: CellInfoDto) -> CfgCellInfo {
         sndcp_service: ci.sndcp_service.unwrap_or(false),
         aie_service: ci.aie_service.unwrap_or(false),
         advanced_link: ci.advanced_link.unwrap_or(false),
+        wap_ip: wap_ip_dto_to_cfg(ci.wap_ip),
         system_code: ci.system_code.unwrap_or(3), // 3 = ETSI EN 300 392-2 V3.1.1
         colour_code: ci.colour_code.unwrap_or(0),
         sharing_mode: ci.sharing_mode.unwrap_or(0),

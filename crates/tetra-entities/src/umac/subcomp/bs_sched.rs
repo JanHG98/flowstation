@@ -3,6 +3,7 @@ use tetra_core::{
 };
 use tetra_saps::{
     control::call_control::{Circuit, CircuitDlMediaSource},
+    lcmc::enums::{alloc_type::ChanAllocType, ul_dl_assignment::UlDlAssignment},
     tmv::{TmvUnitdataReq, TmvUnitdataReqSlot, enums::logical_chans::LogicalChannel},
 };
 
@@ -36,6 +37,11 @@ pub const MACSCHED_TX_AHEAD: usize = 1;
 // We schedule up to this many frames ahead
 pub const MACSCHED_NUM_FRAMES: usize = 18;
 
+/// Fail-safe lifetime for an assigned WAP/PDCH bearer. Normal release is driven
+/// by SN-END-OF-DATA/QuitAndGo; this prevents a vanished terminal from owning
+/// TS2 indefinitely.
+const PACKET_DATA_ASSIGNMENT_TTL_TIMESLOTS: i32 = 4 * 18 * 300;
+
 const NULL_PDU_LEN_BITS: usize = 16;
 
 pub const SCH_HD_CAP: usize = 124;
@@ -48,7 +54,6 @@ pub enum CarrierDownlinkMode {
     SecondaryBcchNoMcch,
     TrafficOnly,
 }
-
 
 /// Number of timeslots the scheduler operates on. May become larger when secondary carriers are supported.
 pub const NUM_TIMESLOTS: usize = 4;
@@ -76,6 +81,16 @@ pub struct TimeslotSchedule {
     /// Valid range for BS-assigned reservations is 4..=62.
     pub usage_marker: Option<u8>,
     // pub dl: Option<TmvUnitdataReq>,
+}
+
+/// Persistent owner of the assigned packet-data channel. Unlike a short
+/// reservation in `ulsched`, this remains valid until SNDCP sends QuitAndGo
+/// or a replacement assignment. NetCore currently exposes one PDCH on TS2.
+#[derive(Debug, Clone, Copy)]
+struct PacketDataAssignment {
+    addr: TetraAddress,
+    ul_dl_assigned: UlDlAssignment,
+    expires_at: TdmaTime,
 }
 
 // #[derive(Debug)]
@@ -125,6 +140,10 @@ pub struct BsChannelScheduler {
     /// fragmented MM PDU (e.g. ULocationUpdate when re-entering coverage).
     /// Issuing a real marker fixes that.
     next_usage_marker: [u8; 4],
+
+    /// Long-lived SNDCP assigned-channel ownership. Index 1 is TS2; the
+    /// remaining entries stay available for future packet-data expansion.
+    packet_data_assignments: [Option<PacketDataAssignment>; 4],
 }
 
 #[derive(Debug)]
@@ -188,6 +207,7 @@ impl BsChannelScheduler {
             mcch_chan_alloc_sent_this_frame: false,
             // Start each timeslot's marker cursor at 4 (first valid value).
             next_usage_marker: [4, 4, 4, 4],
+            packet_data_assignments: [None, None, None, None],
         }
     }
 
@@ -513,6 +533,108 @@ impl BsChannelScheduler {
         }
     }
 
+    fn same_address(left: TetraAddress, right: TetraAddress) -> bool {
+        left.ssi == right.ssi && left.ssi_type == right.ssi_type
+    }
+
+    /// Apply a channel allocation carried by an SNDCP response. Packet data is
+    /// intentionally constrained to the main carrier's TS2 so voice and the
+    /// secondary-carrier control layout remain untouched.
+    pub fn update_packet_data_assignment(
+        &mut self,
+        addr: TetraAddress,
+        timeslots: [bool; 4],
+        alloc_type: ChanAllocType,
+        ul_dl_assigned: UlDlAssignment,
+    ) {
+        if addr.ssi_type != SsiType::Issi {
+            tracing::warn!("packet-data assignment ignored for non-ISSI address {}", addr);
+            return;
+        }
+
+        match alloc_type {
+            ChanAllocType::QuitAndGo => {
+                for assignment in &mut self.packet_data_assignments {
+                    if assignment.is_some_and(|current| Self::same_address(current.addr, addr)) {
+                        *assignment = None;
+                    }
+                }
+                tracing::info!("packet-data PDCH released for {}", addr);
+            }
+            ChanAllocType::Replace | ChanAllocType::Additional => {
+                if matches!(ul_dl_assigned, UlDlAssignment::Augmented) {
+                    tracing::warn!("packet-data augmented assignment is unsupported for {}", addr);
+                    return;
+                }
+
+                if matches!(alloc_type, ChanAllocType::Replace) {
+                    for assignment in &mut self.packet_data_assignments {
+                        if assignment.is_some_and(|current| Self::same_address(current.addr, addr)) {
+                            *assignment = None;
+                        }
+                    }
+                }
+
+                // The current NetCore WAP bearer is deliberately TS2-only.
+                let requested = timeslots.iter().any(|assigned| *assigned);
+                if requested {
+                    let slot = 1usize;
+                    if self.circuits.is_active(Direction::Dl, 2) || self.circuits.is_active(Direction::Ul, 2) {
+                        tracing::warn!("packet-data PDCH assignment for {} deferred: TS2 is voice-owned", addr);
+                        return;
+                    }
+                    if let Some(previous) = self.packet_data_assignments[slot] {
+                        if !Self::same_address(previous.addr, addr) {
+                            tracing::info!("packet-data PDCH TS2 owner changed {} -> {}", previous.addr, addr);
+                        }
+                    }
+                    self.packet_data_assignments[slot] = Some(PacketDataAssignment {
+                        addr,
+                        ul_dl_assigned,
+                        expires_at: self.cur_dltime.add_timeslots(PACKET_DATA_ASSIGNMENT_TTL_TIMESLOTS),
+                    });
+                    tracing::info!("packet-data PDCH assigned to {} on TS2 ({})", addr, ul_dl_assigned);
+                } else {
+                    self.packet_data_assignments[1] =
+                        self.packet_data_assignments[1].filter(|current| !Self::same_address(current.addr, addr));
+                }
+            }
+            ChanAllocType::ReplaceWithCarrierSignalling => {
+                tracing::warn!("packet-data ReplaceWithCarrierSignalling is unsupported for {}", addr);
+            }
+        }
+    }
+
+    fn packet_data_assignment_for_uplink(&self, ts: TdmaTime) -> Option<PacketDataAssignment> {
+        if ts.t != 2 || ts.f == 18 || self.circuits.is_active(Direction::Dl, 2) || self.circuits.is_active(Direction::Ul, 2) {
+            return None;
+        }
+        self.packet_data_assignments[1].filter(|assignment| {
+            assignment.expires_at.diff(ts) > 0 && matches!(assignment.ul_dl_assigned, UlDlAssignment::Ul | UlDlAssignment::Both)
+        })
+    }
+
+    /// Resolve the owner of an addressless MAC-DATA/FRAG/END received on an
+    /// assigned PDCH. The physical block number does not change the owner.
+    pub fn packet_data_uplink_owner(&self, ts: TdmaTime, _slot: PhyBlockNum) -> Option<TetraAddress> {
+        self.packet_data_assignment_for_uplink(ts).map(|assignment| assignment.addr)
+    }
+
+    /// Select the active downlink PDCH for an SNDCP response without a fresh
+    /// channel-allocation element.
+    pub fn packet_data_downlink_timeslot_for(&self, addr: TetraAddress) -> Option<u8> {
+        if self.circuits.is_active(Direction::Dl, 2) || self.circuits.is_active(Direction::Ul, 2) {
+            return None;
+        }
+        self.packet_data_assignments[1]
+            .filter(|assignment| {
+                assignment.expires_at.diff(self.cur_dltime) > 0
+                    && Self::same_address(assignment.addr, addr)
+                    && matches!(assignment.ul_dl_assigned, UlDlAssignment::Dl | UlDlAssignment::Both)
+            })
+            .map(|_| 2)
+    }
+
     fn ul_get_usage(&self, ts: TdmaTime) -> AccessAssignUlUsage {
         let ul_sched = &self.ulsched[ts.t as usize - 1][self.ul_ts_to_sched_index(&ts)];
         match (ul_sched.ul1, ul_sched.ul2) {
@@ -535,7 +657,13 @@ impl BsChannelScheduler {
                     AccessAssignUlUsage::CommonAndAssigned
                 }
             }
-            (None, None) => AccessAssignUlUsage::CommonOnly,
+            (None, None) => {
+                if self.packet_data_assignment_for_uplink(ts).is_some() {
+                    AccessAssignUlUsage::AssignedOnly
+                } else {
+                    AccessAssignUlUsage::CommonOnly
+                }
+            }
             _ => unreachable!("ul2 can't be set with ul1 None"),
         }
     }
@@ -564,9 +692,7 @@ impl BsChannelScheduler {
     /// Total queued downlink scheduling elements across all timeslots plus the next-slot carry-over.
     /// A cheap backlog gauge for the health monitor's Congestion domain (read once per tick).
     pub fn dl_queue_depth(&self) -> usize {
-        self.dltx_queues.iter().map(|q| q.len()).sum::<usize>()
-            + self.dltx_next_slot_queue.len()
-            + self.frame18_common_scch_queue.len()
+        self.dltx_queues.iter().map(|q| q.len()).sum::<usize>() + self.dltx_next_slot_queue.len() + self.frame18_common_scch_queue.len()
     }
 
     /// Registers that we should transmit a MAC-RESOURCE or similar with a grant, somewhere this tick.
@@ -696,13 +822,7 @@ impl BsChannelScheduler {
     /// Only one pending page per call/GSSI is retained. A newer call to the same
     /// GSSI supersedes queued pages from the old call, preventing a later frame-18
     /// opportunity from announcing an already released call or an obsolete usage marker.
-    pub fn dl_enqueue_frame18_common_scch(
-        &mut self,
-        call_id: u16,
-        pdu: MacResource,
-        sdu: BitBuffer,
-        tx_reporter: Option<TxReporter>,
-    ) {
+    pub fn dl_enqueue_frame18_common_scch(&mut self, call_id: u16, pdu: MacResource, sdu: BitBuffer, tx_reporter: Option<TxReporter>) {
         let Some(addr) = pdu.addr else {
             tracing::warn!(
                 "BsChannelScheduler: dropping frame-18 common SCCH resource without address call_id={}",
@@ -766,8 +886,7 @@ impl BsChannelScheduler {
     /// UMAC to retire the queue entry before a later call can inherit it.
     pub fn drop_frame18_common_scch_call(&mut self, call_id: u16) {
         let before = self.frame18_common_scch_queue.len();
-        self.frame18_common_scch_queue
-            .retain(|entry| entry.call_id != call_id);
+        self.frame18_common_scch_queue.retain(|entry| entry.call_id != call_id);
         let dropped = before - self.frame18_common_scch_queue.len();
         if dropped > 0 {
             tracing::info!(
@@ -1354,6 +1473,12 @@ impl BsChannelScheduler {
     pub fn tick_start(&mut self, ts: TdmaTime) {
         // Increment current time
         self.cur_dltime = self.cur_dltime.add_timeslots(1);
+        for assignment in &mut self.packet_data_assignments {
+            if assignment.is_some_and(|current| current.expires_at.diff(self.cur_dltime) <= 0) {
+                tracing::info!("packet-data PDCH assignment expired: {:?}", assignment);
+                *assignment = None;
+            }
+        }
         assert!(
             ts == self.cur_dltime,
             "BsChannelScheduler tick_start: ts mismatch, expected {}, got {}",
@@ -1387,11 +1512,7 @@ impl BsChannelScheduler {
         // During hangtime we stop sending traffic frames and switch to signalling mode.
         // Keep traffic mode while FACCH/stealing is still queued for delivery.
         let hang_slot = (2..=4).contains(&ts.t) || (self.downlink_mode == CarrierDownlinkMode::TrafficOnly && ts.t == 1);
-        let hang_effective = if hang_slot {
-            self.is_hangtime_effective(ts.t)
-        } else {
-            false
-        };
+        let hang_effective = if hang_slot { self.is_hangtime_effective(ts.t) } else { false };
 
         let dl_is_traffic = dl_circuit_active && !hang_effective;
         let ul_is_traffic = ul_circuit_active && !hang_effective;
@@ -1403,7 +1524,9 @@ impl BsChannelScheduler {
         // Returning an empty TP slot makes PHY skip transmission for this carrier/slot.
         if ((self.downlink_mode == CarrierDownlinkMode::TrafficOnly)
             || (self.downlink_mode == CarrierDownlinkMode::SecondaryBcchNoMcch && ts.t != 1))
-            && !dl_is_traffic && !ul_is_traffic {
+            && !dl_is_traffic
+            && !ul_is_traffic
+        {
             let clear_ts = ts.add_timeslots(-4);
             let index = self.ul_ts_to_sched_index(&clear_ts);
             self.ulsched[ts.t as usize - 1][index].ul1 = None;
@@ -1492,7 +1615,7 @@ impl BsChannelScheduler {
                 // Otherwise, fall back to default SYNC/SYSINFO.
                 if hang_effective && dl_circuit_active {
                     TmvUnitdataReqSlot {
-                    carrier_num: self.carrier_num,
+                        carrier_num: self.carrier_num,
                         ts,
                         blk1: Some(TmvUnitdataReq {
                             logical_channel: LogicalChannel::SchF,
@@ -1506,7 +1629,7 @@ impl BsChannelScheduler {
                 } else {
                     // Put default SYNC/SYSINFO frame
                     TmvUnitdataReqSlot {
-                    carrier_num: self.carrier_num,
+                        carrier_num: self.carrier_num,
                         ts,
                         blk1: None,
                         blk2: None,
@@ -2439,5 +2562,33 @@ mod tests {
         sched.dump_dl_queue();
 
         assert!(sched.dltx_queues[ts.t as usize - 1].len() == 1);
+    }
+    #[test]
+    fn packet_data_assignment_owns_ts2_until_quit_and_go() {
+        let mut sched = get_testing_slotter();
+        sched.cur_dltime = TdmaTime { t: 1, f: 1, m: 1, h: 0 };
+        let addr = TetraAddress {
+            ssi_type: SsiType::Issi,
+            ssi: 4_010_001,
+        };
+        let ts2 = TdmaTime { t: 2, f: 2, m: 1, h: 0 };
+
+        sched.update_packet_data_assignment(addr, [false, true, false, false], ChanAllocType::Replace, UlDlAssignment::Both);
+
+        assert_eq!(
+            sched.packet_data_uplink_owner(ts2, PhyBlockNum::Both).map(|owner| owner.ssi),
+            Some(addr.ssi)
+        );
+        assert_eq!(sched.packet_data_downlink_timeslot_for(addr), Some(2));
+        assert_eq!(sched.ul_get_usage(ts2), AccessAssignUlUsage::AssignedOnly);
+        assert!(
+            sched
+                .packet_data_uplink_owner(TdmaTime { f: 18, ..ts2 }, PhyBlockNum::Both)
+                .is_none()
+        );
+
+        sched.update_packet_data_assignment(addr, [false; 4], ChanAllocType::QuitAndGo, UlDlAssignment::Both);
+        assert!(sched.packet_data_uplink_owner(ts2, PhyBlockNum::Both).is_none());
+        assert_eq!(sched.packet_data_downlink_timeslot_for(addr), None);
     }
 }
