@@ -179,6 +179,15 @@ pub struct DashboardStateInner {
     /// Most recent lite stack-health roll-up (Service/Backhaul/Radios/Congestion). Sent on init
     /// so the System Health tile paints immediately on connect.
     pub last_health: Option<crate::health::HealthSnapshot>,
+    /// Most recent SNDCP/TUN packet-data snapshot for the local dashboard.
+    pub last_packet_data: Option<PacketDataDashboardSnapshot>,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct PacketDataDashboardSnapshot {
+    pub gateway: crate::net_telemetry::events::PacketDataGatewayTelemetry,
+    pub contexts: Vec<crate::net_telemetry::events::PacketDataContextTelemetry>,
+    pub bearers: Vec<crate::net_telemetry::events::PdchBearerTelemetry>,
 }
 
 /// Fast-path visual snapshot — spectrum + IQ + RMS/peak. Refreshed several times
@@ -342,6 +351,7 @@ impl DashboardStateInner {
             last_sdr_health: None,
             last_sys_health: None,
             last_health: None,
+            last_packet_data: None,
         }
     }
 

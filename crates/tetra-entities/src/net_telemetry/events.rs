@@ -242,6 +242,67 @@ pub enum TelemetryEvent {
     /// External ISSI deregistered through a Brew/TetraPack backhaul. Appended last for bitcode
     /// wire-stability so consumers can re-arm one-shot REGISTER alerts after a real departure.
     BrewSubscriberDeregistered { issi: u32, source: String },
+    /// Complete SNDCP/packet-data operations snapshot. Appended last for
+    /// bitcode wire-stability. It is emitted roughly once per second and is
+    /// consumed by both the local dashboard and the standalone Control Room.
+    PacketDataSnapshot {
+        gateway: PacketDataGatewayTelemetry,
+        contexts: Vec<PacketDataContextTelemetry>,
+        bearers: Vec<PdchBearerTelemetry>,
+    },
+}
+
+#[derive(Debug, Clone, Encode, Decode, Serialize, Deserialize)]
+pub struct PacketDataGatewayTelemetry {
+    pub enabled: bool,
+    pub running: bool,
+    pub interface_name: String,
+    pub gateway_address: String,
+    pub prefix_len: u8,
+    pub packets_from_mobile: u64,
+    pub bytes_from_mobile: u64,
+    pub packets_to_mobile: u64,
+    pub bytes_to_mobile: u64,
+    pub dropped_from_mobile: u64,
+    pub dropped_to_mobile: u64,
+    pub io_errors: u64,
+    pub queued_packets: u64,
+    pub queued_bytes: u64,
+    pub active_contexts: u32,
+    pub active_bearers: u32,
+    pub bearer_capacity: u8,
+    pub traffic_slots_free: u8,
+    pub reserved_voice_slots: u8,
+}
+
+#[derive(Debug, Clone, Encode, Decode, Serialize, Deserialize)]
+pub struct PacketDataContextTelemetry {
+    pub issi: u32,
+    pub nsapi: u8,
+    pub ipv4: String,
+    pub state: String,
+    pub primary_nsapi: Option<u8>,
+    pub snei: Option<u16>,
+    pub mtu: u16,
+    pub priority: u8,
+    pub queued_packets: u32,
+    pub queued_bytes: u64,
+    pub carrier_num: Option<u16>,
+    pub logical_ts: Option<u8>,
+    pub air_ts: Option<u8>,
+    pub age_secs: u64,
+    pub idle_secs: u64,
+}
+
+#[derive(Debug, Clone, Encode, Decode, Serialize, Deserialize)]
+pub struct PdchBearerTelemetry {
+    pub issi: u32,
+    pub carrier_num: u16,
+    pub logical_ts: u8,
+    pub air_ts: u8,
+    pub nsapis: Vec<u8>,
+    pub age_secs: u64,
+    pub idle_secs: u64,
 }
 
 /// A single host-system sensor reading. Kept flat for easy JSON serialisation

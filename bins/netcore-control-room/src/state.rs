@@ -60,6 +60,13 @@ impl SharedControlRoom {
         self.inner.lock().expect("control room state poisoned").health_snapshot()
     }
 
+    pub fn packet_data_snapshot(&self, node_id: Option<&str>) -> Option<ControlRoomPacketDataSnapshot> {
+        self.inner
+            .lock()
+            .expect("control room state poisoned")
+            .packet_data_snapshot(node_id)
+    }
+
     pub fn subscribers_snapshot(&self, node_id: Option<&str>, online_only: bool) -> Option<ControlRoomSubscribersSnapshot> {
         self.inner
             .lock()
@@ -302,6 +309,10 @@ pub struct NodeOverview {
     pub health_overall: Option<String>,
     pub rf_peak_dbfs: Option<f64>,
     pub rf_rms_dbfs: Option<f64>,
+    pub packet_gateway_running: Option<bool>,
+    pub packet_contexts_active: Option<u64>,
+    pub pdch_bearers_active: Option<u64>,
+    pub pdch_bearer_capacity: Option<u64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -362,6 +373,23 @@ pub struct NodeHealthSnapshot {
     pub sdr_health: Option<Value>,
     pub sys_health: Option<Value>,
     pub errors: Vec<String>,
+}
+
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ControlRoomPacketDataSnapshot {
+    pub now: String,
+    pub node_filter: Option<String>,
+    pub nodes: Vec<NodePacketDataSnapshot>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NodePacketDataSnapshot {
+    pub node_id: String,
+    pub station_name: Option<String>,
+    pub connected: bool,
+    pub last_seen: Option<String>,
+    pub packet_data: Option<Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -512,6 +540,7 @@ pub struct ControlRoomNodeDetail {
     pub sds_log: Vec<SdsDetail>,
     pub brew: HashMap<String, BrewState>,
     pub timeslot_activity: HashMap<String, String>,
+    pub packet_data: Option<Value>,
     pub errors: Vec<String>,
 }
 
@@ -550,6 +579,7 @@ pub struct NodeState {
     pub sdr_health: Option<Value>,
     pub sys_health: Option<Value>,
     pub health: Option<Value>,
+    pub packet_data: Option<Value>,
     pub errors: VecDeque<String>,
 }
 
@@ -585,6 +615,10 @@ impl NodeState {
             health_overall: extract_health_overall(&self.health),
             rf_peak_dbfs: extract_f64_path(&self.rf_quality, &["peak_dbfs"]),
             rf_rms_dbfs: extract_f64_path(&self.rf_quality, &["rms_dbfs"]),
+            packet_gateway_running: extract_bool_path(&self.packet_data, &["gateway", "running"]),
+            packet_contexts_active: extract_u64_path(&self.packet_data, &["gateway", "active_contexts"]),
+            pdch_bearers_active: extract_u64_path(&self.packet_data, &["gateway", "active_bearers"]),
+            pdch_bearer_capacity: extract_u64_path(&self.packet_data, &["gateway", "bearer_capacity"]),
         }
     }
 
@@ -610,6 +644,16 @@ impl NodeState {
             sdr_health: self.sdr_health.clone(),
             sys_health: self.sys_health.clone(),
             errors: self.errors.iter().cloned().collect(),
+        }
+    }
+
+    fn packet_data_snapshot(&self) -> NodePacketDataSnapshot {
+        NodePacketDataSnapshot {
+            node_id: self.node_id.clone(),
+            station_name: self.station_name.clone(),
+            connected: self.connected || self.transport_connected,
+            last_seen: self.last_seen.clone(),
+            packet_data: self.packet_data.clone(),
         }
     }
 
@@ -654,6 +698,7 @@ impl NodeState {
             sdr_health: None,
             sys_health: None,
             health: None,
+            packet_data: None,
             errors: VecDeque::new(),
         }
     }
@@ -937,6 +982,14 @@ impl NodeState {
             }
             TelemetryEvent::HealthSnapshot(_) => {
                 self.health = Some(event_for_log(event));
+            }
+            TelemetryEvent::PacketDataSnapshot { gateway, contexts, bearers } => {
+                self.packet_data = Some(json!({
+                    "gateway": gateway,
+                    "contexts": contexts,
+                    "bearers": bearers,
+                    "timestamp": timestamp,
+                }));
             }
             TelemetryEvent::BrewConnected { connected, server_version } => {
                 self.brew.insert(
@@ -1303,6 +1356,15 @@ impl ControlRoomState {
         }
     }
 
+    fn packet_data_snapshot(&self, node_filter: Option<&str>) -> Option<ControlRoomPacketDataSnapshot> {
+        let nodes = self.selected_nodes(node_filter)?;
+        Some(ControlRoomPacketDataSnapshot {
+            now: now_iso(),
+            node_filter: node_filter.map(ToString::to_string),
+            nodes: nodes.into_iter().map(NodeState::packet_data_snapshot).collect(),
+        })
+    }
+
     fn subscribers_snapshot(&self, node_filter: Option<&str>, online_only: bool) -> Option<ControlRoomSubscribersSnapshot> {
         let nodes = self.selected_nodes(node_filter)?;
         let mut subscribers = Vec::new();
@@ -1459,6 +1521,7 @@ impl ControlRoomState {
             sds_log,
             brew: node.brew.clone(),
             timeslot_activity: node.timeslot_activity.clone(),
+            packet_data: node.packet_data.clone(),
             errors: node.errors.iter().cloned().collect(),
         })
     }
@@ -1970,13 +2033,14 @@ pub fn telemetry_event_type(event: &TelemetryEvent) -> &'static str {
         TelemetryEvent::MeshcomNodeUpdate { .. } => "meshcom_node_update",
         TelemetryEvent::BrewSubscriberRegistered { .. } => "brew_subscriber_registered",
         TelemetryEvent::BrewSubscriberDeregistered { .. } => "brew_subscriber_deregistered",
+        TelemetryEvent::PacketDataSnapshot { .. } => "packet_data_snapshot",
     }
 }
 
 fn is_noisy_event_type(event_type: &str) -> bool {
     matches!(
         event_type,
-        "tx_visual" | "tx_quality" | "sdr_health" | "sys_health" | "health_snapshot" | "ms_rssi" | "ts_voice_activity"
+        "tx_visual" | "tx_quality" | "sdr_health" | "sys_health" | "health_snapshot" | "packet_data_snapshot" | "ms_rssi" | "ts_voice_activity"
     )
 }
 
@@ -1995,6 +2059,22 @@ fn extract_f64_path(value: &Option<Value>, path: &[&str]) -> Option<f64> {
         current = current.get(*key)?;
     }
     current.as_f64()
+}
+
+fn extract_u64_path(value: &Option<Value>, path: &[&str]) -> Option<u64> {
+    let mut current = value.as_ref()?;
+    for key in path {
+        current = current.get(*key)?;
+    }
+    current.as_u64()
+}
+
+fn extract_bool_path(value: &Option<Value>, path: &[&str]) -> Option<bool> {
+    let mut current = value.as_ref()?;
+    for key in path {
+        current = current.get(*key)?;
+    }
+    current.as_bool()
 }
 
 fn event_for_log(event: &TelemetryEvent) -> Value {

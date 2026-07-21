@@ -1,8 +1,8 @@
 //! Runtime state for the SwMI side of ETSI EN 300 392-2 clause 28 SNDCP.
 //!
 //! The implementation deliberately models the capability profile advertised by
-//! NetCore-Tetra: IPv4, no SNDCP compression, one basic/advanced-link PDCH and
-//! multiple primary and secondary PDP contexts/NSAPIs per subscriber.
+//! NetCore-Tetra: IPv4, no SNDCP compression, dynamically allocated one-slot PDCH
+//! bearers and multiple primary and secondary PDP contexts/NSAPIs per subscriber.
 
 use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant};
@@ -166,13 +166,20 @@ pub enum TimerEvent {
 }
 
 #[derive(Debug, Default)]
+struct BearerState {
+    nsapis: HashSet<u8>,
+    ready_deadline: Option<Instant>,
+}
+
+#[derive(Debug, Default)]
 pub struct ContextTable {
     contexts: HashMap<ContextKey, PdpContext>,
     default_priorities: HashMap<u32, u8>,
     network_endpoint_ids: HashMap<u32, u16>,
-    bearer_owner: Option<u32>,
-    bearer_nsapis: HashSet<u8>,
-    bearer_ready_deadline: Option<Instant>,
+    /// One independently timed SNDCP bearer per active subscriber. The actual
+    /// logical PDCH timeslot is owned by `Sndcp`; this table tracks only SNDCP
+    /// state and NSAPI membership.
+    bearers: HashMap<u32, BearerState>,
 }
 
 impl ContextTable {
@@ -252,11 +259,11 @@ impl ContextTable {
     }
 
     pub fn remove(&mut self, key: ContextKey) -> Option<PdpContext> {
-        if self.bearer_owner == Some(key.issi) {
-            self.bearer_nsapis.remove(&key.nsapi);
+        if let Some(bearer) = self.bearers.get_mut(&key.issi) {
+            bearer.nsapis.remove(&key.nsapi);
         }
         let removed = self.contexts.remove(&key);
-        self.clear_bearer_if_empty();
+        self.clear_bearer_if_empty(key.issi);
         self.cleanup_subscriber_if_unused(key.issi);
         removed
     }
@@ -274,11 +281,7 @@ impl ContextTable {
                 removed.push((key, context));
             }
         }
-        if self.bearer_owner == Some(issi) {
-            self.bearer_owner = None;
-            self.bearer_nsapis.clear();
-            self.bearer_ready_deadline = None;
-        }
+        self.bearers.remove(&issi);
         self.default_priorities.remove(&issi);
         self.network_endpoint_ids.remove(&issi);
         removed
@@ -310,72 +313,80 @@ impl ContextTable {
         })
     }
 
+    /// Compatibility helper for older diagnostics: returns the sole bearer owner
+    /// only when exactly one subscriber currently owns a bearer.
     pub fn bearer_owner(&self) -> Option<u32> {
-        self.bearer_owner
+        if self.bearers.len() == 1 {
+            self.bearers.keys().next().copied()
+        } else {
+            None
+        }
+    }
+
+    pub fn bearer_count(&self) -> usize {
+        self.bearers.len()
+    }
+
+    pub fn bearer_owners(&self) -> impl Iterator<Item = u32> + '_ {
+        self.bearers.keys().copied()
+    }
+
+    pub fn has_bearer(&self, issi: u32) -> bool {
+        self.bearers.contains_key(&issi)
     }
 
     pub fn refresh_bearer_ready(&mut self, issi: u32, ready_timer_code: u8, now: Instant) -> bool {
-        if self.bearer_owner != Some(issi) {
+        let Some(bearer) = self.bearers.get_mut(&issi) else {
             return false;
-        }
-        self.bearer_ready_deadline = deadline(now, ready_timer_duration(ready_timer_code));
+        };
+        bearer.ready_deadline = deadline(now, ready_timer_duration(ready_timer_code));
         true
     }
 
-    pub fn bearer_ready_deadline(&self) -> Option<Instant> {
-        self.bearer_ready_deadline
+    pub fn bearer_ready_deadline(&self, issi: u32) -> Option<Instant> {
+        self.bearers.get(&issi).and_then(|bearer| bearer.ready_deadline)
     }
 
-    pub fn can_claim_bearer(&self, issi: u32) -> bool {
-        self.bearer_owner.is_none() || self.bearer_owner == Some(issi)
+    /// Multi-PDCH runtime permits every subscriber to claim its own bearer. The
+    /// physical capacity decision remains in the shared timeslot allocator.
+    pub fn can_claim_bearer(&self, _issi: u32) -> bool {
+        true
     }
 
-    /// Record a successful MAC reservation. Multiple NSAPIs belonging to the same
-    /// ISSI may share the single PDCH; another ISSI must wait until it is released.
     pub fn claim_bearer(&mut self, issi: u32, nsapis: &[u8]) -> bool {
-        if !self.can_claim_bearer(issi) {
-            return false;
-        }
-        if self.bearer_owner != Some(issi) {
-            self.bearer_ready_deadline = None;
-        }
-        self.bearer_owner = Some(issi);
-        self.bearer_nsapis.extend(nsapis.iter().copied().filter(|nsapi| (1..=14).contains(nsapi)));
+        let bearer = self.bearers.entry(issi).or_default();
+        bearer.nsapis.extend(nsapis.iter().copied().filter(|nsapi| (1..=14).contains(nsapi)));
         true
     }
 
+    /// Returns true when the subscriber bearer became empty and was removed.
     pub fn release_bearer_nsapis(&mut self, issi: u32, nsapis: &[u8]) -> bool {
-        if self.bearer_owner != Some(issi) {
+        let Some(bearer) = self.bearers.get_mut(&issi) else {
             return false;
-        }
+        };
         for nsapi in nsapis {
-            self.bearer_nsapis.remove(nsapi);
+            bearer.nsapis.remove(nsapi);
         }
-        self.clear_bearer_if_empty()
+        self.clear_bearer_if_empty(issi)
     }
 
     pub fn release_bearer_for_issi(&mut self, issi: u32) -> bool {
-        if self.bearer_owner != Some(issi) {
-            return false;
-        }
-        self.bearer_owner = None;
-        self.bearer_nsapis.clear();
-        self.bearer_ready_deadline = None;
-        true
+        self.bearers.remove(&issi).is_some()
     }
 
-    fn clear_bearer_if_empty(&mut self) -> bool {
-        if self.bearer_owner.is_some() && self.bearer_nsapis.is_empty() {
-            self.bearer_owner = None;
-            self.bearer_ready_deadline = None;
-            true
-        } else {
-            false
+    fn clear_bearer_if_empty(&mut self, issi: u32) -> bool {
+        let empty = self.bearers.get(&issi).is_some_and(|bearer| bearer.nsapis.is_empty());
+        if empty {
+            self.bearers.remove(&issi);
         }
+        empty
     }
 
-    pub fn bearer_nsapis(&self) -> impl Iterator<Item = u8> + '_ {
-        self.bearer_nsapis.iter().copied()
+    pub fn bearer_nsapis(&self, issi: u32) -> impl Iterator<Item = u8> + '_ {
+        self.bearers
+            .get(&issi)
+            .into_iter()
+            .flat_map(|bearer| bearer.nsapis.iter().copied())
     }
 
     pub fn set_default_priority(&mut self, issi: u32, priority: u8) {
@@ -394,37 +405,36 @@ impl ContextTable {
         let mut events = Vec::new();
         let mut standby_expired_issis = HashSet::new();
 
-        // READY is a subscriber/bearer state, not a per-NSAPI state. Its expiry
-        // returns every context of the current bearer owner to STANDBY and causes
-        // exactly one SN-END OF DATA to be emitted by the entity.
-        if let Some(issi) = self.bearer_owner
-            && self.bearer_ready_deadline.is_some_and(|deadline| now >= deadline)
-        {
+        // READY is per subscriber/bearer. Multiple subscribers may therefore
+        // expire independently when multiple PDCHs are active.
+        let ready_expired = self
+            .bearers
+            .iter()
+            .filter_map(|(issi, bearer)| bearer.ready_deadline.is_some_and(|deadline| now >= deadline).then_some(*issi))
+            .collect::<Vec<_>>();
+        for issi in ready_expired {
             for (key, context) in &mut self.contexts {
                 if key.issi == issi && matches!(context.state, PdpState::Ready | PdpState::Quiescent) {
                     context.enter_standby(standby_timer_code, now);
                 }
             }
-            self.bearer_owner = None;
-            self.bearer_nsapis.clear();
-            self.bearer_ready_deadline = None;
+            self.bearers.remove(&issi);
             events.push(TimerEvent::ReadyExpired(issi));
-        } else {
-            // CONTEXT_READY is per PDP context. Its expiry merely marks that
-            // context quiescent; it does not release a bearer still used by other
-            // contexts. A fresh TRANSMIT REQUEST reactivates it.
-            let keys = self.contexts.keys().copied().collect::<Vec<_>>();
-            for key in keys {
-                let Some(context) = self.contexts.get_mut(&key) else {
-                    continue;
-                };
-                if context.state == PdpState::Ready
-                    && context.ready_deadline.is_some_and(|deadline| now >= deadline)
-                {
-                    context.state = PdpState::Quiescent;
-                    context.ready_deadline = None;
-                    events.push(TimerEvent::ContextReadyExpired(key));
-                }
+        }
+
+        // CONTEXT_READY is per PDP context. Its expiry merely marks that context
+        // quiescent; it does not release a bearer still used by other contexts.
+        let keys = self.contexts.keys().copied().collect::<Vec<_>>();
+        for key in keys {
+            let Some(context) = self.contexts.get_mut(&key) else {
+                continue;
+            };
+            if context.state == PdpState::Ready
+                && context.ready_deadline.is_some_and(|deadline| now >= deadline)
+            {
+                context.state = PdpState::Quiescent;
+                context.ready_deadline = None;
+                events.push(TimerEvent::ContextReadyExpired(key));
             }
         }
 
@@ -443,7 +453,6 @@ impl ContextTable {
                 events.push(TimerEvent::StandbyExpired(key));
             }
         }
-        self.clear_bearer_if_empty();
         events
     }
 
@@ -453,11 +462,7 @@ impl ContextTable {
         }
         self.default_priorities.remove(&issi);
         self.network_endpoint_ids.remove(&issi);
-        if self.bearer_owner == Some(issi) {
-            self.bearer_owner = None;
-            self.bearer_nsapis.clear();
-            self.bearer_ready_deadline = None;
-        }
+        self.bearers.remove(&issi);
     }
 }
 
@@ -577,11 +582,11 @@ mod tests {
         let mut table = ContextTable::default();
         assert!(table.claim_bearer(1001, &[2]));
         assert!(table.claim_bearer(1001, &[3, 4]));
-        assert!(!table.claim_bearer(1002, &[2]));
-        assert_eq!(table.bearer_owner(), Some(1001));
+        assert!(table.claim_bearer(1002, &[2]));
+        assert!(table.has_bearer(1001));
         assert!(!table.release_bearer_nsapis(1001, &[2]));
         assert!(table.release_bearer_nsapis(1001, &[3, 4]));
-        assert_eq!(table.bearer_owner(), None);
+        assert!(!table.has_bearer(1001));
     }
 
     #[test]
@@ -592,8 +597,8 @@ mod tests {
         table.insert(ContextKey { issi: 2, nsapi: 2 }, PdpContext::new([10, 0, 0, 3], 4, 576, 4, now));
         assert!(table.claim_bearer(1, &[2]));
         table.remove(ContextKey { issi: 2, nsapi: 2 });
-        assert_eq!(table.bearer_owner(), Some(1));
-        assert_eq!(table.bearer_nsapis().collect::<Vec<_>>(), vec![2]);
+        assert!(table.has_bearer(1));
+        assert_eq!(table.bearer_nsapis(1).collect::<Vec<_>>(), vec![2]);
     }
 
     #[test]
@@ -636,7 +641,27 @@ mod tests {
         assert_eq!(events, vec![TimerEvent::ReadyExpired(42)]);
         assert_eq!(table.get(first).map(|ctx| ctx.state), Some(PdpState::Standby));
         assert_eq!(table.get(second).map(|ctx| ctx.state), Some(PdpState::Standby));
-        assert_eq!(table.bearer_owner(), None);
+        assert!(!table.has_bearer(42));
+    }
+
+    #[test]
+    fn multiple_bearers_expire_independently() {
+        let now = Instant::now();
+        let mut table = ContextTable::default();
+        for issi in [42, 43] {
+            let key = ContextKey { issi, nsapi: 2 };
+            table.insert(key, PdpContext::new([10, 0, 0, issi as u8], 4, 576, 4, now));
+            assert!(table.claim_bearer(issi, &[2]));
+            table.get_mut(key).unwrap().enter_ready(1, now);
+        }
+        assert!(table.refresh_bearer_ready(42, 1, now));
+        assert!(table.refresh_bearer_ready(43, 2, now));
+
+        let events = table.tick(now + Duration::from_millis(201), 4);
+        assert!(events.contains(&TimerEvent::ReadyExpired(42)));
+        assert!(!events.contains(&TimerEvent::ReadyExpired(43)));
+        assert!(!table.has_bearer(42));
+        assert!(table.has_bearer(43));
     }
 
     #[test]
@@ -652,7 +677,7 @@ mod tests {
         let events = table.tick(now + Duration::from_millis(201), 4);
         assert_eq!(events, vec![TimerEvent::ContextReadyExpired(key)]);
         assert_eq!(table.get(key).map(|ctx| ctx.state), Some(PdpState::Quiescent));
-        assert_eq!(table.bearer_owner(), Some(42));
+        assert!(table.has_bearer(42));
     }
     #[test]
     fn primary_reactivation_may_reuse_address_shared_with_secondary() {

@@ -74,6 +74,15 @@ pub struct ControlRoomNodeCapabilities {
     pub service_control: bool,
     pub brew_bridge: bool,
     pub dual_carrier: bool,
+    /// Node exports SNDCP/PDP/TUN packet-data telemetry and APIs.
+    #[serde(default)]
+    pub packet_data: bool,
+    /// Node accepts WAP/WDP or WAP/SDS-TL payloads through raw SDS Type 4.
+    #[serde(default)]
+    pub legacy_wap_sds: bool,
+    /// Node can maintain more than one independently allocated PDCH bearer.
+    #[serde(default)]
+    pub multi_pdch: bool,
 }
 
 impl ControlRoomNodeCapabilities {
@@ -90,6 +99,9 @@ impl ControlRoomNodeCapabilities {
             service_control: cfg.service_name.is_some(),
             brew_bridge: cfg.brew.is_some() || cfg.brew2.is_some(),
             dual_carrier: cfg.cell.secondary_carrier.is_some(),
+            packet_data: cfg.cell.wap_ip_sndcp_profile_enabled(),
+            legacy_wap_sds: true,
+            multi_pdch: cfg.cell.wap_ip_sndcp_profile_enabled(),
         }
     }
 }

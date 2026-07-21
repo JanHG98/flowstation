@@ -182,6 +182,15 @@ pub struct CfgPacketDataGateway {
     /// RFC 1877 IPCP DNS addresses returned in PDP activation PCO. At most two.
     pub dns_servers: Vec<std::net::Ipv4Addr>,
     pub channel_capacity: usize,
+    /// Maximum simultaneously active one-slot PDCH bearers. Zero means all
+    /// traffic slots available for the configured carrier count.
+    pub max_pdch_bearers: usize,
+    /// Keep this many traffic slots outside the packet-data pool so voice and
+    /// emergency call setup retain deterministic headroom. Zero disables the guard.
+    pub reserved_voice_slots: usize,
+    /// Prefer Carrier 2 for new packet-data bearers, preserving main-carrier
+    /// traffic slots for latency-sensitive voice whenever possible.
+    pub prefer_secondary_carrier: bool,
     pub downlink_queue_packets_per_context: usize,
     pub downlink_queue_bytes_per_context: usize,
     pub downlink_queue_ttl_secs: u64,
@@ -209,6 +218,9 @@ impl Default for CfgPacketDataGateway {
             external_interface: None,
             dns_servers: Vec::new(),
             channel_capacity: 256,
+            max_pdch_bearers: 0,
+            reserved_voice_slots: 1,
+            prefer_secondary_carrier: true,
             downlink_queue_packets_per_context: 64,
             downlink_queue_bytes_per_context: 262_144,
             downlink_queue_ttl_secs: 30,
@@ -238,6 +250,9 @@ pub struct PacketDataGatewayDto {
     pub external_interface: Option<String>,
     pub dns_servers: Option<Vec<std::net::Ipv4Addr>>,
     pub channel_capacity: Option<usize>,
+    pub max_pdch_bearers: Option<usize>,
+    pub reserved_voice_slots: Option<usize>,
+    pub prefer_secondary_carrier: Option<bool>,
     pub downlink_queue_packets_per_context: Option<usize>,
     pub downlink_queue_bytes_per_context: Option<usize>,
     pub downlink_queue_ttl_secs: Option<u64>,
@@ -593,6 +608,11 @@ pub fn cell_dto_to_cfg(ci: CellInfoDto) -> CfgCellInfo {
                 external_interface: dto.external_interface.or(defaults.external_interface),
                 dns_servers: dto.dns_servers.unwrap_or(defaults.dns_servers),
                 channel_capacity: dto.channel_capacity.unwrap_or(defaults.channel_capacity),
+                max_pdch_bearers: dto.max_pdch_bearers.unwrap_or(defaults.max_pdch_bearers),
+                reserved_voice_slots: dto.reserved_voice_slots.unwrap_or(defaults.reserved_voice_slots),
+                prefer_secondary_carrier: dto
+                    .prefer_secondary_carrier
+                    .unwrap_or(defaults.prefer_secondary_carrier),
                 downlink_queue_packets_per_context: dto
                     .downlink_queue_packets_per_context
                     .unwrap_or(defaults.downlink_queue_packets_per_context),

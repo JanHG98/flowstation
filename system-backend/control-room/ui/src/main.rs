@@ -13,7 +13,7 @@ const DEFAULT_API: &str = "http://127.0.0.1:9010";
 const DEFAULT_PROFILE: &str = "default";
 const DEFAULT_NODE: &str = "SRV-M_TBS-01";
 const DEFAULT_OPERATOR: &str = "jan";
-const UI_VERSION_LABEL: &str = "Native UI v5.14.2 · Directory Pull Verified";
+const UI_VERSION_LABEL: &str = "Native UI v5.15.0 · Packet Data / Multi-PDCH";
 const DEFAULT_TILE_URL: &str = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
 const DEFAULT_TILE_ATTRIBUTION: &str = "© OpenStreetMap contributors";
 const TILE_SIZE: f64 = 256.0;
@@ -469,6 +469,7 @@ enum Tab {
     Groups,
     Calls,
     Sds,
+    PacketData,
     Locations,
     Map,
     StatusTableau,
@@ -478,12 +479,13 @@ enum Tab {
 }
 
 impl Tab {
-    const ALL: [Tab; 11] = [
+    const ALL: [Tab; 12] = [
         Tab::Overview,
         Tab::Subscribers,
         Tab::Groups,
         Tab::Calls,
         Tab::Sds,
+        Tab::PacketData,
         Tab::Locations,
         Tab::Map,
         Tab::StatusTableau,
@@ -499,6 +501,7 @@ impl Tab {
             Tab::Groups => "Gruppen",
             Tab::Calls => "Rufe",
             Tab::Sds => "SDS",
+            Tab::PacketData => "Paketdaten",
             Tab::Locations => "Standorte",
             Tab::Map => "Karte",
             Tab::StatusTableau => "Status",
@@ -515,6 +518,7 @@ impl Tab {
             Tab::Groups => "▦",
             Tab::Calls => "☎",
             Tab::Sds => "✉",
+            Tab::PacketData => "⇄",
             Tab::Locations => "⌖",
             Tab::Map => "◎",
             Tab::StatusTableau => "▦",
@@ -634,6 +638,7 @@ struct ControlRoomApp {
     groups: Option<Value>,
     calls: Option<Value>,
     sds: Option<Value>,
+    packet_data: Option<Value>,
     locations: Option<Value>,
     commands: Option<Value>,
     emergencies: Option<Value>,
@@ -649,6 +654,12 @@ struct ControlRoomApp {
     dgna_gssi: String,
     dgna_detach: bool,
     clear_issi: String,
+    legacy_wap_dest_issi: String,
+    legacy_wap_title: String,
+    legacy_wap_message: String,
+    legacy_wap_url: String,
+    legacy_wap_sds_tl: bool,
+    legacy_wap_result: Option<String>,
     command_result: Option<String>,
 
     new_user_username: String,
@@ -688,6 +699,12 @@ impl ControlRoomApp {
             dgna_gssi: String::new(),
             dgna_detach: false,
             clear_issi: String::new(),
+            legacy_wap_dest_issi: String::new(),
+            legacy_wap_title: "NetCore".to_string(),
+            legacy_wap_message: String::new(),
+            legacy_wap_url: "http://10.0.0.1:9200/".to_string(),
+            legacy_wap_sds_tl: false,
+            legacy_wap_result: None,
             command_result: None,
             new_user_username: String::new(),
             new_user_display_name: String::new(),
@@ -719,6 +736,7 @@ impl ControlRoomApp {
             groups: None,
             calls: None,
             sds: None,
+            packet_data: None,
             locations: None,
             commands: None,
             emergencies: None,
@@ -804,6 +822,7 @@ impl ControlRoomApp {
         self.get_into("/api/groups", DataSlot::Groups, &mut errors);
         self.get_into("/api/calls", DataSlot::Calls, &mut errors);
         self.get_into("/api/sds?limit=50", DataSlot::Sds, &mut errors);
+        self.get_into("/api/packet-data", DataSlot::PacketData, &mut errors);
         self.get_into("/api/locations", DataSlot::Locations, &mut errors);
         self.get_into("/api/emergencies", DataSlot::Emergencies, &mut errors);
 
@@ -919,6 +938,7 @@ impl ControlRoomApp {
             DataSlot::Groups => self.groups = Some(value),
             DataSlot::Calls => self.calls = Some(value),
             DataSlot::Sds => self.sds = Some(value),
+            DataSlot::PacketData => self.packet_data = Some(value),
             DataSlot::Locations => self.locations = Some(value),
             DataSlot::Commands => self.commands = Some(value),
             DataSlot::Emergencies => self.emergencies = Some(value),
@@ -1001,6 +1021,47 @@ impl ControlRoomApp {
         self.refresh_all();
     }
 
+    fn send_legacy_wap(&mut self) {
+        if !self.can_operate() {
+            self.legacy_wap_result = Some("Kein Zugriff: deine Rolle darf keine WAP-SDS senden".to_string());
+            return;
+        }
+        let dest_issi = match parse_u32(&self.legacy_wap_dest_issi, "Ziel-ISSI") {
+            Ok(value) if value != 0 => value,
+            Ok(_) => {
+                self.legacy_wap_result = Some("Ziel-ISSI muss ungleich 0 sein".to_string());
+                return;
+            }
+            Err(error) => {
+                self.legacy_wap_result = Some(error);
+                return;
+            }
+        };
+        if self.legacy_wap_message.trim().is_empty() {
+            self.legacy_wap_result = Some("Nachricht fehlt".to_string());
+            return;
+        }
+        let body = json!({
+            "operator_id": self.settings.operator_id.clone(),
+            "dest_issi": dest_issi,
+            "source_issi": 4_010_001u32,
+            "dest_is_group": false,
+            "title": self.legacy_wap_title.trim(),
+            "message": self.legacy_wap_message.trim(),
+            "url": if self.legacy_wap_url.trim().is_empty() { Value::Null } else { Value::String(self.legacy_wap_url.trim().to_string()) },
+            "transport": if self.legacy_wap_sds_tl { "sds_tl" } else { "wdp" },
+            "message_reference": 1u8,
+        });
+        self.legacy_wap_result = Some(match self.api.post(
+            &format!("/api/nodes/{}/commands/legacy-wap", self.settings.default_node),
+            &body,
+        ) {
+            Ok(value) => pretty(&value),
+            Err(error) => error,
+        });
+        self.refresh_all();
+    }
+
     fn login(&mut self) {
         let username = self.login_username.trim().to_string();
         let password = self.login_password.clone();
@@ -1030,6 +1091,7 @@ impl ControlRoomApp {
         self.groups = None;
         self.calls = None;
         self.sds = None;
+        self.packet_data = None;
         self.locations = None;
         self.commands = None;
         self.emergencies = None;
@@ -1099,6 +1161,7 @@ enum DataSlot {
     Groups,
     Calls,
     Sds,
+    PacketData,
     Locations,
     Commands,
     Emergencies,
@@ -1251,6 +1314,9 @@ impl ControlRoomApp {
                     }
                     if ui.add_sized([64.0, 28.0], egui::Button::new("SDS")).clicked() {
                         self.tab = Tab::Sds;
+                    }
+                    if ui.add_sized([104.0, 28.0], egui::Button::new("Paketdaten")).clicked() {
+                        self.tab = Tab::PacketData;
                     }
                     if ui.add_sized([72.0, 28.0], egui::Button::new("Karte")).clicked() {
                         self.tab = Tab::Map;
@@ -1410,6 +1476,7 @@ impl ControlRoomApp {
             Tab::Groups => self.render_groups(ui),
             Tab::Calls => self.render_calls(ui),
             Tab::Sds => self.render_sds(ui),
+            Tab::PacketData => self.render_packet_data(ui),
             Tab::Locations => self.render_locations(ui),
             Tab::Map => self.render_map(ui),
             Tab::StatusTableau => self.render_status_tableau(ui),
@@ -1437,6 +1504,7 @@ impl ControlRoomApp {
             let default_size = match tab {
                 Tab::Map => [1100.0, 760.0],
                 Tab::Overview => [1180.0, 760.0],
+                Tab::PacketData => [1180.0, 760.0],
                 Tab::AdminUsers => [1050.0, 720.0],
                 Tab::Raw => [980.0, 720.0],
                 _ => [900.0, 640.0],
@@ -1444,6 +1512,7 @@ impl ControlRoomApp {
             let min_size = match tab {
                 Tab::Map => [760.0, 520.0],
                 Tab::Overview => [820.0, 520.0],
+                Tab::PacketData => [820.0, 520.0],
                 _ => [640.0, 440.0],
             };
 
@@ -1729,6 +1798,168 @@ impl ControlRoomApp {
             ui.label(sds_protocol(row).map(|value| value.to_string()).unwrap_or_else(|| "-".to_string()));
             ui.label(str_at(row, &["text"]).unwrap_or(""));
         });
+    }
+
+    fn render_packet_data(&mut self, ui: &mut egui::Ui) {
+        ui.heading("Paketdaten / Multi-PDCH");
+        ui.label("Live-Zustand von TUN-Gateway, PDP-Kontexten und dynamisch belegten Paketdatenkanälen.");
+        ui.add_space(8.0);
+
+        let snapshot = self.packet_data.clone();
+        if let Some(snapshot) = snapshot.as_ref() {
+            let nodes = array_at(snapshot, &["nodes"]);
+            if nodes.is_empty() {
+                ui.label("Noch keine Paketdaten-Telemetrie empfangen.");
+            }
+            for node in nodes {
+                let node_id = str_at(node, &["node_id"]).unwrap_or("-");
+                let station_name = str_at(node, &["station_name"]).unwrap_or(node_id);
+                let connected = bool_at(node, &["connected"]).unwrap_or(false);
+                egui::Frame::group(ui.style()).show(ui, |ui| {
+                    ui.horizontal(|ui| {
+                        ui.heading(station_name);
+                        ui.monospace(node_id);
+                        status_pill(ui, "Node", if connected { "online" } else { "offline" }, connected);
+                    });
+                    let Some(packet_data) = get_at(node, &["packet_data"]) else {
+                        ui.label("Für diesen Node liegt noch kein SNDCP-Snapshot vor.");
+                        return;
+                    };
+
+                    egui::Grid::new(format!("packet_gateway_{node_id}"))
+                        .num_columns(4)
+                        .striped(true)
+                        .show(ui, |ui| {
+                            ui.strong("TUN");
+                            ui.label(str_at(packet_data, &["gateway", "interface_name"]).unwrap_or("-"));
+                            ui.strong("Gateway");
+                            ui.label(str_at(packet_data, &["gateway", "gateway_address"]).unwrap_or("-"));
+                            ui.end_row();
+                            ui.strong("Status");
+                            let running = bool_at(packet_data, &["gateway", "running"]).unwrap_or(false);
+                            ui.label(if running { "RUNNING" } else { "STOPPED" });
+                            ui.strong("PDP / PDCH");
+                            ui.label(format!(
+                                "{} / {} von {}",
+                                u64_at(packet_data, &["gateway", "active_contexts"]).unwrap_or(0),
+                                u64_at(packet_data, &["gateway", "active_bearers"]).unwrap_or(0),
+                                u64_at(packet_data, &["gateway", "bearer_capacity"]).unwrap_or(0),
+                            ));
+                            ui.end_row();
+                            ui.strong("Uplink");
+                            ui.label(format!(
+                                "{} Pakete / {} Byte",
+                                u64_at(packet_data, &["gateway", "packets_from_mobile"]).unwrap_or(0),
+                                u64_at(packet_data, &["gateway", "bytes_from_mobile"]).unwrap_or(0),
+                            ));
+                            ui.strong("Downlink");
+                            ui.label(format!(
+                                "{} Pakete / {} Byte",
+                                u64_at(packet_data, &["gateway", "packets_to_mobile"]).unwrap_or(0),
+                                u64_at(packet_data, &["gateway", "bytes_to_mobile"]).unwrap_or(0),
+                            ));
+                            ui.end_row();
+                            ui.strong("Warteschlange");
+                            ui.label(format!(
+                                "{} Pakete / {} Byte",
+                                u64_at(packet_data, &["gateway", "queued_packets"]).unwrap_or(0),
+                                u64_at(packet_data, &["gateway", "queued_bytes"]).unwrap_or(0),
+                            ));
+                            ui.strong("Freie / reservierte Slots");
+                            ui.label(format!(
+                                "{} / {}",
+                                u64_at(packet_data, &["gateway", "traffic_slots_free"]).unwrap_or(0),
+                                u64_at(packet_data, &["gateway", "reserved_voice_slots"]).unwrap_or(0),
+                            ));
+                            ui.end_row();
+                        });
+
+                    ui.add_space(8.0);
+                    ui.strong("Aktive PDCH-Bearer");
+                    egui::ScrollArea::horizontal().id_source(format!("packet_bearers_{node_id}")).show(ui, |ui| {
+                        egui::Grid::new(format!("packet_bearer_grid_{node_id}"))
+                            .striped(true)
+                            .show(ui, |ui| {
+                                for heading in ["ISSI", "Carrier", "Air-TS", "Logisch", "NSAPI", "Alter", "Idle"] {
+                                    ui.strong(heading);
+                                }
+                                ui.end_row();
+                                for bearer in array_at(packet_data, &["bearers"]) {
+                                    ui.monospace(display_u64(bearer, &["issi"]));
+                                    ui.label(display_u64(bearer, &["carrier_num"]));
+                                    ui.label(display_u64(bearer, &["air_ts"]));
+                                    ui.label(display_u64(bearer, &["logical_ts"]));
+                                    ui.label(join_array(bearer, &["nsapis"]));
+                                    ui.label(format!("{} s", u64_at(bearer, &["age_secs"]).unwrap_or(0)));
+                                    ui.label(format!("{} s", u64_at(bearer, &["idle_secs"]).unwrap_or(0)));
+                                    ui.end_row();
+                                }
+                            });
+                    });
+
+                    ui.add_space(8.0);
+                    ui.strong("PDP-Kontexte");
+                    egui::ScrollArea::horizontal().id_source(format!("packet_contexts_{node_id}")).show(ui, |ui| {
+                        egui::Grid::new(format!("packet_context_grid_{node_id}"))
+                            .striped(true)
+                            .show(ui, |ui| {
+                                for heading in ["ISSI", "NSAPI", "IPv4", "State", "SNEI", "MTU", "Priorität", "Carrier/TS", "Queue"] {
+                                    ui.strong(heading);
+                                }
+                                ui.end_row();
+                                for context in array_at(packet_data, &["contexts"]) {
+                                    ui.monospace(display_u64(context, &["issi"]));
+                                    ui.label(display_u64(context, &["nsapi"]));
+                                    ui.monospace(str_at(context, &["ipv4"]).unwrap_or("-"));
+                                    ui.label(str_at(context, &["state"]).unwrap_or("-"));
+                                    ui.label(display_u64(context, &["snei"]));
+                                    ui.label(display_u64(context, &["mtu"]));
+                                    ui.label(display_u64(context, &["priority"]));
+                                    ui.label(format!(
+                                        "{}/{}",
+                                        u64_at(context, &["carrier_num"]).map(|v| v.to_string()).unwrap_or_else(|| "-".to_string()),
+                                        u64_at(context, &["air_ts"]).map(|v| v.to_string()).unwrap_or_else(|| "-".to_string()),
+                                    ));
+                                    ui.label(format!(
+                                        "{} / {} B",
+                                        u64_at(context, &["queued_packets"]).unwrap_or(0),
+                                        u64_at(context, &["queued_bytes"]).unwrap_or(0),
+                                    ));
+                                    ui.end_row();
+                                }
+                            });
+                    });
+                });
+                ui.add_space(10.0);
+            }
+        } else {
+            ui.label("Paketdaten-API wurde noch nicht geladen.");
+        }
+
+        ui.separator();
+        ui.heading("Legacy-WAP über SDS Type 4");
+        ui.label("Sendet eine kompakte WML-Karte über PID 0x04 oder optional über SDS-TL PID 0x84.");
+        ui.horizontal(|ui| {
+            ui.label("Ziel-ISSI");
+            ui.text_edit_singleline(&mut self.legacy_wap_dest_issi);
+            ui.label("Titel");
+            ui.text_edit_singleline(&mut self.legacy_wap_title);
+        });
+        ui.horizontal(|ui| {
+            ui.label("Nachricht");
+            ui.text_edit_singleline(&mut self.legacy_wap_message);
+        });
+        ui.horizontal(|ui| {
+            ui.label("URL");
+            ui.text_edit_singleline(&mut self.legacy_wap_url);
+            ui.checkbox(&mut self.legacy_wap_sds_tl, "SDS-TL / PID 0x84");
+            if ui.add_enabled(self.can_operate(), egui::Button::new("WAP-SDS senden")).clicked() {
+                self.send_legacy_wap();
+            }
+        });
+        if let Some(result) = &self.legacy_wap_result {
+            ui.monospace(result);
+        }
     }
 
     fn render_locations(&mut self, ui: &mut egui::Ui) {
@@ -3313,6 +3544,7 @@ Klick = Gerätedetails",
             raw_block(ui, "groups", &self.groups);
             raw_block(ui, "calls", &self.calls);
             raw_block(ui, "sds", &self.sds);
+            raw_block(ui, "packet_data", &self.packet_data);
             raw_block(ui, "locations", &self.locations);
             raw_block(ui, "commands", &self.commands);
             raw_block(ui, "admin_users", &self.admin_users);

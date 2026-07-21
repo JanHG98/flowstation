@@ -45,6 +45,7 @@ enum Command {
     Groups,
     Calls,
     Locations,
+    PacketData { #[arg(long)] node: Option<String> },
     Sds { #[arg(long, default_value_t = 20)] limit: usize },
     Commands { #[arg(long, default_value_t = 20)] limit: usize },
     Directory { #[arg(long)] resolved: bool },
@@ -53,6 +54,18 @@ enum Command {
     Kick { #[arg(long)] node: Option<String>, #[arg(long)] issi: u32, #[arg(long)] operator: Option<String> },
     Dgna { #[arg(long)] node: Option<String>, #[arg(long)] issi: u32, #[arg(long)] gssi: u32, #[arg(long)] detach: bool, #[arg(long)] operator: Option<String> },
     ClearEmergency { #[arg(long)] node: Option<String>, #[arg(long, default_value_t = 0)] issi: u32, #[arg(long)] operator: Option<String> },
+    LegacyWap {
+        #[arg(long)] node: Option<String>,
+        #[arg(long)] dest_issi: u32,
+        #[arg(long, default_value_t = 4_010_001)] source_issi: u32,
+        #[arg(long, default_value = "NetCore")] title: String,
+        #[arg(long)] message: String,
+        #[arg(long)] url: Option<String>,
+        #[arg(long, default_value = "wdp")] transport: String,
+        #[arg(long, default_value_t = 1)] message_reference: u8,
+        #[arg(long)] group: bool,
+        #[arg(long)] operator: Option<String>,
+    },
     Users { #[command(subcommand)] command: UserCommand },
     Profiles { #[command(subcommand)] command: ProfileCommand },
     Health,
@@ -136,6 +149,12 @@ fn main() -> AppResult<()> {
         Command::Groups => print_json(api.get_json("/api/groups")?),
         Command::Calls => print_json(api.get_json("/api/calls")?),
         Command::Locations => print_json(api.get_json("/api/locations")?),
+        Command::PacketData { node } => {
+            let path = node
+                .map(|node| format!("/api/nodes/{node}/packet-data"))
+                .unwrap_or_else(|| "/api/packet-data".to_string());
+            print_json(api.get_json(&path)?)
+        },
         Command::Sds { limit } => print_json(api.get_json(&format!("/api/sds?limit={limit}"))?),
         Command::Commands { limit } => print_json(api.get_json(&format!("/api/commands?limit={limit}"))?),
         Command::Directory { resolved } => print_json(api.get_json(if resolved { "/api/directory/resolved" } else { "/api/directory" })?),
@@ -148,6 +167,24 @@ fn main() -> AppResult<()> {
         Command::Kick { node, issi, operator } => { let node = node.unwrap_or_else(|| settings.default_node.clone()); let operator = operator.unwrap_or_else(|| settings.operator_id.clone()); print_json(api.post_json(&format!("/api/nodes/{node}/commands/kick"), &json!({"operator_id": operator, "issi": issi}))?) }
         Command::Dgna { node, issi, gssi, detach, operator } => { let node = node.unwrap_or_else(|| settings.default_node.clone()); let operator = operator.unwrap_or_else(|| settings.operator_id.clone()); print_json(api.post_json(&format!("/api/nodes/{node}/commands/dgna"), &json!({"operator_id": operator, "issi": issi, "gssi": gssi, "attach": !detach}))?) }
         Command::ClearEmergency { node, issi, operator } => { let node = node.unwrap_or_else(|| settings.default_node.clone()); let operator = operator.unwrap_or_else(|| settings.operator_id.clone()); print_json(api.post_json(&format!("/api/nodes/{node}/commands/clear-emergency"), &json!({"operator_id": operator, "issi": issi}))?) }
+        Command::LegacyWap { node, dest_issi, source_issi, title, message, url, transport, message_reference, group, operator } => {
+            let node = node.unwrap_or_else(|| settings.default_node.clone());
+            let operator = operator.unwrap_or_else(|| settings.operator_id.clone());
+            print_json(api.post_json(
+                &format!("/api/nodes/{node}/commands/legacy-wap"),
+                &json!({
+                    "operator_id": operator,
+                    "dest_issi": dest_issi,
+                    "source_issi": source_issi,
+                    "dest_is_group": group,
+                    "title": title,
+                    "message": message,
+                    "url": url,
+                    "transport": transport,
+                    "message_reference": message_reference,
+                }),
+            )?)
+        }
         Command::Users { command } => handle_user_command(&api, command),
         Command::Profiles { .. } => Ok(()),
         Command::Health => print_json(api.get_json("/health")?),
@@ -229,4 +266,16 @@ fn escape_toml_string(value: &str) -> String { value.replace('\\', "\\\\").repla
 fn toml_bare_key(value: &str) -> String { if value.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-') { value.to_string() } else { format!("\"{}\"", escape_toml_string(value)) } }
 fn print_json(value: Value) -> AppResult<()> { println!("{}", serde_json::to_string_pretty(&value)?); Ok(()) }
 
-fn run_dashboard(api: &ApiClient, refresh: u64) -> AppResult<()> { loop { let overview = api.get_json("/api/overview")?; print!("\x1B[2J\x1B[1;1H"); println!("NetCore Control Room Dashboard\n"); println!("{}", serde_json::to_string_pretty(&overview)?); thread::sleep(Duration::from_secs(refresh.max(1))); } }
+fn run_dashboard(api: &ApiClient, refresh: u64) -> AppResult<()> {
+    loop {
+        let overview = api.get_json("/api/overview")?;
+        let packet_data = api.get_json("/api/packet-data").unwrap_or_else(|error| json!({ "error": error.to_string() }));
+        print!("\x1B[2J\x1B[1;1H");
+        println!("NetCore Control Room Dashboard\n");
+        println!("{}", serde_json::to_string_pretty(&json!({
+            "overview": overview,
+            "packet_data": packet_data,
+        }))?);
+        thread::sleep(Duration::from_secs(refresh.max(1)));
+    }
+}

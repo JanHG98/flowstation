@@ -3,10 +3,12 @@ use std::net::Ipv4Addr;
 use std::time::{Duration, Instant};
 
 use crate::{MessageQueue, TetraEntityTrait};
+use crate::net_telemetry::{TelemetryEvent, TelemetrySink};
+use crate::net_telemetry::events::{PacketDataContextTelemetry, PacketDataGatewayTelemetry, PdchBearerTelemetry};
 use tetra_config::bluestation::SharedConfig;
 use tetra_core::address::TetraAddress;
 use tetra_core::tetra_entities::TetraEntity;
-use tetra_core::{BitBuffer, Sap, TdmaTime, TimeslotOwner};
+use tetra_core::{BitBuffer, Sap, TdmaTime, TimeslotOwner, Todo};
 use tetra_saps::lcmc::enums::{alloc_type::ChanAllocType, ul_dl_assignment::UlDlAssignment};
 use tetra_saps::lcmc::fields::chan_alloc_req::CmceChanAllocReq;
 use tetra_saps::ltpd::LtpdMleUnitdataInd;
@@ -34,7 +36,7 @@ use super::wap_ip::{WapEndpoint, WapPolicy, build_response_npdu};
 use super::wap_status::WapStatusSnapshot;
 
 const MLE_DISCRIMINATOR_SNDCP: u64 = 0b100;
-const SNDCP_PDCH_LOGICAL_TS: u8 = 2;
+const SECONDARY_CARRIER_HINT: Todo = -2;
 const RESPONSE_CACHE_TTL: Duration = Duration::from_secs(30);
 const CACHE_MAX_ENTRIES: usize = 256;
 
@@ -129,12 +131,25 @@ struct SubscriberRoute {
     endpoint_id: u32,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ChannelAction {
+    None,
+    Allocate(u8),
+    Quit(u8),
+}
+
 #[derive(Debug, Clone)]
 struct CachedReply {
     sn_pdu: BitBuffer,
     acknowledged: bool,
-    include_pdch_allocation: bool,
-    quit_channel: bool,
+    channel_action: ChannelAction,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct PdchBearer {
+    logical_ts: u8,
+    allocated_at: Instant,
+    last_activity: Instant,
 }
 
 #[derive(Debug, Clone)]
@@ -169,7 +184,7 @@ pub struct Sndcp {
     contexts: ContextTable,
     started_at: Instant,
     last_activity: String,
-    pdch_reserved: bool,
+    pdch_bearers: HashMap<u32, PdchBearer>,
     response_cache: HashMap<(u32, String), CachedExchange>,
     routes: HashMap<u32, SubscriberRoute>,
     gateway: Option<PacketGateway>,
@@ -181,10 +196,12 @@ pub struct Sndcp {
     uplink_reassembler: Ipv4Reassembler,
     downlink_reassembler: Ipv4Reassembler,
     last_timer_sweep: Instant,
+    last_telemetry_emit: Instant,
+    telemetry: Option<TelemetrySink>,
 }
 
 impl Sndcp {
-    pub fn new(config: SharedConfig) -> Self {
+    pub fn new(config: SharedConfig, telemetry: Option<TelemetrySink>) -> Self {
         let now = Instant::now();
         let packet = config.config().cell.packet_data_gateway.clone();
         let reassembly_timeout = Duration::from_secs(packet.fragment_reassembly_timeout_secs);
@@ -195,7 +212,7 @@ impl Sndcp {
             contexts: ContextTable::default(),
             started_at: now,
             last_activity: "SNDCP ready".to_string(),
-            pdch_reserved: false,
+            pdch_bearers: HashMap::new(),
             response_cache: HashMap::new(),
             routes: HashMap::new(),
             gateway: None,
@@ -207,6 +224,8 @@ impl Sndcp {
             uplink_reassembler: Ipv4Reassembler::new(reassembly_timeout, reassembly_datagrams, reassembly_bytes),
             downlink_reassembler: Ipv4Reassembler::new(reassembly_timeout, reassembly_datagrams, reassembly_bytes),
             last_timer_sweep: now,
+            last_telemetry_emit: now.checked_sub(Duration::from_secs(2)).unwrap_or(now),
+            telemetry,
         }
     }
 
@@ -281,53 +300,174 @@ impl Sndcp {
         tl_sdu
     }
 
-    fn pdch_allocation() -> CmceChanAllocReq {
+    fn traffic_slot_capacity(&self) -> usize {
+        if self.config.config().cell.secondary_carrier.is_some() {
+            tetra_core::TimeslotAllocator::DUAL_CARRIER_TRAFFIC_SLOTS
+        } else {
+            tetra_core::TimeslotAllocator::SINGLE_CARRIER_TRAFFIC_SLOTS
+        }
+    }
+
+    fn pdch_capacity(&self) -> usize {
+        let traffic_capacity = self.traffic_slot_capacity();
+        let reserved = self
+            .config
+            .config()
+            .cell
+            .packet_data_gateway
+            .reserved_voice_slots
+            .min(traffic_capacity);
+        traffic_capacity.saturating_sub(reserved)
+    }
+
+    fn air_ts(logical_ts: u8) -> u8 {
+        match logical_ts {
+            5..=7 => logical_ts - 3,
+            _ => logical_ts,
+        }
+    }
+
+    fn carrier_hint(logical_ts: u8) -> Option<Todo> {
+        if (5..=7).contains(&logical_ts) {
+            Some(SECONDARY_CARRIER_HINT)
+        } else {
+            None
+        }
+    }
+
+    fn carrier_num(&self, logical_ts: u8) -> u16 {
+        if (5..=7).contains(&logical_ts) {
+            self.config
+                .config()
+                .cell
+                .secondary_carrier
+                .unwrap_or(self.config.config().cell.main_carrier)
+        } else {
+            self.config.config().cell.main_carrier
+        }
+    }
+
+    fn pdch_allocation(logical_ts: u8) -> CmceChanAllocReq {
+        let air_ts = Self::air_ts(logical_ts);
+        let mut timeslots = [false; 4];
+        if (1..=4).contains(&air_ts) {
+            timeslots[air_ts as usize - 1] = true;
+        }
         CmceChanAllocReq {
             usage: None,
-            carrier: None,
-            timeslots: [false, true, false, false],
+            carrier: Self::carrier_hint(logical_ts),
+            timeslots,
             alloc_type: ChanAllocType::Replace,
             ul_dl_assigned: UlDlAssignment::Both,
         }
     }
 
-    fn quit_allocation() -> CmceChanAllocReq {
+    fn quit_allocation(logical_ts: u8) -> CmceChanAllocReq {
         CmceChanAllocReq {
             usage: None,
-            carrier: None,
+            carrier: Self::carrier_hint(logical_ts),
             timeslots: [false; 4],
             alloc_type: ChanAllocType::QuitAndGo,
             ul_dl_assigned: UlDlAssignment::Both,
         }
     }
 
-    fn reserve_pdch(&mut self) -> bool {
-        if self.pdch_reserved {
-            return true;
+    fn reserve_pdch(&mut self, issi: u32) -> Option<u8> {
+        if let Some(bearer) = self.pdch_bearers.get_mut(&issi) {
+            bearer.last_activity = Instant::now();
+            return Some(bearer.logical_ts);
         }
-        let reserved = self
-            .config
-            .state_write()
-            .timeslot_alloc
-            .reserve(TimeslotOwner::Sndcp, SNDCP_PDCH_LOGICAL_TS)
-            .is_ok();
-        self.pdch_reserved = reserved;
-        reserved
+        let capacity = self.traffic_slot_capacity();
+        let packet_cfg = self.config.config().cell.packet_data_gateway.clone();
+        let pool_capacity = self.pdch_capacity();
+        let limit = if packet_cfg.max_pdch_bearers == 0 {
+            pool_capacity
+        } else {
+            packet_cfg.max_pdch_bearers.min(pool_capacity)
+        };
+        if self.pdch_bearers.len() >= limit {
+            tracing::debug!(
+                "SNDCP: dynamic PDCH limit reached active={} limit={}",
+                self.pdch_bearers.len(),
+                limit
+            );
+            return None;
+        }
+        let preferred: &[u8] = if capacity > tetra_core::TimeslotAllocator::SINGLE_CARRIER_TRAFFIC_SLOTS
+            && packet_cfg.prefer_secondary_carrier
+        {
+            &[5, 6, 7, 2, 3, 4]
+        } else {
+            &[2, 3, 4, 5, 6, 7]
+        };
+        let logical_ts = {
+            let mut state = self.config.state_write();
+            let free_slots = state.timeslot_alloc.free_count_with_capacity(capacity);
+            if free_slots <= packet_cfg.reserved_voice_slots.min(capacity) {
+                tracing::debug!(
+                    "SNDCP: preserving voice headroom free={} reserved={}",
+                    free_slots,
+                    packet_cfg.reserved_voice_slots.min(capacity)
+                );
+                return None;
+            }
+            state
+                .timeslot_alloc
+                .allocate_preferred_with_capacity(TimeslotOwner::Sndcp, preferred, capacity)?
+        };
+        let now = Instant::now();
+        self.pdch_bearers.insert(
+            issi,
+            PdchBearer {
+                logical_ts,
+                allocated_at: now,
+                last_activity: now,
+            },
+        );
+        tracing::info!(
+            "SNDCP: allocated dynamic PDCH ISSI={} logical_ts={} carrier={} air_ts={}",
+            issi,
+            logical_ts,
+            self.carrier_num(logical_ts),
+            Self::air_ts(logical_ts)
+        );
+        Some(logical_ts)
     }
 
-    fn release_pdch(&mut self) {
-        if !self.pdch_reserved {
-            return;
+    fn touch_pdch(&mut self, issi: u32) {
+        if let Some(bearer) = self.pdch_bearers.get_mut(&issi) {
+            bearer.last_activity = Instant::now();
         }
+    }
+
+    fn pdch_for_issi(&self, issi: u32) -> Option<u8> {
+        self.pdch_bearers.get(&issi).map(|bearer| bearer.logical_ts)
+    }
+
+    fn release_pdch(&mut self, issi: u32) -> Option<u8> {
+        let bearer = self.pdch_bearers.remove(&issi)?;
         let result = self
             .config
             .state_write()
             .timeslot_alloc
-            .release(TimeslotOwner::Sndcp, SNDCP_PDCH_LOGICAL_TS);
+            .release(TimeslotOwner::Sndcp, bearer.logical_ts);
         if let Err(error) = result {
-            tracing::warn!("SNDCP: failed to release PDCH TS{}: {:?}", SNDCP_PDCH_LOGICAL_TS, error);
+            tracing::warn!(
+                "SNDCP: failed to release dynamic PDCH ISSI={} TS{}: {:?}",
+                issi,
+                bearer.logical_ts,
+                error
+            );
+        } else {
+            tracing::info!(
+                "SNDCP: released dynamic PDCH ISSI={} logical_ts={} carrier={} air_ts={}",
+                issi,
+                bearer.logical_ts,
+                self.carrier_num(bearer.logical_ts),
+                Self::air_ts(bearer.logical_ts)
+            );
         }
-        self.pdch_reserved = false;
+        Some(bearer.logical_ts)
     }
 
     fn queue_acked_to(
@@ -439,7 +579,7 @@ impl Sndcp {
         });
     }
 
-    fn queue_quit(&self, queue: &mut MessageQueue, ind: &LtpdMleUnitdataInd) {
+    fn queue_quit(&self, queue: &mut MessageQueue, ind: &LtpdMleUnitdataInd, logical_ts: u8) {
         queue.push_back(SapMsg {
             sap: Sap::TlaSap,
             src: TetraEntity::Sndcp,
@@ -457,21 +597,23 @@ impl Sndcp {
                 n_tlsdu_repeats: 0,
                 data_class_info: None,
                 req_handle: 0,
-                chan_alloc: Some(Self::quit_allocation()),
+                chan_alloc: Some(Self::quit_allocation(logical_ts)),
                 tx_reporter: None,
             }),
         });
     }
 
     fn emit_reply(&self, queue: &mut MessageQueue, ind: &LtpdMleUnitdataInd, reply: &CachedReply) {
-        if reply.quit_channel && reply.sn_pdu.get_len() == 0 {
-            self.queue_quit(queue, ind);
+        if let ChannelAction::Quit(logical_ts) = reply.channel_action
+            && reply.sn_pdu.get_len() == 0
+        {
+            self.queue_quit(queue, ind, logical_ts);
             return;
         }
-        let alloc = if reply.quit_channel {
-            Some(Self::quit_allocation())
-        } else {
-            reply.include_pdch_allocation.then(Self::pdch_allocation)
+        let alloc = match reply.channel_action {
+            ChannelAction::None => None,
+            ChannelAction::Allocate(logical_ts) => Some(Self::pdch_allocation(logical_ts)),
+            ChannelAction::Quit(logical_ts) => Some(Self::quit_allocation(logical_ts)),
         };
         if reply.acknowledged {
             self.queue_acked(queue, ind, &reply.sn_pdu, alloc);
@@ -543,12 +685,11 @@ impl Sndcp {
         protocol::encode(&pdu)
     }
 
-    fn reply(pdu: SnPdu, acknowledged: bool, include_pdch_allocation: bool) -> CachedReply {
+    fn reply(pdu: SnPdu, acknowledged: bool, allocation_ts: Option<u8>) -> CachedReply {
         CachedReply {
             sn_pdu: Self::encoded(pdu),
             acknowledged,
-            include_pdch_allocation,
-            quit_channel: false,
+            channel_action: allocation_ts.map(ChannelAction::Allocate).unwrap_or(ChannelAction::None),
         }
     }
 
@@ -556,7 +697,7 @@ impl Sndcp {
         Self::reply(
             SnPdu::ActivateReject(ActivateReject { nsapi, cause, optional: Self::zero_optional() }),
             true,
-            false,
+            None,
         )
     }
 
@@ -564,7 +705,7 @@ impl Sndcp {
         mut nsapis: Vec<u8>,
         accepted: bool,
         reject_cause: Option<u8>,
-        with_alloc: bool,
+        allocation_ts: Option<u8>,
         snei: Option<u16>,
     ) -> CachedReply {
         let mut seen = HashSet::new();
@@ -581,7 +722,7 @@ impl Sndcp {
                 optional,
             }),
             true,
-            with_alloc,
+            allocation_ts,
         )
     }
 
@@ -589,10 +730,10 @@ impl Sndcp {
         nsapi: u8,
         accepted: bool,
         reject_cause: Option<u8>,
-        with_alloc: bool,
+        allocation_ts: Option<u8>,
         snei: Option<u16>,
     ) -> CachedReply {
-        Self::transmit_response_nsapis(vec![nsapi], accepted, reject_cause, with_alloc, snei)
+        Self::transmit_response_nsapis(vec![nsapi], accepted, reject_cause, allocation_ts, snei)
     }
 
     fn check_network_endpoint_id(&self, issi: u32, supplied: Option<u16>, pdu_name: &str) {
@@ -667,7 +808,7 @@ impl Sndcp {
     }
 
     fn not_supported(pdu_type: u8) -> CachedReply {
-        Self::reply(SnPdu::NotSupported { pdu_type }, true, false)
+        Self::reply(SnPdu::NotSupported { pdu_type }, true, None)
     }
 
     fn dynamic_address(&self, key: ContextKey, profile: RuntimeProfile) -> Option<[u8; 4]> {
@@ -874,7 +1015,7 @@ impl Sndcp {
                         n_pdu: protocol::raw_octets(fragment),
                     }),
                     false,
-                    false,
+                    None,
                 ))),
                 Err(error) => tracing::warn!("SNDCP: queued downlink fragmentation failed: {:?}", error),
             }
@@ -941,7 +1082,7 @@ impl Sndcp {
             tracing::debug!("SNDCP: no active PDP context for downlink destination={}", Ipv4Addr::from(parsed.destination));
             return;
         };
-        let direct = self.contexts.bearer_owner() == Some(key.issi)
+        let direct = self.contexts.has_bearer(key.issi)
             && self.contexts.get(key).is_some_and(|context| context.state == PdpState::Ready);
         if direct {
             self.enqueue_pending_packet(key, packet);
@@ -980,7 +1121,7 @@ impl Sndcp {
         });
         let keys = self.pending_downlink.keys().copied().collect::<Vec<_>>();
         for key in keys {
-            if self.contexts.bearer_owner() == Some(key.issi)
+            if self.contexts.has_bearer(key.issi)
                 && self.contexts.get(key).is_some_and(|context| context.state == PdpState::Ready)
             {
                 self.flush_pending_to_queue(queue, key);
@@ -1080,7 +1221,7 @@ impl Sndcp {
             self.automatic_bindings.retain(|_, binding| binding.context != key);
         }
         if replacing && self.contexts.release_bearer_nsapis(issi, &[demand.nsapi]) {
-            self.release_pdch();
+            self.release_pdch(issi);
         }
         let snei = self.contexts.ensure_network_endpoint_id(issi);
         let mut context = PdpContext::new(
@@ -1134,7 +1275,7 @@ impl Sndcp {
             chap_id.is_some(),
             ipcp_response.is_some()
         );
-        vec![Self::reply(accept, true, false)]
+        vec![Self::reply(accept, true, None)]
     }
 
     fn activate_requested_nsapis(
@@ -1142,7 +1283,7 @@ impl Sndcp {
         issi: u32,
         nsapis: &[u8],
         profile: RuntimeProfile,
-    ) -> Result<bool, u8> {
+    ) -> Result<u8, u8> {
         if nsapis.is_empty() {
             return Err(TX_REJECT_UNKNOWN_NSAPI);
         }
@@ -1159,16 +1300,14 @@ impl Sndcp {
         }) {
             return Err(TX_REJECT_TEMPORARILY_UNAVAILABLE);
         }
-        if !self.contexts.can_claim_bearer(issi) {
+
+        let had_bearer = self.contexts.has_bearer(issi);
+        let Some(logical_ts) = self.reserve_pdch(issi) else {
             return Err(TX_REJECT_SYSTEM_RESOURCES);
-        }
-        let newly_reserved = self.contexts.bearer_owner().is_none();
-        if newly_reserved && !self.reserve_pdch() {
-            return Err(TX_REJECT_SYSTEM_RESOURCES);
-        }
+        };
         if !self.contexts.claim_bearer(issi, nsapis) {
-            if newly_reserved {
-                self.release_pdch();
+            if !had_bearer {
+                self.release_pdch(issi);
             }
             return Err(TX_REJECT_SYSTEM_RESOURCES);
         }
@@ -1179,7 +1318,8 @@ impl Sndcp {
             }
         }
         let _ = self.contexts.refresh_bearer_ready(issi, profile.ready_timer_code, now);
-        Ok(newly_reserved)
+        self.touch_pdch(issi);
+        Ok(logical_ts)
     }
 
     fn handle_data_transmit_request(
@@ -1192,14 +1332,14 @@ impl Sndcp {
         self.check_network_endpoint_id(issi, request.network_endpoint_id(), "SN-DATA TRANSMIT REQUEST");
         let primary = request.nsapis.first().copied().unwrap_or(1);
         if let Err(cause) = Self::validate_resource_request(request.resource_request) {
-            return vec![Self::transmit_response(primary, false, Some(cause), false, self.contexts.network_endpoint_id(issi))];
+            return vec![Self::transmit_response(primary, false, Some(cause), None, self.contexts.network_endpoint_id(issi))];
         }
         match self.activate_requested_nsapis(issi, &request.nsapis, profile) {
-            Ok(_) => {
+            Ok(logical_ts) => {
                 self.last_activity = format!("PDCH {} NSAPI{:?}", issi, request.nsapis);
                 let nsapis = request.nsapis;
                 let mut replies = vec![Self::transmit_response_nsapis(
-                    nsapis.clone(), true, None, true, self.contexts.network_endpoint_id(issi),
+                    nsapis.clone(), true, None, Some(logical_ts), self.contexts.network_endpoint_id(issi),
                 )];
                 for nsapi in nsapis {
                     let key = ContextKey { issi, nsapi };
@@ -1209,7 +1349,7 @@ impl Sndcp {
                 }
                 replies
             }
-            Err(cause) => vec![Self::transmit_response(primary, false, Some(cause), false, self.contexts.network_endpoint_id(issi))],
+            Err(cause) => vec![Self::transmit_response(primary, false, Some(cause), None, self.contexts.network_endpoint_id(issi))],
         }
     }
 
@@ -1235,19 +1375,19 @@ impl Sndcp {
                 self.contexts.release_bearer_nsapis(issi, &nsapis)
             };
             if released {
-                self.release_pdch();
+                self.release_pdch(issi);
             }
             self.last_activity = format!("Reconnect standby {}", issi);
             return Vec::new();
         }
         let primary = nsapis.first().copied().unwrap_or(1);
         if let Err(cause) = Self::validate_resource_request(reconnect.resource_request) {
-            return vec![Self::transmit_response(primary, false, Some(cause), false, self.contexts.network_endpoint_id(issi))];
+            return vec![Self::transmit_response(primary, false, Some(cause), None, self.contexts.network_endpoint_id(issi))];
         }
         match self.activate_requested_nsapis(issi, &nsapis, profile) {
-            Ok(_) => {
+            Ok(logical_ts) => {
                 let mut replies = vec![Self::transmit_response_nsapis(
-                    nsapis.clone(), true, None, true, self.contexts.network_endpoint_id(issi),
+                    nsapis.clone(), true, None, Some(logical_ts), self.contexts.network_endpoint_id(issi),
                 )];
                 for nsapi in nsapis {
                     let key = ContextKey { issi, nsapi };
@@ -1257,7 +1397,7 @@ impl Sndcp {
                 }
                 replies
             }
-            Err(cause) => vec![Self::transmit_response(primary, false, Some(cause), false, self.contexts.network_endpoint_id(issi))],
+            Err(cause) => vec![Self::transmit_response(primary, false, Some(cause), None, self.contexts.network_endpoint_id(issi))],
         }
     }
 
@@ -1382,7 +1522,7 @@ impl Sndcp {
                     n_pdu: protocol::raw_octets(fragment),
                 }),
                 false,
-                false,
+                None,
             )).collect();
         }
 
@@ -1437,8 +1577,8 @@ impl Sndcp {
             }
             _ => return vec![Self::not_supported(protocol::SN_DEACTIVATE_PDP_CONTEXT_DEMAND)],
         }
-        if self.contexts.bearer_owner().is_none() {
-            self.release_pdch();
+        if !self.contexts.has_bearer(issi) {
+            self.release_pdch(issi);
         }
         if self.contexts.contexts_for_issi(issi) == 0 {
             self.routes.remove(&issi);
@@ -1452,7 +1592,7 @@ impl Sndcp {
                 optional: Self::zero_optional(),
             }),
             true,
-            false,
+            None,
         )]
     }
 
@@ -1463,11 +1603,11 @@ impl Sndcp {
         profile: RuntimeProfile,
     ) -> Vec<CachedReply> {
         let issi = ind.received_tetra_address.ssi;
-        if self.contexts.bearer_owner() != Some(issi) {
+        if !self.contexts.has_bearer(issi) {
             tracing::warn!("SNDCP: SN-END OF DATA from ISSI={} without owned bearer", issi);
             return Vec::new();
         }
-        let active_nsapis = self.contexts.bearer_nsapis().collect::<Vec<_>>();
+        let active_nsapis = self.contexts.bearer_nsapis(issi).collect::<Vec<_>>();
         let now = Instant::now();
         for nsapi in &active_nsapis {
             if let Some(context) = self.contexts.get_mut(ContextKey { issi, nsapi: *nsapi }) {
@@ -1478,16 +1618,17 @@ impl Sndcp {
                 }
             }
         }
-        if self.contexts.release_bearer_for_issi(issi) {
-            self.release_pdch();
-        }
+        self.contexts.release_bearer_for_issi(issi);
+        let logical_ts = self.release_pdch(issi);
         self.last_activity = format!("End data {}", issi);
+        let Some(logical_ts) = logical_ts else {
+            return Vec::new();
+        };
         if end.immediate_service_change {
             vec![CachedReply {
                 sn_pdu: BitBuffer::new(0),
                 acknowledged: false,
-                include_pdch_allocation: false,
-                quit_channel: true,
+                channel_action: ChannelAction::Quit(logical_ts),
             }]
         } else {
             vec![CachedReply {
@@ -1496,8 +1637,7 @@ impl Sndcp {
                     optional: Self::zero_optional(),
                 })),
                 acknowledged: true,
-                include_pdch_allocation: false,
-                quit_channel: true,
+                channel_action: ChannelAction::Quit(logical_ts),
             }]
         }
     }
@@ -1519,20 +1659,20 @@ impl Sndcp {
             if let Some(context) = self.contexts.get_mut(key) {
                 context.suspend(profile.standby_timer_code, Instant::now());
             }
-            if self.contexts.release_bearer_nsapis(key.issi, &[key.nsapi]) { self.release_pdch(); }
+            if self.contexts.release_bearer_nsapis(key.issi, &[key.nsapi]) { self.release_pdch(key.issi); }
             self.pending_downlink.remove(&key);
             return Vec::new();
         }
         if let Err(cause) = Self::validate_resource_request(response.resource_request) {
             self.page_inflight.insert(key, Instant::now());
             return vec![Self::transmit_response(
-                key.nsapi, false, Some(cause), false, self.contexts.network_endpoint_id(key.issi),
+                key.nsapi, false, Some(cause), None, self.contexts.network_endpoint_id(key.issi),
             )];
         }
         match self.activate_requested_nsapis(key.issi, &[key.nsapi], profile) {
-            Ok(_) => {
+            Ok(logical_ts) => {
                 let mut replies = vec![Self::transmit_response(
-                    key.nsapi, true, None, true, self.contexts.network_endpoint_id(key.issi),
+                    key.nsapi, true, None, Some(logical_ts), self.contexts.network_endpoint_id(key.issi),
                 )];
                 if let Some(mtu) = self.contexts.get(key).map(|context| context.mtu_octets) {
                     replies.extend(self.pending_replies(key, mtu));
@@ -1542,7 +1682,7 @@ impl Sndcp {
             Err(cause) => {
                 self.page_inflight.insert(key, Instant::now());
                 vec![Self::transmit_response(
-                    key.nsapi, false, Some(cause), false, self.contexts.network_endpoint_id(key.issi),
+                    key.nsapi, false, Some(cause), None, self.contexts.network_endpoint_id(key.issi),
                 )]
             }
         }
@@ -1579,13 +1719,13 @@ impl Sndcp {
                 ms_default: accepted.then_some(current),
             }),
             true,
-            false,
+            None,
         )];
         if request_type == 9 && accepted {
             replies.push(Self::reply(
                 SnPdu::DataPriority(DataPriority::Information { details, ms_default: Some(current) }),
                 true,
-                false,
+                None,
             ));
         }
         replies
@@ -1609,7 +1749,7 @@ impl Sndcp {
                             optional: RawBits::empty(),
                         }),
                         true,
-                        false,
+                        None,
                     )];
                 }
                 let decoded_qos = match QosProfile::decode(&qos) {
@@ -1623,7 +1763,7 @@ impl Sndcp {
                                 optional: RawBits::empty(),
                             }),
                             true,
-                            false,
+                            None,
                         )];
                     }
                 };
@@ -1636,7 +1776,7 @@ impl Sndcp {
                             optional: RawBits::empty(),
                         }),
                         true,
-                        false,
+                        None,
                     )];
                 }
                 self.automatic_bindings.retain(|_, binding| binding.context != key);
@@ -1653,7 +1793,7 @@ impl Sndcp {
                         qos,
                     }),
                     true,
-                    false,
+                    None,
                 )]
             }
             Modify::Availability { nsapi, availability, .. } => {
@@ -1687,7 +1827,7 @@ impl Sndcp {
                     self.automatic_bindings.retain(|_, binding| binding.context != key);
                 }
                 if should_release && self.contexts.release_bearer_nsapis(issi, &[nsapi]) {
-                    self.release_pdch();
+                    self.release_pdch(issi);
                 }
                 Vec::new()
             }
@@ -1708,7 +1848,7 @@ impl Sndcp {
                     self.automatic_bindings.retain(|_, binding| binding.context != key);
                 }
                 if self.contexts.release_bearer_nsapis(issi, &[nsapi]) {
-                    self.release_pdch();
+                    self.release_pdch(issi);
                 }
                 Vec::new()
             }
@@ -1746,6 +1886,118 @@ impl Sndcp {
         }
     }
 
+    fn packet_data_telemetry(&self) -> TelemetryEvent {
+        let now = Instant::now();
+        let gateway_stats = self.gateway.as_ref().map(PacketGateway::stats).unwrap_or_default();
+        let packet_cfg = self.config.config().cell.packet_data_gateway.clone();
+        let wap_cfg = self.config.config().cell.wap_ip.clone();
+        let queued_packets = self.pending_downlink.values().map(|queue| queue.len() as u64).sum::<u64>();
+        let queued_bytes = self
+            .pending_downlink
+            .values()
+            .flat_map(|queue| queue.iter())
+            .map(|packet| packet.octets.len() as u64)
+            .sum::<u64>();
+
+        let traffic_capacity = self.traffic_slot_capacity();
+        let traffic_slots_free = self
+            .config
+            .state_read()
+            .timeslot_alloc
+            .free_count_with_capacity(traffic_capacity);
+
+        let mut contexts = self
+            .contexts
+            .iter()
+            .map(|(key, context)| {
+                let queue = self.pending_downlink.get(key);
+                let bearer = self.pdch_bearers.get(&key.issi);
+                PacketDataContextTelemetry {
+                    issi: key.issi,
+                    nsapi: key.nsapi,
+                    ipv4: Ipv4Addr::from(context.address).to_string(),
+                    state: match context.state {
+                        PdpState::Standby => "STANDBY",
+                        PdpState::Ready => "READY",
+                        PdpState::Quiescent => "QUIESCENT",
+                        PdpState::Suspended => "SUSPENDED",
+                    }
+                    .to_string(),
+                    primary_nsapi: context.primary_nsapi,
+                    snei: context.network_endpoint_id,
+                    mtu: context.mtu_octets.min(u16::MAX as usize) as u16,
+                    priority: context.pdu_priority_max,
+                    queued_packets: queue.map(|items| items.len().min(u32::MAX as usize) as u32).unwrap_or(0),
+                    queued_bytes: queue
+                        .map(|items| items.iter().map(|packet| packet.octets.len() as u64).sum())
+                        .unwrap_or(0),
+                    carrier_num: bearer.map(|bearer| self.carrier_num(bearer.logical_ts)),
+                    logical_ts: bearer.map(|bearer| bearer.logical_ts),
+                    air_ts: bearer.map(|bearer| Self::air_ts(bearer.logical_ts)),
+                    age_secs: now.duration_since(context.created_at).as_secs(),
+                    idle_secs: now.duration_since(context.last_activity).as_secs(),
+                }
+            })
+            .collect::<Vec<_>>();
+        contexts.sort_by_key(|context| (context.issi, context.nsapi));
+
+        let mut bearers = self
+            .pdch_bearers
+            .iter()
+            .map(|(issi, bearer)| {
+                let mut nsapis = self.contexts.bearer_nsapis(*issi).collect::<Vec<_>>();
+                nsapis.sort_unstable();
+                PdchBearerTelemetry {
+                    issi: *issi,
+                    carrier_num: self.carrier_num(bearer.logical_ts),
+                    logical_ts: bearer.logical_ts,
+                    air_ts: Self::air_ts(bearer.logical_ts),
+                    nsapis,
+                    age_secs: now.duration_since(bearer.allocated_at).as_secs(),
+                    idle_secs: now.duration_since(bearer.last_activity).as_secs(),
+                }
+            })
+            .collect::<Vec<_>>();
+        bearers.sort_by_key(|bearer| bearer.logical_ts);
+
+        TelemetryEvent::PacketDataSnapshot {
+            gateway: PacketDataGatewayTelemetry {
+                enabled: packet_cfg.enabled,
+                running: gateway_stats.running,
+                interface_name: packet_cfg.interface_name,
+                gateway_address: wap_cfg.address.to_string(),
+                prefix_len: packet_cfg.prefix_len,
+                packets_from_mobile: gateway_stats.packets_from_mobile,
+                bytes_from_mobile: gateway_stats.bytes_from_mobile,
+                packets_to_mobile: gateway_stats.packets_to_mobile,
+                bytes_to_mobile: gateway_stats.bytes_to_mobile,
+                dropped_from_mobile: gateway_stats.dropped_from_mobile,
+                dropped_to_mobile: gateway_stats.dropped_to_mobile,
+                io_errors: gateway_stats.io_errors,
+                queued_packets,
+                queued_bytes,
+                active_contexts: self.contexts.len().min(u32::MAX as usize) as u32,
+                active_bearers: self.pdch_bearers.len().min(u32::MAX as usize) as u32,
+                bearer_capacity: self.pdch_capacity().min(u8::MAX as usize) as u8,
+                traffic_slots_free: traffic_slots_free.min(u8::MAX as usize) as u8,
+                reserved_voice_slots: packet_cfg.reserved_voice_slots.min(u8::MAX as usize) as u8,
+            },
+            contexts,
+            bearers,
+        }
+    }
+
+    fn emit_packet_data_telemetry(&mut self) {
+        let now = Instant::now();
+        if now.duration_since(self.last_telemetry_emit) < Duration::from_secs(1) {
+            return;
+        }
+        self.last_telemetry_emit = now;
+        if let Some(telemetry) = &self.telemetry {
+            telemetry.send(self.packet_data_telemetry());
+        }
+    }
+
     fn snapshot(&self) -> WapStatusSnapshot {
         let state = self.config.state_read();
         let active_calls = state.active_call_ts.values().copied().collect::<HashSet<_>>().len();
@@ -1764,7 +2016,7 @@ impl Sndcp {
             health: format!(
                 "OK PDP={} PDCH={} GW={} UL={}/{} DL={}/{} Q={}",
                 self.contexts.len(),
-                self.contexts.bearer_owner().map(|issi| issi.to_string()).unwrap_or_else(|| "free".to_string()),
+                self.pdch_bearers.len(),
                 gateway.map(|stats| if stats.running { "UP" } else { "DOWN" }).unwrap_or("OFF"),
                 gateway.map(|stats| stats.packets_from_mobile).unwrap_or(0),
                 gateway.map(|stats| stats.bytes_from_mobile).unwrap_or(0),
@@ -1776,7 +2028,7 @@ impl Sndcp {
     }
 
     fn cleanup_subscriber(&mut self, issi: u32, reason: &str) {
-        let owned_bearer = self.contexts.bearer_owner() == Some(issi);
+        let owned_bearer = self.contexts.has_bearer(issi) || self.pdch_bearers.contains_key(&issi);
         self.contexts.remove_all_for_issi(issi);
         self.routes.remove(&issi);
         self.response_cache.retain(|(cached_issi, _), _| *cached_issi != issi);
@@ -1784,7 +2036,7 @@ impl Sndcp {
         self.page_inflight.retain(|key, _| key.issi != issi);
         self.automatic_bindings.retain(|_, binding| binding.context.issi != issi);
         if owned_bearer {
-            self.release_pdch();
+            self.release_pdch(issi);
         }
         self.last_activity = format!("PDP cleanup {} ({})", issi, reason);
         tracing::info!("SNDCP: subscriber cleanup ISSI={} reason={}", issi, reason);
@@ -1796,7 +2048,6 @@ impl Sndcp {
             return;
         }
         self.last_timer_sweep = now;
-        let had_bearer = self.contexts.bearer_owner().is_some();
         let events = self.contexts.tick(now, profile.standby_timer_code);
         let mut end_of_data_issis = HashSet::new();
         let mut expired_issis = HashSet::new();
@@ -1821,15 +2072,21 @@ impl Sndcp {
         }
 
         for issi in end_of_data_issis {
-            let Some(route) = self.routes.get(&issi).copied() else {
-                tracing::warn!("SNDCP: cannot send timer SN-END OF DATA; no route for ISSI={}", issi);
-                continue;
-            };
-            let pdu = Self::encoded(SnPdu::EndOfData(EndOfData {
-                immediate_service_change: false,
-                optional: Self::zero_optional(),
-            }));
-            self.queue_acked_to(queue, route, &pdu, Some(Self::quit_allocation()));
+            let route = self.routes.get(&issi).copied();
+            let logical_ts = self.release_pdch(issi);
+            match (route, logical_ts) {
+                (Some(route), Some(logical_ts)) => {
+                    let pdu = Self::encoded(SnPdu::EndOfData(EndOfData {
+                        immediate_service_change: false,
+                        optional: Self::zero_optional(),
+                    }));
+                    self.queue_acked_to(queue, route, &pdu, Some(Self::quit_allocation(logical_ts)));
+                }
+                (None, Some(_)) => {
+                    tracing::warn!("SNDCP: READY timeout released PDCH without sending SN-END OF DATA; no route for ISSI={}", issi);
+                }
+                (_, None) => {}
+            }
             self.last_activity = format!("READY timeout {}", issi);
         }
 
@@ -1839,9 +2096,6 @@ impl Sndcp {
             self.pending_downlink.retain(|key, _| key.issi != issi);
             self.page_inflight.retain(|key, _| key.issi != issi);
             self.automatic_bindings.retain(|_, binding| binding.context.issi != issi);
-        }
-        if had_bearer && self.contexts.bearer_owner().is_none() {
-            self.release_pdch();
         }
         self.response_cache.retain(|_, exchange| exchange.expires_at > now);
         self.automatic_bindings.retain(|_, binding| binding.expires_at > now);
@@ -2088,6 +2342,7 @@ impl TetraEntityTrait for Sndcp {
                 self.gateway_config = None;
             }
             self.sweep_timers(queue, profile);
+            self.emit_packet_data_telemetry();
         }
     }
 }

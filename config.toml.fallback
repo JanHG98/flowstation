@@ -364,6 +364,12 @@ firewall_backend = "auto"     # "auto", "nftables", "iptables", "none"
 # external_interface = "eth0" # omitted = interface carrying the default route
 dns_servers = ["1.1.1.1", "9.9.9.9"]
 channel_capacity = 256
+# 0 = dynamisch bis zur verfügbaren PDCH-Kapazität; sonst 1-6
+max_pdch_bearers = 0
+# Mindestens so viele Traffic-Slots bleiben für Sprache/Notruf frei
+reserved_voice_slots = 1
+# Bei Dual Carrier zuerst Carrier 2 nutzen und Carrier 1 für Sprache freihalten
+prefer_secondary_carrier = true
 downlink_queue_packets_per_context = 64
 downlink_queue_bytes_per_context = 262144
 downlink_queue_ttl_secs = 30

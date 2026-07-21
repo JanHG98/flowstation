@@ -75,6 +75,28 @@ impl TimeslotAllocator {
         None
     }
 
+    /// Allocate the first free logical traffic slot from a caller supplied
+    /// preference order. Entries outside the configured carrier capacity are
+    /// ignored. This lets packet data prefer the secondary carrier while still
+    /// sharing the same allocator with CMCE voice calls.
+    pub fn allocate_preferred_with_capacity(
+        &mut self,
+        owner: TimeslotOwner,
+        preferred: &[u8],
+        capacity: usize,
+    ) -> Option<u8> {
+        let capacity = Self::clamp_capacity(capacity);
+        for &ts in preferred {
+            let Ok(idx) = Self::idx(ts) else { continue };
+            if idx >= capacity || self.owners[idx].is_some() {
+                continue;
+            }
+            self.owners[idx] = Some(owner);
+            return Some(ts);
+        }
+        None
+    }
+
     pub fn reserve(&mut self, owner: TimeslotOwner, ts: u8) -> Result<(), TimeslotAllocErr> {
         self.reserve_with_capacity(owner, ts, Self::DUAL_CARRIER_TRAFFIC_SLOTS)
     }
@@ -146,4 +168,44 @@ mod tests {
         alloc.release(TimeslotOwner::Sndcp, 2).unwrap();
         assert!(alloc.reserve(TimeslotOwner::Cmce, 2).is_ok());
     }
+    #[test]
+    fn preferred_allocation_can_keep_main_carrier_free() {
+        let mut alloc = TimeslotAllocator::default();
+        let order = [5, 6, 7, 2, 3, 4];
+        assert_eq!(
+            alloc.allocate_preferred_with_capacity(
+                TimeslotOwner::Sndcp,
+                &order,
+                TimeslotAllocator::DUAL_CARRIER_TRAFFIC_SLOTS,
+            ),
+            Some(5),
+        );
+        assert!(alloc.is_free(2));
+        assert_eq!(alloc.owner(5), Some(TimeslotOwner::Sndcp));
+    }
+
+    #[test]
+    fn multiple_sndcp_bearers_share_allocator_with_voice() {
+        let mut alloc = TimeslotAllocator::default();
+        alloc.reserve(TimeslotOwner::Cmce, 2).unwrap();
+        let order = [5, 6, 7, 3, 4, 2];
+        assert_eq!(
+            alloc.allocate_preferred_with_capacity(
+                TimeslotOwner::Sndcp,
+                &order,
+                TimeslotAllocator::DUAL_CARRIER_TRAFFIC_SLOTS,
+            ),
+            Some(5),
+        );
+        assert_eq!(
+            alloc.allocate_preferred_with_capacity(
+                TimeslotOwner::Sndcp,
+                &order,
+                TimeslotAllocator::DUAL_CARRIER_TRAFFIC_SLOTS,
+            ),
+            Some(6),
+        );
+        assert_eq!(alloc.owner(2), Some(TimeslotOwner::Cmce));
+    }
+
 }

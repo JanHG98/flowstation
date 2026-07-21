@@ -326,6 +326,16 @@ impl StackConfig {
         if gateway.channel_capacity < 16 || gateway.channel_capacity > 65_536 {
             return Err("cell_info.packet_data_gateway.channel_capacity must be 16-65536");
         }
+        if gateway.max_pdch_bearers > 6 {
+            return Err("cell_info.packet_data_gateway.max_pdch_bearers must be 0-6");
+        }
+        if gateway.reserved_voice_slots > 5 {
+            return Err("cell_info.packet_data_gateway.reserved_voice_slots must be 0-5");
+        }
+        let traffic_slots = if self.cell.secondary_carrier.is_some() { 6 } else { 3 };
+        if gateway.enabled && gateway.reserved_voice_slots >= traffic_slots {
+            return Err("cell_info.packet_data_gateway.reserved_voice_slots must leave at least one PDCH slot");
+        }
         if gateway.downlink_queue_packets_per_context == 0
             || gateway.downlink_queue_bytes_per_context < 576
             || gateway.downlink_queue_ttl_secs == 0
