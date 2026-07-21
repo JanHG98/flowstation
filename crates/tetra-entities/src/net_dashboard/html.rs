@@ -10685,7 +10685,7 @@ input:focus{border-color:var(--accent2);background:var(--bg4);}
       </svg>
     </div>
     <div style="text-align:center">
-      <div class="logo-title"><span>Net</span><span class="accent">Core</span></div>
+      <div class="logo-title"><span>NetCore-Systems</span></div>
       <div class="logo-sub">TETRA-Basisstation</div>
     </div>
   </div>
