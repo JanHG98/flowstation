@@ -4687,8 +4687,15 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
       <div id="dgna-current" style="display:flex;flex-wrap:wrap;gap:4px;min-height:22px;align-items:center">—</div>
     </div>
     <div class="form-row">
-      <label class="form-label" data-i18n="dgna_gssi">Gruppe (GSSI)</label>
-      <input type="number" id="dgna-gssi" class="form-input" placeholder="e.g. 100" min="1">
+      <label class="form-label" for="dgna-group-select">Gruppe aus dem Gruppenbuch</label>
+      <select id="dgna-group-select" class="form-input" onchange="selectDgnaGroup()">
+        <option value="">Gruppenbuch wird geladen …</option>
+      </select>
+      <div id="dgna-group-select-hint" style="font-size:11px;color:var(--text3);margin-top:5px;min-height:14px"></div>
+    </div>
+    <div class="form-row">
+      <label class="form-label" data-i18n="dgna_gssi" for="dgna-gssi">Gruppe (GSSI) manuell</label>
+      <input type="number" id="dgna-gssi" class="form-input" placeholder="z. B. 15201" min="1" max="16777215" inputmode="numeric">
     </div>
     <div class="modal-actions">
       <button class="btn" onclick="closeDgnaModal()" data-i18n="cancel">Abbrechen</button>
@@ -8570,7 +8577,105 @@ function resetSdsCallout(){document.getElementById('sds-callout').checked=false;
 function openSds(issi){sdsDest=issi;document.getElementById('sds-dest').value=issi;document.getElementById('sds-msg').value='';resetSdsCallout();document.getElementById('sds-modal').classList.add('open');}
 function closeSdsModal(){document.getElementById('sds-modal').classList.remove('open');}
 function sendSds(){const dest=parseInt(document.getElementById('sds-dest').value);if(!dest)return;if(document.getElementById('sds-callout').checked){const source=parseInt(document.getElementById('sds-callout-source').value)||9999;const calloutId=Math.max(0,Math.min(255,parseInt(document.getElementById('sds-callout-id').value)||0));const tpgRic=tpgRicInput('sds-callout-ric',0x00090D10);const priority=Math.max(0,Math.min(15,parseInt(document.getElementById('sds-callout-priority').value)||0));const alarmText=document.getElementById('sds-callout-text').value.trim()||'ALARM';const rawhex=document.getElementById('sds-callout-raw').value.trim();wsSend({type:'sds_callout',dest_issi:dest,source_issi:source,tpg_ric:tpgRic,callout_id:calloutId,priority,message:alarmText,raw_hex:rawhex});closeSdsModal();return;}const msg=document.getElementById('sds-msg').value.trim();if(!msg)return;wsSend({type:'sds',dest_issi:dest,message:msg});closeSdsModal();}
-function openDgna(issi){document.getElementById('dgna-issi').value=issi;document.getElementById('dgna-gssi').value='';const cur=document.getElementById('dgna-current');const gl=(state.ms[issi]&&state.ms[issi].groups)||[];cur.innerHTML=gl.length?gl.slice().sort((a,b)=>a-b).map(g=>`<span class="badge badge-blue" style="font-size:10px">${g}</span>`).join(''):'<span class="badge badge-dim">—</span>';document.getElementById('dgna-modal').classList.add('open');}
+let dgnaGroupRegistry={};
+let dgnaGroupsLoading=false;
+
+function normalizeDgnaGroups(raw){
+  const out={};
+  const put=(id,value)=>{
+    const n=Number(id);
+    if(!Number.isInteger(n)||n<=0||n>0xFFFFFF)return;
+    let name='';
+    if(typeof value==='string')name=value.trim();
+    else if(value&&typeof value==='object')name=String(value.name??value.label??value.title??value.callsign??'').trim();
+    out[String(n)]=name;
+  };
+  if(Array.isArray(raw)){
+    raw.forEach(entry=>put(entry&&(entry.gssi??entry.id??entry.ssi),entry));
+  }else if(raw&&Array.isArray(raw.groups)){
+    raw.groups.forEach(entry=>put(entry&&(entry.gssi??entry.id??entry.ssi),entry));
+  }else if(raw&&Array.isArray(raw.results)){
+    raw.results.forEach(entry=>put(entry&&(entry.gssi??entry.id??entry.ssi),entry));
+  }else if(raw&&typeof raw==='object'){
+    Object.entries(raw).forEach(([id,value])=>put(id,value));
+  }
+  return out;
+}
+
+function renderDgnaGroupSelect(issi){
+  const select=document.getElementById('dgna-group-select');
+  const hint=document.getElementById('dgna-group-select-hint');
+  if(!select)return;
+  const assigned=new Set((((state.ms[issi]||{}).groups)||[]).map(Number));
+  const rows=Object.entries(dgnaGroupRegistry)
+    .map(([id,name])=>({id:Number(id),name:String(name||'')}))
+    .filter(row=>Number.isInteger(row.id)&&row.id>0)
+    .sort((a,b)=>(a.name||String(a.id)).localeCompare(b.name||String(b.id),'de',{numeric:true,sensitivity:'base'})||a.id-b.id);
+  if(!rows.length){
+    select.innerHTML='<option value="">Keine Gruppen im Gruppenbuch gefunden</option>';
+    select.disabled=true;
+    if(hint)hint.textContent='Die GSSI kann weiterhin manuell eingegeben werden.';
+    return;
+  }
+  select.disabled=false;
+  select.innerHTML='<option value="">Bitte Gruppe wählen …</option>'+rows.map(row=>{
+    const assignedText=assigned.has(row.id)?' · bereits zugewiesen':'';
+    const label=(row.name?row.name+' · ':'')+'GSSI '+row.id+assignedText;
+    return '<option value="'+row.id+'">'+escHtml(label)+'</option>';
+  }).join('');
+  if(hint)hint.textContent=rows.length+' Gruppen aus dem Gruppenbuch geladen.';
+}
+
+async function loadDgnaGroups(issi){
+  if(dgnaGroupsLoading)return;
+  dgnaGroupsLoading=true;
+  const select=document.getElementById('dgna-group-select');
+  const hint=document.getElementById('dgna-group-select-hint');
+  if(select){select.disabled=true;select.innerHTML='<option value="">Gruppenbuch wird geladen …</option>';}
+  if(hint)hint.textContent='';
+  try{
+    const response=await fetch('/api/groups',{cache:'no-store',credentials:'same-origin'});
+    if(!response.ok)throw new Error('HTTP '+response.status);
+    dgnaGroupRegistry=normalizeDgnaGroups(await response.json());
+    renderDgnaGroupSelect(issi);
+  }catch(error){
+    dgnaGroupRegistry={};
+    if(select){select.disabled=true;select.innerHTML='<option value="">Gruppenbuch nicht verfügbar</option>';}
+    if(hint)hint.textContent='Laden fehlgeschlagen: '+String(error&&error.message?error.message:error)+' · Manuelle GSSI-Eingabe bleibt möglich.';
+  }finally{
+    dgnaGroupsLoading=false;
+  }
+}
+
+function selectDgnaGroup(){
+  const select=document.getElementById('dgna-group-select');
+  const input=document.getElementById('dgna-gssi');
+  if(select&&input&&select.value)input.value=select.value;
+}
+
+function chooseDgnaCurrentGroup(gssi){
+  const input=document.getElementById('dgna-gssi');
+  const select=document.getElementById('dgna-group-select');
+  if(input)input.value=gssi;
+  if(select){
+    const exists=Array.from(select.options).some(option=>option.value===String(gssi));
+    select.value=exists?String(gssi):'';
+  }
+}
+
+function openDgna(issi){
+  document.getElementById('dgna-issi').value=issi;
+  document.getElementById('dgna-gssi').value='';
+  const select=document.getElementById('dgna-group-select');
+  if(select)select.value='';
+  const cur=document.getElementById('dgna-current');
+  const gl=(state.ms[issi]&&state.ms[issi].groups)||[];
+  cur.innerHTML=gl.length
+    ?gl.slice().sort((a,b)=>a-b).map(g=>`<button type="button" class="badge badge-blue" style="font-size:10px;cursor:pointer" onclick="chooseDgnaCurrentGroup(${Number(g)})" title="GSSI ${Number(g)} übernehmen">${Number(g)}</button>`).join('')
+    :'<span class="badge badge-dim">—</span>';
+  document.getElementById('dgna-modal').classList.add('open');
+  loadDgnaGroups(issi);
+}
 function closeDgnaModal(){document.getElementById('dgna-modal').classList.remove('open');}
 function sendDgna(attach){const issi=parseInt(document.getElementById('dgna-issi').value),gssi=parseInt(document.getElementById('dgna-gssi').value);if(!issi||!gssi)return;wsSend({type:'dgna',issi,gssi,attach});closeDgnaModal();}
 
