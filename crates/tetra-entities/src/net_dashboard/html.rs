@@ -7063,7 +7063,7 @@ function updateMapsLatestButton(){
   if(!btn)return;
   btn.classList.toggle('btn-primary',mapsLatestOnly);
   btn.setAttribute('aria-pressed',mapsLatestOnly?'true':'false');
-  btn.textContent=mapsLatestOnly?'Nur Aktuelle: ON':'Nur Aktuelle: OFF';
+  btn.textContent=mapsLatestOnly?'Latest only: ON':'Latest only: OFF';
 }
 function bindMapsControls(){
   const btn=document.getElementById('maps-latest-btn');
@@ -7113,7 +7113,7 @@ function renderMapsPage(){
   const dot=document.getElementById('maps-hero-dot');
   updateMapsLatestButton();
   if(count)count.textContent=markers.length
-    ? (mapsLatestOnly?`${markers.length} zuletzt · ${sourceMarkers.length} aktivierte Einträge`:`${visibleMarkers.length} positions · ${markers.length} aktivierte Einträge`)
+    ? (mapsLatestOnly?`${markers.length} latest · ${sourceMarkers.length} enabled entries`:`${visibleMarkers.length} positions · ${markers.length} enabled entries`)
     : `${rawTotal} records · 0 positions`;
   if(sub)sub.innerHTML=mapsSourceButtonsHtml(mapsSourceMessage(markers.length,rawTotal));
   if(dot){dot.classList.toggle('is-ok',markers.length>0);dot.classList.toggle('is-idle',!markers.length);}
