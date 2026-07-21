@@ -4,6 +4,7 @@
 // `runtime` feature so external tools such as `netcore-control-room` can share
 // the same wire structs without linking SDR/audio/native runtime libraries.
 pub mod health;
+pub mod legacy_wap;
 pub mod net_control;
 pub mod net_control_room;
 pub mod net_telemetry;

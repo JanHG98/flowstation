@@ -321,7 +321,7 @@ fn build_bs_stack(
     let llc = Llc::new(cfg.clone());
     let mle = MleBs::new(cfg.clone());
     let mut mm = MmBs::new(cfg.clone(), tsink.clone(), c_e.remove(&TetraEntity::Mm));
-    let sndcp = Sndcp::new(cfg.clone());
+    let sndcp = Sndcp::new(cfg.clone(), tsink.clone());
     let mut cmce = CmceBs::new(cfg.clone(), tsink.clone(), c_e.remove(&TetraEntity::Cmce));
     // Wire the built-in WX/METAR service's reply channel: its background fetch threads
     // re-inject SendSds commands through the CMCE command dispatcher, same as the dashboard.

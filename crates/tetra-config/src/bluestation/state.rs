@@ -146,6 +146,14 @@ impl SubscriberRegistry {
         self.subscribers.keys().copied()
     }
 
+    pub fn registered_count(&self) -> usize {
+        self.subscribers.len()
+    }
+
+    pub fn attached_group_count(&self) -> usize {
+        self.all_attached_groups.len()
+    }
+
     /// Groups the given ISSI is currently affiliated to (empty if not registered).
     /// Used by the SDS path to reach a member of an active group call on the group's
     /// traffic timeslot.

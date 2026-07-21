@@ -39,6 +39,231 @@ pub struct HomeModeDisplayDto {
     pub text: Option<String>,
 }
 
+
+/// Compiled configuration for the opt-in WAP-over-SNDCP IPv4 service.
+#[derive(Debug, Clone)]
+pub struct CfgWapIp {
+    pub enabled: bool,
+    pub address: std::net::Ipv4Addr,
+    pub port: u16,
+    pub response_ttl: u8,
+    /// Three-octet prefix written as `a.b.c`.
+    pub dynamic_pool_prefix: String,
+    pub dynamic_pool_first_host: u8,
+    pub dynamic_pool_last_host: u8,
+    pub allow_static_ipv4: bool,
+    pub accept_empty_probe: bool,
+    pub accept_root_path: bool,
+    pub accept_status_path: bool,
+    pub accept_status_wml_path: bool,
+    pub max_request_payload_bytes: usize,
+    pub assume_pdch_ready_after_data_transmit: bool,
+    /// SNDCP timer/priority profile advertised in ACTIVATE ACCEPT.
+    pub pdu_priority_max: u8,
+    pub ready_timer_code: u8,
+    pub standby_timer_code: u8,
+    pub response_wait_timer_code: u8,
+    pub mtu_code: u8,
+    pub network_default_data_priority: u8,
+    /// Resource bounds for all primary and secondary PDP contexts.
+    pub max_contexts_per_issi: usize,
+    pub max_total_contexts: usize,
+    /// Reject source-address spoofing inside the local packet-data profile.
+    pub strict_source_address: bool,
+}
+
+impl Default for CfgWapIp {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            address: std::net::Ipv4Addr::new(10, 0, 0, 1),
+            port: 9200,
+            response_ttl: 32,
+            dynamic_pool_prefix: "10.0.0".to_string(),
+            dynamic_pool_first_host: 2,
+            dynamic_pool_last_host: 254,
+            allow_static_ipv4: true,
+            accept_empty_probe: true,
+            accept_root_path: true,
+            accept_status_path: true,
+            accept_status_wml_path: true,
+            max_request_payload_bytes: 1024,
+            assume_pdch_ready_after_data_transmit: false,
+            pdu_priority_max: 4,
+            ready_timer_code: 8,
+            standby_timer_code: 4,
+            response_wait_timer_code: 7,
+            mtu_code: 2,
+            network_default_data_priority: 4,
+            max_contexts_per_issi: 4,
+            max_total_contexts: 64,
+            strict_source_address: true,
+        }
+    }
+}
+
+impl CfgWapIp {
+    /// Parse the configured three-octet pool prefix.
+    pub fn pool_prefix_octets(&self) -> Option<[u8; 3]> {
+        let parts: Vec<_> = self.dynamic_pool_prefix.split('.').collect();
+        if parts.len() != 3 {
+            return None;
+        }
+        Some([parts[0].parse().ok()?, parts[1].parse().ok()?, parts[2].parse().ok()?])
+    }
+}
+
+/// Serde DTO for `[cell_info.wap_ip]`. Unknown keys are rejected so a typo cannot
+/// leave packet data advertised while the gateway silently uses a default.
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WapIpDto {
+    pub enabled: Option<bool>,
+    pub address: Option<std::net::Ipv4Addr>,
+    pub port: Option<u16>,
+    pub response_ttl: Option<u8>,
+    pub dynamic_pool_prefix: Option<String>,
+    pub dynamic_pool_first_host: Option<u8>,
+    pub dynamic_pool_last_host: Option<u8>,
+    pub allow_static_ipv4: Option<bool>,
+    pub accept_empty_probe: Option<bool>,
+    pub accept_root_path: Option<bool>,
+    pub accept_status_path: Option<bool>,
+    pub accept_status_wml_path: Option<bool>,
+    pub max_request_payload_bytes: Option<usize>,
+    pub assume_pdch_ready_after_data_transmit: Option<bool>,
+    pub pdu_priority_max: Option<u8>,
+    pub ready_timer_code: Option<u8>,
+    pub standby_timer_code: Option<u8>,
+    pub response_wait_timer_code: Option<u8>,
+    pub mtu_code: Option<u8>,
+    pub network_default_data_priority: Option<u8>,
+    pub max_contexts_per_issi: Option<usize>,
+    pub max_total_contexts: Option<usize>,
+    pub strict_source_address: Option<bool>,
+}
+
+
+/// Host firewall backend used for the managed packet-data forwarding rules.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum PacketGatewayFirewallBackend {
+    Auto,
+    Nftables,
+    Iptables,
+    None,
+}
+
+/// IPv4 source-NAT mode for traffic leaving the TETRA subscriber subnet.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum PacketGatewayNatMode {
+    Disabled,
+    Masquerade,
+}
+
+/// Linux TUN/IP gateway above SNDCP. The radio bearer carries raw IPv4 N-PDUs;
+/// the kernel provides normal routing, TCP/UDP/ICMP, conntrack and optional NAT.
+#[derive(Debug, Clone)]
+pub struct CfgPacketDataGateway {
+    pub enabled: bool,
+    pub interface_name: String,
+    pub prefix_len: u8,
+    pub mtu: Option<u16>,
+    pub auto_configure: bool,
+    pub enable_ipv4_forwarding: bool,
+    pub managed_forwarding: bool,
+    /// Permit new connections routed from the external interface into the subscriber subnet.
+    /// False keeps inbound forwarding stateful (ESTABLISHED/RELATED only).
+    pub allow_unsolicited_inbound: bool,
+    pub nat_mode: PacketGatewayNatMode,
+    pub firewall_backend: PacketGatewayFirewallBackend,
+    pub external_interface: Option<String>,
+    /// RFC 1877 IPCP DNS addresses returned in PDP activation PCO. At most two.
+    pub dns_servers: Vec<std::net::Ipv4Addr>,
+    pub channel_capacity: usize,
+    /// Maximum simultaneously active one-slot PDCH bearers. Zero means all
+    /// traffic slots available for the configured carrier count.
+    pub max_pdch_bearers: usize,
+    /// Keep this many traffic slots outside the packet-data pool so voice and
+    /// emergency call setup retain deterministic headroom. Zero disables the guard.
+    pub reserved_voice_slots: usize,
+    /// Prefer Carrier 2 for new packet-data bearers, preserving main-carrier
+    /// traffic slots for latency-sensitive voice whenever possible.
+    pub prefer_secondary_carrier: bool,
+    pub downlink_queue_packets_per_context: usize,
+    pub downlink_queue_bytes_per_context: usize,
+    pub downlink_queue_ttl_secs: u64,
+    pub page_retry_secs: u64,
+    pub fragment_reassembly_timeout_secs: u64,
+    pub fragment_reassembly_max_datagrams: usize,
+    pub fragment_reassembly_max_bytes: usize,
+    pub automatic_filter_ttl_secs: u64,
+    pub automatic_filter_max_bindings: usize,
+}
+
+impl Default for CfgPacketDataGateway {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            interface_name: "ntetra0".to_string(),
+            prefix_len: 24,
+            mtu: None,
+            auto_configure: true,
+            enable_ipv4_forwarding: false,
+            managed_forwarding: false,
+            allow_unsolicited_inbound: false,
+            nat_mode: PacketGatewayNatMode::Disabled,
+            firewall_backend: PacketGatewayFirewallBackend::Auto,
+            external_interface: None,
+            dns_servers: Vec::new(),
+            channel_capacity: 256,
+            max_pdch_bearers: 0,
+            reserved_voice_slots: 1,
+            prefer_secondary_carrier: true,
+            downlink_queue_packets_per_context: 64,
+            downlink_queue_bytes_per_context: 262_144,
+            downlink_queue_ttl_secs: 30,
+            page_retry_secs: 5,
+            fragment_reassembly_timeout_secs: 30,
+            fragment_reassembly_max_datagrams: 128,
+            fragment_reassembly_max_bytes: 4_194_304,
+            automatic_filter_ttl_secs: 300,
+            automatic_filter_max_bindings: 4096,
+        }
+    }
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PacketDataGatewayDto {
+    pub enabled: Option<bool>,
+    pub interface_name: Option<String>,
+    pub prefix_len: Option<u8>,
+    pub mtu: Option<u16>,
+    pub auto_configure: Option<bool>,
+    pub enable_ipv4_forwarding: Option<bool>,
+    pub managed_forwarding: Option<bool>,
+    pub allow_unsolicited_inbound: Option<bool>,
+    pub nat_mode: Option<PacketGatewayNatMode>,
+    pub firewall_backend: Option<PacketGatewayFirewallBackend>,
+    pub external_interface: Option<String>,
+    pub dns_servers: Option<Vec<std::net::Ipv4Addr>>,
+    pub channel_capacity: Option<usize>,
+    pub max_pdch_bearers: Option<usize>,
+    pub reserved_voice_slots: Option<usize>,
+    pub prefer_secondary_carrier: Option<bool>,
+    pub downlink_queue_packets_per_context: Option<usize>,
+    pub downlink_queue_bytes_per_context: Option<usize>,
+    pub downlink_queue_ttl_secs: Option<u64>,
+    pub page_retry_secs: Option<u64>,
+    pub fragment_reassembly_timeout_secs: Option<u64>,
+    pub fragment_reassembly_max_datagrams: Option<usize>,
+    pub fragment_reassembly_max_bytes: Option<usize>,
+    pub automatic_filter_ttl_secs: Option<u64>,
+    pub automatic_filter_max_bindings: Option<usize>,
+}
+
 /// Service details for a neighbor cell — mirrors BsServiceDetails but for config parsing.
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct CfgBsServiceDetails {
@@ -145,6 +370,11 @@ pub struct CfgCellInfo {
     pub aie_service: bool,
     pub advanced_link: bool,
 
+    /// Opt-in terminal-browser WAP/IP endpoint carried over SNDCP packet data.
+    pub wap_ip: CfgWapIp,
+    /// Optional general IPv4 TUN/router/NAT gateway above SNDCP.
+    pub packet_data_gateway: CfgPacketDataGateway,
+
     // From SYNC
     pub system_code: u8,
     pub colour_code: u8,
@@ -211,6 +441,13 @@ pub struct CfgCellInfo {
     pub release_group_on_same_speaker_retake: bool,
 }
 
+impl CfgCellInfo {
+    /// One predicate controls both capability advertisement and runtime acceptance.
+    pub fn wap_ip_sndcp_profile_enabled(&self) -> bool {
+        self.sndcp_service && (self.wap_ip.enabled || self.packet_data_gateway.enabled)
+    }
+}
+
 #[derive(Default, Deserialize)]
 pub struct CellInfoDto {
     pub main_carrier: u16,
@@ -241,6 +478,8 @@ pub struct CellInfoDto {
     pub sndcp_service: Option<bool>,
     pub aie_service: Option<bool>,
     pub advanced_link: Option<bool>,
+    pub wap_ip: Option<WapIpDto>,
+    pub packet_data_gateway: Option<PacketDataGatewayDto>,
 
     pub system_code: Option<u8>,
     pub colour_code: Option<u8>,
@@ -317,6 +556,88 @@ pub fn cell_dto_to_cfg(ci: CellInfoDto) -> CfgCellInfo {
         sndcp_service: ci.sndcp_service.unwrap_or(false),
         aie_service: ci.aie_service.unwrap_or(false),
         advanced_link: ci.advanced_link.unwrap_or(false),
+        wap_ip: {
+            let dto = ci.wap_ip.unwrap_or_default();
+            let defaults = CfgWapIp::default();
+            CfgWapIp {
+                enabled: dto.enabled.unwrap_or(defaults.enabled),
+                address: dto.address.unwrap_or(defaults.address),
+                port: dto.port.unwrap_or(defaults.port),
+                response_ttl: dto.response_ttl.unwrap_or(defaults.response_ttl),
+                dynamic_pool_prefix: dto.dynamic_pool_prefix.unwrap_or(defaults.dynamic_pool_prefix),
+                dynamic_pool_first_host: dto.dynamic_pool_first_host.unwrap_or(defaults.dynamic_pool_first_host),
+                dynamic_pool_last_host: dto.dynamic_pool_last_host.unwrap_or(defaults.dynamic_pool_last_host),
+                allow_static_ipv4: dto.allow_static_ipv4.unwrap_or(defaults.allow_static_ipv4),
+                accept_empty_probe: dto.accept_empty_probe.unwrap_or(defaults.accept_empty_probe),
+                accept_root_path: dto.accept_root_path.unwrap_or(defaults.accept_root_path),
+                accept_status_path: dto.accept_status_path.unwrap_or(defaults.accept_status_path),
+                accept_status_wml_path: dto.accept_status_wml_path.unwrap_or(defaults.accept_status_wml_path),
+                max_request_payload_bytes: dto.max_request_payload_bytes.unwrap_or(defaults.max_request_payload_bytes),
+                assume_pdch_ready_after_data_transmit: dto
+                    .assume_pdch_ready_after_data_transmit
+                    .unwrap_or(defaults.assume_pdch_ready_after_data_transmit),
+                pdu_priority_max: dto.pdu_priority_max.unwrap_or(defaults.pdu_priority_max),
+                ready_timer_code: dto.ready_timer_code.unwrap_or(defaults.ready_timer_code),
+                standby_timer_code: dto.standby_timer_code.unwrap_or(defaults.standby_timer_code),
+                response_wait_timer_code: dto.response_wait_timer_code.unwrap_or(defaults.response_wait_timer_code),
+                mtu_code: dto.mtu_code.unwrap_or(defaults.mtu_code),
+                network_default_data_priority: dto
+                    .network_default_data_priority
+                    .unwrap_or(defaults.network_default_data_priority),
+                max_contexts_per_issi: dto.max_contexts_per_issi.unwrap_or(defaults.max_contexts_per_issi),
+                max_total_contexts: dto.max_total_contexts.unwrap_or(defaults.max_total_contexts),
+                strict_source_address: dto.strict_source_address.unwrap_or(defaults.strict_source_address),
+            }
+        },
+        packet_data_gateway: {
+            let dto = ci.packet_data_gateway.unwrap_or_default();
+            let defaults = CfgPacketDataGateway::default();
+            CfgPacketDataGateway {
+                enabled: dto.enabled.unwrap_or(defaults.enabled),
+                interface_name: dto.interface_name.unwrap_or(defaults.interface_name),
+                prefix_len: dto.prefix_len.unwrap_or(defaults.prefix_len),
+                mtu: dto.mtu.or(defaults.mtu),
+                auto_configure: dto.auto_configure.unwrap_or(defaults.auto_configure),
+                enable_ipv4_forwarding: dto.enable_ipv4_forwarding.unwrap_or(defaults.enable_ipv4_forwarding),
+                managed_forwarding: dto.managed_forwarding.unwrap_or(defaults.managed_forwarding),
+                allow_unsolicited_inbound: dto
+                    .allow_unsolicited_inbound
+                    .unwrap_or(defaults.allow_unsolicited_inbound),
+                nat_mode: dto.nat_mode.unwrap_or(defaults.nat_mode),
+                firewall_backend: dto.firewall_backend.unwrap_or(defaults.firewall_backend),
+                external_interface: dto.external_interface.or(defaults.external_interface),
+                dns_servers: dto.dns_servers.unwrap_or(defaults.dns_servers),
+                channel_capacity: dto.channel_capacity.unwrap_or(defaults.channel_capacity),
+                max_pdch_bearers: dto.max_pdch_bearers.unwrap_or(defaults.max_pdch_bearers),
+                reserved_voice_slots: dto.reserved_voice_slots.unwrap_or(defaults.reserved_voice_slots),
+                prefer_secondary_carrier: dto
+                    .prefer_secondary_carrier
+                    .unwrap_or(defaults.prefer_secondary_carrier),
+                downlink_queue_packets_per_context: dto
+                    .downlink_queue_packets_per_context
+                    .unwrap_or(defaults.downlink_queue_packets_per_context),
+                downlink_queue_bytes_per_context: dto
+                    .downlink_queue_bytes_per_context
+                    .unwrap_or(defaults.downlink_queue_bytes_per_context),
+                downlink_queue_ttl_secs: dto.downlink_queue_ttl_secs.unwrap_or(defaults.downlink_queue_ttl_secs),
+                page_retry_secs: dto.page_retry_secs.unwrap_or(defaults.page_retry_secs),
+                fragment_reassembly_timeout_secs: dto
+                    .fragment_reassembly_timeout_secs
+                    .unwrap_or(defaults.fragment_reassembly_timeout_secs),
+                fragment_reassembly_max_datagrams: dto
+                    .fragment_reassembly_max_datagrams
+                    .unwrap_or(defaults.fragment_reassembly_max_datagrams),
+                fragment_reassembly_max_bytes: dto
+                    .fragment_reassembly_max_bytes
+                    .unwrap_or(defaults.fragment_reassembly_max_bytes),
+                automatic_filter_ttl_secs: dto
+                    .automatic_filter_ttl_secs
+                    .unwrap_or(defaults.automatic_filter_ttl_secs),
+                automatic_filter_max_bindings: dto
+                    .automatic_filter_max_bindings
+                    .unwrap_or(defaults.automatic_filter_max_bindings),
+            }
+        },
         system_code: ci.system_code.unwrap_or(3), // 3 = ETSI EN 300 392-2 V3.1.1
         colour_code: ci.colour_code.unwrap_or(0),
         sharing_mode: ci.sharing_mode.unwrap_or(0),

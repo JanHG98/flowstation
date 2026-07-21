@@ -11,7 +11,10 @@ use tungstenite::{
 
 use crate::net_control::commands::ControlCommand;
 use crate::net_dashboard::html::DASHBOARD_HTML;
-use crate::net_dashboard::state::{CallEntry, DashboardState, DashboardStateInner, MeshcomMessageLogEntry, MeshcomNodeLogEntry, MsEntry};
+use crate::net_dashboard::state::{
+    CallEntry, DashboardState, DashboardStateInner, MeshcomMessageLogEntry, MeshcomNodeLogEntry, MsEntry,
+    PacketDataDashboardSnapshot,
+};
 use crate::net_echolink::{EcholinkCmdSender, EcholinkCommand};
 #[cfg(feature = "recording")]
 use crate::net_recorder::RecorderHandle;
@@ -1059,6 +1062,13 @@ impl DashboardServer {
                     }
                     s.last_health = Some(h.clone());
                 }
+                TelemetryEvent::PacketDataSnapshot { gateway, contexts, bearers } => {
+                    s.last_packet_data = Some(PacketDataDashboardSnapshot {
+                        gateway: gateway.clone(),
+                        contexts: contexts.clone(),
+                        bearers: bearers.clone(),
+                    });
+                }
                 TelemetryEvent::EmergencyAlarm { source_issi, dest_ssi } => {
                     // ENTER only — re-sends return false and produce no log/broadcast.
                     if s.emergency_enter(*source_issi, *dest_ssi) {
@@ -1336,6 +1346,12 @@ fn event_to_ws_msg(event: &TelemetryEvent) -> Option<String> {
             "domains": h.domains,
             "last_action": h.last_action,
             "uptime_secs": h.uptime_secs,
+        }),
+        TelemetryEvent::PacketDataSnapshot { gateway, contexts, bearers } => serde_json::json!({
+            "type": "packet_data",
+            "gateway": gateway,
+            "contexts": contexts,
+            "bearers": bearers,
         }),
         // Emergency add/remove are broadcast explicitly (transition-gated) from handle_telemetry,
         // so the generic path stays silent — otherwise every periodic re-send would re-broadcast.
@@ -2789,6 +2805,9 @@ fn handle_connection(
 
     if req_line.contains("/ws") {
         handle_ws(stream, state, clients, cmd_tx, update_state, auth);
+    } else if req_line.contains("GET /api/packet-data ") {
+        drain_http_headers(&mut stream);
+        serve_packet_data_snapshot(stream, &state);
     } else if request_route(&req_line).starts_with("/api/recordings") {
         serve_recording_request(stream, &req_line, &recorder);
     } else if request_route(&req_line).starts_with("/api/audio/tts") {
@@ -3481,6 +3500,16 @@ fn handle_connection(
     }
 }
 
+fn serve_packet_data_snapshot(stream: TcpStream, state: &DashboardState) {
+    let snapshot = state.read().ok().and_then(|state| state.last_packet_data.clone());
+    let body = serde_json::to_string(&serde_json::json!({
+        "ok": true,
+        "packet_data": snapshot,
+    }))
+    .unwrap_or_else(|_| "{\"ok\":false}".to_string());
+    http_json_response(stream, 200, &body);
+}
+
 fn handle_ws(
     stream: TcpStream,
     state: DashboardState,
@@ -3528,6 +3557,7 @@ fn handle_ws(
         let last_sdr_health = s.last_sdr_health.clone();
         let last_sys_health = s.last_sys_health.clone();
         let last_health = s.last_health.clone();
+        let packet_data = s.last_packet_data.clone();
         drop(s);
         if let Ok(json) = serde_json::to_string(&serde_json::json!({
             "type": "snapshot", "ms": ms, "calls": calls, "emergencies": emergencies, "log": logs,
@@ -3538,6 +3568,7 @@ fn handle_ws(
             "last_sdr_health": last_sdr_health,
             "last_sys_health": last_sys_health,
             "health": last_health,
+            "packet_data": packet_data,
         })) {
             let _ = ws.send(Message::Text(json));
         }
@@ -3739,6 +3770,67 @@ fn handle_ws_command(text: &str, state: &DashboardState, cmd_tx: &Arc<Mutex<Opti
                     dest, tpg_ric, callout_id, priority, alarm_text
                 ),
             );
+        }
+        Some("legacy_wap_sds") => {
+            let dest = v.get("dest_issi").and_then(|value| value.as_u64()).unwrap_or(0) as u32;
+            let source = v
+                .get("source_issi")
+                .and_then(|value| value.as_u64())
+                .unwrap_or(4_010_001)
+                .min(u32::MAX as u64) as u32;
+            let title = v.get("title").and_then(|value| value.as_str()).unwrap_or("NetCore");
+            let message = v.get("message").and_then(|value| value.as_str()).unwrap_or("");
+            let url = v.get("url").and_then(|value| value.as_str());
+            let message_reference = v
+                .get("message_reference")
+                .and_then(|value| value.as_u64())
+                .unwrap_or(1)
+                .min(255) as u8;
+            let transport = match v.get("transport").and_then(|value| value.as_str()) {
+                Some("sds_tl") | Some("84") | Some("0x84") => crate::legacy_wap::LegacyWapTransport::SdsTl,
+                _ => crate::legacy_wap::LegacyWapTransport::Wdp,
+            };
+            if dest == 0 || message.trim().is_empty() {
+                return;
+            }
+            let payload = match crate::legacy_wap::build_compact_wml_type4(
+                title,
+                message,
+                url,
+                transport,
+                message_reference,
+            ) {
+                Ok(payload) => payload,
+                Err(error) => {
+                    tracing::warn!("Dashboard: legacy WAP/SDS payload rejected: {:?}", error);
+                    if let Ok(mut state) = state.write() {
+                        state.push_log("WARN", format!("Legacy WAP/SDS not sent: {:?}", error));
+                    }
+                    return;
+                }
+            };
+            let len_bits = (payload.len() * 8) as u16;
+            if !send_cmd(ControlCommand::SendRawSdsType4 {
+                handle: 0,
+                source_ssi: source,
+                dest_ssi: dest,
+                dest_is_group: false,
+                len_bits,
+                payload,
+            }) {
+                tracing::warn!("Dashboard: no control dispatcher for legacy WAP/SDS");
+                return;
+            }
+            if let Ok(mut state) = state.write() {
+                state.push_log(
+                    "INFO",
+                    format!(
+                        "Legacy WAP/SDS sent to {} via {}",
+                        dest,
+                        if transport == crate::legacy_wap::LegacyWapTransport::SdsTl { "PID 0x84" } else { "PID 0x04" }
+                    ),
+                );
+            }
         }
         Some("dgna") => {
             let issi = v.get("issi").and_then(|i| i.as_u64()).unwrap_or(0) as u32;

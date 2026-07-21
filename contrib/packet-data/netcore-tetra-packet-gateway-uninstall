@@ -1,0 +1,20 @@
+#!/bin/sh
+set -eu
+
+SERVICE=${1:-tetra.service}
+DROPIN="/etc/systemd/system/${SERVICE}.d/20-packet-data-gateway.conf"
+CLEANUP=/usr/local/libexec/netcore-tetra-packet-gateway-cleanup
+
+if [ "$(id -u)" -ne 0 ]; then
+    echo "Run as root: sudo $0 [service-name]" >&2
+    exit 1
+fi
+
+if [ -x "$CLEANUP" ]; then
+    "$CLEANUP" || true
+fi
+rm -f "$DROPIN" "$CLEANUP"
+rmdir "/etc/systemd/system/${SERVICE}.d" 2>/dev/null || true
+systemctl daemon-reload
+
+echo "Removed packet-data systemd integration for $SERVICE."

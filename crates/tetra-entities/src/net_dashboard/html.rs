@@ -2380,6 +2380,11 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
       <span class="nav-icon" data-icon="sdslog"></span>
       <span class="nav-label" data-i18n="sdslog">SDS-PROTOKOLL</span>
     </div>
+    <div class="nav-item" onclick="showPage('packetdata',this)" id="nav-packetdata">
+      <span class="nav-icon" data-icon="packetdata"></span>
+      <span class="nav-label">PAKETDATEN</span>
+      <span class="nav-badge" id="badge-pdch" style="display:none">0</span>
+    </div>
     <div class="nav-item" onclick="showPage('maps',this)" id="nav-maps">
       <span class="nav-icon" data-icon="maps"></span>
       <span class="nav-label" data-i18n="maps">Karte</span>
@@ -2866,6 +2871,53 @@ tbody tr:hover td{background:color-mix(in srgb,var(--bg3) 70%, transparent);}
             <span class="sds-empty" id="sdslog-page">Seite 1 / 1</span>
             <button class="btn btn-sm" onclick="sdsLogNextPage()">Weiter ›</button>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── PACKET DATA / SNDCP ── -->
+    <div class="page" id="page-packetdata">
+      <div class="hero">
+        <span class="hero-dot is-idle" id="pd-hero-dot"></span>
+        <div class="hero-main">
+          <div class="hero-title">SNDCP-Paketdatennetz</div>
+          <div class="hero-sub" id="pd-hero-sub">Warte auf Telemetrie…</div>
+        </div>
+        <div class="hero-metrics">
+          <div class="hero-metric"><div class="hero-metric-label">PDP-Kontexte</div><div class="hero-metric-value" id="pd-context-count">0</div></div>
+          <div class="hero-metric"><div class="hero-metric-label">PDCH-Bearer</div><div class="hero-metric-value" id="pd-bearer-count">0</div></div>
+        </div>
+      </div>
+      <div class="stat-grid" style="margin-bottom:16px">
+        <div class="stat-card"><div class="stat-label">Gateway</div><div class="stat-value" id="pd-gateway-state">—</div><div class="stat-sub" id="pd-gateway-if">—</div></div>
+        <div class="stat-card"><div class="stat-label">Uplink</div><div class="stat-value" id="pd-ul-packets">0</div><div class="stat-sub" id="pd-ul-bytes">0 B</div></div>
+        <div class="stat-card"><div class="stat-label">Downlink</div><div class="stat-value" id="pd-dl-packets">0</div><div class="stat-sub" id="pd-dl-bytes">0 B</div></div>
+        <div class="stat-card"><div class="stat-label">Warteschlange</div><div class="stat-value" id="pd-queue-packets">0</div><div class="stat-sub" id="pd-queue-bytes">0 B</div></div>
+      </div>
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-head"><div class="card-title">Dynamische PDCH-Bearer</div><div class="card-actions"><button class="btn btn-sm" onclick="loadPacketData()">Aktualisieren</button></div></div>
+        <div class="table-wrap"><table><thead><tr><th>ISSI</th><th>Carrier</th><th>TS</th><th>NSAPI</th><th>Alter</th><th>Leerlauf</th></tr></thead><tbody id="pd-bearer-tbody"></tbody></table></div>
+      </div>
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-head"><div class="card-title">PDP-Kontexte</div></div>
+        <div class="table-wrap"><table><thead><tr><th>ISSI</th><th>NSAPI</th><th>IPv4</th><th>Status</th><th>PDCH</th><th>MTU</th><th>Queue</th><th>Inaktiv</th></tr></thead><tbody id="pd-context-tbody"></tbody></table></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><div class="card-title">Legacy-WAP über SDS Type 4</div></div>
+        <div class="card-body">
+          <div class="form-row">
+            <label class="h-field"><span class="h-field-label">Ziel-ISSI</span><input class="form-input" id="wap-sds-dest" type="number" min="1" max="16777215" placeholder="4010001"></label>
+            <label class="h-field"><span class="h-field-label">Quell-ISSI</span><input class="form-input" id="wap-sds-source" type="number" min="1" max="16777215" value="4010001"></label>
+            <label class="h-field"><span class="h-field-label">Transport</span><select class="form-input" id="wap-sds-transport"><option value="wdp">WAP/WDP PID 0x04</option><option value="sds_tl">WAP + SDS-TL PID 0x84</option></select></label>
+          </div>
+          <div class="form-row" style="margin-top:10px">
+            <label class="h-field"><span class="h-field-label">Titel</span><input class="form-input" id="wap-sds-title" value="NetCore"></label>
+            <label class="h-field" style="flex:2"><span class="h-field-label">Ziel-URL optional</span><input class="form-input" id="wap-sds-url" placeholder="http://10.0.0.1:9200/"></label>
+          </div>
+          <label class="h-field" style="margin-top:10px"><span class="h-field-label">Nachricht</span><textarea class="form-input" id="wap-sds-message" rows="4" placeholder="Kurze WAP-Nachricht"></textarea></label>
+          <div class="help-text">Die WML-Karte wird automatisch XML-sicher erzeugt und auf das SDS-Type-4-Limit von 255 Byte gekürzt.</div>
+          <button class="btn btn-primary" style="margin-top:12px" onclick="sendLegacyWapSds()">WAP-SDS senden</button>
+          <span class="help-text" id="wap-sds-state" style="margin-left:10px"></span>
         </div>
       </div>
     </div>
@@ -4726,6 +4778,7 @@ const ICONS = {
   lastheard:'<path d="M4 12h2M8 8v8M12 5v14M16 8v8M20 12h-2"/>',
   log:'<rect x="5" y="4" width="14" height="16" rx="2.5"/><path d="M9 9h6M9 13h6M9 17h3"/>',
   sdslog:'<path d="M4.5 6.5A1.5 1.5 0 0 1 6 5h12a1.5 1.5 0 0 1 1.5 1.5v8A1.5 1.5 0 0 1 18 16H9l-4 3v-3a1.5 1.5 0 0 1-.5-1.1Z"/>',
+  packetdata:'<ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/>',
   rf:'<circle cx="12" cy="12" r="2"/><path d="M7.8 7.8a6 6 0 0 0 0 8.4M16.2 7.8a6 6 0 0 1 0 8.4M5 5a9 9 0 0 0 0 14M19 5a9 9 0 0 1 0 14"/>',
   health:'<path d="M3 12h3l2-5 3 10 2.5-7 1.5 2h6"/>',
   // nav — integrations / system
@@ -4896,6 +4949,7 @@ const LANGS={
     "offline":"OFFLINE",
     "online":"ONLINE",
     "online_badge":"ONLINE",
+    "packetdata":"Paketdaten",
     "power":"Leistung",
     "profile_edit_btn":"Bearbeiten",
     "profile_edit_save_fail":"✗ Speichern fehlgeschlagen",
@@ -5228,7 +5282,7 @@ function closeMobileSidebar(){
 }
 
 // ── Page navigation ───────────────────────────────────────────────────────
-const PAGE_TITLES={stations:'stations',calls:'calls',lastheard:'lastheard',log:'log',sdslog:'sdslog',rf:'rf',health:'health',asterisk:'asterisk',dapnet:'dapnet',echolink:'echolink',meshcom:'meshcom',maps:'maps',geoalarm:'geoalarm',audio:'audio',config:'config',system:'system'};
+const PAGE_TITLES={stations:'stations',calls:'calls',lastheard:'lastheard',log:'log',sdslog:'sdslog',packetdata:'packetdata',rf:'rf',health:'health',asterisk:'asterisk',dapnet:'dapnet',echolink:'echolink',meshcom:'meshcom',maps:'maps',geoalarm:'geoalarm',audio:'audio',config:'config',system:'system'};
 
 // Hidden laboratory integrations. They stay compiled and fully functional, but are omitted from
 // the normal dashboard. Access is deliberately session-scoped and undocumented in the UI:
@@ -5266,6 +5320,7 @@ function showPage(name,el){
   document.getElementById('topbar-title').textContent=t(name)||name;
   if(name==='stations'){loadBtsInfo();}
   if(name==='sdslog'){loadSdsLog();}
+  if(name==='packetdata'){loadPacketData();}
   if(name==='health'){loadHealthIntegrations();}
   if(name==='asterisk'){loadAsteriskStatus();loadSnomNotify();}
   if(name==='dapnet'){loadDapnet();loadDapnetLog();}
@@ -5594,7 +5649,7 @@ async function wifiCall(url, body){
 function escAttr(s){ return String(s).replace(/&/g,'&amp;').replace(/'/g,"&#39;").replace(/"/g,'&quot;'); }
 
 // ── State + WS ────────────────────────────────────────────────────────────
-let ws=null,state={ms:{},calls:{},emergencies:{},lastHeard:[],sdsLog:[],dapnetLog:[],echolinkDirectory:[],echolinkDirectoryStatus:'',meshcomNodes:[],meshcomMessages:[],geoalarmEvents:[],geoalarmConfig:null,brewOnline:false,brewVer:0,brewStatus:null,brewStatusLoadedAt:0,btsMainCarrier:null,btsSecondaryCarrier:null,dualCarrierActive:false,dualCarrierRunning:false},sdsDest=0;
+let ws=null,state={ms:{},calls:{},emergencies:{},lastHeard:[],sdsLog:[],dapnetLog:[],echolinkDirectory:[],echolinkDirectoryStatus:'',meshcomNodes:[],meshcomMessages:[],geoalarmEvents:[],geoalarmConfig:null,packetData:null,brewOnline:false,brewVer:0,brewStatus:null,brewStatusLoadedAt:0,btsMainCarrier:null,btsSecondaryCarrier:null,dualCarrierActive:false,dualCarrierRunning:false},sdsDest=0;
 
 // ── Local device registry (root /devices.json) ────────────────────────────────
 // Supports both compact mappings ("2010002":"Hytera HRT") and structured entries:
@@ -6021,6 +6076,7 @@ function handleMsg(msg){
       if(msg.last_sdr_health){handleSdrHealth(msg.last_sdr_health);}
       if(msg.last_sys_health){handleSysHealth(msg.last_sys_health);}
       if(msg.health){handleHealth(msg.health);}
+      if(msg.packet_data){state.packetData=msg.packet_data;renderPacketData();}
       renderAll();renderEmergencyBanner();refreshCallsigns();break;
     case 'brew_status':
       setBrewStatus(!!msg.connected,msg.brew_version||0);break;
@@ -6120,6 +6176,7 @@ function handleMsg(msg){
     case 'emergency_removed':
       delete state.emergencies[msg.issi];
       renderEmergencyBanner();renderStations();break;
+    case 'packet_data':state.packetData={gateway:msg.gateway,contexts:msg.contexts||[],bearers:msg.bearers||[]};renderPacketData();break;
     case 'health':handleHealth(msg);break;
   }
 }
@@ -6605,6 +6662,32 @@ function renderLastHeard(){
   }).join('');
 }
 function clearLastHeard(){state.lastHeard=[];renderLastHeard();}
+
+// ── Packet data / SNDCP ─────────────────────────────────────────────────
+function packetBytes(value){
+  let n=Number(value||0);if(n<1024)return `${n} B`;if(n<1048576)return `${(n/1024).toFixed(1)} KiB`;return `${(n/1048576).toFixed(1)} MiB`;
+}
+async function loadPacketData(){
+  try{const r=await fetch('/api/packet-data');const j=await r.json();if(j&&j.packet_data)state.packetData=j.packet_data;renderPacketData();}catch(_){renderPacketData();}
+}
+function renderPacketData(){
+  const snap=state.packetData||{};const g=snap.gateway||{};const contexts=snap.contexts||[];const bearers=snap.bearers||[];
+  const dot=document.getElementById('pd-hero-dot');if(dot){dot.className='hero-dot '+(g.running?'is-ok':'is-idle');}
+  const sub=document.getElementById('pd-hero-sub');if(sub)sub.textContent=g.enabled?(g.running?`${g.interface_name||'TUN'} aktiv · ${g.gateway_address||'—'}/${g.prefix_len??'—'} · ${g.traffic_slots_free??0} Verkehrsslots frei · ${g.reserved_voice_slots??0} für Sprache reserviert`:'Gateway konfiguriert, derzeit nicht aktiv'):'Paketdaten-Gateway deaktiviert';
+  const set=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};
+  set('pd-context-count',contexts.length);set('pd-bearer-count',`${bearers.length}/${g.bearer_capacity||0}`);set('pd-gateway-state',g.running?'ONLINE':(g.enabled?'BEREIT':'AUS'));set('pd-gateway-if',`${g.interface_name||'—'} · ${g.gateway_address||'—'}/${g.prefix_len??'—'}`);
+  set('pd-ul-packets',g.packets_from_mobile||0);set('pd-ul-bytes',packetBytes(g.bytes_from_mobile));set('pd-dl-packets',g.packets_to_mobile||0);set('pd-dl-bytes',packetBytes(g.bytes_to_mobile));set('pd-queue-packets',g.queued_packets||0);set('pd-queue-bytes',packetBytes(g.queued_bytes));
+  const badge=document.getElementById('badge-pdch');if(badge){badge.textContent=bearers.length;badge.style.display=bearers.length?'':'none';}
+  const bt=document.getElementById('pd-bearer-tbody');if(bt)bt.innerHTML=bearers.length?bearers.map(b=>`<tr><td>${b.issi}</td><td>${b.carrier_num}</td><td>${b.air_ts} <span class="muted">(L${b.logical_ts})</span></td><td>${(b.nsapis||[]).join(', ')||'—'}</td><td>${b.age_secs}s</td><td>${b.idle_secs}s</td></tr>`).join(''):'<tr><td colspan="6" class="sds-empty">Keine aktiven PDCH-Bearer</td></tr>';
+  const ct=document.getElementById('pd-context-tbody');if(ct)ct.innerHTML=contexts.length?contexts.map(c=>`<tr><td>${c.issi}</td><td>${c.nsapi}${c.primary_nsapi!=null?` <span class="muted">→${c.primary_nsapi}</span>`:''}</td><td>${escHtml(c.ipv4||'—')}</td><td><span class="pill ${c.state==='READY'?'pill-ok':(c.state==='STANDBY'?'pill-idle':'pill-warn')}">${escHtml(c.state||'—')}</span></td><td>${c.carrier_num?`${c.carrier_num}/TS${c.air_ts}`:'—'}</td><td>${c.mtu||'—'}</td><td>${c.queued_packets||0} · ${packetBytes(c.queued_bytes)}</td><td>${c.idle_secs}s</td></tr>`).join(''):'<tr><td colspan="8" class="sds-empty">Keine PDP-Kontexte</td></tr>';
+}
+function sendLegacyWapSds(){
+  if(!ws||ws.readyState!==WebSocket.OPEN){alert('Basisstation ist nicht verbunden.');return;}
+  const dest=Number(document.getElementById('wap-sds-dest')?.value||0),source=Number(document.getElementById('wap-sds-source')?.value||4010001),title=document.getElementById('wap-sds-title')?.value||'NetCore',message=document.getElementById('wap-sds-message')?.value||'',url=document.getElementById('wap-sds-url')?.value||'',transport=document.getElementById('wap-sds-transport')?.value||'wdp';
+  if(!dest||!message.trim()){alert('Ziel-ISSI und Nachricht sind erforderlich.');return;}
+  ws.send(JSON.stringify({type:'legacy_wap_sds',dest_issi:dest,source_issi:source,title,message,url,transport,message_reference:(Date.now()&255)}));
+  const st=document.getElementById('wap-sds-state');if(st)st.textContent=`Gesendet an ${dest} (${transport==='sds_tl'?'PID 0x84':'PID 0x04'})`;
+}
 
 // ── SDS Log ───────────────────────────────────────────────────────────────
 function _p2(n){return String(n).padStart(2,'0');}

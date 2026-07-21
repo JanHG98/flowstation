@@ -1,0 +1,42 @@
+#!/bin/sh
+set -eu
+
+SERVICE=${1:-tetra.service}
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+DROPIN_SOURCE="$SCRIPT_DIR/../systemd/tetra.service.d/20-packet-data-gateway.conf"
+CLEANUP_SOURCE="$SCRIPT_DIR/netcore-tetra-packet-gateway-cleanup"
+DROPIN_DIR="/etc/systemd/system/${SERVICE}.d"
+
+if [ "$(id -u)" -ne 0 ]; then
+    echo "Run as root: sudo $0 [service-name]" >&2
+    exit 1
+fi
+
+command -v ip >/dev/null 2>&1 || {
+    echo "Missing iproute2 ('ip' command)." >&2
+    exit 1
+}
+if ! command -v nft >/dev/null 2>&1 && ! command -v iptables >/dev/null 2>&1; then
+    echo "Install nftables or iptables before enabling managed forwarding/NAT." >&2
+    exit 1
+fi
+[ -c /dev/net/tun ] || {
+    echo "/dev/net/tun is missing; load the tun module or enable TUN support." >&2
+    exit 1
+}
+[ -r "$DROPIN_SOURCE" ] && [ -x "$CLEANUP_SOURCE" ] || {
+    echo "Run this helper from the NetCore-Tetra source tree." >&2
+    exit 1
+}
+
+install -d -m 0755 /usr/local/libexec
+install -m 0755 "$CLEANUP_SOURCE" /usr/local/libexec/netcore-tetra-packet-gateway-cleanup
+install -d -m 0755 "$DROPIN_DIR"
+install -m 0644 "$DROPIN_SOURCE" "$DROPIN_DIR/20-packet-data-gateway.conf"
+
+systemctl daemon-reload
+systemctl reset-failed "$SERVICE" >/dev/null 2>&1 || true
+
+echo "Installed packet-data systemd integration for $SERVICE."
+echo "Review with: systemctl cat $SERVICE"
+echo "Then restart with: systemctl restart $SERVICE"

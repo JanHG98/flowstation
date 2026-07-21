@@ -127,6 +127,10 @@ fn route_http(request: HttpRequest, state: SharedControlRoom, node_path: &str, u
         ("GET", "/api/state") => HttpResponse::json(200, &state.snapshot()),
         ("GET", "/api/rf") => HttpResponse::json(200, &state.rf_snapshot()),
         ("GET", "/api/health/full") => HttpResponse::json(200, &state.health_snapshot()),
+        ("GET", "/api/packet-data") => HttpResponse::json(
+            200,
+            &state.packet_data_snapshot(None).expect("global packet-data snapshot exists"),
+        ),
         ("GET", "/api/subscribers") => {
             let online_only = query_bool(&request, "online", false) || query_bool(&request, "online_only", false);
             HttpResponse::json(200, &state.subscribers_snapshot(None, online_only).expect("global subscribers snapshot exists"))
@@ -187,9 +191,10 @@ fn route_http(request: HttpRequest, state: SharedControlRoom, node_path: &str, u
                         node_or_404(state.emergencies_snapshot(Some(&route.node_id), active_only))
                     }
                     Some("locations") => node_or_404(state.locations_snapshot(Some(&route.node_id))),
+                    Some("packet-data") => node_or_404(state.packet_data_snapshot(Some(&route.node_id))),
                     Some(other) => HttpResponse::json(404, &json!({
                         "error": format!("unknown node detail collection '{}'", other),
-                        "available_collections": ["subscribers", "groups", "calls", "sds", "emergencies", "locations"]
+                        "available_collections": ["subscribers", "groups", "calls", "sds", "emergencies", "locations", "packet-data"]
                     })),
                 }
             } else {
@@ -203,11 +208,12 @@ fn route_http(request: HttpRequest, state: SharedControlRoom, node_path: &str, u
                     Some("kick") => submit_kick_command(&request.body, state, route.node_id),
                     Some("dgna") => submit_dgna_command(&request.body, state, route.node_id),
                     Some("clear-emergency") => submit_clear_emergency_command(&request.body, state, route.node_id),
+                    Some("legacy-wap") => submit_legacy_wap_command(&request.body, state, route.node_id),
                     Some("restart-service") => submit_service_command(&request.body, state, route.node_id, ServiceAction::Restart),
                     Some("shutdown-service") => submit_service_command(&request.body, state, route.node_id, ServiceAction::Shutdown),
                     Some(other) => HttpResponse::json(404, &json!({
                         "error": format!("unknown command shortcut '{}'", other),
-                        "available_shortcuts": ["kick", "dgna", "clear-emergency", "restart-service", "shutdown-service"]
+                        "available_shortcuts": ["kick", "dgna", "clear-emergency", "legacy-wap", "restart-service", "shutdown-service"]
                     })),
                 }
             } else {
@@ -918,6 +924,36 @@ struct ClearEmergencyCommandRequest {
     issi: u32,
 }
 
+#[derive(Debug, Deserialize)]
+struct LegacyWapCommandRequest {
+    operator_id: Option<String>,
+    dest_issi: u32,
+    #[serde(default = "default_legacy_wap_source_issi")]
+    source_issi: u32,
+    #[serde(default)]
+    dest_is_group: bool,
+    #[serde(default = "default_legacy_wap_title")]
+    title: String,
+    message: String,
+    url: Option<String>,
+    #[serde(default)]
+    transport: Option<String>,
+    #[serde(default = "default_legacy_wap_message_reference")]
+    message_reference: u8,
+}
+
+fn default_legacy_wap_source_issi() -> u32 {
+    4_010_001
+}
+
+fn default_legacy_wap_title() -> String {
+    "NetCore".to_string()
+}
+
+fn default_legacy_wap_message_reference() -> u8 {
+    1
+}
+
 #[derive(Debug, Clone, Copy)]
 enum ServiceAction {
     Restart,
@@ -956,6 +992,62 @@ fn submit_clear_emergency_command(body: &[u8], state: SharedControlRoom, node_id
         Err(response) => return response,
     };
     let envelope = state.make_envelope(node_id, req.operator_id, ControlCommand::ClearEmergency { issi: req.issi });
+    submit_envelope(envelope, state)
+}
+
+fn submit_legacy_wap_command(body: &[u8], state: SharedControlRoom, node_id: String) -> HttpResponse {
+    let req: LegacyWapCommandRequest = match parse_json_body(body) {
+        Ok(req) => req,
+        Err(response) => return response,
+    };
+    if req.dest_issi == 0 {
+        return HttpResponse::json(400, &json!({ "error": "dest_issi must be non-zero" }));
+    }
+    if req.message.trim().is_empty() {
+        return HttpResponse::json(400, &json!({ "error": "message must not be empty" }));
+    }
+    let transport = match req.transport.as_deref().map(str::trim) {
+        Some("sds_tl") | Some("sds-tl") | Some("84") | Some("0x84") => {
+            tetra_entities::legacy_wap::LegacyWapTransport::SdsTl
+        }
+        Some("") | None | Some("wdp") | Some("04") | Some("0x04") => {
+            tetra_entities::legacy_wap::LegacyWapTransport::Wdp
+        }
+        Some(other) => {
+            return HttpResponse::json(
+                400,
+                &json!({ "error": format!("unsupported legacy WAP transport '{}'", other) }),
+            );
+        }
+    };
+    let payload = match tetra_entities::legacy_wap::build_compact_wml_type4(
+        &req.title,
+        &req.message,
+        req.url.as_deref(),
+        transport,
+        req.message_reference,
+    ) {
+        Ok(payload) => payload,
+        Err(error) => {
+            return HttpResponse::json(
+                400,
+                &json!({ "error": format!("legacy WAP payload rejected: {:?}", error) }),
+            );
+        }
+    };
+    let len_bits = (payload.len() * 8) as u16;
+    let envelope = state.make_envelope(
+        node_id,
+        req.operator_id,
+        ControlCommand::SendRawSdsType4 {
+            handle: 0,
+            source_ssi: req.source_issi,
+            dest_ssi: req.dest_issi,
+            dest_is_group: req.dest_is_group,
+            len_bits,
+            payload,
+        },
+    );
     submit_envelope(envelope, state)
 }
 
@@ -1177,6 +1269,8 @@ fn not_found(node_path: &str, ui_path: &str) -> HttpResponse {
                 "GET /api/state",
                 "GET /api/rf",
                 "GET /api/health/full",
+                "GET /api/packet-data",
+                "GET /api/nodes/{node_id}/packet-data",
                 "GET /api/events?limit=50&quiet=true",
                 "GET /api/commands?limit=50",
                 "POST /api/login",
@@ -1191,6 +1285,7 @@ fn not_found(node_path: &str, ui_path: &str) -> HttpResponse {
                 "POST /api/nodes/{node_id}/commands/kick",
                 "POST /api/nodes/{node_id}/commands/dgna",
                 "POST /api/nodes/{node_id}/commands/clear-emergency",
+                "POST /api/nodes/{node_id}/commands/legacy-wap",
                 format!("WS {}", node_path),
                 format!("WS {}", ui_path)
             ]
@@ -1269,6 +1364,8 @@ fn index_html(node_path: &str, ui_path: &str) -> String {
     <li><code>GET /api/state</code> — kompletter Debug-State</li>
     <li><code>GET /api/rf</code> — RF/SDR-Snapshot</li>
     <li><code>GET /api/health/full</code> — technische Health-Daten</li>
+    <li><code>GET /api/packet-data</code> — SNDCP-, TUN-, PDP- und PDCH-Übersicht aller Nodes</li>
+    <li><code>GET /api/nodes/&lt;node_id&gt;/packet-data</code> — Paketdaten eines Nodes</li>
     <li><code>GET /api/events?limit=50&amp;quiet=true</code></li>
     <li><code>GET /api/commands?limit=50</code></li>
     <li><code>POST /api/login</code> — Benutzer/Passwort Login-Prüfung</li>
@@ -1282,11 +1379,17 @@ fn index_html(node_path: &str, ui_path: &str) -> String {
     <li><code>POST /api/nodes/&lt;node_id&gt;/commands/kick</code></li>
     <li><code>POST /api/nodes/&lt;node_id&gt;/commands/dgna</code></li>
     <li><code>POST /api/nodes/&lt;node_id&gt;/commands/clear-emergency</code></li>
+    <li><code>POST /api/nodes/&lt;node_id&gt;/commands/legacy-wap</code> — WML über SDS Type 4, PID 0x04/0x84</li>
   </ul>
   <h2>Beispiel: Kick MS</h2>
   <pre>curl -X POST http://127.0.0.1:9010/api/nodes/tbs-04010001/commands/kick \
   -H 'Content-Type: application/json' \
   -d '{{"operator_id":"jan","issi":2010001}}'</pre>
+
+  <h2>Beispiel: Legacy-WAP über SDS Type 4</h2>
+  <pre>curl -X POST http://127.0.0.1:9010/api/nodes/tbs-04010001/commands/legacy-wap \
+  -H 'Content-Type: application/json' \
+  -d '{{"operator_id":"jan","dest_issi":4010001,"title":"NetCore","message":"Statusseite öffnen","url":"http://10.0.0.1:9200/","transport":"wdp"}}'</pre>
 
   <h2>Beispiel: DGNA Attach</h2>
   <pre>curl -X POST http://127.0.0.1:9010/api/nodes/tbs-04010001/commands/dgna \

@@ -1,0 +1,41 @@
+#!/bin/sh
+# Crash-safe cleanup for the NetCore-Tetra SNDCP packet-data gateway.
+# Invoked by systemd ExecStopPost after normal exits and crashes.
+
+NFT_TABLE=netcore_tetra
+IPT_FILTER_CHAIN=NETCORE_TETRA_FWD
+IPT_NAT_CHAIN=NETCORE_TETRA_NAT
+STATE_FILE=/run/netcore-tetra/packet-gateway-sysctls
+
+if command -v nft >/dev/null 2>&1; then
+    nft delete table ip "$NFT_TABLE" >/dev/null 2>&1 || true
+fi
+
+if command -v iptables >/dev/null 2>&1; then
+    while iptables -C FORWARD -j "$IPT_FILTER_CHAIN" >/dev/null 2>&1; do
+        iptables -D FORWARD -j "$IPT_FILTER_CHAIN" >/dev/null 2>&1 || break
+    done
+    iptables -F "$IPT_FILTER_CHAIN" >/dev/null 2>&1 || true
+    iptables -X "$IPT_FILTER_CHAIN" >/dev/null 2>&1 || true
+
+    while iptables -t nat -C POSTROUTING -j "$IPT_NAT_CHAIN" >/dev/null 2>&1; do
+        iptables -t nat -D POSTROUTING -j "$IPT_NAT_CHAIN" >/dev/null 2>&1 || break
+    done
+    iptables -t nat -F "$IPT_NAT_CHAIN" >/dev/null 2>&1 || true
+    iptables -t nat -X "$IPT_NAT_CHAIN" >/dev/null 2>&1 || true
+fi
+
+if [ -r "$STATE_FILE" ]; then
+    tab=$(printf '\t')
+    while IFS="$tab" read -r path previous; do
+        case "$path" in
+            /proc/sys/net/*) ;;
+            *) continue ;;
+        esac
+        [ -w "$path" ] || continue
+        printf '%s\n' "$previous" > "$path" 2>/dev/null || true
+    done < "$STATE_FILE"
+    rm -f "$STATE_FILE"
+fi
+
+exit 0
