@@ -84,22 +84,43 @@ jobs:
 
       - name: Check configuration crate
         if: steps.payload.outputs.present == 'true'
-        run: cargo check --locked -p tetra-config
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo check --locked -p tetra-config 2>&1 | tee /tmp/wap-ci.log
 
       - name: Check runtime entities
         if: steps.payload.outputs.present == 'true'
-        run: cargo check --locked -p tetra-entities
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo check --locked -p tetra-entities 2>&1 | tee -a /tmp/wap-ci.log
 
       - name: Run SNDCP and WAP tests
         if: steps.payload.outputs.present == 'true'
-        run: cargo test --locked -p tetra-entities --lib sndcp
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo test --locked -p tetra-entities --lib sndcp 2>&1 | tee -a /tmp/wap-ci.log
 
       - name: Run assigned-PDCH test
         if: steps.payload.outputs.present == 'true'
-        run: cargo test --locked -p tetra-entities --lib packet_data_assignment_owns_ts2_until_quit_and_go
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo test --locked -p tetra-entities --lib packet_data_assignment_owns_ts2_until_quit_and_go 2>&1 | tee -a /tmp/wap-ci.log
+
+      - name: Upload WAP CI log
+        if: always() && steps.payload.outputs.present == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: wap-ci-log
+          path: /tmp/wap-ci.log
+          if-no-files-found: ignore
+          retention-days: 3
 
       - name: Commit verified implementation
-        if: steps.payload.outputs.present == 'true'
+        if: steps.payload.outputs.present == 'true' && success()
         shell: bash
         run: |
           set -euo pipefail
