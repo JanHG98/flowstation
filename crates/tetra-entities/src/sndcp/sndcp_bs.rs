@@ -1852,6 +1852,13 @@ impl Sndcp {
 }
 
 
+fn snei_optional_section(snei: Option<u16>) -> String {
+    match snei {
+        Some(snei) => format!("11{snei:016b}0"),
+        None => "0".to_string(),
+    }
+}
+
 fn data_transmit_response_optional_section(snei: Option<u16>, additional_nsapis: &[u8]) -> String {
     let mut seen = HashSet::new();
     let additional = additional_nsapis
@@ -2103,6 +2110,12 @@ mod tests {
              c2231a0205001a10db3b2df8c57cce0db8712b16aa9cb5a361646d696",
         );
         assert_eq!(find_chap_response_id(&pco), Some(5));
+    }
+
+    #[test]
+    fn snei_only_optional_section_has_o_p_value_and_terminator() {
+        assert_eq!(snei_optional_section(None), "0");
+        assert_eq!(snei_optional_section(Some(0x1234)), "1100010010001101000");
     }
 
     #[test]

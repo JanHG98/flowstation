@@ -1,19 +1,16 @@
-# NetCore Control Room
+# Control Room
 
-Control Room Core + native Operator-UI.
+## Zweck
 
-Ab v5.0 nutzt der Operatorzugang klassischen Benutzername+Passwort-Login mit RBAC.
+Der Control Room ist die zentrale Bedien-, Leitstellen- und Übersichtsebene.
 
-- TBS: Maschinen-Token für `/node` bleibt in der TBS `config.toml`.
-- LXC: headless Core, SQLite, User/RBAC-Verwaltung.
-- Windows: native UI mit Loginmaske.
+## Kernaufgaben
 
-Rollen:
+- TBS, Teilnehmer, Gruppen, Calls, SDS und Notrufe anzeigen
+- Operator-Kommandos, DGNA und Rufauslösung bereitstellen
+- Rollen, Rechte und Audit verwalten
+- Leitstellen-Audio integrieren
 
-```text
-viewer    lesen
-operator  lesen + Funkbefehle
-admin     alles + Benutzerverwaltung
-```
+## Architekturregel
 
-Siehe `CONTROL_ROOM_USER_LOGIN_RBAC_APPLY.md` und `docs/auth.md`.
+Der Control Room ist keine autoritative Teilnehmer-, Mobility- oder Call-Datenbank.

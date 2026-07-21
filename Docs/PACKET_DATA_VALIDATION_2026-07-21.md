@@ -26,6 +26,22 @@ Stand: 21.07.2026
 - ZIP-Neuextraktion und Integritätsvergleich;
 - SHA-256-Prüfsummen für alle Lieferartefakte.
 
+## Compile-Fix R1
+
+Nach dem ersten echten Build auf dem Zielsystem wurden fünf Rust-Typcheckfehler
+gemeldet und in R1 korrigiert:
+
+- fehlende IPv4-/UDP-Headerkonstante ergänzt;
+- fehlenden SNEI-Optional-IE-Encoder für SN-PAGE ergänzt;
+- fehlende `IpError::UnsupportedProtocol(u8)`-Variante ergänzt;
+- Rückgabetyp der nftables-Setup-Closure explizit auf `Result<(), GatewayError>` festgelegt;
+- die WAP-Nutzlastgrenze verwendet nun die gemeinsame IPv4-/UDP-Headerkonstante.
+
+Die korrigierten Dateien wurden erneut vollständig mit Tree-sitter-Rust geparst.
+Ein vollständiger `cargo check` war im Arbeitscontainer weiterhin nicht möglich,
+da keine Rust-Standardtoolchain installiert und der Toolchain-Download aus dem
+Container nicht erreichbar war.
+
 ## Referenzvektoren
 
 ### IPv4/UDP

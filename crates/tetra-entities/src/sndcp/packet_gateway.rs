@@ -466,7 +466,7 @@ impl NetworkConfiguration {
     fn apply_nftables(&mut self, external: &str) -> Result<(), GatewayError> {
         let _ = run_allow_failure("nft", &["delete", "table", "ip", NFT_TABLE]);
         run("nft", &["add", "table", "ip", NFT_TABLE])?;
-        let result = (|| {
+        let result: Result<(), GatewayError> = (|| {
             run("nft", &["add", "chain", "ip", NFT_TABLE, "forward", "{", "type", "filter", "hook", "forward", "priority", "filter", ";", "policy", "accept", ";", "}"])?;
             run("nft", &["add", "rule", "ip", NFT_TABLE, "forward", "iifname", &self.config.interface_name, "oifname", &self.config.interface_name, "accept"])?;
             run("nft", &["add", "rule", "ip", NFT_TABLE, "forward", "iifname", &self.config.interface_name, "oifname", external, "accept"])?;

@@ -3,11 +3,15 @@
 pub const IPV4_PROTOCOL_ICMP: u8 = 1;
 pub const IPV4_PROTOCOL_TCP: u8 = 6;
 pub const IPV4_PROTOCOL_UDP: u8 = 17;
+pub const IPV4_HEADER_BYTES: usize = 20;
+pub const UDP_HEADER_BYTES: usize = 8;
+pub const IPV4_UDP_HEADER_BYTES: usize = IPV4_HEADER_BYTES + UDP_HEADER_BYTES;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IpError {
     TooShort,
     UnsupportedVersion(u8),
+    UnsupportedProtocol(u8),
     InvalidHeaderLength,
     InvalidTotalLength,
     InvalidChecksum,

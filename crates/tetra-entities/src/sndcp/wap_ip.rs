@@ -295,7 +295,7 @@ pub fn build_response_npdu(
         if !policy.accept_empty_probe {
             return Err(WapError::UnsupportedPayload);
         }
-        Some(render_raw_xhtml(snapshot, 548).into_bytes())
+        Some(render_raw_xhtml(snapshot, 576 - IPV4_UDP_HEADER_BYTES).into_bytes())
     } else {
         // Binary WTP first. Byte 0 encodes a known WTP type in bits 6..3.
         let wtp_type = (udp.payload[0] >> 3) & 0x0f;
@@ -303,7 +303,7 @@ pub fn build_response_npdu(
             handle_wtp(udp.payload, policy, snapshot)?
         } else if let Some(path) = plain_get_path(udp.payload) {
             let _ = path_allowed(path, policy).ok_or(WapError::UnsupportedPath)?;
-            Some(render_raw_xhtml(snapshot, 548).into_bytes())
+            Some(render_raw_xhtml(snapshot, 576 - IPV4_UDP_HEADER_BYTES).into_bytes())
         } else {
             return Err(WapError::UnsupportedPayload);
         }
