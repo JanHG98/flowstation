@@ -235,6 +235,42 @@ impl StackConfig {
             return Err("ms_txpwr_max_cell must be 0-7 (3 bits)");
         }
 
+        // WAP/IP is a single, opt-in packet-data profile. Advertising and runtime enablement
+        // must agree, otherwise terminals start a PDP procedure that the BS cannot complete.
+        if self.cell.sndcp_service && !self.cell.wap_ip.enabled {
+            return Err("cell.sndcp_service=true requires cell_info.wap_ip.enabled=true");
+        }
+        if self.cell.wap_ip.enabled && !self.cell.sndcp_service {
+            return Err("cell_info.wap_ip.enabled=true requires cell.sndcp_service=true");
+        }
+        if self.cell.wap_ip.enabled && !self.cell.advanced_link {
+            return Err("cell_info.wap_ip.enabled=true requires cell.advanced_link=true");
+        }
+        if self.cell.wap_ip.port == 0 {
+            return Err("cell_info.wap_ip.port must be non-zero");
+        }
+        if self.cell.wap_ip.response_ttl == 0 {
+            return Err("cell_info.wap_ip.response_ttl must be non-zero");
+        }
+        if self.cell.wap_ip.max_request_payload_bytes == 0 || self.cell.wap_ip.max_request_payload_bytes > 1024 {
+            return Err("cell_info.wap_ip.max_request_payload_bytes must be 1-1024");
+        }
+        if self.cell.wap_ip.dynamic_pool_first_host == 0
+            || self.cell.wap_ip.dynamic_pool_last_host == 255
+            || self.cell.wap_ip.dynamic_pool_first_host > self.cell.wap_ip.dynamic_pool_last_host
+        {
+            return Err("cell_info.wap_ip dynamic pool hosts must be ordered inside 1-254");
+        }
+        let Some(pool_prefix) = self.cell.wap_ip.pool_prefix_octets() else {
+            return Err("cell_info.wap_ip.dynamic_pool_prefix must contain exactly three IPv4 octets");
+        };
+        let endpoint = self.cell.wap_ip.address.octets();
+        if endpoint[..3] == pool_prefix[..]
+            && (self.cell.wap_ip.dynamic_pool_first_host..=self.cell.wap_ip.dynamic_pool_last_host).contains(&endpoint[3])
+        {
+            return Err("cell_info.wap_ip.address must not be inside the dynamic client pool");
+        }
+
         // Validate timezone if configured
         if let Some(ref tz) = self.cell.timezone
             && tz.parse::<chrono_tz::Tz>().is_err()
@@ -262,6 +298,9 @@ impl StackConfig {
         }
 
         for cell in &self.cell.neighbor_cells_ca {
+            if cell.bs_service_details.as_ref().is_some_and(|details| details.sndcp_service) {
+                return Err("cell.neighbor_cells_ca: neighbor SNDCP advertisement is unsupported by the local WAP profile");
+            }
             if cell.cell_identifier_ca > 0x1F {
                 return Err("cell.neighbor_cells_ca: cell_identifier_ca must be 0-31");
             }

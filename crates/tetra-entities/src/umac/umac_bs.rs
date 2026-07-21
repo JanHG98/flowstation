@@ -228,6 +228,9 @@ impl UmacBs {
     pub fn generate_precomps(config: &SharedConfig) -> PrecomputedUmacPdus {
         let c = config.config();
 
+        // One predicate controls both the over-air advertisement and SNDCP runtime.
+        let wap_profile = c.cell.wap_ip_sndcp_profile_enabled();
+
         // TODO FIXME make more/all parameters configurable
         let ext_services = SysinfoExtendedServices {
             auth_required: false,
@@ -242,7 +245,8 @@ impl UmacBs {
             sdstl_addressing_method: 2,
             gck_supported: false,
             section: 0,
-            section_data: 0,
+            // Extended-services section 0, bit 6 advertises the packet-data/WAP profile.
+            section_data: if wap_profile { 0x40 } else { 0 },
         };
 
         let def_access = SysinfoDefaultDefForAccessCodeA {
@@ -309,8 +313,9 @@ impl UmacBs {
                 system_wide_services,
                 voice_service: c.cell.voice_service,
                 circuit_mode_data_service: c.cell.circuit_mode_data_service,
-                sndcp_service: c.cell.sndcp_service,
-                aie_service: c.cell.aie_service,
+                sndcp_service: wap_profile,
+                // The local WAP profile is currently clear-text packet data only.
+                aie_service: if wap_profile { false } else { c.cell.aie_service },
                 advanced_link: c.cell.advanced_link,
             },
         };
@@ -320,7 +325,7 @@ impl UmacBs {
         // BOTH sndcp_service AND advanced_link advertised, or it won't start the SNDCP procedure.
         tracing::info!(
             "SYSINFO advertising: sndcp_service={} advanced_link={} voice_service={} circuit_mode_data={}",
-            c.cell.sndcp_service,
+            wap_profile,
             c.cell.advanced_link,
             c.cell.voice_service,
             c.cell.circuit_mode_data_service

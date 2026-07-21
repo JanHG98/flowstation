@@ -25,10 +25,10 @@ A complete MXP600 (Motorola/Dimetra, Openwave UP.Browser 6.3.0.1) packet-data se
 | 2 | BS → MS | **SN-ACTIVATE PDP CONTEXT ACCEPT** (SN type 0). NSAPI echoed; TIA=1 (static, echo MS IPv4) or TIA=2 (dynamic, assign pool IP); timers/MTU; **PCO CHAP-Success** if DEMAND had CHAP, else O-bit=0. | Sent on **acknowledged basic link** (`TlaTlDataReqBl`) to `ind.received_tetra_address`. Context state → STANDBY. |
 | 3 | MS → BS | **SN-DATA TRANSMIT REQUEST** (SN type 6). Optional phase-modulation resource request (1 or 4 slots). | Build **SN-DATA TRANSMIT RESPONSE** (type 7, Accept). Attach **CmceChanAllocReq**: TS2 single-slot, Replace, Both. Context → READY. |
 | 4 | BS → MS | **SN-DATA TRANSMIT RESPONSE** + PDCH channel allocation (timeslots `[F,T,F,F]`). | MS moves to assigned PDCH on TS2. |
-| 5 | MS → BS | **SN-UNITDATA** (type 4) *or* **SN-DATA** (type 1) carrying an **IPv4/UDP** N-PDU to `BS_IP:9200`. Payload = WTP Invoke+WSP Connect, or WSP GET, or plain-text `GET /…`. | Decode SN body; extract N-PDU; parse IPv4→UDP; classify WAP request. |
+| 5 | MS → BS | **SN-UNITDATA** (type 4) *or* **SN-DATA** (type 5) carrying an **IPv4/UDP** N-PDU to `BS_IP:9200`. Payload = WTP Invoke+WSP Connect, or WSP GET, or plain-text `GET /…`. | Decode SN body; extract N-PDU; parse IPv4→UDP; classify WAP request. |
 | 6 | (within 5) | **WSP CONNECT** (WTP Invoke) | Reply **WSP CONNECT-REPLY** in a WTP Result. |
 | 7 | (within 5) | **WSP GET /status.xhtml** (WTP Invoke) | Render page; reply **WSP Reply** (200 OK + content-type) in a WTP Result. |
-| 8 | BS → MS | **SN-UNITDATA** (type 4 — *always*, even if request was type 1) wrapping IPv4/UDP, src/dst swapped, IP id = req+1, UDP cksum 0. | Built only **after** WAP response succeeds; then READY-state gate runs. |
+| 8 | BS → MS | **SN-UNITDATA** (type 4 — *always*, even if request was type 5) wrapping IPv4/UDP, src/dst swapped, IP id = req+1, UDP cksum 0. | Built only **after** WAP response succeeds; then READY-state gate runs. |
 | 9 | MS → BS | **WTP ACK** or **WTP ABORT** | **No response** (drop). |
 | 10 | MS → BS | **SN-DEACTIVATE PDP CONTEXT DEMAND** (type 2) | Reply **SN-DEACTIVATE PDP CONTEXT ACCEPT** (type 1); remove context. |
 | — | MS → BS | **SN-END OF DATA** (type 8) | Attach return-to-common-control alloc (timeslots `[F,F,F,F]`, QuitAndGo). |
@@ -74,7 +74,7 @@ Dynamic/static IPv4 ACCEPT = **70 bits** (`pdp.rs:648`); NoAddress = 38 bits.
 
 Dynamic = **28 bits** (`pdp.rs:615`); static = 60; secondary = 32.
 
-### 2.3 SN-UNITDATA (type 4) / SN-DATA (type 5/1) — `unitdata.rs:149-176`
+### 2.3 SN-UNITDATA (type 4) / SN-DATA (type 5) — `unitdata.rs:149-176`
 
 | Field | Bits | Value |
 |---|---|---|
@@ -269,7 +269,7 @@ Per-mode overrides (literals): sector title 24/16/8 (Normal/Compact/Tiny `L301-3
 ## 5. Downlink encapsulation + channel
 
 ### 5.1 Downlink SN-UNITDATA (always type 4) — `unitdata.rs:149-176`, `mle_adapter.rs:262-285`
-Header `type=4 | nsapi(echo) | pcomp=0 | dcomp=0` (16 bits), then the IPv4/UDP N-PDU bit-appended. Built even when the request was SN-DATA (type 1). `layer2service = Unacknowledged` for WAP unitdata; `packet_data_flag = true` (forced, `mle_adapter.rs:267`); `fcs_flag = false` default.
+Header `type=4 | nsapi(echo) | pcomp=0 | dcomp=0` (16 bits), then the IPv4/UDP N-PDU bit-appended. Built even when the request was SN-DATA (type 5). `layer2service = Unacknowledged` for WAP unitdata; `packet_data_flag = true` (forced, `mle_adapter.rs:267`); `fcs_flag = false` default.
 
 **Response IPv4/UDP fields** (`wap_ip.rs:379-385`, `ip.rs:187-229`): src=`endpoint.address` (10.0.0.1), dst=`request.source` (MS IP); src_port=`endpoint.port` (9200), dst_port=`request.src_port`; **IP id = req_id + 1 wrapping**; ttl=`endpoint.response_ttl` (32); UDP cksum `0x0000`; IPv4 cksum computed.
 
@@ -337,12 +337,12 @@ SYSINFO emits two variants alternately: sysinfo1 `option_field=2` (access-code p
 - **DEMAND dynamic IPv4** (`L584-617`, **28 bits**): ver=1,nsapi=2,ATID=1,mstype=0,pcomp=0 → `0000 0001 0010 001 0000 00000000 0` ⇒ bytes `0x01 0x22 0x00 0x00` (first 28 bits).
 - **DEMAND static 10.0.0.18** (`L621-628`, 60 bits): ATID=0, IPv4 `00001010 00000000 00000000 00010010`.
 - **DEMAND secondary** (`L630-634`, 32 bits): nsapi=3, ATID=5, primary=2.
-- **ACCEPT dynamic IPv4** (`L594-606`, **70 bits**): nsapi=2,pri=4,ready=8,standby=4,respwait=7,TIA=2,IPv4=`10.0.0.226`,pcomp=0,mtu=Octets576(code 2). Bitstring `0000 0010 100 1000 0100 0111 010 00001010000000000000000011100010 00000000 010 0`; **byte view** (pad to 72): `0x0A 0x44 0x74 0x28 0x00 0x00 0x38 0x80 0x40`. **This is the ground-truth ACCEPT ordering FlowStation must match.**
+- **ACCEPT dynamic IPv4** (`L594-606`, **70 bits**): nsapi=2,pri=4,ready=8,standby=4,respwait=7,TIA=2,IPv4=`10.0.0.226`,pcomp=0,mtu=Octets576(code 2). Bitstring `0000 0010 100 1000 0100 0111 010 00001010000000000000000011100010 00000000 010 0`; **byte view** (pad to 72): `0x02 0x90 0x8E 0x82 0x80 0x00 0x38 0x80 0x10`. **This is the ground-truth ACCEPT ordering FlowStation must match.**
 - **REJECT** (`L653-657`, 17 bits): type=3,nsapi=2,cause=34 → `00110010 00100010 0`.
 - **DEACTIVATE** (`L667-687`): AllNsapis DEMAND(2) 13 bits `0010 00000000 0`; single NSAPI=2 ACCEPT(1) 17 bits.
 
 ### 7.2 SN-UNITDATA (`unitdata.rs`)
-- **Round-trip** (`L217-231`): `encode(nsapi=2,pcomp=0,dcomp=0, n_pdu=[0x45,0x00,0x00,0x14])` → bytes `0x42 0x45 0x00 0x00 0x14` (header `0x42`=type4|nsapi2). kind=Ipv4. 48 bits.
+- **Round-trip** (`L217-231`): `encode(nsapi=2,pcomp=0,dcomp=0, n_pdu=[0x45,0x00,0x00,0x14])` → bytes `0x42 0x00 0x45 0x00 0x00 0x14` (16-bit header: `0x42`=type4|nsapi2, then `0x00`=PCOMP0|DCOMP0). kind=Ipv4. 48 bits.
 - **IPv6** (`L234-243`): nsapi=3, n_pdu=`[0x60,…]` → first byte `0x43`, kind=Ipv6.
 - **Reserved NSAPI** (`L276-286`): first byte `0x4F` → `Err UnsupportedNsapi(15)`.
 - **Compression** (`L288-298`): `0x41 0x10 0x45…` → `UnsupportedCompression{pcomp:1,dcomp:0}`.
@@ -423,7 +423,7 @@ Motorola/Dimetra MS (incl. MXP600) run **PPP CHAP (RFC 1994) inside PDP-context 
 15. **Enablement gating** — single predicate `sndcp_service && wap_ip.enabled` drives (a) D-MLE-SYSINFO bits 9+11, (b) MAC SYSINFO section_data `0x40`, (c) SNDCP runtime accept-vs-drop. Config validation forbidding disagreement. → `umac_bs.rs`/`mle_bs.rs`/config. **REWRITE/EXTEND.** **VERIFY** reserved IE-bit 8 = 0 between circuit_mode_data and sndcp_service.
 16. **D-MLE-SYNC neighbor_cell_broadcast = 2 hardcoded** (Motorola time/date display) and **AIE/security forced off** → `umac_bs.rs`. **REWRITE** (do not config-drive `neighbor_cell_broadcast`).
 17. **SAP routing reuse** → FlowStation's existing TLA/LTPD/SN SAPs and MLE routing are **REUSED**; the discriminator match (4→SNDCP, 1→MM, 2→CMCE; 0/3/5/6/7 drop) is **VERIFY**.
-18. **Freeze conformance fixtures** — port §7.1-7.6 as FlowStation tests (the ACCEPT 70-bit byte view `0A 44 74 28 00 00 38 80 40`, the three IP full-packet hex, the WTP/WSP prefixes, the CHAP 81-bit section). **REWRITE** as FlowStation `#[cfg(test)]`.
+18. **Freeze conformance fixtures** — port §7.1-7.6 as FlowStation tests (the ACCEPT 70-bit byte view `02 90 8E 82 80 00 38 80 10`, the three IP full-packet hex, the WTP/WSP prefixes, the CHAP 81-bit section). **REWRITE** as FlowStation `#[cfg(test)]`.
 
 **Files reused vs rewritten:** the BitBuffer engine, SAP types (TLA/LTPD/SN), and MLE routing skeleton are **reused**; `sndcp_bs.rs send_pdp_accept` framing + the entire CHAP path are **reused/extended**; everything else (IP/UDP/TCP, WTP, WSP, page renderer, gateway, full SN-PDU codecs, PDCH alloc, SYSINFO enablement) is **rewritten clean-room** from this spec.
 

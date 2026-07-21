@@ -39,6 +39,80 @@ pub struct HomeModeDisplayDto {
     pub text: Option<String>,
 }
 
+
+/// Compiled configuration for the opt-in WAP-over-SNDCP IPv4 service.
+#[derive(Debug, Clone)]
+pub struct CfgWapIp {
+    pub enabled: bool,
+    pub address: std::net::Ipv4Addr,
+    pub port: u16,
+    pub response_ttl: u8,
+    /// Three-octet prefix written as `a.b.c`.
+    pub dynamic_pool_prefix: String,
+    pub dynamic_pool_first_host: u8,
+    pub dynamic_pool_last_host: u8,
+    pub allow_static_ipv4: bool,
+    pub accept_empty_probe: bool,
+    pub accept_root_path: bool,
+    pub accept_status_path: bool,
+    pub accept_status_wml_path: bool,
+    pub max_request_payload_bytes: usize,
+    pub assume_pdch_ready_after_data_transmit: bool,
+}
+
+impl Default for CfgWapIp {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            address: std::net::Ipv4Addr::new(10, 0, 0, 1),
+            port: 9200,
+            response_ttl: 32,
+            dynamic_pool_prefix: "10.0.0".to_string(),
+            dynamic_pool_first_host: 2,
+            dynamic_pool_last_host: 254,
+            allow_static_ipv4: true,
+            accept_empty_probe: true,
+            accept_root_path: true,
+            accept_status_path: true,
+            accept_status_wml_path: true,
+            max_request_payload_bytes: 1024,
+            assume_pdch_ready_after_data_transmit: false,
+        }
+    }
+}
+
+impl CfgWapIp {
+    /// Parse the configured three-octet pool prefix.
+    pub fn pool_prefix_octets(&self) -> Option<[u8; 3]> {
+        let parts: Vec<_> = self.dynamic_pool_prefix.split('.').collect();
+        if parts.len() != 3 {
+            return None;
+        }
+        Some([parts[0].parse().ok()?, parts[1].parse().ok()?, parts[2].parse().ok()?])
+    }
+}
+
+/// Serde DTO for `[cell_info.wap_ip]`. Unknown keys are rejected so a typo cannot
+/// leave packet data advertised while the gateway silently uses a default.
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WapIpDto {
+    pub enabled: Option<bool>,
+    pub address: Option<std::net::Ipv4Addr>,
+    pub port: Option<u16>,
+    pub response_ttl: Option<u8>,
+    pub dynamic_pool_prefix: Option<String>,
+    pub dynamic_pool_first_host: Option<u8>,
+    pub dynamic_pool_last_host: Option<u8>,
+    pub allow_static_ipv4: Option<bool>,
+    pub accept_empty_probe: Option<bool>,
+    pub accept_root_path: Option<bool>,
+    pub accept_status_path: Option<bool>,
+    pub accept_status_wml_path: Option<bool>,
+    pub max_request_payload_bytes: Option<usize>,
+    pub assume_pdch_ready_after_data_transmit: Option<bool>,
+}
+
 /// Service details for a neighbor cell — mirrors BsServiceDetails but for config parsing.
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct CfgBsServiceDetails {
@@ -145,6 +219,9 @@ pub struct CfgCellInfo {
     pub aie_service: bool,
     pub advanced_link: bool,
 
+    /// Opt-in terminal-browser WAP/IP endpoint carried over SNDCP packet data.
+    pub wap_ip: CfgWapIp,
+
     // From SYNC
     pub system_code: u8,
     pub colour_code: u8,
@@ -211,6 +288,13 @@ pub struct CfgCellInfo {
     pub release_group_on_same_speaker_retake: bool,
 }
 
+impl CfgCellInfo {
+    /// One predicate controls both capability advertisement and runtime acceptance.
+    pub fn wap_ip_sndcp_profile_enabled(&self) -> bool {
+        self.sndcp_service && self.wap_ip.enabled
+    }
+}
+
 #[derive(Default, Deserialize)]
 pub struct CellInfoDto {
     pub main_carrier: u16,
@@ -241,6 +325,7 @@ pub struct CellInfoDto {
     pub sndcp_service: Option<bool>,
     pub aie_service: Option<bool>,
     pub advanced_link: Option<bool>,
+    pub wap_ip: Option<WapIpDto>,
 
     pub system_code: Option<u8>,
     pub colour_code: Option<u8>,
@@ -317,6 +402,28 @@ pub fn cell_dto_to_cfg(ci: CellInfoDto) -> CfgCellInfo {
         sndcp_service: ci.sndcp_service.unwrap_or(false),
         aie_service: ci.aie_service.unwrap_or(false),
         advanced_link: ci.advanced_link.unwrap_or(false),
+        wap_ip: {
+            let dto = ci.wap_ip.unwrap_or_default();
+            let defaults = CfgWapIp::default();
+            CfgWapIp {
+                enabled: dto.enabled.unwrap_or(defaults.enabled),
+                address: dto.address.unwrap_or(defaults.address),
+                port: dto.port.unwrap_or(defaults.port),
+                response_ttl: dto.response_ttl.unwrap_or(defaults.response_ttl),
+                dynamic_pool_prefix: dto.dynamic_pool_prefix.unwrap_or(defaults.dynamic_pool_prefix),
+                dynamic_pool_first_host: dto.dynamic_pool_first_host.unwrap_or(defaults.dynamic_pool_first_host),
+                dynamic_pool_last_host: dto.dynamic_pool_last_host.unwrap_or(defaults.dynamic_pool_last_host),
+                allow_static_ipv4: dto.allow_static_ipv4.unwrap_or(defaults.allow_static_ipv4),
+                accept_empty_probe: dto.accept_empty_probe.unwrap_or(defaults.accept_empty_probe),
+                accept_root_path: dto.accept_root_path.unwrap_or(defaults.accept_root_path),
+                accept_status_path: dto.accept_status_path.unwrap_or(defaults.accept_status_path),
+                accept_status_wml_path: dto.accept_status_wml_path.unwrap_or(defaults.accept_status_wml_path),
+                max_request_payload_bytes: dto.max_request_payload_bytes.unwrap_or(defaults.max_request_payload_bytes),
+                assume_pdch_ready_after_data_transmit: dto
+                    .assume_pdch_ready_after_data_transmit
+                    .unwrap_or(defaults.assume_pdch_ready_after_data_transmit),
+            }
+        },
         system_code: ci.system_code.unwrap_or(3), // 3 = ETSI EN 300 392-2 V3.1.1
         colour_code: ci.colour_code.unwrap_or(0),
         sharing_mode: ci.sharing_mode.unwrap_or(0),

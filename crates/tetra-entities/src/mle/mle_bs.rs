@@ -94,12 +94,62 @@ impl MleBs {
                 self.rx_tla_data_ind_bl(queue, message);
             }
             SapMsgInner::TlaTlUnitdataIndBl(_) => {
-                // self.rx_tla_unitdata_ind_bl(queue, message);
-                tracing::warn!("MLE: BS received unexpected TL-UNITDATA, ignoring");
+                self.rx_tla_unitdata_ind_bl(queue, message);
             }
             _ => {
                 tracing::error!("BUG: unexpected message or state -- routing error");
                 return;
+            }
+        }
+    }
+
+    /// Route unacknowledged basic-link traffic. SNDCP SN-UNITDATA uses this path;
+    /// dropping TL-UNITDATA here leaves PDP activation working while every browser request
+    /// disappears between LLC and SNDCP.
+    fn rx_tla_unitdata_ind_bl(&mut self, queue: &mut MessageQueue, mut message: SapMsg) {
+        let SapMsgInner::TlaTlUnitdataIndBl(prim) = &mut message.msg else {
+            tracing::error!("BUG: unexpected message or state -- routing error");
+            return;
+        };
+        let Some(mut sdu) = prim.tl_sdu.take() else {
+            tracing::warn!("MLE: rx_tla_unitdata_ind_bl received message with no tl_sdu, ignoring");
+            return;
+        };
+        if sdu.get_pos() != 0 {
+            tracing::warn!(
+                "MLE: rx_tla_unitdata_ind_bl sdu not at start position (pos={}), seeking to 0",
+                sdu.get_pos()
+            );
+            sdu.seek(0);
+        }
+        let Some(bits) = sdu.read_bits(3) else {
+            tracing::warn!("insufficient bits: {}", sdu.dump_bin());
+            return;
+        };
+        let Ok(pdu_type) = MleProtocolDiscriminator::try_from(bits) else {
+            tracing::warn!("invalid pdu type: {} in {}", bits, sdu.dump_bin());
+            return;
+        };
+
+        match pdu_type {
+            MleProtocolDiscriminator::Sndcp => {
+                let indication = LtpdMleUnitdataInd {
+                    sdu,
+                    endpoint_id: prim.endpoint_id,
+                    link_id: prim.link_id,
+                    received_tetra_address: prim.main_address,
+                    chan_change_resp_req: prim.chan_change_resp_req,
+                    chan_change_handle: prim.chan_change_handle,
+                };
+                queue.push_back(SapMsg {
+                    sap: Sap::TlpdSap,
+                    src: TetraEntity::Mle,
+                    dest: TetraEntity::Sndcp,
+                    msg: SapMsgInner::LtpdMleUnitdataInd(indication),
+                });
+            }
+            other => {
+                tracing::warn!("MLE: unsupported TL-UNITDATA discriminator {:?}, ignoring", other);
             }
         }
     }

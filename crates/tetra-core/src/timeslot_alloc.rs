@@ -2,6 +2,8 @@
 pub enum TimeslotOwner {
     Brew,
     Cmce,
+    /// One-slot packet-data bearer used by the opt-in SNDCP/WAP profile.
+    Sndcp,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -125,5 +127,23 @@ impl TimeslotAllocator {
     pub fn free_count_with_capacity(&self, capacity: usize) -> usize {
         let capacity = Self::clamp_capacity(capacity);
         self.owners.iter().take(capacity).filter(|o| o.is_none()).count()
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sndcp_reservation_blocks_voice_until_release() {
+        let mut alloc = TimeslotAllocator::default();
+        alloc.reserve(TimeslotOwner::Sndcp, 2).unwrap();
+        assert_eq!(
+            alloc.reserve(TimeslotOwner::Cmce, 2),
+            Err(TimeslotAllocErr::InUse { ts: 2, owner: TimeslotOwner::Sndcp })
+        );
+        alloc.release(TimeslotOwner::Sndcp, 2).unwrap();
+        assert!(alloc.reserve(TimeslotOwner::Cmce, 2).is_ok());
     }
 }
