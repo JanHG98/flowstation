@@ -78,7 +78,31 @@ jobs:
         shell: bash
         run: |
           sudo apt-get update
-          sudo apt-get install --yes pkg-config libsoapysdr-dev
+          sudo apt-get install --yes pkg-config libsoapysdr-dev libgsm1-dev
+
+      - name: Provide codec linker stub for protocol-only tests
+        if: steps.payload.outputs.present == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/wap-native
+          cat > /tmp/wap-native/tetra-codec-stub.c <<'C'
+          #include <stdint.h>
+          #include <stdlib.h>
+
+          void *tetra_encoder_create(void) { return NULL; }
+          void *tetra_decoder_create(void) { return NULL; }
+          void tetra_codec_destroy(void *state) { (void)state; }
+          void tetra_encode(void *state, const int16_t *pcm, uint8_t *coded) {
+              (void)state; (void)pcm; (void)coded;
+          }
+          void tetra_decode(void *state, const uint8_t *coded, int16_t *pcm, int32_t bfi) {
+              (void)state; (void)coded; (void)pcm; (void)bfi;
+          }
+          C
+          cc -c /tmp/wap-native/tetra-codec-stub.c -o /tmp/wap-native/tetra-codec-stub.o
+          ar rcs /tmp/wap-native/libtetra-codec.a /tmp/wap-native/tetra-codec-stub.o
+          echo 'RUSTFLAGS=-L native=/tmp/wap-native' >> "$GITHUB_ENV"
 
       - name: Ensure Rust toolchain
         if: steps.payload.outputs.present == 'true'
