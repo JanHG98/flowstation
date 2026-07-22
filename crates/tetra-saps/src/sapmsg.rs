@@ -50,8 +50,25 @@ pub enum SapMsgInner {
     TlmbSyncInd(TlmbSyncInd),
     TlmbSysinfoInd(TlmbSysinfoInd),
 
-    // TMC-SAP
+    // TLC/TMC-SAP (merged to TLMC-SAP)
+    TlmcAssessmentInd(TlmcAssessmentInd),
+    TlmcAssessmentListReq(TlmcAssessmentListReq),
+    TlmcCellReadReq(TlmcCellReadReq),
+    TlmcCellReadConf(TlmcCellReadConf),
+    TlmcConfigureInd(TlmcConfigureInd),
     TlmcConfigureReq(TlmcConfigureReq),
+    TlmcConfigureConf(TlmcConfigureConf),
+    TlmcMeasurementInd(TlmcMeasurementInd),
+    TlmcMonitorInd(TlmcMonitorInd),
+    TlmcMonitorListReq(TlmcMonitorListReq),
+    TlmcReportInd(TlmcReportInd),
+    TlmcScanReq(TlmcScanReq),
+    TlmcScanConf(TlmcScanConf),
+    TlmcScanReportInd(TlmcScanReportInd),
+    TlmcSelectReq(TlmcSelectReq),
+    TlmcSelectInd(TlmcSelectInd),
+    TlmcSelectResp(TlmcSelectResp),
+    TlmcSelectConf(TlmcSelectConf),
 
     // TMD-SAP (Uplane traffic and signalling)
     TmdCircuitDataReq(TmdCircuitDataReq),
@@ -107,7 +124,33 @@ pub enum SapMsgInner {
     // CMCE SDS <-> Brew SDS routing
     CmceSdsData(CmceSdsData),
 
-    // LTPD-SAP (MLE-LTPD)
+    // LTPD-SAP (MLE-SNDCP)
+    LtpdMleActivityReq(LtpdMleActivityReq),
+    LtpdMleBreakInd(LtpdMleBreakInd),
+    LtpdMleBusyInd(LtpdMleBusyInd),
+    LtpdMleCancelReq(LtpdMleCancelReq),
+    LtpdMleCloseInd(LtpdMleCloseInd),
+    LtpdMleConfigureReq(LtpdMleConfigureReq),
+    LtpdMleConfigureInd(LtpdMleConfigureInd),
+    LtpdMleConnectReq(LtpdMleConnectReq),
+    LtpdMleConnectInd(LtpdMleConnectInd),
+    LtpdMleConnectResp(LtpdMleConnectResp),
+    LtpdMleConnectConfirm(LtpdMleConnectConfirm),
+    LtpdMleDisableInd(LtpdMleDisableInd),
+    LtpdMleDisconnectReq(LtpdMleDisconnectReq),
+    LtpdMleDisconnectInd(LtpdMleDisconnectInd),
+    LtpdMleEnableInd(LtpdMleEnableInd),
+    LtpdMleInfoInd(LtpdMleInfoInd),
+    LtpdMleIdleInd(LtpdMleIdleInd),
+    LtpdMleOpenInd(LtpdMleOpenInd),
+    LtpdMleReceiveInd(LtpdMleReceiveInd),
+    LtpdMleReconnectReq(LtpdMleReconnectReq),
+    LtpdMleReconnectConfirm(LtpdMleReconnectConfirm),
+    LtpdMleReconnectInd(LtpdMleReconnectInd),
+    LtpdMleReleaseReq(LtpdMleReleaseReq),
+    LtpdMleReportInd(LtpdMleReportInd),
+    LtpdMleResumeInd(LtpdMleResumeInd),
+    LtpdMleUnitdataReq(LtpdMleUnitdataReq),
     LtpdMleUnitdataInd(LtpdMleUnitdataInd),
 
     // TNMM-SAP (MM-User)
@@ -148,7 +191,7 @@ impl Display for SapMsgInner {
             // TLB-SAP
             // SapMsgInner::TlbTlSyncInd(_) => write!(f, "TlbTlSyncInd"),
             // SapMsgInner::TlbTlSysinfoInd(_) => write!(f, "TlbTlSysinfoInd"),
-            _ => panic!("Unknown SapMsgInner type"),
+            _ => write!(f, "{self:?}"),
         }
     }
 }

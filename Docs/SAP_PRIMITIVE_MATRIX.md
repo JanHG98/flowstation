@@ -5,9 +5,9 @@
 
 ## Übersicht
 
-- erfasste Primitive: **126**
-- nicht in `SapMsgInner` verdrahtet: **103**
-- vorhandene Variante ohne sichtbaren Runtime-Pfad: **4**
+- erfasste Primitive: **128**
+- nicht in `SapMsgInner` verdrahtet: **62**
+- vorhandene Variante ohne sichtbaren Runtime-Pfad: **47**
 - Primitive ohne Testverweis: **115**
 
 ## CONTROL
@@ -64,6 +64,7 @@
 | LmmMleInfoReq | nein | 0 | 0 | 0 | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/lmm/mod.rs` |
 | LmmMleLinkInd | nein | 0 | 0 | 0 | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/lmm/mod.rs` |
 | LmmMleLinkReq | nein | 0 | 0 | 0 | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/lmm/mod.rs` |
+| LmmMlePrepareConfirm | nein | 0 | 0 | 0 | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/lmm/mod.rs` |
 | LmmMlePrepareReq | nein | 0 | 0 | 0 | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/lmm/mod.rs` |
 | LmmMleReportInd | nein | 0 | 0 | 0 | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/lmm/mod.rs` |
 | LmmMleUnitdataInd | ja | 3 | 10 | 5 | bidirektional sichtbar | `crates/tetra-saps/src/lmm/mod.rs` |
@@ -74,31 +75,33 @@
 
 | Primitive | SapMsgInner | erzeugt | behandelt | Testtreffer | Status | Definition |
 | --- | --- | --- | --- | --- | --- | --- |
-| LtpdMleActivityReq | nein | 0 | 0 | 0 | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/ltpd/mod.rs` |
-| LtpdMleBreakInd | nein | 0 | 0 | 0 | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/ltpd/mod.rs` |
-| LtpdMleBusyInd | nein | 0 | 0 | 0 | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/ltpd/mod.rs` |
-| LtpdMleCancelReq | nein | 0 | 0 | 0 | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/ltpd/mod.rs` |
-| LtpdMleCloseInd | nein | 0 | 0 | 0 | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/ltpd/mod.rs` |
-| LtpdMleConfigureInd | nein | 0 | 0 | 0 | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/ltpd/mod.rs` |
-| LtpdMleConfigureReq | nein | 0 | 0 | 0 | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/ltpd/mod.rs` |
-| LtpdMleConnectInd | nein | 0 | 0 | 0 | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/ltpd/mod.rs` |
-| LtpdMleConnectReq | nein | 0 | 0 | 0 | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/ltpd/mod.rs` |
-| LtpdMleConnectResp | nein | 0 | 0 | 0 | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/ltpd/mod.rs` |
-| LtpdMleDisableInd | nein | 0 | 0 | 0 | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/ltpd/mod.rs` |
-| LtpdMleDisconnectInd | nein | 0 | 0 | 0 | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/ltpd/mod.rs` |
-| LtpdMleDisconnectReq | nein | 0 | 0 | 0 | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/ltpd/mod.rs` |
-| LtpdMleEnableInd | nein | 0 | 0 | 0 | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/ltpd/mod.rs` |
-| LtpdMleIdleInd | nein | 0 | 0 | 0 | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/ltpd/mod.rs` |
-| LtpdMleInfoInd | nein | 0 | 0 | 0 | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/ltpd/mod.rs` |
-| LtpdMleOpenInd | nein | 0 | 0 | 0 | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/ltpd/mod.rs` |
-| LtpdMleReceiveInd | nein | 0 | 0 | 0 | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/ltpd/mod.rs` |
-| LtpdMleReconnectInd | nein | 0 | 0 | 0 | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/ltpd/mod.rs` |
-| LtpdMleReconnectReq | nein | 0 | 0 | 0 | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/ltpd/mod.rs` |
-| LtpdMleReleaseReq | nein | 0 | 0 | 0 | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/ltpd/mod.rs` |
-| LtpdMleReportInd | nein | 0 | 0 | 0 | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/ltpd/mod.rs` |
-| LtpdMleResumeInd | nein | 0 | 0 | 0 | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/ltpd/mod.rs` |
+| LtpdMleActivityReq | ja | 0 | 0 | 4 | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/ltpd/mod.rs` |
+| LtpdMleBreakInd | ja | 0 | 0 | 0 | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/ltpd/mod.rs` |
+| LtpdMleBusyInd | ja | 0 | 0 | 0 | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/ltpd/mod.rs` |
+| LtpdMleCancelReq | ja | 0 | 0 | 0 | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/ltpd/mod.rs` |
+| LtpdMleCloseInd | ja | 0 | 0 | 0 | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/ltpd/mod.rs` |
+| LtpdMleConfigureInd | ja | 0 | 0 | 0 | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/ltpd/mod.rs` |
+| LtpdMleConfigureReq | ja | 0 | 0 | 0 | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/ltpd/mod.rs` |
+| LtpdMleConnectConfirm | ja | 0 | 0 | 0 | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/ltpd/mod.rs` |
+| LtpdMleConnectInd | ja | 0 | 0 | 0 | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/ltpd/mod.rs` |
+| LtpdMleConnectReq | ja | 0 | 0 | 0 | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/ltpd/mod.rs` |
+| LtpdMleConnectResp | ja | 0 | 0 | 0 | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/ltpd/mod.rs` |
+| LtpdMleDisableInd | ja | 0 | 0 | 0 | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/ltpd/mod.rs` |
+| LtpdMleDisconnectInd | ja | 0 | 0 | 0 | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/ltpd/mod.rs` |
+| LtpdMleDisconnectReq | ja | 0 | 0 | 0 | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/ltpd/mod.rs` |
+| LtpdMleEnableInd | ja | 0 | 0 | 0 | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/ltpd/mod.rs` |
+| LtpdMleIdleInd | ja | 0 | 0 | 0 | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/ltpd/mod.rs` |
+| LtpdMleInfoInd | ja | 0 | 0 | 0 | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/ltpd/mod.rs` |
+| LtpdMleOpenInd | ja | 0 | 0 | 0 | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/ltpd/mod.rs` |
+| LtpdMleReceiveInd | ja | 0 | 0 | 0 | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/ltpd/mod.rs` |
+| LtpdMleReconnectConfirm | ja | 0 | 0 | 0 | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/ltpd/mod.rs` |
+| LtpdMleReconnectInd | ja | 0 | 0 | 0 | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/ltpd/mod.rs` |
+| LtpdMleReconnectReq | ja | 0 | 0 | 0 | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/ltpd/mod.rs` |
+| LtpdMleReleaseReq | ja | 0 | 0 | 0 | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/ltpd/mod.rs` |
+| LtpdMleReportInd | ja | 0 | 0 | 0 | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/ltpd/mod.rs` |
+| LtpdMleResumeInd | ja | 0 | 0 | 0 | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/ltpd/mod.rs` |
 | LtpdMleUnitdataInd | ja | 4 | 1 | 0 | bidirektional sichtbar | `crates/tetra-saps/src/ltpd/mod.rs` |
-| LtpdMleUnitdataReq | nein | 0 | 0 | 0 | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/ltpd/mod.rs` |
+| LtpdMleUnitdataReq | ja | 0 | 0 | 0 | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/ltpd/mod.rs` |
 
 ## TLA
 
@@ -142,25 +145,24 @@
 
 | Primitive | SapMsgInner | erzeugt | behandelt | Testtreffer | Status | Definition |
 | --- | --- | --- | --- | --- | --- | --- |
-| TlmcAssessmentInd | nein | 0 | 0 | 0 | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/tlmc/mod.rs` |
-| TlmcAssessmentListReq | nein | 0 | 0 | 0 | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/tlmc/mod.rs` |
-| TlmcCellReadConf | nein | 0 | 0 | 0 | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/tlmc/mod.rs` |
-| TlmcCellReadInd | nein | 0 | 0 | 0 | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/tlmc/mod.rs` |
-| TlmcConfigureConf | nein | 0 | 0 | 0 | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/tlmc/mod.rs` |
-| TlmcConfigureInd | nein | 0 | 0 | 0 | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/tlmc/mod.rs` |
-| TlmcConfigureReq | ja | 1 | 2 | 0 | bidirektional sichtbar | `crates/tetra-saps/src/tlmc/mod.rs` |
-| TlmcMeasurementInd | nein | 0 | 0 | 0 | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/tlmc/mod.rs` |
-| TlmcMonitorInd | nein | 0 | 0 | 0 | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/tlmc/mod.rs` |
-| TlmcMonitorListReq | nein | 0 | 0 | 0 | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/tlmc/mod.rs` |
-| TlmcReportInd | nein | 0 | 0 | 0 | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/tlmc/mod.rs` |
-| TlmcScanConf | nein | 0 | 0 | 0 | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/tlmc/mod.rs` |
-| TlmcScanReportInd | nein | 0 | 0 | 0 | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/tlmc/mod.rs` |
-| TlmcScanReq | nein | 0 | 0 | 0 | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/tlmc/mod.rs` |
-| TlmcSelectConf | nein | 0 | 0 | 0 | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/tlmc/mod.rs` |
-| TlmcSelectInd | nein | 0 | 0 | 0 | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/tlmc/mod.rs` |
-| TlmcSelectReq | nein | 0 | 0 | 0 | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/tlmc/mod.rs` |
-| TlmcSelectResp | nein | 0 | 0 | 0 | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/tlmc/mod.rs` |
-| TmcTlConfigureReq | nein | 0 | 0 | 0 | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/tlmc/mod.rs` |
+| TlmcAssessmentInd | ja | 0 | 0 | 0 | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/tlmc/mod.rs` |
+| TlmcAssessmentListReq | ja | 0 | 0 | 0 | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/tlmc/mod.rs` |
+| TlmcCellReadConf | ja | 0 | 0 | 0 | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/tlmc/mod.rs` |
+| TlmcCellReadReq | ja | 0 | 0 | 0 | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/tlmc/mod.rs` |
+| TlmcConfigureConf | ja | 0 | 0 | 0 | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/tlmc/mod.rs` |
+| TlmcConfigureInd | ja | 0 | 0 | 0 | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/tlmc/mod.rs` |
+| TlmcConfigureReq | ja | 1 | 2 | 7 | bidirektional sichtbar | `crates/tetra-saps/src/tlmc/mod.rs` |
+| TlmcMeasurementInd | ja | 0 | 0 | 0 | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/tlmc/mod.rs` |
+| TlmcMonitorInd | ja | 0 | 0 | 0 | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/tlmc/mod.rs` |
+| TlmcMonitorListReq | ja | 0 | 0 | 0 | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/tlmc/mod.rs` |
+| TlmcReportInd | ja | 0 | 0 | 0 | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/tlmc/mod.rs` |
+| TlmcScanConf | ja | 0 | 0 | 0 | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/tlmc/mod.rs` |
+| TlmcScanReportInd | ja | 0 | 0 | 0 | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/tlmc/mod.rs` |
+| TlmcScanReq | ja | 0 | 0 | 0 | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/tlmc/mod.rs` |
+| TlmcSelectConf | ja | 0 | 0 | 0 | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/tlmc/mod.rs` |
+| TlmcSelectInd | ja | 0 | 0 | 0 | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/tlmc/mod.rs` |
+| TlmcSelectReq | ja | 0 | 0 | 0 | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/tlmc/mod.rs` |
+| TlmcSelectResp | ja | 0 | 0 | 0 | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/tlmc/mod.rs` |
 
 ## TMA
 

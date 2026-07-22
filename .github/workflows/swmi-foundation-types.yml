@@ -1,0 +1,39 @@
+name: SWMI foundation types
+
+on:
+  push:
+    paths:
+      - "crates/tetra-core/src/address.rs"
+      - "crates/tetra-saps/**"
+      - "crates/tetra-entities/src/mle/mle_bs.rs"
+      - "crates/tetra-entities/src/mle/mle_ms.rs"
+      - "tools/check_swmi_foundation_types.py"
+      - "tools/protocol_inventory.py"
+      - "Docs/TLMC_TLPD_WORKLIST.md"
+      - "Docs/SWMI_FOUNDATION_1_PACKAGE_B*.md"
+      - "Docs/generated/**"
+      - ".github/workflows/swmi-foundation-types.yml"
+  pull_request:
+    paths:
+      - "crates/tetra-core/src/address.rs"
+      - "crates/tetra-saps/**"
+      - "crates/tetra-entities/src/mle/mle_bs.rs"
+      - "crates/tetra-entities/src/mle/mle_ms.rs"
+      - "tools/check_swmi_foundation_types.py"
+      - "tools/protocol_inventory.py"
+      - "Docs/TLMC_TLPD_WORKLIST.md"
+      - "Docs/SWMI_FOUNDATION_1_PACKAGE_B*.md"
+      - "Docs/generated/**"
+      - ".github/workflows/swmi-foundation-types.yml"
+
+jobs:
+  foundation-types:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify Package B static invariants
+        run: python3 tools/check_swmi_foundation_types.py
+      - name: Verify generated protocol inventory
+        run: python3 tools/protocol_inventory.py --check
+      - name: Test typed TLMC/TLPD foundation
+        run: cargo test -p tetra-saps

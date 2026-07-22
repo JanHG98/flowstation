@@ -1,5 +1,8 @@
 #![allow(dead_code)]
 
+/// Shared typed values for local MLE/LLC/MAC service primitives.
+pub mod common;
+
 /// Custom definitions for stack control
 pub mod control;
 pub mod tmd;

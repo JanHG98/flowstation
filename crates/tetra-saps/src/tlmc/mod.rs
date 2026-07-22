@@ -1,139 +1,267 @@
-use tetra_core::{EndpointId, Todo};
+//! TLC/TMC service primitives used between MLE, LLC and MAC.
+//!
+//! ETSI EN 300 392-2 defines the TLC-SAP and TMC-SAP as local management
+//! interfaces.  In NetCore-Tetra they are represented by one merged `TlmcSap`.
 
-#[derive(Debug, Clone)]
-pub struct TlmcAssessmentInd;
+use tetra_core::EndpointId;
 
-#[derive(Debug, Clone)]
-pub struct TlmcAssessmentListReq;
+use crate::common::{
+    CallReleaseInstruction, ChannelChangeDecision, ChannelChangeHandle, ChannelClassAssessmentRequest,
+    ChannelClassMeasurement, ChannelInformation, DataClass, DataPriority, DataPriorityRandomAccessDelayFactor,
+    EnergyEconomyGroup, EnergyEconomyStartpoint, Frame18Distribution, GracefulServiceDegradationControl,
+    Layer2Report, LinkPerformanceInformation, LlcTimerStatus, LowerLayerResourceAvailability, MeasurementReport,
+    MeasurementValue, MleActivityIndicator, OperatingMode, PeriodicReportingTimer, QualityIndication,
+    RequestHandle, RfChannelCharacteristics, RfChannelNumber, ScanRequestId, ScanningMeasurementMethod,
+    ScheduleRepetitionInformation, ScchInformation, SelectionCause, SelectionResult, ThresholdValues,
+};
 
-#[derive(Debug, Clone)]
-pub struct TlmcCellReadInd;
-#[derive(Debug, Clone)]
-pub struct TlmcCellReadConf;
-
-/// Clause 20.4.3 and 20.3.5.4.1c
-/// TMC-CONFIGURE indication: MAY BE USED BY LLC. this primitive shall be used to indicate loss of lower layer
-/// resources. It may be used to indicate regain of lower layer resources.
-#[derive(Debug, Clone)]
-pub struct TlmcConfigureInd {
-    pub endpoint_id: EndpointId,
-    pub lower_layer_resource_availability: Todo,
-}
-
-#[derive(Debug, Clone)]
-/// Poorly documented, but used in TL-CONFIGURE. Signals which addresses are valid,
-/// including full MCC/MNC.
+/// Information identifying the currently valid network address scope.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TlmcValidAddress {
     pub mcc: u16,
     pub mnc: u16,
 }
-/// Clause 20.4.3 and 20.3.5.4.1c
-/// TMC-CONFIGURE request, see below. When used by MLE:
-/// TL-CONFIGURE request, confirm: this primitive shall be used to set up and configure the layer 2 according to the
-/// chosen cell parameters and the current state of the MS. It may also be used to provide the LLC and MAC with
-/// retransmission strategy in graceful service degradation mode. The parameters shall be as defined in table 20.36.
-#[derive(Debug, Clone)]
+
+/// Result of path-loss assessment for one or more channel classes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TlmcAssessmentInd {
+    pub assessments: Vec<ChannelClassMeasurement>,
+}
+
+/// Start assessment for a list of channel classes on the serving cell.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TlmcAssessmentListReq {
+    pub classes: Vec<ChannelClassAssessmentRequest>,
+}
+
+/// Request reading SYSINFO-DA on a DA-neighbour main carrier.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TlmcCellReadReq {
+    pub request_id: ScanRequestId,
+    pub channel_number: RfChannelNumber,
+    pub characteristics: Option<RfChannelCharacteristics>,
+}
+
+/// Compatibility alias for the earlier incorrectly named placeholder.
+#[deprecated(note = "use TlmcCellReadReq; ETSI defines a request/confirm pair")]
+pub type TlmcCellReadInd = TlmcCellReadReq;
+
+/// Completion of a SYSINFO-DA cell-read request.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TlmcCellReadConf {
+    pub request_id: ScanRequestId,
+    pub channel_number: RfChannelNumber,
+    pub report: Layer2Report,
+}
+
+/// TMC-CONFIGURE indication for loss or recovery of a local MAC resource.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TlmcConfigureInd {
+    pub endpoint_id: EndpointId,
+    pub lower_layer_resource_availability: LowerLayerResourceAvailability,
+}
+
+/// TL/TMC-CONFIGURE request.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct TlmcConfigureReq {
-    pub threshold_values: Option<Todo>,
-    pub distribution_on_18th_frame: Option<Todo>,
-    pub scch_information: Option<Todo>,
-    pub energy_economy_group: Option<Todo>,
-    pub energy_economy_startpoint: Option<Todo>,
-    pub dual_watch_energy_economy_group: Option<Todo>,
-    pub dual_watch_startpoint: Option<Todo>,
-    pub mle_activity_indicator: Option<Todo>,
-    pub channel_change_accepted: Option<Todo>,
-    pub channel_change_handle: Option<Todo>,
-    pub operating_mode: Option<Todo>,
-    pub call_release: Option<Todo>,
+    pub threshold_values: Option<ThresholdValues>,
+    pub distribution_on_18th_frame: Option<Frame18Distribution>,
+    pub scch_information: Option<ScchInformation>,
+    pub energy_economy_group: Option<EnergyEconomyGroup>,
+    pub energy_economy_startpoint: Option<EnergyEconomyStartpoint>,
+    pub dual_watch_energy_economy_group: Option<EnergyEconomyGroup>,
+    pub dual_watch_startpoint: Option<EnergyEconomyStartpoint>,
+    pub mle_activity_indicator: Option<MleActivityIndicator>,
+    pub channel_change_accepted: Option<ChannelChangeDecision>,
+    pub channel_change_handle: Option<ChannelChangeHandle>,
+    pub operating_mode: Option<OperatingMode>,
+    pub call_release: Option<CallReleaseInstruction>,
     pub valid_addresses: Option<TlmcValidAddress>,
-    pub ms_default_data_priority: Option<Todo>,
-    pub layer_2_data_priority_lifetime: Option<Todo>,
-    pub layer_2_data_priority_signalling_delay: Option<Todo>,
-    pub data_priority_random_access_delay_factor: Option<Todo>,
-    pub schedule_repetition_information: Option<Todo>,
-    pub data_class_activity_information: Option<Todo>,
-    pub endpoint_id: Option<Todo>,
-    pub periodic_reporting_timer: Option<Todo>,
-    pub graceful_service_degradation_mode_control: Option<Todo>,
+    pub ms_default_data_priority: Option<DataPriority>,
+    pub layer_2_data_priority_lifetime: Option<std::time::Duration>,
+    pub layer_2_data_priority_signalling_delay: Option<std::time::Duration>,
+    pub data_priority_random_access_delay_factor: Option<DataPriorityRandomAccessDelayFactor>,
+    pub schedule_repetition_information: Option<ScheduleRepetitionInformation>,
+    pub data_class_activity_information: Option<DataClass>,
+    pub endpoint_id: Option<EndpointId>,
+    pub periodic_reporting_timer: Option<PeriodicReportingTimer>,
+    pub graceful_service_degradation_mode_control: Option<GracefulServiceDegradationControl>,
+    pub llc_timer_status: Option<LlcTimerStatus>,
+    pub link_performance_information: Option<LinkPerformanceInformation>,
 }
 
-/// Clause 20.4.3
-/// TMC-CONFIGURE request: this primitive shall be used to accept or reject a channel change. It is also used for the
-/// LLC to provide the MAC with information about activity. It is used for the LLC to provide the MAC with timer
-/// information that may be needed in the napping procedure. It may also be used for the LLC to provide the MAC with
-/// information that the MAC may use to make choices about link adaptation. It may also be used to provide the MAC with
-/// retransmission strategy in graceful service degradation mode. The parameters shall be as defined in table 20.57.
-// #[derive(Debug, Clone)]
-// pub struct TmcTlConfigureReq {
-//     pub channel_change_handle: Option<Todo>,
-//     pub channel_change_accepted: Option<bool>,
-//     pub mle_activity_indicator: Option<Todo>,
-//     pub llc_timer_status: Option<Todo>,
-//     pub link_performance_info: Option<Todo>,
-//     pub endpoint_identifier: Option<EndpointId>,
-//     pub graceful_service_degradation_mode_control: Option<Todo>,
-// }
-
-/// 20.3.5.4.1c TL-CONFIGURE primitive
-/// TL-CONFIGURE request, confirm: this primitive shall be used to set up and configure the layer 2 according to the
-/// chosen cell parameters and the current state of the MS. It may also be used to provide the LLC and MAC with
-/// retransmission strategy in graceful service degradation mode. The parameters shall be as defined in table 20.36.
-#[derive(Debug, Clone)]
+/// TL-CONFIGURE confirmation. Only values reflected by lower layers are carried.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct TlmcConfigureConf {
-    pub threshold_values: Option<Todo>,
-    pub distribution_on_18th_frame: Option<Todo>,
-    pub scch_information: Option<Todo>,
-    pub energy_economy_group: Option<Todo>,
-    pub energy_economy_startpoint: Option<Todo>,
-    pub dual_watch_energy_economy_group: Option<Todo>,
-    pub dual_watch_startpoint: Option<Todo>,
-    pub operating_mode: Option<Todo>,
-    pub call_release: Option<Todo>,
-    pub valid_addresses: Option<Todo>,
-    pub ms_default_data_priority: Option<Todo>,
-    pub layer_2_data_priority_lifetime: Option<Todo>,
-    pub layer_2_data_priority_signalling_delay: Option<Todo>,
-    pub data_priority_random_access_delay_factor: Option<Todo>,
-    pub schedule_repetition_information: Option<Todo>,
-    pub data_class_activity_information: Option<Todo>,
-    pub endpoint_id: Option<Todo>,
+    pub threshold_values: Option<ThresholdValues>,
+    pub distribution_on_18th_frame: Option<Frame18Distribution>,
+    pub scch_information: Option<ScchInformation>,
+    pub energy_economy_group: Option<EnergyEconomyGroup>,
+    pub energy_economy_startpoint: Option<EnergyEconomyStartpoint>,
+    pub dual_watch_energy_economy_group: Option<EnergyEconomyGroup>,
+    pub dual_watch_startpoint: Option<EnergyEconomyStartpoint>,
+    pub operating_mode: Option<OperatingMode>,
+    pub call_release: Option<CallReleaseInstruction>,
+    pub valid_addresses: Option<TlmcValidAddress>,
+    pub ms_default_data_priority: Option<DataPriority>,
+    pub layer_2_data_priority_lifetime: Option<std::time::Duration>,
+    pub layer_2_data_priority_signalling_delay: Option<std::time::Duration>,
+    pub data_priority_random_access_delay_factor: Option<DataPriorityRandomAccessDelayFactor>,
+    pub schedule_repetition_information: Option<ScheduleRepetitionInformation>,
+    pub data_class_activity_information: Option<DataClass>,
+    pub endpoint_id: Option<EndpointId>,
 }
 
-#[derive(Debug, Clone)]
-pub struct TlmcMeasurementInd;
+/// Quality of the current serving-channel link.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TlmcMeasurementInd {
+    pub measurement: MeasurementReport,
+}
 
-#[derive(Debug, Clone)]
-pub struct TlmcMonitorInd;
+/// Result of monitoring one RF channel.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TlmcMonitorInd {
+    pub channel_number: RfChannelNumber,
+    pub path_loss_c2: MeasurementValue,
+    pub quality: Option<QualityIndication>,
+    pub channel_classes: Vec<ChannelClassMeasurement>,
+}
 
-#[derive(Debug, Clone)]
-pub struct TlmcMonitorListReq;
+/// One channel and optional channel classes included in a monitor list.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TlmcMonitorChannel {
+    pub channel_number: RfChannelNumber,
+    pub characteristics: RfChannelCharacteristics,
+    pub channel_classes: Vec<ChannelClassAssessmentRequest>,
+}
 
-#[derive(Debug, Clone)]
-pub struct TlmcReportInd;
+/// Start monitoring one or more RF channels.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TlmcMonitorListReq {
+    pub channels: Vec<TlmcMonitorChannel>,
+}
 
-#[derive(Debug, Clone)]
-pub struct TlmcScanReq;
-#[derive(Debug, Clone)]
-pub struct TlmcScanConf;
+/// Local status/progress report generated by LLC or MAC.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TlmcReportInd {
+    pub request_handle: Option<RequestHandle>,
+    pub report: Layer2Report,
+    pub endpoint_id: Option<EndpointId>,
+    pub nsapi: Option<crate::common::Nsapi>,
+}
 
-#[derive(Debug, Clone)]
-pub struct TlmcScanReportInd;
+/// Start scanning a neighbour-cell main carrier.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TlmcScanReq {
+    pub request_id: ScanRequestId,
+    pub channel_number: RfChannelNumber,
+    pub measurement_method: ScanningMeasurementMethod,
+    pub characteristics: Option<RfChannelCharacteristics>,
+    pub threshold_level: Option<MeasurementValue>,
+    pub channel_classes: Vec<ChannelClassAssessmentRequest>,
+}
 
-#[derive(Debug, Clone)]
-pub struct TlmcSelectReq;
-#[derive(Debug, Clone)]
-pub struct TlmcSelectInd;
-#[derive(Debug, Clone)]
-pub struct TlmcSelectResp;
-#[derive(Debug, Clone)]
-pub struct TlmcSelectConf;
+/// Completion of an explicit scan request.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TlmcScanConf {
+    pub request_id: ScanRequestId,
+    pub channel_number: RfChannelNumber,
+    pub measurement_method: ScanningMeasurementMethod,
+    pub threshold_level: MeasurementValue,
+    pub report: Layer2Report,
+    pub channel_classes: Vec<ChannelClassMeasurement>,
+}
 
-// Clause 20.4.3
+/// Updated scan measurement reported after monitoring/scanning has completed.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TlmcScanReportInd {
+    pub request_id: Option<ScanRequestId>,
+    pub channel_number: RfChannelNumber,
+    pub path_loss_c1: MeasurementValue,
+    pub report: Option<Layer2Report>,
+    pub channel_classes: Vec<ChannelClassMeasurement>,
+}
 
-// The TMC-SAP shall be used for the transfer of local layer management information. It does not provide data transfer
-// services over the air interface. The request and response primitives at the TLC-SAP shall be directly mapped as request
-// and response primitives at the TMC-SAP, and the indication and confirm primitives at the TMC-SAP shall be directly
-// transported to the TLC-SAP as indication and confirm primitives. The service descriptions for the TLC-SAP are
-// therefore valid for the TMC-SAP and are not repeated. The LLC also may use the TMC-CONFIGURE request
-// primitive.
+/// Request MAC to tune to an RF channel.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TlmcSelectReq {
+    pub channel_number: RfChannelNumber,
+    pub channel_information: Option<ChannelInformation>,
+    pub threshold_level: Option<MeasurementValue>,
+    pub main_carrier_number: Option<RfChannelNumber>,
+    pub main_carrier_information: Option<ChannelInformation>,
+    pub cause: SelectionCause,
+}
+
+/// BS-controlled channel change reported by MAC to MLE.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TlmcSelectInd {
+    pub channel_number: RfChannelNumber,
+    pub channel_information: ChannelInformation,
+    pub threshold_level: Option<MeasurementValue>,
+    pub report: Option<Layer2Report>,
+    pub channel_change_handle: Option<ChannelChangeHandle>,
+}
+
+/// MLE response to a cell-change indication.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TlmcSelectResp {
+    pub channel_number: RfChannelNumber,
+    pub threshold_level: Option<MeasurementValue>,
+    pub main_carrier_number: Option<RfChannelNumber>,
+    pub report: Option<Layer2Report>,
+    pub channel_change_handle: Option<ChannelChangeHandle>,
+    pub decision: ChannelChangeDecision,
+}
+
+/// Completion of a requested channel selection.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TlmcSelectConf {
+    pub channel_number: RfChannelNumber,
+    pub threshold_level: Option<MeasurementValue>,
+    pub main_carrier_number: Option<RfChannelNumber>,
+    pub report: Option<Layer2Report>,
+    pub result: SelectionResult,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::common::{ChannelBandwidth, ChannelRole, ChannelTopology, ModulationMode};
+
+    fn characteristics() -> RfChannelCharacteristics {
+        RfChannelCharacteristics {
+            modulation: ModulationMode::PhaseModulation,
+            bandwidth: ChannelBandwidth::Khz25,
+            max_ms_tx_power_dbm: None,
+            min_rx_access_level_dbm: None,
+            discontinuous: None,
+            role: ChannelRole::NeighbourMainCarrier,
+            topology: ChannelTopology::Conforming,
+        }
+    }
+
+    #[test]
+    fn scan_request_keeps_explicit_correlation_and_units() {
+        let request = TlmcScanReq {
+            request_id: ScanRequestId(42),
+            channel_number: RfChannelNumber(720),
+            measurement_method: ScanningMeasurementMethod::NonInterrupting,
+            characteristics: Some(characteristics()),
+            threshold_level: Some(MeasurementValue::db(-12)),
+            channel_classes: Vec::new(),
+        };
+
+        assert_eq!(request.request_id, ScanRequestId(42));
+        assert_eq!(request.channel_number, RfChannelNumber(720));
+        assert_eq!(request.threshold_level, Some(MeasurementValue::db(-12)));
+    }
+
+    #[test]
+    fn configure_default_does_not_invent_normative_values() {
+        let configure = TlmcConfigureReq::default();
+        assert!(configure.valid_addresses.is_none());
+        assert!(configure.endpoint_id.is_none());
+        assert!(configure.channel_change_accepted.is_none());
+    }
+}

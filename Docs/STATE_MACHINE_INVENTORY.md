@@ -16,6 +16,12 @@
 | NET_ECHOLINK | QsoState | 3 | 0 | `crates/tetra-entities/src/net_echolink/mod.rs` |
 | NET_TTS | TtsState | 6 | 0 | `crates/tetra-entities/src/net_tts/types.rs` |
 | PHY | SynthesisBufferState | 3 | 0 | `crates/tetra-entities/src/phy/components/fcfb.rs` |
+| SAP/COMMON | ChannelChangeState | 6 | 0 | `crates/tetra-saps/src/common/mod.rs` |
+| SAP/COMMON | LtpdLinkState | 10 | 0 | `crates/tetra-saps/src/common/mod.rs` |
+| SAP/COMMON | MleCellState | 10 | 0 | `crates/tetra-saps/src/common/mod.rs` |
+| SAP/COMMON | TlmcScanState | 5 | 3 | `crates/tetra-saps/src/common/mod.rs` |
+| SAP/COMMON | TlmcSelectionState | 5 | 0 | `crates/tetra-saps/src/common/mod.rs` |
+| SAP/COMMON | TxGrantState | 2 | 0 | `crates/tetra-saps/src/common/mod.rs` |
 | SNDCP | PdpState | 4 | 0 | `crates/tetra-entities/src/sndcp/state.rs` |
 | UMAC | DefragBufferState | 3 | 0 | `crates/tetra-entities/src/umac/subcomp/defrag.rs` |
 
@@ -23,13 +29,14 @@
 
 | Bereich | Inventurstatus | Roadmap |
 | --- | --- | --- |
-| MLE State Machine | noch keine eindeutige zentrale State-Enum nachgewiesen | Phase 3 |
+| MLE Cell State | Typfundament mit `MleCellState` vorhanden; Runtime-Transitionen fehlen | Paket C/Phase 3 |
 | MM Registration State | teilweise über Client-/Registration-Zustände vorhanden | Phase 4 |
 | CMCE Group Call | vorhandene Call-State-Typen prüfen und formalisieren | Phase 5 |
 | CMCE Individual Call | vorhandene Individual-Call-State-Typen prüfen und formalisieren | Phase 5 |
-| SNDCP Context State | Kontextzustände vollständig inventarisieren | Phase 11 |
-| LLC Link State | implizite Linkzustände und Timer explizit dokumentieren | Phase 0/1 |
-| Channel Change State | für TLMC/MLE neu als explizites Modell erforderlich | Phase 1/3 |
+| SNDCP Context State | PDP-State vorhanden; vollständige Context-Transitionen folgen | Phase 11 |
+| LTPD Link State | Typfundament mit `LtpdLinkState` vorhanden; Runtime fehlt | Paket D |
+| LLC Link State | implizite Linkzustände und Timer explizit dokumentieren | Paket C/D |
+| Channel Change State | Typfundament mit `ChannelChangeState` vorhanden; Runtime fehlt | Paket C/Phase 3 |
 
 ## Nächster manueller Review
 

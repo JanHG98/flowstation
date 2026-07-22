@@ -298,7 +298,7 @@ def sap_records(root: Path) -> list[SapRecord]:
         text = read(path)
         names = re.findall(r"\bpub\s+(?:struct|enum)\s+([A-Z][A-Za-z0-9_]*)", text)
         for name in names:
-            if not re.search(r"(?:Req|Ind|Conf|Resp|Demand|Response|Update|Data)$", name):
+            if not re.search(r"(?:Req|Ind|Conf|Confirm|Resp|Demand|Response|Update|Data)$", name):
                 continue
             constructed, handled = count_variant_usage(entity_files, name)
             tests = sum(read(p).count(name) for p in test_files)
@@ -390,7 +390,9 @@ def enum_body(text: str, name: str) -> str | None:
 
 
 def state_records(root: Path) -> list[StateRecord]:
-    files = rust_files(root, "crates", "tetra-entities", "src")
+    entity_root = root / "crates" / "tetra-entities" / "src"
+    sap_root = root / "crates" / "tetra-saps" / "src"
+    files = rust_files(root, "crates", "tetra-entities", "src") + rust_files(root, "crates", "tetra-saps", "src")
     tests = {p: read(p) for p in root.rglob("*.rs") if "tests" in p.parts}
     result: list[StateRecord] = []
     for path in files:
@@ -402,8 +404,12 @@ def state_records(root: Path) -> list[StateRecord]:
                 stripped = re.sub(r"//.*$", "", line).strip()
                 if re.match(r"^[A-Z][A-Za-z0-9_]*(?:\s*\([^)]*\)|\s*\{[^}]*\})?\s*,?", stripped):
                     variants += 1
-            parts = path.relative_to(root / "crates" / "tetra-entities" / "src").parts
-            layer = parts[0].upper() if parts else "UNKNOWN"
+            if path.is_relative_to(entity_root):
+                parts = path.relative_to(entity_root).parts
+                layer = parts[0].upper() if parts else "UNKNOWN"
+            else:
+                parts = path.relative_to(sap_root).parts
+                layer = "SAP/" + (parts[0].upper() if parts else "COMMON")
             test_refs = sum(t.count(name) for t in tests.values())
             result.append(StateRecord(layer, name, rel(path, root), variants, test_refs))
     return sorted(result, key=lambda r: (r.layer, r.name, r.path))
@@ -559,13 +565,14 @@ def render_gaps(gaps: list[GapRecord], saps: list[SapRecord], pdus: list[PduReco
 
 def render_states(records: list[StateRecord]) -> str:
     required = [
-        ("MLE State Machine", "noch keine eindeutige zentrale State-Enum nachgewiesen", "Phase 3"),
+        ("MLE Cell State", "Typfundament mit `MleCellState` vorhanden; Runtime-Transitionen fehlen", "Paket C/Phase 3"),
         ("MM Registration State", "teilweise über Client-/Registration-Zustände vorhanden", "Phase 4"),
         ("CMCE Group Call", "vorhandene Call-State-Typen prüfen und formalisieren", "Phase 5"),
         ("CMCE Individual Call", "vorhandene Individual-Call-State-Typen prüfen und formalisieren", "Phase 5"),
-        ("SNDCP Context State", "Kontextzustände vollständig inventarisieren", "Phase 11"),
-        ("LLC Link State", "implizite Linkzustände und Timer explizit dokumentieren", "Phase 0/1"),
-        ("Channel Change State", "für TLMC/MLE neu als explizites Modell erforderlich", "Phase 1/3"),
+        ("SNDCP Context State", "PDP-State vorhanden; vollständige Context-Transitionen folgen", "Phase 11"),
+        ("LTPD Link State", "Typfundament mit `LtpdLinkState` vorhanden; Runtime fehlt", "Paket D"),
+        ("LLC Link State", "implizite Linkzustände und Timer explizit dokumentieren", "Paket C/D"),
+        ("Channel Change State", "Typfundament mit `ChannelChangeState` vorhanden; Runtime fehlt", "Paket C/Phase 3"),
     ]
     return "\n".join(
         [
@@ -605,11 +612,11 @@ def render_summary(pdus: list[PduRecord], saps: list[SapRecord], gaps: list[GapR
     return "\n".join(
         [
             GENERATED_HEADER.rstrip(),
-            "# SWMI Foundation 1 – Paket A: Inventur",
+            "# SWMI Foundation 1 – Protokollinventur",
             "",
             "## Ergebnis",
             "",
-            "Paket A ist als reproduzierbare statische Inventur umgesetzt. Die erzeugten Dateien bilden den Ausgangspunkt für Paket B (Typen) und verhindern, dass TLMC/TLPD ohne vollständige Arbeitsliste erweitert werden.",
+            "Paket A stellt die reproduzierbare Inventur bereit. Paket B ergänzt darauf aufbauend die typisierten TLMC-/TLPD-Primitive, ihre `SapMsgInner`-Varianten und die grundlegenden Mobilitäts-/Linkzustände. Die Matrix bleibt die laufend aktualisierte Bestandsaufnahme für die folgenden Runtime-Pakete.",
             "",
             table(
                 ["Messgröße", "Stand"],
@@ -650,7 +657,7 @@ def render_summary(pdus: list[PduRecord], saps: list[SapRecord], gaps: list[GapR
             "",
             "## Nächster Arbeitsschritt",
             "",
-            "Paket B beginnt mit den in der SAP-Matrix ausgewiesenen TLMC- und TLPD-Lücken: konkrete Typen statt `Todo`, vollständige `SapMsgInner`-Verdrahtung und explizite MLE-/Channel-Change-Kontexte.",
+            "Paket C implementiert als Nächstes die TLMC-Runtime: Configure, Ressourcenverlust/-wiederkehr, Measurement, Monitor, Scan, Cell Read, Assessment und Select. Anschließend folgt Paket D mit der vollständigen LTPD-Runtime.",
             "",
         ]
     )

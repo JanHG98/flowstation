@@ -1,5 +1,5 @@
 #[allow(dead_code)]
-#[derive(Copy, Debug, Clone, PartialEq)]
+#[derive(Copy, Debug, Clone, PartialEq, Eq, Hash)]
 pub enum SsiType {
     Unknown,
     /// Generic type when specific type unknown. Avoid using where possible.
@@ -33,7 +33,7 @@ impl core::fmt::Display for SsiType {
     }
 }
 
-#[derive(Copy, Debug, Clone)]
+#[derive(Copy, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct TetraAddress {
     pub ssi: u32,
     pub ssi_type: SsiType,

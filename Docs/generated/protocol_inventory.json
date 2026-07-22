@@ -954,7 +954,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 64,
+      "line": 65,
       "path": "crates/tetra-entities/src/mle/mle_bs.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -962,7 +962,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 67,
+      "line": 68,
       "path": "crates/tetra-entities/src/mle/mle_bs.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -970,7 +970,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 70,
+      "line": 71,
       "path": "crates/tetra-entities/src/mle/mle_bs.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -978,7 +978,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 73,
+      "line": 74,
       "path": "crates/tetra-entities/src/mle/mle_bs.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -986,7 +986,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 74,
+      "line": 75,
       "path": "crates/tetra-entities/src/mle/mle_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -994,7 +994,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 76,
+      "line": 77,
       "path": "crates/tetra-entities/src/mle/mle_bs.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -1002,7 +1002,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 79,
+      "line": 80,
       "path": "crates/tetra-entities/src/mle/mle_bs.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -1010,7 +1010,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 82,
+      "line": 83,
       "path": "crates/tetra-entities/src/mle/mle_bs.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -1018,7 +1018,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 85,
+      "line": 86,
       "path": "crates/tetra-entities/src/mle/mle_bs.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -1026,7 +1026,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 206,
+      "line": 211,
       "path": "crates/tetra-entities/src/mle/mle_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -1034,7 +1034,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 207,
+      "line": 212,
       "path": "crates/tetra-entities/src/mle/mle_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -1042,7 +1042,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 223,
+      "line": 229,
       "path": "crates/tetra-entities/src/mle/mle_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -1050,7 +1050,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 224,
+      "line": 230,
       "path": "crates/tetra-entities/src/mle/mle_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -1058,7 +1058,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 240,
+      "line": 246,
       "path": "crates/tetra-entities/src/mle/mle_bs.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -1066,7 +1066,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 249,
+      "line": 255,
       "path": "crates/tetra-entities/src/mle/mle_bs.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -1074,7 +1074,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 283,
+      "line": 289,
       "path": "crates/tetra-entities/src/mle/mle_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -1082,7 +1082,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 288,
+      "line": 294,
       "path": "crates/tetra-entities/src/mle/mle_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -1090,7 +1090,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 311,
+      "line": 317,
       "path": "crates/tetra-entities/src/mle/mle_bs.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -1098,7 +1098,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 351,
+      "line": 357,
       "path": "crates/tetra-entities/src/mle/mle_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -1106,7 +1106,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 378,
+      "line": 384,
       "path": "crates/tetra-entities/src/mle/mle_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -1114,7 +1114,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 383,
+      "line": 389,
       "path": "crates/tetra-entities/src/mle/mle_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -1122,7 +1122,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 61,
+      "line": 62,
       "path": "crates/tetra-entities/src/mle/mle_ms.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -1130,7 +1130,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 64,
+      "line": 65,
       "path": "crates/tetra-entities/src/mle/mle_ms.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -1138,7 +1138,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 67,
+      "line": 68,
       "path": "crates/tetra-entities/src/mle/mle_ms.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -1146,7 +1146,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 70,
+      "line": 71,
       "path": "crates/tetra-entities/src/mle/mle_ms.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -1154,7 +1154,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 71,
+      "line": 72,
       "path": "crates/tetra-entities/src/mle/mle_ms.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -1162,7 +1162,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 73,
+      "line": 74,
       "path": "crates/tetra-entities/src/mle/mle_ms.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -1170,7 +1170,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 76,
+      "line": 77,
       "path": "crates/tetra-entities/src/mle/mle_ms.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -1178,7 +1178,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 79,
+      "line": 80,
       "path": "crates/tetra-entities/src/mle/mle_ms.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -1186,7 +1186,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 82,
+      "line": 83,
       "path": "crates/tetra-entities/src/mle/mle_ms.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -1194,7 +1194,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 154,
+      "line": 155,
       "path": "crates/tetra-entities/src/mle/mle_ms.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -1202,7 +1202,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 155,
+      "line": 156,
       "path": "crates/tetra-entities/src/mle/mle_ms.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -1210,7 +1210,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 172,
+      "line": 174,
       "path": "crates/tetra-entities/src/mle/mle_ms.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -1218,7 +1218,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 173,
+      "line": 175,
       "path": "crates/tetra-entities/src/mle/mle_ms.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -1226,7 +1226,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 188,
+      "line": 190,
       "path": "crates/tetra-entities/src/mle/mle_ms.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -1234,7 +1234,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 194,
+      "line": 196,
       "path": "crates/tetra-entities/src/mle/mle_ms.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -1242,7 +1242,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 254,
+      "line": 256,
       "path": "crates/tetra-entities/src/mle/mle_ms.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -1250,7 +1250,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 255,
+      "line": 257,
       "path": "crates/tetra-entities/src/mle/mle_ms.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -1258,7 +1258,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 272,
+      "line": 275,
       "path": "crates/tetra-entities/src/mle/mle_ms.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -1266,7 +1266,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 273,
+      "line": 276,
       "path": "crates/tetra-entities/src/mle/mle_ms.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -1274,7 +1274,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 288,
+      "line": 291,
       "path": "crates/tetra-entities/src/mle/mle_ms.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -1282,7 +1282,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 327,
+      "line": 330,
       "path": "crates/tetra-entities/src/mle/mle_ms.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -1290,7 +1290,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 386,
+      "line": 389,
       "path": "crates/tetra-entities/src/mle/mle_ms.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -1298,7 +1298,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 407,
+      "line": 410,
       "path": "crates/tetra-entities/src/mle/mle_ms.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -1306,7 +1306,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 433,
+      "line": 436,
       "path": "crates/tetra-entities/src/mle/mle_ms.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -1314,7 +1314,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 467,
+      "line": 470,
       "path": "crates/tetra-entities/src/mle/mle_ms.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -1322,7 +1322,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 472,
+      "line": 475,
       "path": "crates/tetra-entities/src/mle/mle_ms.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -1330,7 +1330,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 493,
+      "line": 496,
       "path": "crates/tetra-entities/src/mle/mle_ms.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -1338,7 +1338,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 531,
+      "line": 534,
       "path": "crates/tetra-entities/src/mle/mle_ms.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -1346,7 +1346,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 536,
+      "line": 539,
       "path": "crates/tetra-entities/src/mle/mle_ms.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -4825,516 +4825,12 @@
       "text": "pub registration_result: Todo,"
     },
     {
-      "category": "Todo-Typ",
-      "line": 4,
-      "path": "crates/tetra-saps/src/ltpd/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "use tetra_core::{BitBuffer, EndpointId, Layer2Service, LinkId, TetraAddress, Todo};"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 19,
-      "path": "crates/tetra-saps/src/ltpd/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub handle: Todo,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 28,
-      "path": "crates/tetra-saps/src/ltpd/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub chan_change_handle: Todo,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 29,
-      "path": "crates/tetra-saps/src/ltpd/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub call_release: Todo,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 32,
-      "path": "crates/tetra-saps/src/ltpd/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub ms_default_data_prio: Todo,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 33,
-      "path": "crates/tetra-saps/src/ltpd/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub layer2_data_prio_lifetime: Todo,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 34,
-      "path": "crates/tetra-saps/src/ltpd/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub layer2_data_prio_signalling_delay: Todo,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 35,
-      "path": "crates/tetra-saps/src/ltpd/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub data_prio_random_access_delay_factor: Todo,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 36,
-      "path": "crates/tetra-saps/src/ltpd/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub data_class_info: Todo,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 37,
-      "path": "crates/tetra-saps/src/ltpd/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub schedule_repetition_info: Todo,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 38,
-      "path": "crates/tetra-saps/src/ltpd/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub sndcp_status: Todo,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 45,
-      "path": "crates/tetra-saps/src/ltpd/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub chan_change_handle: Todo,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 46,
-      "path": "crates/tetra-saps/src/ltpd/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub reason_for_config_indication: Todo,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 52,
-      "path": "crates/tetra-saps/src/ltpd/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub address: Todo,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 55,
-      "path": "crates/tetra-saps/src/ltpd/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub reservation_info: Todo,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 56,
-      "path": "crates/tetra-saps/src/ltpd/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub pdu_prio: Todo,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 57,
-      "path": "crates/tetra-saps/src/ltpd/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub layer2_qos: Todo,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 59,
-      "path": "crates/tetra-saps/src/ltpd/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub setup_report: Todo,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 64,
-      "path": "crates/tetra-saps/src/ltpd/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub address: Todo,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 68,
-      "path": "crates/tetra-saps/src/ltpd/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub layer2_qos: Todo,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 71,
-      "path": "crates/tetra-saps/src/ltpd/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub chan_change_handle: Option<Todo>,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 72,
-      "path": "crates/tetra-saps/src/ltpd/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub setup_report: Todo,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 77,
-      "path": "crates/tetra-saps/src/ltpd/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub address: Todo,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 80,
-      "path": "crates/tetra-saps/src/ltpd/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub pdu_prio: Todo,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 82,
-      "path": "crates/tetra-saps/src/ltpd/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub layer2_qos: Todo,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 84,
-      "path": "crates/tetra-saps/src/ltpd/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub setup_report: Todo,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 89,
-      "path": "crates/tetra-saps/src/ltpd/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub address: Todo,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 92,
-      "path": "crates/tetra-saps/src/ltpd/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub layer2_qos: Todo,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 95,
-      "path": "crates/tetra-saps/src/ltpd/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub channel_change_handle: Todo,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 96,
-      "path": "crates/tetra-saps/src/ltpd/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub setup_report: Todo,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 101,
-      "path": "crates/tetra-saps/src/ltpd/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub permitted_services_in_temp_disabled_mode: Todo,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 108,
-      "path": "crates/tetra-saps/src/ltpd/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub pdu_prio: Todo,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 110,
-      "path": "crates/tetra-saps/src/ltpd/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub report: Todo,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 120,
-      "path": "crates/tetra-saps/src/ltpd/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub chan_change_handle: Option<Todo>,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 121,
-      "path": "crates/tetra-saps/src/ltpd/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub report: Todo,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 129,
-      "path": "crates/tetra-saps/src/ltpd/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub broadcast_params: Todo,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 130,
-      "path": "crates/tetra-saps/src/ltpd/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub subscriber_class_match: Todo,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 131,
-      "path": "crates/tetra-saps/src/ltpd/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub schedule_timing_prompt: Todo,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 132,
-      "path": "crates/tetra-saps/src/ltpd/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub permitted_cell_info: Todo,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 140,
-      "path": "crates/tetra-saps/src/ltpd/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub mcc: Todo, // Current network"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 141,
-      "path": "crates/tetra-saps/src/ltpd/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub mnc: Todo, // Current network"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 147,
-      "path": "crates/tetra-saps/src/ltpd/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub received_tetra_address: Todo, // ITSI/GSSI"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 148,
-      "path": "crates/tetra-saps/src/ltpd/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub received_address_type: Todo,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 155,
-      "path": "crates/tetra-saps/src/ltpd/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub reservation_info: Todo,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 156,
-      "path": "crates/tetra-saps/src/ltpd/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub pdu_prio: Todo,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 167,
-      "path": "crates/tetra-saps/src/ltpd/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub report: Todo,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 168,
-      "path": "crates/tetra-saps/src/ltpd/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub reconnection_result: Todo,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 177,
-      "path": "crates/tetra-saps/src/ltpd/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub report: Todo,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 178,
-      "path": "crates/tetra-saps/src/ltpd/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub reconnection_result: Todo,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 188,
-      "path": "crates/tetra-saps/src/ltpd/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub handle: Todo,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 189,
-      "path": "crates/tetra-saps/src/ltpd/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub transfer_result: Todo,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 194,
-      "path": "crates/tetra-saps/src/ltpd/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub mcc: Todo, // Current network"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 195,
-      "path": "crates/tetra-saps/src/ltpd/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub mnc: Todo, // Current network"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 200,
-      "path": "crates/tetra-saps/src/ltpd/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub sdu: Todo,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 201,
-      "path": "crates/tetra-saps/src/ltpd/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub handle: Todo,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 203,
-      "path": "crates/tetra-saps/src/ltpd/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub unacked_bl_repetitions: Todo,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 204,
-      "path": "crates/tetra-saps/src/ltpd/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub pdu_prio: Todo,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 210,
-      "path": "crates/tetra-saps/src/ltpd/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub data_class_info: Todo,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 211,
-      "path": "crates/tetra-saps/src/ltpd/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub data_prio: Todo,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 214,
-      "path": "crates/tetra-saps/src/ltpd/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub scheduled_data_status: Todo,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 215,
-      "path": "crates/tetra-saps/src/ltpd/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub max_schedule_interval: Todo,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 226,
-      "path": "crates/tetra-saps/src/ltpd/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub chan_change_handle: Option<Todo>,"
-    },
-    {
       "category": "TODO/FIXME",
       "line": 28,
       "path": "crates/tetra-saps/src/sapmsg.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
       "text": "// TODO FIXME and all that stuff"
-    },
-    {
-      "category": "panic!",
-      "line": 151,
-      "path": "crates/tetra-saps/src/sapmsg.rs",
-      "scope": "Runtime",
-      "severity": "prüfen",
-      "text": "_ => panic!(\"Unknown SapMsgInner type\"),"
     },
     {
       "category": "Todo-Typ",
@@ -6199,366 +5695,6 @@
       "scope": "Runtime",
       "severity": "Typ-Platzhalter",
       "text": "pub mac_broadcast_info: Option<Todo>,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 1,
-      "path": "crates/tetra-saps/src/tlmc/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "use tetra_core::{EndpointId, Todo};"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 20,
-      "path": "crates/tetra-saps/src/tlmc/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub lower_layer_resource_availability: Todo,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 37,
-      "path": "crates/tetra-saps/src/tlmc/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub threshold_values: Option<Todo>,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 38,
-      "path": "crates/tetra-saps/src/tlmc/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub distribution_on_18th_frame: Option<Todo>,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 39,
-      "path": "crates/tetra-saps/src/tlmc/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub scch_information: Option<Todo>,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 40,
-      "path": "crates/tetra-saps/src/tlmc/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub energy_economy_group: Option<Todo>,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 41,
-      "path": "crates/tetra-saps/src/tlmc/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub energy_economy_startpoint: Option<Todo>,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 42,
-      "path": "crates/tetra-saps/src/tlmc/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub dual_watch_energy_economy_group: Option<Todo>,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 43,
-      "path": "crates/tetra-saps/src/tlmc/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub dual_watch_startpoint: Option<Todo>,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 44,
-      "path": "crates/tetra-saps/src/tlmc/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub mle_activity_indicator: Option<Todo>,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 45,
-      "path": "crates/tetra-saps/src/tlmc/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub channel_change_accepted: Option<Todo>,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 46,
-      "path": "crates/tetra-saps/src/tlmc/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub channel_change_handle: Option<Todo>,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 47,
-      "path": "crates/tetra-saps/src/tlmc/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub operating_mode: Option<Todo>,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 48,
-      "path": "crates/tetra-saps/src/tlmc/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub call_release: Option<Todo>,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 50,
-      "path": "crates/tetra-saps/src/tlmc/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub ms_default_data_priority: Option<Todo>,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 51,
-      "path": "crates/tetra-saps/src/tlmc/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub layer_2_data_priority_lifetime: Option<Todo>,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 52,
-      "path": "crates/tetra-saps/src/tlmc/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub layer_2_data_priority_signalling_delay: Option<Todo>,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 53,
-      "path": "crates/tetra-saps/src/tlmc/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub data_priority_random_access_delay_factor: Option<Todo>,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 54,
-      "path": "crates/tetra-saps/src/tlmc/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub schedule_repetition_information: Option<Todo>,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 55,
-      "path": "crates/tetra-saps/src/tlmc/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub data_class_activity_information: Option<Todo>,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 56,
-      "path": "crates/tetra-saps/src/tlmc/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub endpoint_id: Option<Todo>,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 57,
-      "path": "crates/tetra-saps/src/tlmc/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub periodic_reporting_timer: Option<Todo>,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 58,
-      "path": "crates/tetra-saps/src/tlmc/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub graceful_service_degradation_mode_control: Option<Todo>,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 69,
-      "path": "crates/tetra-saps/src/tlmc/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "//     pub channel_change_handle: Option<Todo>,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 71,
-      "path": "crates/tetra-saps/src/tlmc/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "//     pub mle_activity_indicator: Option<Todo>,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 72,
-      "path": "crates/tetra-saps/src/tlmc/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "//     pub llc_timer_status: Option<Todo>,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 73,
-      "path": "crates/tetra-saps/src/tlmc/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "//     pub link_performance_info: Option<Todo>,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 75,
-      "path": "crates/tetra-saps/src/tlmc/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "//     pub graceful_service_degradation_mode_control: Option<Todo>,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 84,
-      "path": "crates/tetra-saps/src/tlmc/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub threshold_values: Option<Todo>,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 85,
-      "path": "crates/tetra-saps/src/tlmc/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub distribution_on_18th_frame: Option<Todo>,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 86,
-      "path": "crates/tetra-saps/src/tlmc/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub scch_information: Option<Todo>,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 87,
-      "path": "crates/tetra-saps/src/tlmc/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub energy_economy_group: Option<Todo>,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 88,
-      "path": "crates/tetra-saps/src/tlmc/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub energy_economy_startpoint: Option<Todo>,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 89,
-      "path": "crates/tetra-saps/src/tlmc/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub dual_watch_energy_economy_group: Option<Todo>,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 90,
-      "path": "crates/tetra-saps/src/tlmc/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub dual_watch_startpoint: Option<Todo>,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 91,
-      "path": "crates/tetra-saps/src/tlmc/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub operating_mode: Option<Todo>,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 92,
-      "path": "crates/tetra-saps/src/tlmc/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub call_release: Option<Todo>,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 93,
-      "path": "crates/tetra-saps/src/tlmc/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub valid_addresses: Option<Todo>,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 94,
-      "path": "crates/tetra-saps/src/tlmc/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub ms_default_data_priority: Option<Todo>,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 95,
-      "path": "crates/tetra-saps/src/tlmc/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub layer_2_data_priority_lifetime: Option<Todo>,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 96,
-      "path": "crates/tetra-saps/src/tlmc/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub layer_2_data_priority_signalling_delay: Option<Todo>,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 97,
-      "path": "crates/tetra-saps/src/tlmc/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub data_priority_random_access_delay_factor: Option<Todo>,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 98,
-      "path": "crates/tetra-saps/src/tlmc/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub schedule_repetition_information: Option<Todo>,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 99,
-      "path": "crates/tetra-saps/src/tlmc/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub data_class_activity_information: Option<Todo>,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 100,
-      "path": "crates/tetra-saps/src/tlmc/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub endpoint_id: Option<Todo>,"
     },
     {
       "category": "Todo-Typ",
@@ -8586,6 +7722,16 @@
       "constructed": 0,
       "handled": 0,
       "path": "crates/tetra-saps/src/lmm/mod.rs",
+      "primitive": "LmmMlePrepareConfirm",
+      "sap": "LMM",
+      "sapmsg_variant": "nein",
+      "status": "nicht in SapMsgInner verdrahtet",
+      "tests": 0
+    },
+    {
+      "constructed": 0,
+      "handled": 0,
+      "path": "crates/tetra-saps/src/lmm/mod.rs",
       "primitive": "LmmMlePrepareReq",
       "sap": "LMM",
       "sapmsg_variant": "nein",
@@ -8638,9 +7784,9 @@
       "path": "crates/tetra-saps/src/ltpd/mod.rs",
       "primitive": "LtpdMleActivityReq",
       "sap": "LTPD",
-      "sapmsg_variant": "nein",
-      "status": "nicht in SapMsgInner verdrahtet",
-      "tests": 0
+      "sapmsg_variant": "ja",
+      "status": "Variante vorhanden, Runtime-Pfad fehlt",
+      "tests": 4
     },
     {
       "constructed": 0,
@@ -8648,8 +7794,8 @@
       "path": "crates/tetra-saps/src/ltpd/mod.rs",
       "primitive": "LtpdMleBreakInd",
       "sap": "LTPD",
-      "sapmsg_variant": "nein",
-      "status": "nicht in SapMsgInner verdrahtet",
+      "sapmsg_variant": "ja",
+      "status": "Variante vorhanden, Runtime-Pfad fehlt",
       "tests": 0
     },
     {
@@ -8658,8 +7804,8 @@
       "path": "crates/tetra-saps/src/ltpd/mod.rs",
       "primitive": "LtpdMleBusyInd",
       "sap": "LTPD",
-      "sapmsg_variant": "nein",
-      "status": "nicht in SapMsgInner verdrahtet",
+      "sapmsg_variant": "ja",
+      "status": "Variante vorhanden, Runtime-Pfad fehlt",
       "tests": 0
     },
     {
@@ -8668,8 +7814,8 @@
       "path": "crates/tetra-saps/src/ltpd/mod.rs",
       "primitive": "LtpdMleCancelReq",
       "sap": "LTPD",
-      "sapmsg_variant": "nein",
-      "status": "nicht in SapMsgInner verdrahtet",
+      "sapmsg_variant": "ja",
+      "status": "Variante vorhanden, Runtime-Pfad fehlt",
       "tests": 0
     },
     {
@@ -8678,8 +7824,8 @@
       "path": "crates/tetra-saps/src/ltpd/mod.rs",
       "primitive": "LtpdMleCloseInd",
       "sap": "LTPD",
-      "sapmsg_variant": "nein",
-      "status": "nicht in SapMsgInner verdrahtet",
+      "sapmsg_variant": "ja",
+      "status": "Variante vorhanden, Runtime-Pfad fehlt",
       "tests": 0
     },
     {
@@ -8688,8 +7834,8 @@
       "path": "crates/tetra-saps/src/ltpd/mod.rs",
       "primitive": "LtpdMleConfigureInd",
       "sap": "LTPD",
-      "sapmsg_variant": "nein",
-      "status": "nicht in SapMsgInner verdrahtet",
+      "sapmsg_variant": "ja",
+      "status": "Variante vorhanden, Runtime-Pfad fehlt",
       "tests": 0
     },
     {
@@ -8698,8 +7844,18 @@
       "path": "crates/tetra-saps/src/ltpd/mod.rs",
       "primitive": "LtpdMleConfigureReq",
       "sap": "LTPD",
-      "sapmsg_variant": "nein",
-      "status": "nicht in SapMsgInner verdrahtet",
+      "sapmsg_variant": "ja",
+      "status": "Variante vorhanden, Runtime-Pfad fehlt",
+      "tests": 0
+    },
+    {
+      "constructed": 0,
+      "handled": 0,
+      "path": "crates/tetra-saps/src/ltpd/mod.rs",
+      "primitive": "LtpdMleConnectConfirm",
+      "sap": "LTPD",
+      "sapmsg_variant": "ja",
+      "status": "Variante vorhanden, Runtime-Pfad fehlt",
       "tests": 0
     },
     {
@@ -8708,8 +7864,8 @@
       "path": "crates/tetra-saps/src/ltpd/mod.rs",
       "primitive": "LtpdMleConnectInd",
       "sap": "LTPD",
-      "sapmsg_variant": "nein",
-      "status": "nicht in SapMsgInner verdrahtet",
+      "sapmsg_variant": "ja",
+      "status": "Variante vorhanden, Runtime-Pfad fehlt",
       "tests": 0
     },
     {
@@ -8718,8 +7874,8 @@
       "path": "crates/tetra-saps/src/ltpd/mod.rs",
       "primitive": "LtpdMleConnectReq",
       "sap": "LTPD",
-      "sapmsg_variant": "nein",
-      "status": "nicht in SapMsgInner verdrahtet",
+      "sapmsg_variant": "ja",
+      "status": "Variante vorhanden, Runtime-Pfad fehlt",
       "tests": 0
     },
     {
@@ -8728,8 +7884,8 @@
       "path": "crates/tetra-saps/src/ltpd/mod.rs",
       "primitive": "LtpdMleConnectResp",
       "sap": "LTPD",
-      "sapmsg_variant": "nein",
-      "status": "nicht in SapMsgInner verdrahtet",
+      "sapmsg_variant": "ja",
+      "status": "Variante vorhanden, Runtime-Pfad fehlt",
       "tests": 0
     },
     {
@@ -8738,8 +7894,8 @@
       "path": "crates/tetra-saps/src/ltpd/mod.rs",
       "primitive": "LtpdMleDisableInd",
       "sap": "LTPD",
-      "sapmsg_variant": "nein",
-      "status": "nicht in SapMsgInner verdrahtet",
+      "sapmsg_variant": "ja",
+      "status": "Variante vorhanden, Runtime-Pfad fehlt",
       "tests": 0
     },
     {
@@ -8748,8 +7904,8 @@
       "path": "crates/tetra-saps/src/ltpd/mod.rs",
       "primitive": "LtpdMleDisconnectInd",
       "sap": "LTPD",
-      "sapmsg_variant": "nein",
-      "status": "nicht in SapMsgInner verdrahtet",
+      "sapmsg_variant": "ja",
+      "status": "Variante vorhanden, Runtime-Pfad fehlt",
       "tests": 0
     },
     {
@@ -8758,8 +7914,8 @@
       "path": "crates/tetra-saps/src/ltpd/mod.rs",
       "primitive": "LtpdMleDisconnectReq",
       "sap": "LTPD",
-      "sapmsg_variant": "nein",
-      "status": "nicht in SapMsgInner verdrahtet",
+      "sapmsg_variant": "ja",
+      "status": "Variante vorhanden, Runtime-Pfad fehlt",
       "tests": 0
     },
     {
@@ -8768,8 +7924,8 @@
       "path": "crates/tetra-saps/src/ltpd/mod.rs",
       "primitive": "LtpdMleEnableInd",
       "sap": "LTPD",
-      "sapmsg_variant": "nein",
-      "status": "nicht in SapMsgInner verdrahtet",
+      "sapmsg_variant": "ja",
+      "status": "Variante vorhanden, Runtime-Pfad fehlt",
       "tests": 0
     },
     {
@@ -8778,8 +7934,8 @@
       "path": "crates/tetra-saps/src/ltpd/mod.rs",
       "primitive": "LtpdMleIdleInd",
       "sap": "LTPD",
-      "sapmsg_variant": "nein",
-      "status": "nicht in SapMsgInner verdrahtet",
+      "sapmsg_variant": "ja",
+      "status": "Variante vorhanden, Runtime-Pfad fehlt",
       "tests": 0
     },
     {
@@ -8788,8 +7944,8 @@
       "path": "crates/tetra-saps/src/ltpd/mod.rs",
       "primitive": "LtpdMleInfoInd",
       "sap": "LTPD",
-      "sapmsg_variant": "nein",
-      "status": "nicht in SapMsgInner verdrahtet",
+      "sapmsg_variant": "ja",
+      "status": "Variante vorhanden, Runtime-Pfad fehlt",
       "tests": 0
     },
     {
@@ -8798,8 +7954,8 @@
       "path": "crates/tetra-saps/src/ltpd/mod.rs",
       "primitive": "LtpdMleOpenInd",
       "sap": "LTPD",
-      "sapmsg_variant": "nein",
-      "status": "nicht in SapMsgInner verdrahtet",
+      "sapmsg_variant": "ja",
+      "status": "Variante vorhanden, Runtime-Pfad fehlt",
       "tests": 0
     },
     {
@@ -8808,8 +7964,18 @@
       "path": "crates/tetra-saps/src/ltpd/mod.rs",
       "primitive": "LtpdMleReceiveInd",
       "sap": "LTPD",
-      "sapmsg_variant": "nein",
-      "status": "nicht in SapMsgInner verdrahtet",
+      "sapmsg_variant": "ja",
+      "status": "Variante vorhanden, Runtime-Pfad fehlt",
+      "tests": 0
+    },
+    {
+      "constructed": 0,
+      "handled": 0,
+      "path": "crates/tetra-saps/src/ltpd/mod.rs",
+      "primitive": "LtpdMleReconnectConfirm",
+      "sap": "LTPD",
+      "sapmsg_variant": "ja",
+      "status": "Variante vorhanden, Runtime-Pfad fehlt",
       "tests": 0
     },
     {
@@ -8818,8 +7984,8 @@
       "path": "crates/tetra-saps/src/ltpd/mod.rs",
       "primitive": "LtpdMleReconnectInd",
       "sap": "LTPD",
-      "sapmsg_variant": "nein",
-      "status": "nicht in SapMsgInner verdrahtet",
+      "sapmsg_variant": "ja",
+      "status": "Variante vorhanden, Runtime-Pfad fehlt",
       "tests": 0
     },
     {
@@ -8828,8 +7994,8 @@
       "path": "crates/tetra-saps/src/ltpd/mod.rs",
       "primitive": "LtpdMleReconnectReq",
       "sap": "LTPD",
-      "sapmsg_variant": "nein",
-      "status": "nicht in SapMsgInner verdrahtet",
+      "sapmsg_variant": "ja",
+      "status": "Variante vorhanden, Runtime-Pfad fehlt",
       "tests": 0
     },
     {
@@ -8838,8 +8004,8 @@
       "path": "crates/tetra-saps/src/ltpd/mod.rs",
       "primitive": "LtpdMleReleaseReq",
       "sap": "LTPD",
-      "sapmsg_variant": "nein",
-      "status": "nicht in SapMsgInner verdrahtet",
+      "sapmsg_variant": "ja",
+      "status": "Variante vorhanden, Runtime-Pfad fehlt",
       "tests": 0
     },
     {
@@ -8848,8 +8014,8 @@
       "path": "crates/tetra-saps/src/ltpd/mod.rs",
       "primitive": "LtpdMleReportInd",
       "sap": "LTPD",
-      "sapmsg_variant": "nein",
-      "status": "nicht in SapMsgInner verdrahtet",
+      "sapmsg_variant": "ja",
+      "status": "Variante vorhanden, Runtime-Pfad fehlt",
       "tests": 0
     },
     {
@@ -8858,8 +8024,8 @@
       "path": "crates/tetra-saps/src/ltpd/mod.rs",
       "primitive": "LtpdMleResumeInd",
       "sap": "LTPD",
-      "sapmsg_variant": "nein",
-      "status": "nicht in SapMsgInner verdrahtet",
+      "sapmsg_variant": "ja",
+      "status": "Variante vorhanden, Runtime-Pfad fehlt",
       "tests": 0
     },
     {
@@ -8878,8 +8044,8 @@
       "path": "crates/tetra-saps/src/ltpd/mod.rs",
       "primitive": "LtpdMleUnitdataReq",
       "sap": "LTPD",
-      "sapmsg_variant": "nein",
-      "status": "nicht in SapMsgInner verdrahtet",
+      "sapmsg_variant": "ja",
+      "status": "Variante vorhanden, Runtime-Pfad fehlt",
       "tests": 0
     },
     {
@@ -9118,8 +8284,8 @@
       "path": "crates/tetra-saps/src/tlmc/mod.rs",
       "primitive": "TlmcAssessmentInd",
       "sap": "TLMC",
-      "sapmsg_variant": "nein",
-      "status": "nicht in SapMsgInner verdrahtet",
+      "sapmsg_variant": "ja",
+      "status": "Variante vorhanden, Runtime-Pfad fehlt",
       "tests": 0
     },
     {
@@ -9128,8 +8294,8 @@
       "path": "crates/tetra-saps/src/tlmc/mod.rs",
       "primitive": "TlmcAssessmentListReq",
       "sap": "TLMC",
-      "sapmsg_variant": "nein",
-      "status": "nicht in SapMsgInner verdrahtet",
+      "sapmsg_variant": "ja",
+      "status": "Variante vorhanden, Runtime-Pfad fehlt",
       "tests": 0
     },
     {
@@ -9138,18 +8304,18 @@
       "path": "crates/tetra-saps/src/tlmc/mod.rs",
       "primitive": "TlmcCellReadConf",
       "sap": "TLMC",
-      "sapmsg_variant": "nein",
-      "status": "nicht in SapMsgInner verdrahtet",
+      "sapmsg_variant": "ja",
+      "status": "Variante vorhanden, Runtime-Pfad fehlt",
       "tests": 0
     },
     {
       "constructed": 0,
       "handled": 0,
       "path": "crates/tetra-saps/src/tlmc/mod.rs",
-      "primitive": "TlmcCellReadInd",
+      "primitive": "TlmcCellReadReq",
       "sap": "TLMC",
-      "sapmsg_variant": "nein",
-      "status": "nicht in SapMsgInner verdrahtet",
+      "sapmsg_variant": "ja",
+      "status": "Variante vorhanden, Runtime-Pfad fehlt",
       "tests": 0
     },
     {
@@ -9158,8 +8324,8 @@
       "path": "crates/tetra-saps/src/tlmc/mod.rs",
       "primitive": "TlmcConfigureConf",
       "sap": "TLMC",
-      "sapmsg_variant": "nein",
-      "status": "nicht in SapMsgInner verdrahtet",
+      "sapmsg_variant": "ja",
+      "status": "Variante vorhanden, Runtime-Pfad fehlt",
       "tests": 0
     },
     {
@@ -9168,8 +8334,8 @@
       "path": "crates/tetra-saps/src/tlmc/mod.rs",
       "primitive": "TlmcConfigureInd",
       "sap": "TLMC",
-      "sapmsg_variant": "nein",
-      "status": "nicht in SapMsgInner verdrahtet",
+      "sapmsg_variant": "ja",
+      "status": "Variante vorhanden, Runtime-Pfad fehlt",
       "tests": 0
     },
     {
@@ -9180,7 +8346,7 @@
       "sap": "TLMC",
       "sapmsg_variant": "ja",
       "status": "bidirektional sichtbar",
-      "tests": 0
+      "tests": 7
     },
     {
       "constructed": 0,
@@ -9188,8 +8354,8 @@
       "path": "crates/tetra-saps/src/tlmc/mod.rs",
       "primitive": "TlmcMeasurementInd",
       "sap": "TLMC",
-      "sapmsg_variant": "nein",
-      "status": "nicht in SapMsgInner verdrahtet",
+      "sapmsg_variant": "ja",
+      "status": "Variante vorhanden, Runtime-Pfad fehlt",
       "tests": 0
     },
     {
@@ -9198,8 +8364,8 @@
       "path": "crates/tetra-saps/src/tlmc/mod.rs",
       "primitive": "TlmcMonitorInd",
       "sap": "TLMC",
-      "sapmsg_variant": "nein",
-      "status": "nicht in SapMsgInner verdrahtet",
+      "sapmsg_variant": "ja",
+      "status": "Variante vorhanden, Runtime-Pfad fehlt",
       "tests": 0
     },
     {
@@ -9208,8 +8374,8 @@
       "path": "crates/tetra-saps/src/tlmc/mod.rs",
       "primitive": "TlmcMonitorListReq",
       "sap": "TLMC",
-      "sapmsg_variant": "nein",
-      "status": "nicht in SapMsgInner verdrahtet",
+      "sapmsg_variant": "ja",
+      "status": "Variante vorhanden, Runtime-Pfad fehlt",
       "tests": 0
     },
     {
@@ -9218,8 +8384,8 @@
       "path": "crates/tetra-saps/src/tlmc/mod.rs",
       "primitive": "TlmcReportInd",
       "sap": "TLMC",
-      "sapmsg_variant": "nein",
-      "status": "nicht in SapMsgInner verdrahtet",
+      "sapmsg_variant": "ja",
+      "status": "Variante vorhanden, Runtime-Pfad fehlt",
       "tests": 0
     },
     {
@@ -9228,8 +8394,8 @@
       "path": "crates/tetra-saps/src/tlmc/mod.rs",
       "primitive": "TlmcScanConf",
       "sap": "TLMC",
-      "sapmsg_variant": "nein",
-      "status": "nicht in SapMsgInner verdrahtet",
+      "sapmsg_variant": "ja",
+      "status": "Variante vorhanden, Runtime-Pfad fehlt",
       "tests": 0
     },
     {
@@ -9238,8 +8404,8 @@
       "path": "crates/tetra-saps/src/tlmc/mod.rs",
       "primitive": "TlmcScanReportInd",
       "sap": "TLMC",
-      "sapmsg_variant": "nein",
-      "status": "nicht in SapMsgInner verdrahtet",
+      "sapmsg_variant": "ja",
+      "status": "Variante vorhanden, Runtime-Pfad fehlt",
       "tests": 0
     },
     {
@@ -9248,8 +8414,8 @@
       "path": "crates/tetra-saps/src/tlmc/mod.rs",
       "primitive": "TlmcScanReq",
       "sap": "TLMC",
-      "sapmsg_variant": "nein",
-      "status": "nicht in SapMsgInner verdrahtet",
+      "sapmsg_variant": "ja",
+      "status": "Variante vorhanden, Runtime-Pfad fehlt",
       "tests": 0
     },
     {
@@ -9258,8 +8424,8 @@
       "path": "crates/tetra-saps/src/tlmc/mod.rs",
       "primitive": "TlmcSelectConf",
       "sap": "TLMC",
-      "sapmsg_variant": "nein",
-      "status": "nicht in SapMsgInner verdrahtet",
+      "sapmsg_variant": "ja",
+      "status": "Variante vorhanden, Runtime-Pfad fehlt",
       "tests": 0
     },
     {
@@ -9268,8 +8434,8 @@
       "path": "crates/tetra-saps/src/tlmc/mod.rs",
       "primitive": "TlmcSelectInd",
       "sap": "TLMC",
-      "sapmsg_variant": "nein",
-      "status": "nicht in SapMsgInner verdrahtet",
+      "sapmsg_variant": "ja",
+      "status": "Variante vorhanden, Runtime-Pfad fehlt",
       "tests": 0
     },
     {
@@ -9278,8 +8444,8 @@
       "path": "crates/tetra-saps/src/tlmc/mod.rs",
       "primitive": "TlmcSelectReq",
       "sap": "TLMC",
-      "sapmsg_variant": "nein",
-      "status": "nicht in SapMsgInner verdrahtet",
+      "sapmsg_variant": "ja",
+      "status": "Variante vorhanden, Runtime-Pfad fehlt",
       "tests": 0
     },
     {
@@ -9288,18 +8454,8 @@
       "path": "crates/tetra-saps/src/tlmc/mod.rs",
       "primitive": "TlmcSelectResp",
       "sap": "TLMC",
-      "sapmsg_variant": "nein",
-      "status": "nicht in SapMsgInner verdrahtet",
-      "tests": 0
-    },
-    {
-      "constructed": 0,
-      "handled": 0,
-      "path": "crates/tetra-saps/src/tlmc/mod.rs",
-      "primitive": "TmcTlConfigureReq",
-      "sap": "TLMC",
-      "sapmsg_variant": "nein",
-      "status": "nicht in SapMsgInner verdrahtet",
+      "sapmsg_variant": "ja",
+      "status": "Variante vorhanden, Runtime-Pfad fehlt",
       "tests": 0
     },
     {
@@ -9509,6 +8665,48 @@
       "variants": 3
     },
     {
+      "layer": "SAP/COMMON",
+      "name": "ChannelChangeState",
+      "path": "crates/tetra-saps/src/common/mod.rs",
+      "test_references": 0,
+      "variants": 6
+    },
+    {
+      "layer": "SAP/COMMON",
+      "name": "LtpdLinkState",
+      "path": "crates/tetra-saps/src/common/mod.rs",
+      "test_references": 0,
+      "variants": 10
+    },
+    {
+      "layer": "SAP/COMMON",
+      "name": "MleCellState",
+      "path": "crates/tetra-saps/src/common/mod.rs",
+      "test_references": 0,
+      "variants": 10
+    },
+    {
+      "layer": "SAP/COMMON",
+      "name": "TlmcScanState",
+      "path": "crates/tetra-saps/src/common/mod.rs",
+      "test_references": 3,
+      "variants": 5
+    },
+    {
+      "layer": "SAP/COMMON",
+      "name": "TlmcSelectionState",
+      "path": "crates/tetra-saps/src/common/mod.rs",
+      "test_references": 0,
+      "variants": 5
+    },
+    {
+      "layer": "SAP/COMMON",
+      "name": "TxGrantState",
+      "path": "crates/tetra-saps/src/common/mod.rs",
+      "test_references": 0,
+      "variants": 2
+    },
+    {
       "layer": "SNDCP",
       "name": "PdpState",
       "path": "crates/tetra-entities/src/sndcp/state.rs",
@@ -9524,9 +8722,9 @@
     }
   ],
   "summary": {
-    "gap_count": 847,
+    "gap_count": 739,
     "pdu_count": 76,
-    "sap_primitive_count": 126,
-    "state_type_count": 11
+    "sap_primitive_count": 128,
+    "state_type_count": 17
   }
 }

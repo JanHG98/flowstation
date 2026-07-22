@@ -5,6 +5,7 @@ use tetra_core::tetra_entities::TetraEntity;
 use tetra_core::{BitBuffer, Layer2Service, Sap, TdmaTime, unimplemented_log};
 use tetra_saps::lcmc::LcmcMleUnitdataInd;
 use tetra_saps::lmm::LmmMleUnitdataInd;
+use tetra_saps::common::{ChannelChangeHandle, ReceivedAddressType};
 use tetra_saps::ltpd::LtpdMleUnitdataInd;
 use tetra_saps::tla::{TlaTlDataReqBl, TlaTlUnitdataReqBl};
 use tetra_saps::{SapMsg, SapMsgInner};
@@ -138,8 +139,12 @@ impl MleBs {
                     endpoint_id: prim.endpoint_id,
                     link_id: prim.link_id,
                     received_tetra_address: prim.main_address,
+                    received_address_type: ReceivedAddressType::from_tetra_address(prim.main_address),
                     chan_change_resp_req: prim.chan_change_resp_req,
-                    chan_change_handle: prim.chan_change_handle,
+                    chan_change_handle: prim
+                        .chan_change_handle
+                        .and_then(|value| u32::try_from(value).ok())
+                        .map(ChannelChangeHandle),
                 };
                 queue.push_back(SapMsg {
                     sap: Sap::TlpdSap,
@@ -220,6 +225,7 @@ impl MleBs {
                     endpoint_id: prim.endpoint_id,
                     link_id: prim.link_id,
                     received_tetra_address: prim.main_address,
+                    received_address_type: ReceivedAddressType::from_tetra_address(prim.main_address),
                     chan_change_resp_req: false, // TODO FIXME
                     chan_change_handle: None,    // TODO FIXME
                 };

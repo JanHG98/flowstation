@@ -6,6 +6,7 @@ use tetra_core::tetra_entities::TetraEntity;
 use tetra_core::{BitBuffer, Sap, SsiType, TdmaTime, TetraAddress, unimplemented_log};
 use tetra_saps::lcmc::LcmcMleUnitdataInd;
 use tetra_saps::lmm::LmmMleUnitdataInd;
+use tetra_saps::common::ReceivedAddressType;
 use tetra_saps::ltpd::LtpdMleUnitdataInd;
 use tetra_saps::tla::TlaTlDataReqBl;
 use tetra_saps::{SapMsg, SapMsgInner};
@@ -169,13 +170,14 @@ impl MleMs {
                     endpoint_id: prim.endpoint_id,
                     link_id: prim.link_id,
                     received_tetra_address: prim.main_address,
+                    received_address_type: ReceivedAddressType::from_tetra_address(prim.main_address),
                     chan_change_resp_req: false, // TODO FIXME
                     chan_change_handle: None,    // TODO FIXME
                 };
                 let msg = SapMsg {
-                    sap: Sap::LcmcSap,
+                    sap: Sap::TlpdSap,
                     src: self.self_component,
-                    dest: TetraEntity::Cmce,
+                    dest: TetraEntity::Sndcp,
                     dltime: message.dltime,
                     msg: SapMsgInner::LtpdMleUnitdataInd(m),
                 };
@@ -269,13 +271,14 @@ impl MleMs {
                     endpoint_id: prim.endpoint_id,
                     link_id: prim.link_id,
                     received_tetra_address: prim.main_address,
+                    received_address_type: ReceivedAddressType::from_tetra_address(prim.main_address),
                     chan_change_resp_req: false, // TODO FIXME
                     chan_change_handle: None,    // TODO FIXME
                 };
                 let msg = SapMsg {
-                    sap: Sap::LcmcSap,
+                    sap: Sap::TlpdSap,
                     src: self.self_component,
-                    dest: TetraEntity::Cmce,
+                    dest: TetraEntity::Sndcp,
                     dltime: message.dltime,
                     msg: SapMsgInner::LtpdMleUnitdataInd(m),
                 };

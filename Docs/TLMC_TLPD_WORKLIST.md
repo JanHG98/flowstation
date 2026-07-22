@@ -1,22 +1,22 @@
 # SWMI Foundation 1 – TLMC/TLPD-Arbeitsliste
 
-## Status nach Paket A
+## Status nach Paket B
 
-Die statische Inventur zeigt:
+Paket B ist umgesetzt:
 
-- **19 TLMC-nahe Primitive** sind als Typnamen vorhanden;
-- davon ist aktuell nur `TlmcConfigureReq` in `SapMsgInner` verdrahtet;
-- **25 LTPD-nahe Primitive** sind als Typnamen vorhanden;
-- davon ist aktuell nur `LtpdMleUnitdataInd` in `SapMsgInner` verdrahtet;
-- zahlreiche Felder verwenden noch den generischen Platzhaltertyp `Todo`;
-- `rx_tlmc_prim()` und `rx_tlpd_prim()` besitzen noch keine vollständige Runtime-Routinglogik;
-- für TLMC und LTPD ist statisch keine belastbare eigene Testabdeckung nachgewiesen.
+- **18 normative TLMC-Primitive** besitzen konkrete Strukturen und `SapMsgInner`-Varianten;
+- **27 LTPD-Primitive** besitzen konkrete Strukturen und `SapMsgInner`-Varianten;
+- die neuen TLMC-/LTPD-Module verwenden keine aktiven `Todo`-Typen mehr;
+- gemeinsame Mobilitäts-, RF-, QoS-, Channel-Change- und SNDCP-Typen liegen in `tetra_saps::common`;
+- Scan-, Selection-, MLE-Cell-, Channel-Change- und LTPD-Link-Zustände sind explizit modelliert;
+- Unit- und Integrationstests sowie ein dependency-freier statischer Checker sind vorhanden;
+- `rx_tlmc_prim()` und `rx_tlpd_prim()` besitzen weiterhin noch keine vollständige Runtime-Routinglogik.
 
-Die genauen Einzelzeilen stehen in `Docs/SAP_PRIMITIVE_MATRIX.md` und `Docs/IMPLEMENTATION_GAPS.md`.
+Die genauen Einzelzeilen stehen in `Docs/SAP_PRIMITIVE_MATRIX.md`, `Docs/IMPLEMENTATION_GAPS.md` und `Docs/SWMI_FOUNDATION_1_PACKAGE_B.md`.
 
-## Paket B – Typen: verbindliche Reihenfolge
+## Paket B – Typen: abgeschlossen
 
-### B1 – Gemeinsame Basistypen
+### B1 – Gemeinsame Basistypen ✅
 
 Zuerst werden gemeinsam verwendete Typen definiert, damit TLMC und TLPD nicht zwei inkompatible Modelle erhalten:
 
@@ -50,7 +50,7 @@ crates/tetra-saps/src/common/
 
 oder – falls die Typen auch außerhalb der SAP-Schicht benötigt werden – in einem klar benannten Modul unter `tetra-core`.
 
-### B2 – TLMC-Typen
+### B2 – TLMC-Typen ✅
 
 Die leeren Strukturen erhalten konkrete Felder:
 
@@ -71,7 +71,7 @@ Besonderes Augenmerk:
 - eindeutige Einheiten für RXLEV, Frequenz, Zeit und Priorität;
 - keine nackten `u8`/`u32`, wenn der Wertebereich normativ eingeschränkt ist.
 
-### B3 – TLPD-Typen
+### B3 – TLPD-Typen ✅
 
 Alle `Todo`-Felder werden ersetzt. Priorität haben:
 
@@ -84,7 +84,7 @@ Alle `Todo`-Felder werden ersetzt. Priorität haben:
 7. Report/Cancel/Release
 8. Open/Close/Idle/Info/Activity/Busy/Enable/Disable
 
-### B4 – `SapMsgInner`-Verdrahtung
+### B4 – `SapMsgInner`-Verdrahtung ✅
 
 Jede benötigte Primitive erhält eine eigene Variante. Dabei gilt:
 
@@ -94,7 +94,7 @@ Jede benötigte Primitive erhält eine eigene Variante. Dabei gilt:
 - Source, Destination und SAP werden in Tests geprüft;
 - große Payloads werden nicht unnötig kopiert.
 
-### B5 – Explizite Kontexte
+### B5 – Explizite Kontexte ✅
 
 Noch vor der Runtime-Implementierung werden folgende Zustände modelliert:
 
@@ -167,4 +167,4 @@ Die zukünftigen Backend-Dienste folgen dem Standard in `Docs/BACKEND_WEBUI_STAN
 - noch keine vollständige D-NEW-CELL-/RESTORE-Runtime;
 - noch kein vollständiger Packet Core.
 
-Paket B schafft ausschließlich die typsichere Grundlage, auf der Paket C und D ohne erneute Datenmodelländerung aufgebaut werden können.
+Paket B schafft die typsichere Grundlage, auf der Paket C und D ohne erneute grundlegende Datenmodelländerung aufgebaut werden können. Diese Grundlage ist jetzt umgesetzt.
