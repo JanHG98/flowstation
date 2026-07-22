@@ -9,7 +9,7 @@ use crate::common::{
     CallReleaseInstruction, ChannelChangeDecision, ChannelChangeHandle, ChannelClassAssessmentRequest,
     ChannelClassMeasurement, ChannelInformation, DataClass, DataPriority, DataPriorityRandomAccessDelayFactor,
     EnergyEconomyGroup, EnergyEconomyStartpoint, Frame18Distribution, GracefulServiceDegradationControl,
-    Layer2Report, LinkPerformanceInformation, LlcTimerStatus, LowerLayerResourceAvailability, MeasurementReport,
+    Layer2Report, LinkPerformanceInformation, LlcTimerStatus, LowerLayerResourceAvailability, LowerLayerResourceReason, MeasurementReport,
     MeasurementValue, MleActivityIndicator, OperatingMode, PeriodicReportingTimer, QualityIndication,
     RequestHandle, RfChannelCharacteristics, RfChannelNumber, ScanRequestId, ScanningMeasurementMethod,
     ScheduleRepetitionInformation, ScchInformation, SelectionCause, SelectionResult, ThresholdValues,
@@ -59,6 +59,7 @@ pub struct TlmcCellReadConf {
 pub struct TlmcConfigureInd {
     pub endpoint_id: EndpointId,
     pub lower_layer_resource_availability: LowerLayerResourceAvailability,
+    pub reason: LowerLayerResourceReason,
 }
 
 /// TL/TMC-CONFIGURE request.

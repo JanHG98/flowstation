@@ -3,7 +3,7 @@
 
 ## Ergebnis
 
-Paket A stellt die reproduzierbare Inventur bereit. Paket B ergänzt darauf aufbauend die typisierten TLMC-/TLPD-Primitive, ihre `SapMsgInner`-Varianten und die grundlegenden Mobilitäts-/Linkzustände. Die Matrix bleibt die laufend aktualisierte Bestandsaufnahme für die folgenden Runtime-Pakete.
+Paket A stellt die reproduzierbare Inventur bereit. Paket B ergänzt die typisierten TLMC-/TLPD-Primitive und grundlegenden Zustände. Paket C aktiviert darauf die lokale TLMC-Runtime mit Configure, Ressourcenstatus, Measurement, Monitor, Assessment, Scan, Cell Read, Select, Timeouts und Diagnose-Snapshot. Die Matrix bleibt die laufend aktualisierte Bestandsaufnahme für die folgenden Runtime-Pakete.
 
 | Messgröße | Stand |
 | --- | --- |
@@ -13,7 +13,7 @@ Paket A stellt die reproduzierbare Inventur bereit. Paket B ergänzt darauf aufb
 | SAP-Primitive nicht in SapMsgInner | 62 |
 | TLMC-Primitive inventarisiert | 18 |
 | LTPD-Primitive inventarisiert | 27 |
-| kritische Runtime-Platzhalter | 57 |
+| kritische Runtime-Platzhalter | 56 |
 | gefundene State-Typen | 17 |
 
 ## Erzeugte Artefakte
@@ -41,4 +41,4 @@ Die Matrix bewertet den Quellcode konservativ. Ein Codec ohne offensichtlichen P
 
 ## Nächster Arbeitsschritt
 
-Paket C implementiert als Nächstes die TLMC-Runtime: Configure, Ressourcenverlust/-wiederkehr, Measurement, Monitor, Scan, Cell Read, Assessment und Select. Anschließend folgt Paket D mit der vollständigen LTPD-Runtime.
+Paket C ist abgeschlossen. Als Nächstes implementiert Paket D die vollständige LTPD-Runtime mit bidirektionalem MLE-UNITDATA, Context Registry, Configure, Connect/Disconnect, Break/Resume, Reconnect und sauberem Release/Report.

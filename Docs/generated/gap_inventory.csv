@@ -132,13 +132,12 @@ TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/mle/mle_bs.rs,212
 TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/mle/mle_bs.rs,229,"chan_change_resp_req: false, // TODO FIXME"
 TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/mle/mle_bs.rs,230,"chan_change_handle: None,    // TODO FIXME"
 unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/mle/mle_bs.rs,246,"unimplemented_log!(""MleProtocolDiscriminator::TetraManagementEntity"");"
-unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/mle/mle_bs.rs,255,"unimplemented_log!(""rx_tlmc_prim called but TLMC SAP is not implemented"");"
-TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/mle/mle_bs.rs,289,"subscriber_class: 0, // TODO fixme"
-TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/mle/mle_bs.rs,294,"req_handle: 0, // TODO FIXME; should we pass the same handle here?"
-unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/mle/mle_bs.rs,317,"unimplemented_log!(""rx_tlpd_prim called but TLPD SAP is not implemented"");"
-TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/mle/mle_bs.rs,357,"subscriber_class: 0, // TODO fixme"
-TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/mle/mle_bs.rs,384,"subscriber_class: 0, // TODO fixme"
-TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/mle/mle_bs.rs,389,"req_handle: 0, // TODO FIXME"
+TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/mle/mle_bs.rs,329,"subscriber_class: 0, // TODO fixme"
+TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/mle/mle_bs.rs,334,"req_handle: 0, // TODO FIXME; should we pass the same handle here?"
+unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/mle/mle_bs.rs,357,"unimplemented_log!(""rx_tlpd_prim called but TLPD SAP is not implemented"");"
+TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/mle/mle_bs.rs,397,"subscriber_class: 0, // TODO fixme"
+TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/mle/mle_bs.rs,424,"subscriber_class: 0, // TODO fixme"
+TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/mle/mle_bs.rs,429,"req_handle: 0, // TODO FIXME"
 unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/mle/mle_ms.rs,62,"unimplemented_log!(""DNewCell"")"
 unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/mle/mle_ms.rs,65,"unimplemented_log!(""DPrepareFail"")"
 unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/mle/mle_ms.rs,68,"unimplemented_log!(""DNwrkBroadcast"")"
@@ -162,12 +161,11 @@ unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/mle/ml
 unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/mle/mle_ms.rs,330,"unimplemented_log!(""rx_tlmb_tl_sysinfo_ind"");"
 unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/mle/mle_ms.rs,389,"unimplemented_log!(""rx_tlmb_tl_sync_ind"");"
 TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/mle/mle_ms.rs,410,//     // TODO FIXME: This is ugly. We should pass the message through all the intermediate layers
-unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/mle/mle_ms.rs,436,"unimplemented_log!(""rx_tlmc_prim called but TLMC SAP is not implemented"");"
-TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/mle/mle_ms.rs,470,"subscriber_class: 0, // TODO fixme"
-TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/mle/mle_ms.rs,475,"req_handle: 0, // TODO FIXME; should we pass the same handle here?"
-unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/mle/mle_ms.rs,496,"unimplemented_log!(""rx_tlpd_prim called but TLPD SAP is not implemented"");"
-TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/mle/mle_ms.rs,534,"subscriber_class: 0, // TODO fixme"
-TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/mle/mle_ms.rs,539,"req_handle: 0, // TODO FIXME"
+TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/mle/mle_ms.rs,497,"subscriber_class: 0, // TODO fixme"
+TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/mle/mle_ms.rs,502,"req_handle: 0, // TODO FIXME; should we pass the same handle here?"
+unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/mle/mle_ms.rs,523,"unimplemented_log!(""rx_tlpd_prim called but TLPD SAP is not implemented"");"
+TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/mle/mle_ms.rs,561,"subscriber_class: 0, // TODO fixme"
+TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/mle/mle_ms.rs,566,"req_handle: 0, // TODO FIXME"
 Todo-Typ,Typ-Platzhalter,Runtime,crates/tetra-entities/src/mm/components/not_supported.rs,34,"layer2service: Layer2Service::Todo,"
 panic!,prüfen,Runtime,crates/tetra-entities/src/mm/components/recovery_cache.rs,246,"cache.maybe_flush(|| panic!(""snapshot must not be called when clean""));"
 unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/mm/mm_bs.rs,1126,"unimplemented_log!(""{:?}"", pdu.status_uplink)"
@@ -312,70 +310,69 @@ TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/subcomp/ms_d
 Todo-Typ,Typ-Platzhalter,Runtime,crates/tetra-entities/src/umac/subcomp/ms_defrag.rs,38,"pub fn insert_first(&mut self, bitbuffer: &mut BitBuffer, t: TdmaTime, addr: TetraAddress, aie_info: Option<Todo>) {"
 Todo-Typ,Typ-Platzhalter,Runtime,crates/tetra-entities/src/umac/subcomp/ms_defrag.rs,130,"pub fn get_aie_info(&self, t: TdmaTime) -> Option<&Todo> {"
 Todo-Typ,Typ-Platzhalter,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,4,"use tetra_core::{BitBuffer, Direction, PhyBlockNum, Sap, SsiType, TdmaTime, TetraAddress, Todo, unimplemented_log};"
-Todo-Typ,Typ-Platzhalter,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,189,"fn resolve_cmce_carrier_hint(&self, carrier_hint: Option<Todo>, logical_ts: Option<u8>) -> u16 {"
-TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,234,// TODO FIXME make more/all parameters configurable
-panic!,prüfen,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,265,.unwrap_or_else(|| panic!(
-TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,355,"cell_load_ca: 0, // TODO implement dynamic setting. 0 = info unavailable"
-Todo-Typ,Typ-Platzhalter,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,412,"fn send_tma_report_ind(queue: &mut MessageQueue, handle: Todo, report: TmaReport) {"
-unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,617,"unimplemented_log!(""event labels not implemented"");"
-TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,695,// TODO not sure if there is scenarios in which we want to pass a null pdu to the LLC
-unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,702,"unimplemented_log!(""rx_mac_data: Encryption mode > 0"");"
-TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,732,// TODO FIXME should not copy here but take ownership
-TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,750,"endpoint_id: 0,        // TODO FIXME"
-TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,751,"new_endpoint_id: None, // TODO FIXME"
-TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,752,"css_endpoint_id: None, // TODO FIXME"
-Todo-Typ,Typ-Platzhalter,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,753,"air_interface_encryption: pdu.encrypted as Todo,"
-unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,890,"unimplemented_log!(""rx_mac_access: Encryption mode > 0"");"
-TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,924,// TODO FIXME check if there is a reasonable way to avoid copying here by taking ownership
-TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,940,"endpoint_id: 0,        // TODO FIXME"
-TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,941,"new_endpoint_id: None, // TODO FIXME"
-TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,942,"css_endpoint_id: None, // TODO FIXME"
-Todo-Typ,Typ-Platzhalter,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,943,"air_interface_encryption: pdu.encrypted as Todo,"
-unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,1015,"unimplemented_log!(""rx_mac_frag_ul: Encryption not supported"");"
-unimplemented!,kritisch,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,1091,"unimplemented!(""rx_mac_end_ul: Encryption not supported"");"
-TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,1126,"endpoint_id: 0,              // TODO FIXME"
-TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,1127,"new_endpoint_id: None,       // TODO FIXME"
-TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,1128,"css_endpoint_id: None,       // TODO FIXME"
-TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,1129,"air_interface_encryption: 0, // TODO FIXME implement"
-unimplemented!,kritisch,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,1220,"unimplemented!(""rx_mac_end_hu: Encryption not supported"");"
-TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,1255,"endpoint_id: 0,              // TODO FIXME"
-TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,1256,"new_endpoint_id: None,       // TODO FIXME"
-TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,1257,"css_endpoint_id: None,       // TODO FIXME"
-TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,1258,"air_interface_encryption: 0, // TODO FIXME implement"
-TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,1364,// TODO implement slightly different handling since enum is not the same.
-unimplemented!,kritisch,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,1365,unimplemented!();
-Todo-Typ,Typ-Platzhalter,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,1836,"//             air_interface_encryption: pending.encrypted as Todo,"
-unimplemented!,kritisch,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,2167,unimplemented!();
+Todo-Typ,Typ-Platzhalter,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,201,"fn resolve_cmce_carrier_hint(&self, carrier_hint: Option<Todo>, logical_ts: Option<u8>) -> u16 {"
+TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,246,// TODO FIXME make more/all parameters configurable
+panic!,prüfen,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,277,.unwrap_or_else(|| panic!(
+TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,367,"cell_load_ca: 0, // TODO implement dynamic setting. 0 = info unavailable"
+Todo-Typ,Typ-Platzhalter,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,424,"fn send_tma_report_ind(queue: &mut MessageQueue, handle: Todo, report: TmaReport) {"
+unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,629,"unimplemented_log!(""event labels not implemented"");"
+TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,707,// TODO not sure if there is scenarios in which we want to pass a null pdu to the LLC
+unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,714,"unimplemented_log!(""rx_mac_data: Encryption mode > 0"");"
+TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,744,// TODO FIXME should not copy here but take ownership
+TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,762,"endpoint_id: 0,        // TODO FIXME"
+TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,763,"new_endpoint_id: None, // TODO FIXME"
+TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,764,"css_endpoint_id: None, // TODO FIXME"
+Todo-Typ,Typ-Platzhalter,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,765,"air_interface_encryption: pdu.encrypted as Todo,"
+unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,902,"unimplemented_log!(""rx_mac_access: Encryption mode > 0"");"
+TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,936,// TODO FIXME check if there is a reasonable way to avoid copying here by taking ownership
+TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,952,"endpoint_id: 0,        // TODO FIXME"
+TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,953,"new_endpoint_id: None, // TODO FIXME"
+TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,954,"css_endpoint_id: None, // TODO FIXME"
+Todo-Typ,Typ-Platzhalter,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,955,"air_interface_encryption: pdu.encrypted as Todo,"
+unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,1027,"unimplemented_log!(""rx_mac_frag_ul: Encryption not supported"");"
+unimplemented!,kritisch,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,1103,"unimplemented!(""rx_mac_end_ul: Encryption not supported"");"
+TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,1138,"endpoint_id: 0,              // TODO FIXME"
+TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,1139,"new_endpoint_id: None,       // TODO FIXME"
+TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,1140,"css_endpoint_id: None,       // TODO FIXME"
+TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,1141,"air_interface_encryption: 0, // TODO FIXME implement"
+unimplemented!,kritisch,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,1232,"unimplemented!(""rx_mac_end_hu: Encryption not supported"");"
+TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,1267,"endpoint_id: 0,              // TODO FIXME"
+TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,1268,"new_endpoint_id: None,       // TODO FIXME"
+TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,1269,"css_endpoint_id: None,       // TODO FIXME"
+TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,1270,"air_interface_encryption: 0, // TODO FIXME implement"
+TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,1376,// TODO implement slightly different handling since enum is not the same.
+unimplemented!,kritisch,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,1377,unimplemented!();
+Todo-Typ,Typ-Platzhalter,Runtime,crates/tetra-entities/src/umac/umac_bs.rs,1848,"//             air_interface_encryption: pending.encrypted as Todo,"
 Todo-Typ,Typ-Platzhalter,Runtime,crates/tetra-entities/src/umac/umac_ms.rs,3,"use tetra_core::{BitBuffer, PhyBlockNum, Sap, TdmaTime, Todo, unimplemented_log};"
-unreachable!,prüfen,Runtime,crates/tetra-entities/src/umac/umac_ms.rs,106,"_ => unreachable!(""invalid channel: {:?}"", prim.logical_channel),"
-TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_ms.rs,220,// TODO FIXME adopt sysinfo info into global state
-unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/umac/umac_ms.rs,280,"unimplemented_log!(""rx_mac_resource: Encryption mode > 0, not implemented"");"
-unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/umac/umac_ms.rs,292,"unimplemented_log!(""rx_mac_resource: SECOND HALF SLOT STOLEN IN STCH but signal not implemented"");"
-TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_ms.rs,308,// TODO FIXME: I sometimes encounter len = 0b100010 = 32
-TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_ms.rs,341,// TODO not sure if there is scenarios in which we want to pass a null pdu to the LLC
-unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/umac/umac_ms.rs,348,"unimplemented_log!(""rx_mac_resource: Encryption mode > 0"");"
-TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_ms.rs,350,// TODO:
-TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_ms.rs,372,// TODO FIXME should not copy here but take ownership
-TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_ms.rs,390,"endpoint_id: 0,        // TODO FIXME"
-TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_ms.rs,391,"new_endpoint_id: None, // TODO FIXME"
-TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_ms.rs,392,"css_endpoint_id: None, // TODO FIXME"
-Todo-Typ,Typ-Platzhalter,Runtime,crates/tetra-entities/src/umac/umac_ms.rs,393,"air_interface_encryption: pdu.encryption_mode as Todo,"
-TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_ms.rs,449,// TODO FIXME implement
-unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/umac/umac_ms.rs,450,"unimplemented_log!(""rx_mac_frag: Encryption not supported"");"
-TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_ms.rs,497,// TODO FIXME implement
-unimplemented!,kritisch,Runtime,crates/tetra-entities/src/umac/umac_ms.rs,498,"unimplemented!(""rx_mac_end: Encryption not supported"");"
-TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_ms.rs,499,// TODO FIXME Also re-parse chanalloc
-TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_ms.rs,524,"endpoint_id: 0,              // TODO FIXME"
-TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_ms.rs,525,"new_endpoint_id: None,       // TODO FIXME"
-TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_ms.rs,526,"css_endpoint_id: None,       // TODO FIXME"
-TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_ms.rs,527,"air_interface_encryption: 0, // TODO FIXME implement"
-unimplemented!,kritisch,Runtime,crates/tetra-entities/src/umac/umac_ms.rs,548,"unimplemented!(""rx_usignal"");"
-unimplemented!,kritisch,Runtime,crates/tetra-entities/src/umac/umac_ms.rs,560,"unimplemented!(""rx_supp"");"
-TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_ms.rs,566,"// TODO FIXME, more extensively store and process AACH state in both LMAC and UMAC"
-unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/umac/umac_ms.rs,634,"unimplemented_log!(""can't update global state"");"
-TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_ms.rs,659,//     // TODO warn/bail when really not in line with expected time
-unimplemented!,kritisch,Runtime,crates/tetra-entities/src/umac/umac_ms.rs,719,unimplemented!();
-unimplemented!,kritisch,Runtime,crates/tetra-entities/src/umac/umac_ms.rs,724,unimplemented!();
+unreachable!,prüfen,Runtime,crates/tetra-entities/src/umac/umac_ms.rs,138,"_ => unreachable!(""invalid channel: {:?}"", prim.logical_channel),"
+TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_ms.rs,254,// TODO FIXME adopt sysinfo info into global state
+unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/umac/umac_ms.rs,314,"unimplemented_log!(""rx_mac_resource: Encryption mode > 0, not implemented"");"
+unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/umac/umac_ms.rs,326,"unimplemented_log!(""rx_mac_resource: SECOND HALF SLOT STOLEN IN STCH but signal not implemented"");"
+TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_ms.rs,342,// TODO FIXME: I sometimes encounter len = 0b100010 = 32
+TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_ms.rs,375,// TODO not sure if there is scenarios in which we want to pass a null pdu to the LLC
+unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/umac/umac_ms.rs,382,"unimplemented_log!(""rx_mac_resource: Encryption mode > 0"");"
+TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_ms.rs,384,// TODO:
+TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_ms.rs,406,// TODO FIXME should not copy here but take ownership
+TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_ms.rs,424,"endpoint_id: 0,        // TODO FIXME"
+TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_ms.rs,425,"new_endpoint_id: None, // TODO FIXME"
+TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_ms.rs,426,"css_endpoint_id: None, // TODO FIXME"
+Todo-Typ,Typ-Platzhalter,Runtime,crates/tetra-entities/src/umac/umac_ms.rs,427,"air_interface_encryption: pdu.encryption_mode as Todo,"
+TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_ms.rs,483,// TODO FIXME implement
+unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/umac/umac_ms.rs,484,"unimplemented_log!(""rx_mac_frag: Encryption not supported"");"
+TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_ms.rs,531,// TODO FIXME implement
+unimplemented!,kritisch,Runtime,crates/tetra-entities/src/umac/umac_ms.rs,532,"unimplemented!(""rx_mac_end: Encryption not supported"");"
+TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_ms.rs,533,// TODO FIXME Also re-parse chanalloc
+TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_ms.rs,558,"endpoint_id: 0,              // TODO FIXME"
+TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_ms.rs,559,"new_endpoint_id: None,       // TODO FIXME"
+TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_ms.rs,560,"css_endpoint_id: None,       // TODO FIXME"
+TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_ms.rs,561,"air_interface_encryption: 0, // TODO FIXME implement"
+unimplemented!,kritisch,Runtime,crates/tetra-entities/src/umac/umac_ms.rs,582,"unimplemented!(""rx_usignal"");"
+unimplemented!,kritisch,Runtime,crates/tetra-entities/src/umac/umac_ms.rs,594,"unimplemented!(""rx_supp"");"
+TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_ms.rs,600,"// TODO FIXME, more extensively store and process AACH state in both LMAC and UMAC"
+unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/umac/umac_ms.rs,669,"unimplemented_log!(""can't update global state"");"
+TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/umac/umac_ms.rs,694,//     // TODO warn/bail when really not in line with expected time
+unimplemented!,kritisch,Runtime,crates/tetra-entities/src/umac/umac_ms.rs,754,unimplemented!();
+unimplemented!,kritisch,Runtime,crates/tetra-entities/src/umac/umac_ms.rs,759,unimplemented!();
 panic!,Test-Assertion,Test,crates/tetra-entities/tests/common/component_test.rs,43,"_ => panic!(""Unsupported stack mode""),"
 panic!,Test-Assertion,Test,crates/tetra-entities/tests/common/component_test.rs,87,"panic!(""Only BS stack mode is supported in ComponentTest"");"
 panic!,Test-Assertion,Test,crates/tetra-entities/tests/common/component_test.rs,130,"panic!(""Component not implemented: {:?}"", component);"

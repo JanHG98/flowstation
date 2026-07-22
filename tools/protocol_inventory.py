@@ -571,8 +571,8 @@ def render_states(records: list[StateRecord]) -> str:
         ("CMCE Individual Call", "vorhandene Individual-Call-State-Typen prüfen und formalisieren", "Phase 5"),
         ("SNDCP Context State", "PDP-State vorhanden; vollständige Context-Transitionen folgen", "Phase 11"),
         ("LTPD Link State", "Typfundament mit `LtpdLinkState` vorhanden; Runtime fehlt", "Paket D"),
-        ("LLC Link State", "implizite Linkzustände und Timer explizit dokumentieren", "Paket C/D"),
-        ("Channel Change State", "Typfundament mit `ChannelChangeState` vorhanden; Runtime fehlt", "Paket C/Phase 3"),
+        ("LLC Link State", "implizite Linkzustände und Timer explizit dokumentieren", "Paket D"),
+        ("Channel Change State", "TLMC Select/Response-Lifecycle vorhanden; MLE-Zellwechseltransitionen fehlen", "Phase 3"),
     ]
     return "\n".join(
         [
@@ -616,7 +616,7 @@ def render_summary(pdus: list[PduRecord], saps: list[SapRecord], gaps: list[GapR
             "",
             "## Ergebnis",
             "",
-            "Paket A stellt die reproduzierbare Inventur bereit. Paket B ergänzt darauf aufbauend die typisierten TLMC-/TLPD-Primitive, ihre `SapMsgInner`-Varianten und die grundlegenden Mobilitäts-/Linkzustände. Die Matrix bleibt die laufend aktualisierte Bestandsaufnahme für die folgenden Runtime-Pakete.",
+            "Paket A stellt die reproduzierbare Inventur bereit. Paket B ergänzt die typisierten TLMC-/TLPD-Primitive und grundlegenden Zustände. Paket C aktiviert darauf die lokale TLMC-Runtime mit Configure, Ressourcenstatus, Measurement, Monitor, Assessment, Scan, Cell Read, Select, Timeouts und Diagnose-Snapshot. Die Matrix bleibt die laufend aktualisierte Bestandsaufnahme für die folgenden Runtime-Pakete.",
             "",
             table(
                 ["Messgröße", "Stand"],
@@ -657,7 +657,7 @@ def render_summary(pdus: list[PduRecord], saps: list[SapRecord], gaps: list[GapR
             "",
             "## Nächster Arbeitsschritt",
             "",
-            "Paket C implementiert als Nächstes die TLMC-Runtime: Configure, Ressourcenverlust/-wiederkehr, Measurement, Monitor, Scan, Cell Read, Assessment und Select. Anschließend folgt Paket D mit der vollständigen LTPD-Runtime.",
+            "Paket C ist abgeschlossen. Als Nächstes implementiert Paket D die vollständige LTPD-Runtime mit bidirektionalem MLE-UNITDATA, Context Registry, Configure, Connect/Disconnect, Break/Resume, Reconnect und sauberem Release/Report.",
             "",
         ]
     )

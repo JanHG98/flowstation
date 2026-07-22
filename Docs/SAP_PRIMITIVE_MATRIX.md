@@ -7,8 +7,8 @@
 
 - erfasste Primitive: **128**
 - nicht in `SapMsgInner` verdrahtet: **62**
-- vorhandene Variante ohne sichtbaren Runtime-Pfad: **47**
-- Primitive ohne Testverweis: **115**
+- vorhandene Variante ohne sichtbaren Runtime-Pfad: **30**
+- Primitive ohne Testverweis: **110**
 
 ## CONTROL
 
@@ -145,24 +145,24 @@
 
 | Primitive | SapMsgInner | erzeugt | behandelt | Testtreffer | Status | Definition |
 | --- | --- | --- | --- | --- | --- | --- |
-| TlmcAssessmentInd | ja | 0 | 0 | 0 | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/tlmc/mod.rs` |
-| TlmcAssessmentListReq | ja | 0 | 0 | 0 | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/tlmc/mod.rs` |
-| TlmcCellReadConf | ja | 0 | 0 | 0 | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/tlmc/mod.rs` |
-| TlmcCellReadReq | ja | 0 | 0 | 0 | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/tlmc/mod.rs` |
-| TlmcConfigureConf | ja | 0 | 0 | 0 | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/tlmc/mod.rs` |
-| TlmcConfigureInd | ja | 0 | 0 | 0 | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/tlmc/mod.rs` |
-| TlmcConfigureReq | ja | 1 | 2 | 7 | bidirektional sichtbar | `crates/tetra-saps/src/tlmc/mod.rs` |
-| TlmcMeasurementInd | ja | 0 | 0 | 0 | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/tlmc/mod.rs` |
-| TlmcMonitorInd | ja | 0 | 0 | 0 | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/tlmc/mod.rs` |
-| TlmcMonitorListReq | ja | 0 | 0 | 0 | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/tlmc/mod.rs` |
-| TlmcReportInd | ja | 0 | 0 | 0 | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/tlmc/mod.rs` |
-| TlmcScanConf | ja | 0 | 0 | 0 | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/tlmc/mod.rs` |
-| TlmcScanReportInd | ja | 0 | 0 | 0 | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/tlmc/mod.rs` |
-| TlmcScanReq | ja | 0 | 0 | 0 | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/tlmc/mod.rs` |
-| TlmcSelectConf | ja | 0 | 0 | 0 | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/tlmc/mod.rs` |
-| TlmcSelectInd | ja | 0 | 0 | 0 | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/tlmc/mod.rs` |
-| TlmcSelectReq | ja | 0 | 0 | 0 | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/tlmc/mod.rs` |
-| TlmcSelectResp | ja | 0 | 0 | 0 | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/tlmc/mod.rs` |
+| TlmcAssessmentInd | ja | 0 | 2 | 0 | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/tlmc/mod.rs` |
+| TlmcAssessmentListReq | ja | 0 | 1 | 0 | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/tlmc/mod.rs` |
+| TlmcCellReadConf | ja | 0 | 4 | 0 | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/tlmc/mod.rs` |
+| TlmcCellReadReq | ja | 0 | 1 | 0 | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/tlmc/mod.rs` |
+| TlmcConfigureConf | ja | 0 | 4 | 1 | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/tlmc/mod.rs` |
+| TlmcConfigureInd | ja | 0 | 4 | 3 | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/tlmc/mod.rs` |
+| TlmcConfigureReq | ja | 1 | 4 | 10 | bidirektional sichtbar | `crates/tetra-saps/src/tlmc/mod.rs` |
+| TlmcMeasurementInd | ja | 0 | 3 | 0 | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/tlmc/mod.rs` |
+| TlmcMonitorInd | ja | 0 | 3 | 0 | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/tlmc/mod.rs` |
+| TlmcMonitorListReq | ja | 0 | 1 | 0 | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/tlmc/mod.rs` |
+| TlmcReportInd | ja | 0 | 6 | 0 | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/tlmc/mod.rs` |
+| TlmcScanConf | ja | 0 | 4 | 2 | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/tlmc/mod.rs` |
+| TlmcScanReportInd | ja | 0 | 2 | 0 | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/tlmc/mod.rs` |
+| TlmcScanReq | ja | 0 | 1 | 5 | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/tlmc/mod.rs` |
+| TlmcSelectConf | ja | 0 | 4 | 0 | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/tlmc/mod.rs` |
+| TlmcSelectInd | ja | 0 | 2 | 0 | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/tlmc/mod.rs` |
+| TlmcSelectReq | ja | 0 | 1 | 0 | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/tlmc/mod.rs` |
+| TlmcSelectResp | ja | 0 | 1 | 0 | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/tlmc/mod.rs` |
 
 ## TMA
 
@@ -186,8 +186,8 @@
 | Primitive | SapMsgInner | erzeugt | behandelt | Testtreffer | Status | Definition |
 | --- | --- | --- | --- | --- | --- | --- |
 | TmvConfigureConf | ja | 0 | 0 | 0 | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/tmv/mod.rs` |
-| TmvConfigureReq | ja | 5 | 4 | 0 | bidirektional sichtbar | `crates/tetra-saps/src/tmv/mod.rs` |
-| TmvUnitdataInd | ja | 3 | 27 | 26 | bidirektional sichtbar | `crates/tetra-saps/src/tmv/mod.rs` |
+| TmvConfigureReq | ja | 6 | 4 | 1 | bidirektional sichtbar | `crates/tetra-saps/src/tmv/mod.rs` |
+| TmvUnitdataInd | ja | 3 | 27 | 29 | bidirektional sichtbar | `crates/tetra-saps/src/tmv/mod.rs` |
 | TmvUnitdataReq | ja | 1 | 3 | 2 | bidirektional sichtbar | `crates/tetra-saps/src/tmv/mod.rs` |
 
 ## TNMM

@@ -1,0 +1,53 @@
+name: SWMI foundation TLMC runtime
+
+on:
+  push:
+    paths:
+      - "crates/tetra-saps/src/common/**"
+      - "crates/tetra-saps/src/tlmc/**"
+      - "crates/tetra-saps/src/sapmsg.rs"
+      - "crates/tetra-entities/src/umac/**"
+      - "crates/tetra-entities/src/mle/mle_bs.rs"
+      - "crates/tetra-entities/src/mle/mle_ms.rs"
+      - "crates/tetra-entities/tests/test_tlmc_runtime.rs"
+      - "tools/check_tlmc_runtime.py"
+      - "tools/protocol_inventory.py"
+      - "Docs/TLMC_TLPD_WORKLIST.md"
+      - "Docs/SWMI_FOUNDATION_1_PACKAGE_C*.md"
+      - "Docs/generated/**"
+      - ".github/workflows/swmi-foundation-tlmc-runtime.yml"
+  pull_request:
+    paths:
+      - "crates/tetra-saps/src/common/**"
+      - "crates/tetra-saps/src/tlmc/**"
+      - "crates/tetra-saps/src/sapmsg.rs"
+      - "crates/tetra-entities/src/umac/**"
+      - "crates/tetra-entities/src/mle/mle_bs.rs"
+      - "crates/tetra-entities/src/mle/mle_ms.rs"
+      - "crates/tetra-entities/tests/test_tlmc_runtime.rs"
+      - "tools/check_tlmc_runtime.py"
+      - "tools/protocol_inventory.py"
+      - "Docs/TLMC_TLPD_WORKLIST.md"
+      - "Docs/SWMI_FOUNDATION_1_PACKAGE_C*.md"
+      - "Docs/generated/**"
+      - ".github/workflows/swmi-foundation-tlmc-runtime.yml"
+
+jobs:
+  tlmc-runtime:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install native runtime dependency
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libsoapysdr-dev
+      - name: Verify Package C static invariants
+        run: python3 tools/check_tlmc_runtime.py
+      - name: Verify Package B type invariants
+        run: python3 tools/check_swmi_foundation_types.py
+      - name: Verify generated protocol inventory
+        run: python3 tools/protocol_inventory.py --check
+      - name: Test TLMC SAP types
+        run: cargo test -p tetra-saps
+      - name: Test TLMC runtime
+        run: cargo test -p tetra-entities --test test_tlmc_runtime

@@ -95,24 +95,24 @@ TLMB,TlmbSyncInd,crates/tetra-saps/src/tlmb/mod.rs,ja,1,2,0,bidirektional sichtb
 TLMB,TlmbSyncReq,crates/tetra-saps/src/tlmb/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
 TLMB,TlmbSysinfoInd,crates/tetra-saps/src/tlmb/mod.rs,ja,1,2,0,bidirektional sichtbar
 TLMB,TlmbSysinfoReq,crates/tetra-saps/src/tlmb/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
-TLMC,TlmcAssessmentInd,crates/tetra-saps/src/tlmc/mod.rs,ja,0,0,0,"Variante vorhanden, Runtime-Pfad fehlt"
-TLMC,TlmcAssessmentListReq,crates/tetra-saps/src/tlmc/mod.rs,ja,0,0,0,"Variante vorhanden, Runtime-Pfad fehlt"
-TLMC,TlmcCellReadConf,crates/tetra-saps/src/tlmc/mod.rs,ja,0,0,0,"Variante vorhanden, Runtime-Pfad fehlt"
-TLMC,TlmcCellReadReq,crates/tetra-saps/src/tlmc/mod.rs,ja,0,0,0,"Variante vorhanden, Runtime-Pfad fehlt"
-TLMC,TlmcConfigureConf,crates/tetra-saps/src/tlmc/mod.rs,ja,0,0,0,"Variante vorhanden, Runtime-Pfad fehlt"
-TLMC,TlmcConfigureInd,crates/tetra-saps/src/tlmc/mod.rs,ja,0,0,0,"Variante vorhanden, Runtime-Pfad fehlt"
-TLMC,TlmcConfigureReq,crates/tetra-saps/src/tlmc/mod.rs,ja,1,2,7,bidirektional sichtbar
-TLMC,TlmcMeasurementInd,crates/tetra-saps/src/tlmc/mod.rs,ja,0,0,0,"Variante vorhanden, Runtime-Pfad fehlt"
-TLMC,TlmcMonitorInd,crates/tetra-saps/src/tlmc/mod.rs,ja,0,0,0,"Variante vorhanden, Runtime-Pfad fehlt"
-TLMC,TlmcMonitorListReq,crates/tetra-saps/src/tlmc/mod.rs,ja,0,0,0,"Variante vorhanden, Runtime-Pfad fehlt"
-TLMC,TlmcReportInd,crates/tetra-saps/src/tlmc/mod.rs,ja,0,0,0,"Variante vorhanden, Runtime-Pfad fehlt"
-TLMC,TlmcScanConf,crates/tetra-saps/src/tlmc/mod.rs,ja,0,0,0,"Variante vorhanden, Runtime-Pfad fehlt"
-TLMC,TlmcScanReportInd,crates/tetra-saps/src/tlmc/mod.rs,ja,0,0,0,"Variante vorhanden, Runtime-Pfad fehlt"
-TLMC,TlmcScanReq,crates/tetra-saps/src/tlmc/mod.rs,ja,0,0,0,"Variante vorhanden, Runtime-Pfad fehlt"
-TLMC,TlmcSelectConf,crates/tetra-saps/src/tlmc/mod.rs,ja,0,0,0,"Variante vorhanden, Runtime-Pfad fehlt"
-TLMC,TlmcSelectInd,crates/tetra-saps/src/tlmc/mod.rs,ja,0,0,0,"Variante vorhanden, Runtime-Pfad fehlt"
-TLMC,TlmcSelectReq,crates/tetra-saps/src/tlmc/mod.rs,ja,0,0,0,"Variante vorhanden, Runtime-Pfad fehlt"
-TLMC,TlmcSelectResp,crates/tetra-saps/src/tlmc/mod.rs,ja,0,0,0,"Variante vorhanden, Runtime-Pfad fehlt"
+TLMC,TlmcAssessmentInd,crates/tetra-saps/src/tlmc/mod.rs,ja,0,2,0,nur Empfang/Handler sichtbar
+TLMC,TlmcAssessmentListReq,crates/tetra-saps/src/tlmc/mod.rs,ja,0,1,0,nur Empfang/Handler sichtbar
+TLMC,TlmcCellReadConf,crates/tetra-saps/src/tlmc/mod.rs,ja,0,4,0,nur Empfang/Handler sichtbar
+TLMC,TlmcCellReadReq,crates/tetra-saps/src/tlmc/mod.rs,ja,0,1,0,nur Empfang/Handler sichtbar
+TLMC,TlmcConfigureConf,crates/tetra-saps/src/tlmc/mod.rs,ja,0,4,1,nur Empfang/Handler sichtbar
+TLMC,TlmcConfigureInd,crates/tetra-saps/src/tlmc/mod.rs,ja,0,4,3,nur Empfang/Handler sichtbar
+TLMC,TlmcConfigureReq,crates/tetra-saps/src/tlmc/mod.rs,ja,1,4,10,bidirektional sichtbar
+TLMC,TlmcMeasurementInd,crates/tetra-saps/src/tlmc/mod.rs,ja,0,3,0,nur Empfang/Handler sichtbar
+TLMC,TlmcMonitorInd,crates/tetra-saps/src/tlmc/mod.rs,ja,0,3,0,nur Empfang/Handler sichtbar
+TLMC,TlmcMonitorListReq,crates/tetra-saps/src/tlmc/mod.rs,ja,0,1,0,nur Empfang/Handler sichtbar
+TLMC,TlmcReportInd,crates/tetra-saps/src/tlmc/mod.rs,ja,0,6,0,nur Empfang/Handler sichtbar
+TLMC,TlmcScanConf,crates/tetra-saps/src/tlmc/mod.rs,ja,0,4,2,nur Empfang/Handler sichtbar
+TLMC,TlmcScanReportInd,crates/tetra-saps/src/tlmc/mod.rs,ja,0,2,0,nur Empfang/Handler sichtbar
+TLMC,TlmcScanReq,crates/tetra-saps/src/tlmc/mod.rs,ja,0,1,5,nur Empfang/Handler sichtbar
+TLMC,TlmcSelectConf,crates/tetra-saps/src/tlmc/mod.rs,ja,0,4,0,nur Empfang/Handler sichtbar
+TLMC,TlmcSelectInd,crates/tetra-saps/src/tlmc/mod.rs,ja,0,2,0,nur Empfang/Handler sichtbar
+TLMC,TlmcSelectReq,crates/tetra-saps/src/tlmc/mod.rs,ja,0,1,0,nur Empfang/Handler sichtbar
+TLMC,TlmcSelectResp,crates/tetra-saps/src/tlmc/mod.rs,ja,0,1,0,nur Empfang/Handler sichtbar
 TMA,TmaCancelReq,crates/tetra-saps/src/tma/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
 TMA,TmaReleaseInd,crates/tetra-saps/src/tma/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
 TMA,TmaReportInd,crates/tetra-saps/src/tma/mod.rs,ja,1,1,0,bidirektional sichtbar
@@ -121,8 +121,8 @@ TMA,TmaUnitdataReq,crates/tetra-saps/src/tma/mod.rs,ja,5,2,11,bidirektional sich
 TMD,TmdCircuitDataInd,crates/tetra-saps/src/tmd/mod.rs,ja,5,5,0,bidirektional sichtbar
 TMD,TmdCircuitDataReq,crates/tetra-saps/src/tmd/mod.rs,ja,4,1,3,bidirektional sichtbar
 TMV,TmvConfigureConf,crates/tetra-saps/src/tmv/mod.rs,ja,0,0,0,"Variante vorhanden, Runtime-Pfad fehlt"
-TMV,TmvConfigureReq,crates/tetra-saps/src/tmv/mod.rs,ja,5,4,0,bidirektional sichtbar
-TMV,TmvUnitdataInd,crates/tetra-saps/src/tmv/mod.rs,ja,3,27,26,bidirektional sichtbar
+TMV,TmvConfigureReq,crates/tetra-saps/src/tmv/mod.rs,ja,6,4,1,bidirektional sichtbar
+TMV,TmvUnitdataInd,crates/tetra-saps/src/tmv/mod.rs,ja,3,27,29,bidirektional sichtbar
 TMV,TmvUnitdataReq,crates/tetra-saps/src/tmv/mod.rs,ja,1,3,2,bidirektional sichtbar
 TNMM,TnmmTestDemand,crates/tetra-saps/src/tnmm/mod.rs,ja,0,0,0,"Variante vorhanden, Runtime-Pfad fehlt"
 TNMM,TnmmTestResponse,crates/tetra-saps/src/tnmm/mod.rs,ja,0,0,0,"Variante vorhanden, Runtime-Pfad fehlt"

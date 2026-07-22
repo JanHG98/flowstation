@@ -1065,16 +1065,8 @@
       "text": "unimplemented_log!(\"MleProtocolDiscriminator::TetraManagementEntity\");"
     },
     {
-      "category": "unimplemented_log!",
-      "line": 255,
-      "path": "crates/tetra-entities/src/mle/mle_bs.rs",
-      "scope": "Runtime",
-      "severity": "offener Runtime-Pfad",
-      "text": "unimplemented_log!(\"rx_tlmc_prim called but TLMC SAP is not implemented\");"
-    },
-    {
       "category": "TODO/FIXME",
-      "line": 289,
+      "line": 329,
       "path": "crates/tetra-entities/src/mle/mle_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -1082,7 +1074,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 294,
+      "line": 334,
       "path": "crates/tetra-entities/src/mle/mle_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -1090,7 +1082,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 317,
+      "line": 357,
       "path": "crates/tetra-entities/src/mle/mle_bs.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -1098,7 +1090,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 357,
+      "line": 397,
       "path": "crates/tetra-entities/src/mle/mle_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -1106,7 +1098,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 384,
+      "line": 424,
       "path": "crates/tetra-entities/src/mle/mle_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -1114,7 +1106,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 389,
+      "line": 429,
       "path": "crates/tetra-entities/src/mle/mle_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -1305,16 +1297,8 @@
       "text": "//     // TODO FIXME: This is ugly. We should pass the message through all the intermediate layers"
     },
     {
-      "category": "unimplemented_log!",
-      "line": 436,
-      "path": "crates/tetra-entities/src/mle/mle_ms.rs",
-      "scope": "Runtime",
-      "severity": "offener Runtime-Pfad",
-      "text": "unimplemented_log!(\"rx_tlmc_prim called but TLMC SAP is not implemented\");"
-    },
-    {
       "category": "TODO/FIXME",
-      "line": 470,
+      "line": 497,
       "path": "crates/tetra-entities/src/mle/mle_ms.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -1322,7 +1306,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 475,
+      "line": 502,
       "path": "crates/tetra-entities/src/mle/mle_ms.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -1330,7 +1314,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 496,
+      "line": 523,
       "path": "crates/tetra-entities/src/mle/mle_ms.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -1338,7 +1322,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 534,
+      "line": 561,
       "path": "crates/tetra-entities/src/mle/mle_ms.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -1346,7 +1330,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 539,
+      "line": 566,
       "path": "crates/tetra-entities/src/mle/mle_ms.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -2506,7 +2490,7 @@
     },
     {
       "category": "Todo-Typ",
-      "line": 189,
+      "line": 201,
       "path": "crates/tetra-entities/src/umac/umac_bs.rs",
       "scope": "Runtime",
       "severity": "Typ-Platzhalter",
@@ -2514,7 +2498,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 234,
+      "line": 246,
       "path": "crates/tetra-entities/src/umac/umac_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -2522,7 +2506,7 @@
     },
     {
       "category": "panic!",
-      "line": 265,
+      "line": 277,
       "path": "crates/tetra-entities/src/umac/umac_bs.rs",
       "scope": "Runtime",
       "severity": "prüfen",
@@ -2530,7 +2514,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 355,
+      "line": 367,
       "path": "crates/tetra-entities/src/umac/umac_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -2538,7 +2522,7 @@
     },
     {
       "category": "Todo-Typ",
-      "line": 412,
+      "line": 424,
       "path": "crates/tetra-entities/src/umac/umac_bs.rs",
       "scope": "Runtime",
       "severity": "Typ-Platzhalter",
@@ -2546,7 +2530,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 617,
+      "line": 629,
       "path": "crates/tetra-entities/src/umac/umac_bs.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -2554,7 +2538,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 695,
+      "line": 707,
       "path": "crates/tetra-entities/src/umac/umac_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -2562,7 +2546,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 702,
+      "line": 714,
       "path": "crates/tetra-entities/src/umac/umac_bs.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -2570,7 +2554,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 732,
+      "line": 744,
       "path": "crates/tetra-entities/src/umac/umac_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -2578,7 +2562,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 750,
+      "line": 762,
       "path": "crates/tetra-entities/src/umac/umac_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -2586,7 +2570,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 751,
+      "line": 763,
       "path": "crates/tetra-entities/src/umac/umac_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -2594,7 +2578,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 752,
+      "line": 764,
       "path": "crates/tetra-entities/src/umac/umac_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -2602,7 +2586,7 @@
     },
     {
       "category": "Todo-Typ",
-      "line": 753,
+      "line": 765,
       "path": "crates/tetra-entities/src/umac/umac_bs.rs",
       "scope": "Runtime",
       "severity": "Typ-Platzhalter",
@@ -2610,7 +2594,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 890,
+      "line": 902,
       "path": "crates/tetra-entities/src/umac/umac_bs.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -2618,7 +2602,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 924,
+      "line": 936,
       "path": "crates/tetra-entities/src/umac/umac_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -2626,7 +2610,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 940,
+      "line": 952,
       "path": "crates/tetra-entities/src/umac/umac_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -2634,7 +2618,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 941,
+      "line": 953,
       "path": "crates/tetra-entities/src/umac/umac_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -2642,7 +2626,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 942,
+      "line": 954,
       "path": "crates/tetra-entities/src/umac/umac_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -2650,7 +2634,7 @@
     },
     {
       "category": "Todo-Typ",
-      "line": 943,
+      "line": 955,
       "path": "crates/tetra-entities/src/umac/umac_bs.rs",
       "scope": "Runtime",
       "severity": "Typ-Platzhalter",
@@ -2658,7 +2642,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 1015,
+      "line": 1027,
       "path": "crates/tetra-entities/src/umac/umac_bs.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -2666,7 +2650,7 @@
     },
     {
       "category": "unimplemented!",
-      "line": 1091,
+      "line": 1103,
       "path": "crates/tetra-entities/src/umac/umac_bs.rs",
       "scope": "Runtime",
       "severity": "kritisch",
@@ -2674,7 +2658,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 1126,
+      "line": 1138,
       "path": "crates/tetra-entities/src/umac/umac_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -2682,7 +2666,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 1127,
+      "line": 1139,
       "path": "crates/tetra-entities/src/umac/umac_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -2690,7 +2674,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 1128,
+      "line": 1140,
       "path": "crates/tetra-entities/src/umac/umac_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -2698,7 +2682,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 1129,
+      "line": 1141,
       "path": "crates/tetra-entities/src/umac/umac_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -2706,7 +2690,7 @@
     },
     {
       "category": "unimplemented!",
-      "line": 1220,
+      "line": 1232,
       "path": "crates/tetra-entities/src/umac/umac_bs.rs",
       "scope": "Runtime",
       "severity": "kritisch",
@@ -2714,7 +2698,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 1255,
+      "line": 1267,
       "path": "crates/tetra-entities/src/umac/umac_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -2722,7 +2706,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 1256,
+      "line": 1268,
       "path": "crates/tetra-entities/src/umac/umac_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -2730,7 +2714,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 1257,
+      "line": 1269,
       "path": "crates/tetra-entities/src/umac/umac_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -2738,7 +2722,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 1258,
+      "line": 1270,
       "path": "crates/tetra-entities/src/umac/umac_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -2746,7 +2730,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 1364,
+      "line": 1376,
       "path": "crates/tetra-entities/src/umac/umac_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -2754,7 +2738,7 @@
     },
     {
       "category": "unimplemented!",
-      "line": 1365,
+      "line": 1377,
       "path": "crates/tetra-entities/src/umac/umac_bs.rs",
       "scope": "Runtime",
       "severity": "kritisch",
@@ -2762,19 +2746,11 @@
     },
     {
       "category": "Todo-Typ",
-      "line": 1836,
+      "line": 1848,
       "path": "crates/tetra-entities/src/umac/umac_bs.rs",
       "scope": "Runtime",
       "severity": "Typ-Platzhalter",
       "text": "//             air_interface_encryption: pending.encrypted as Todo,"
-    },
-    {
-      "category": "unimplemented!",
-      "line": 2167,
-      "path": "crates/tetra-entities/src/umac/umac_bs.rs",
-      "scope": "Runtime",
-      "severity": "kritisch",
-      "text": "unimplemented!();"
     },
     {
       "category": "Todo-Typ",
@@ -2786,7 +2762,7 @@
     },
     {
       "category": "unreachable!",
-      "line": 106,
+      "line": 138,
       "path": "crates/tetra-entities/src/umac/umac_ms.rs",
       "scope": "Runtime",
       "severity": "prüfen",
@@ -2794,7 +2770,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 220,
+      "line": 254,
       "path": "crates/tetra-entities/src/umac/umac_ms.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -2802,7 +2778,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 280,
+      "line": 314,
       "path": "crates/tetra-entities/src/umac/umac_ms.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -2810,7 +2786,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 292,
+      "line": 326,
       "path": "crates/tetra-entities/src/umac/umac_ms.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -2818,7 +2794,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 308,
+      "line": 342,
       "path": "crates/tetra-entities/src/umac/umac_ms.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -2826,7 +2802,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 341,
+      "line": 375,
       "path": "crates/tetra-entities/src/umac/umac_ms.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -2834,7 +2810,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 348,
+      "line": 382,
       "path": "crates/tetra-entities/src/umac/umac_ms.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -2842,7 +2818,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 350,
+      "line": 384,
       "path": "crates/tetra-entities/src/umac/umac_ms.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -2850,7 +2826,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 372,
+      "line": 406,
       "path": "crates/tetra-entities/src/umac/umac_ms.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -2858,7 +2834,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 390,
+      "line": 424,
       "path": "crates/tetra-entities/src/umac/umac_ms.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -2866,7 +2842,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 391,
+      "line": 425,
       "path": "crates/tetra-entities/src/umac/umac_ms.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -2874,7 +2850,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 392,
+      "line": 426,
       "path": "crates/tetra-entities/src/umac/umac_ms.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -2882,7 +2858,7 @@
     },
     {
       "category": "Todo-Typ",
-      "line": 393,
+      "line": 427,
       "path": "crates/tetra-entities/src/umac/umac_ms.rs",
       "scope": "Runtime",
       "severity": "Typ-Platzhalter",
@@ -2890,7 +2866,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 449,
+      "line": 483,
       "path": "crates/tetra-entities/src/umac/umac_ms.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -2898,7 +2874,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 450,
+      "line": 484,
       "path": "crates/tetra-entities/src/umac/umac_ms.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -2906,7 +2882,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 497,
+      "line": 531,
       "path": "crates/tetra-entities/src/umac/umac_ms.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -2914,7 +2890,7 @@
     },
     {
       "category": "unimplemented!",
-      "line": 498,
+      "line": 532,
       "path": "crates/tetra-entities/src/umac/umac_ms.rs",
       "scope": "Runtime",
       "severity": "kritisch",
@@ -2922,7 +2898,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 499,
+      "line": 533,
       "path": "crates/tetra-entities/src/umac/umac_ms.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -2930,7 +2906,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 524,
+      "line": 558,
       "path": "crates/tetra-entities/src/umac/umac_ms.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -2938,7 +2914,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 525,
+      "line": 559,
       "path": "crates/tetra-entities/src/umac/umac_ms.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -2946,7 +2922,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 526,
+      "line": 560,
       "path": "crates/tetra-entities/src/umac/umac_ms.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -2954,7 +2930,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 527,
+      "line": 561,
       "path": "crates/tetra-entities/src/umac/umac_ms.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -2962,7 +2938,7 @@
     },
     {
       "category": "unimplemented!",
-      "line": 548,
+      "line": 582,
       "path": "crates/tetra-entities/src/umac/umac_ms.rs",
       "scope": "Runtime",
       "severity": "kritisch",
@@ -2970,7 +2946,7 @@
     },
     {
       "category": "unimplemented!",
-      "line": 560,
+      "line": 594,
       "path": "crates/tetra-entities/src/umac/umac_ms.rs",
       "scope": "Runtime",
       "severity": "kritisch",
@@ -2978,7 +2954,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 566,
+      "line": 600,
       "path": "crates/tetra-entities/src/umac/umac_ms.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -2986,7 +2962,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 634,
+      "line": 669,
       "path": "crates/tetra-entities/src/umac/umac_ms.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -2994,7 +2970,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 659,
+      "line": 694,
       "path": "crates/tetra-entities/src/umac/umac_ms.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -3002,7 +2978,7 @@
     },
     {
       "category": "unimplemented!",
-      "line": 719,
+      "line": 754,
       "path": "crates/tetra-entities/src/umac/umac_ms.rs",
       "scope": "Runtime",
       "severity": "kritisch",
@@ -3010,7 +2986,7 @@
     },
     {
       "category": "unimplemented!",
-      "line": 724,
+      "line": 759,
       "path": "crates/tetra-entities/src/umac/umac_ms.rs",
       "scope": "Runtime",
       "severity": "kritisch",
@@ -8280,182 +8256,182 @@
     },
     {
       "constructed": 0,
-      "handled": 0,
+      "handled": 2,
       "path": "crates/tetra-saps/src/tlmc/mod.rs",
       "primitive": "TlmcAssessmentInd",
       "sap": "TLMC",
       "sapmsg_variant": "ja",
-      "status": "Variante vorhanden, Runtime-Pfad fehlt",
+      "status": "nur Empfang/Handler sichtbar",
       "tests": 0
     },
     {
       "constructed": 0,
-      "handled": 0,
+      "handled": 1,
       "path": "crates/tetra-saps/src/tlmc/mod.rs",
       "primitive": "TlmcAssessmentListReq",
       "sap": "TLMC",
       "sapmsg_variant": "ja",
-      "status": "Variante vorhanden, Runtime-Pfad fehlt",
+      "status": "nur Empfang/Handler sichtbar",
       "tests": 0
     },
     {
       "constructed": 0,
-      "handled": 0,
+      "handled": 4,
       "path": "crates/tetra-saps/src/tlmc/mod.rs",
       "primitive": "TlmcCellReadConf",
       "sap": "TLMC",
       "sapmsg_variant": "ja",
-      "status": "Variante vorhanden, Runtime-Pfad fehlt",
+      "status": "nur Empfang/Handler sichtbar",
       "tests": 0
     },
     {
       "constructed": 0,
-      "handled": 0,
+      "handled": 1,
       "path": "crates/tetra-saps/src/tlmc/mod.rs",
       "primitive": "TlmcCellReadReq",
       "sap": "TLMC",
       "sapmsg_variant": "ja",
-      "status": "Variante vorhanden, Runtime-Pfad fehlt",
+      "status": "nur Empfang/Handler sichtbar",
       "tests": 0
     },
     {
       "constructed": 0,
-      "handled": 0,
+      "handled": 4,
       "path": "crates/tetra-saps/src/tlmc/mod.rs",
       "primitive": "TlmcConfigureConf",
       "sap": "TLMC",
       "sapmsg_variant": "ja",
-      "status": "Variante vorhanden, Runtime-Pfad fehlt",
-      "tests": 0
+      "status": "nur Empfang/Handler sichtbar",
+      "tests": 1
     },
     {
       "constructed": 0,
-      "handled": 0,
+      "handled": 4,
       "path": "crates/tetra-saps/src/tlmc/mod.rs",
       "primitive": "TlmcConfigureInd",
       "sap": "TLMC",
       "sapmsg_variant": "ja",
-      "status": "Variante vorhanden, Runtime-Pfad fehlt",
-      "tests": 0
+      "status": "nur Empfang/Handler sichtbar",
+      "tests": 3
     },
     {
       "constructed": 1,
-      "handled": 2,
+      "handled": 4,
       "path": "crates/tetra-saps/src/tlmc/mod.rs",
       "primitive": "TlmcConfigureReq",
       "sap": "TLMC",
       "sapmsg_variant": "ja",
       "status": "bidirektional sichtbar",
-      "tests": 7
+      "tests": 10
     },
     {
       "constructed": 0,
-      "handled": 0,
+      "handled": 3,
       "path": "crates/tetra-saps/src/tlmc/mod.rs",
       "primitive": "TlmcMeasurementInd",
       "sap": "TLMC",
       "sapmsg_variant": "ja",
-      "status": "Variante vorhanden, Runtime-Pfad fehlt",
+      "status": "nur Empfang/Handler sichtbar",
       "tests": 0
     },
     {
       "constructed": 0,
-      "handled": 0,
+      "handled": 3,
       "path": "crates/tetra-saps/src/tlmc/mod.rs",
       "primitive": "TlmcMonitorInd",
       "sap": "TLMC",
       "sapmsg_variant": "ja",
-      "status": "Variante vorhanden, Runtime-Pfad fehlt",
+      "status": "nur Empfang/Handler sichtbar",
       "tests": 0
     },
     {
       "constructed": 0,
-      "handled": 0,
+      "handled": 1,
       "path": "crates/tetra-saps/src/tlmc/mod.rs",
       "primitive": "TlmcMonitorListReq",
       "sap": "TLMC",
       "sapmsg_variant": "ja",
-      "status": "Variante vorhanden, Runtime-Pfad fehlt",
+      "status": "nur Empfang/Handler sichtbar",
       "tests": 0
     },
     {
       "constructed": 0,
-      "handled": 0,
+      "handled": 6,
       "path": "crates/tetra-saps/src/tlmc/mod.rs",
       "primitive": "TlmcReportInd",
       "sap": "TLMC",
       "sapmsg_variant": "ja",
-      "status": "Variante vorhanden, Runtime-Pfad fehlt",
+      "status": "nur Empfang/Handler sichtbar",
       "tests": 0
     },
     {
       "constructed": 0,
-      "handled": 0,
+      "handled": 4,
       "path": "crates/tetra-saps/src/tlmc/mod.rs",
       "primitive": "TlmcScanConf",
       "sap": "TLMC",
       "sapmsg_variant": "ja",
-      "status": "Variante vorhanden, Runtime-Pfad fehlt",
-      "tests": 0
+      "status": "nur Empfang/Handler sichtbar",
+      "tests": 2
     },
     {
       "constructed": 0,
-      "handled": 0,
+      "handled": 2,
       "path": "crates/tetra-saps/src/tlmc/mod.rs",
       "primitive": "TlmcScanReportInd",
       "sap": "TLMC",
       "sapmsg_variant": "ja",
-      "status": "Variante vorhanden, Runtime-Pfad fehlt",
+      "status": "nur Empfang/Handler sichtbar",
       "tests": 0
     },
     {
       "constructed": 0,
-      "handled": 0,
+      "handled": 1,
       "path": "crates/tetra-saps/src/tlmc/mod.rs",
       "primitive": "TlmcScanReq",
       "sap": "TLMC",
       "sapmsg_variant": "ja",
-      "status": "Variante vorhanden, Runtime-Pfad fehlt",
-      "tests": 0
+      "status": "nur Empfang/Handler sichtbar",
+      "tests": 5
     },
     {
       "constructed": 0,
-      "handled": 0,
+      "handled": 4,
       "path": "crates/tetra-saps/src/tlmc/mod.rs",
       "primitive": "TlmcSelectConf",
       "sap": "TLMC",
       "sapmsg_variant": "ja",
-      "status": "Variante vorhanden, Runtime-Pfad fehlt",
+      "status": "nur Empfang/Handler sichtbar",
       "tests": 0
     },
     {
       "constructed": 0,
-      "handled": 0,
+      "handled": 2,
       "path": "crates/tetra-saps/src/tlmc/mod.rs",
       "primitive": "TlmcSelectInd",
       "sap": "TLMC",
       "sapmsg_variant": "ja",
-      "status": "Variante vorhanden, Runtime-Pfad fehlt",
+      "status": "nur Empfang/Handler sichtbar",
       "tests": 0
     },
     {
       "constructed": 0,
-      "handled": 0,
+      "handled": 1,
       "path": "crates/tetra-saps/src/tlmc/mod.rs",
       "primitive": "TlmcSelectReq",
       "sap": "TLMC",
       "sapmsg_variant": "ja",
-      "status": "Variante vorhanden, Runtime-Pfad fehlt",
+      "status": "nur Empfang/Handler sichtbar",
       "tests": 0
     },
     {
       "constructed": 0,
-      "handled": 0,
+      "handled": 1,
       "path": "crates/tetra-saps/src/tlmc/mod.rs",
       "primitive": "TlmcSelectResp",
       "sap": "TLMC",
       "sapmsg_variant": "ja",
-      "status": "Variante vorhanden, Runtime-Pfad fehlt",
+      "status": "nur Empfang/Handler sichtbar",
       "tests": 0
     },
     {
@@ -8539,14 +8515,14 @@
       "tests": 0
     },
     {
-      "constructed": 5,
+      "constructed": 6,
       "handled": 4,
       "path": "crates/tetra-saps/src/tmv/mod.rs",
       "primitive": "TmvConfigureReq",
       "sap": "TMV",
       "sapmsg_variant": "ja",
       "status": "bidirektional sichtbar",
-      "tests": 0
+      "tests": 1
     },
     {
       "constructed": 3,
@@ -8556,7 +8532,7 @@
       "sap": "TMV",
       "sapmsg_variant": "ja",
       "status": "bidirektional sichtbar",
-      "tests": 26
+      "tests": 29
     },
     {
       "constructed": 1,
@@ -8722,7 +8698,7 @@
     }
   ],
   "summary": {
-    "gap_count": 739,
+    "gap_count": 736,
     "pdu_count": 76,
     "sap_primitive_count": 128,
     "state_type_count": 17

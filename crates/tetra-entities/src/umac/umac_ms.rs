@@ -1,7 +1,12 @@
 use tetra_config::bluestation::SharedConfig;
 use tetra_core::tetra_entities::TetraEntity;
 use tetra_core::{BitBuffer, PhyBlockNum, Sap, TdmaTime, Todo, unimplemented_log};
+use tetra_saps::common::{
+    CellServiceLevel, Layer2Report, LowerLayerResourceAvailability, LowerLayerResourceReason,
+    MeasurementReport, MeasurementValue, QualityIndication, RfChannelNumber, SelectionResult,
+};
 use tetra_saps::tlmb::TlmbSysinfoInd;
+use tetra_saps::tlmc::{TlmcConfigureReq, TlmcReportInd};
 use tetra_saps::tma::TmaUnitdataInd;
 use tetra_saps::tmv::TmvConfigureReq;
 use tetra_saps::tmv::enums::logical_chans::LogicalChannel;
@@ -18,6 +23,7 @@ use tetra_pdus::umac::pdus::mac_sync::MacSync;
 use tetra_pdus::umac::pdus::mac_sysinfo::MacSysinfo;
 
 use crate::umac::subcomp::fillbits;
+use crate::umac::tlmc_runtime::{TlmcRuntime, TlmcRuntimeError, TlmcRuntimeSnapshot};
 use crate::umac::subcomp::ms_defrag::MsDefrag;
 use crate::{MessagePrio, MessageQueue, TetraEntityTrait};
 
@@ -36,6 +42,21 @@ pub struct UmacMs {
     cc: Option<u8>,
     /// Derived from mcc/mnc, and passed to lmac
     scrambling_code: Option<u32>,
+
+    /// Local TLC/TMC management state. TLMC is MS-side in ETSI and remains
+    /// inside the radio stack; it is not a backend service.
+    tlmc: TlmcRuntime,
+    /// Last valid serving/monitored downlink observation, used to emit a
+    /// single edge-triggered resource-loss indication.
+    last_tlmc_rx: Option<TdmaTime>,
+    /// Rate limiter for serving-channel measurement indications.
+    last_tlmc_measurement: Option<TdmaTime>,
+    /// Start times for bounded local TLMC operations. A missing RF response
+    /// must complete with a negative confirmation instead of leaving MLE
+    /// blocked forever.
+    tlmc_scan_started: Option<TdmaTime>,
+    tlmc_cell_read_started: Option<TdmaTime>,
+    tlmc_select_started: Option<TdmaTime>,
 }
 
 impl UmacMs {
@@ -50,7 +71,18 @@ impl UmacMs {
             mnc: None,
             cc: None,
             scrambling_code: None,
+            tlmc: TlmcRuntime::new(),
+            last_tlmc_rx: None,
+            last_tlmc_measurement: None,
+            tlmc_scan_started: None,
+            tlmc_cell_read_started: None,
+            tlmc_select_started: None,
         }
+    }
+
+    /// Read-only TLMC state for diagnostics, tests and the future TBS WebUI.
+    pub fn tlmc_snapshot(&self) -> TlmcRuntimeSnapshot {
+        self.tlmc.snapshot()
     }
 
     fn rx_tmv_prim(&mut self, queue: &mut MessageQueue, message: SapMsg) {
@@ -174,7 +206,7 @@ impl UmacMs {
 
     // message pos: start of broadcast frame
     // Will NOT advance pos but pass to underlying function
-    fn rx_broadcast(&self, queue: &mut MessageQueue, message: &mut SapMsg) {
+    fn rx_broadcast(&mut self, queue: &mut MessageQueue, message: &mut SapMsg) {
         tracing::trace!("rx_broadcast");
 
         let SapMsgInner::TmvUnitdataInd(prim) = &mut message.msg else {
@@ -198,7 +230,7 @@ impl UmacMs {
     }
 
     // Parses the sysinfo pdu
-    fn rx_broadcast_sysinfo(&self, queue: &mut MessageQueue, message: &mut SapMsg) {
+    fn rx_broadcast_sysinfo(&mut self, queue: &mut MessageQueue, message: &mut SapMsg) {
         tracing::trace!("rx_broadcast_sysinfo");
         let SapMsgInner::TmvUnitdataInd(prim) = &mut message.msg else {
             tracing::error!("BUG: unexpected message or state -- routing error");
@@ -216,6 +248,8 @@ impl UmacMs {
                 return;
             }
         };
+
+        self.observe_tlmc_sysinfo(queue, prim.carrier_num);
 
         // TODO FIXME adopt sysinfo info into global state
         if pdu.hyperframe_number.is_some() && pdu.hyperframe_number.unwrap() != self.dltime.h {
@@ -612,7 +646,7 @@ impl UmacMs {
         queue.push_prio(m, MessagePrio::Immediate);
     }
 
-    pub fn rx_tmv_bsch(&mut self, _queue: &mut MessageQueue, mut message: SapMsg) {
+    pub fn rx_tmv_bsch(&mut self, queue: &mut MessageQueue, mut message: SapMsg) {
         tracing::trace!("rx_tmv_bsch");
         let SapMsgInner::TmvUnitdataInd(prim) = &mut message.msg else {
             tracing::error!("BUG: unexpected message or state -- routing error");
@@ -631,6 +665,7 @@ impl UmacMs {
             }
         };
 
+        self.observe_tlmc_channel(queue, prim.carrier_num, prim.rssi_dbfs);
         unimplemented_log!("can't update global state");
 
         // let netinfo_changed = {
@@ -749,43 +784,329 @@ impl UmacMs {
         }
     }
 
+    fn queue_tlmc(queue: &mut MessageQueue, msg: SapMsgInner) {
+        queue.push_back(SapMsg {
+            sap: Sap::TlmcSap,
+            src: TetraEntity::Umac,
+            dest: TetraEntity::Mle,
+            msg,
+        });
+    }
+
+    fn report_tlmc_error(queue: &mut MessageQueue, operation: &str, error: &TlmcRuntimeError) {
+        tracing::warn!("TLMC: {} failed: {}", operation, error);
+        Self::queue_tlmc(
+            queue,
+            SapMsgInner::TlmcReportInd(TlmcReportInd {
+                request_handle: None,
+                report: match error {
+                    TlmcRuntimeError::OperationBusy(_) => Layer2Report::ServiceTemporarilyUnavailable,
+                    TlmcRuntimeError::ChannelNotMonitored(_)
+                    | TlmcRuntimeError::ChannelClassNotRequested(_)
+                    | TlmcRuntimeError::UnknownRequest(_)
+                    | TlmcRuntimeError::RequestMismatch(_)
+                    | TlmcRuntimeError::NoPendingSelection
+                    | TlmcRuntimeError::InvalidConfiguration(_) => Layer2Report::Reject,
+                },
+                endpoint_id: None,
+                nsapi: None,
+            }),
+        );
+    }
+
     fn rx_tlmc_configure_req(&mut self, queue: &mut MessageQueue, message: SapMsg) {
         tracing::trace!("rx_tlmc_configure_req");
-        let SapMsgInner::TlmcConfigureReq(prim) = &message.msg else {
+        let SapMsgInner::TlmcConfigureReq(prim) = message.msg else {
             tracing::error!("BUG: unexpected message or state -- routing error");
             return;
         };
 
-        if let Some(valid_addresses) = &prim.valid_addresses {
-            tracing::debug!("rx_tlmc_configure_req: valid_addresses: {:?}", valid_addresses);
+        let valid_addresses = prim.valid_addresses;
+        match self.tlmc.apply_configure(prim) {
+            Ok(confirmation) => {
+                if let Some(valid_addresses) = valid_addresses {
+                    tracing::debug!("TLMC-CONFIGURE valid addresses: {:?}", valid_addresses);
+                    self.mcc = Some(valid_addresses.mcc);
+                    self.mnc = Some(valid_addresses.mnc);
+                    self.update_scrambing_and_submit_to_lmac(queue);
+                }
+                Self::queue_tlmc(queue, SapMsgInner::TlmcConfigureConf(confirmation));
+            }
+            Err(error) => Self::report_tlmc_error(queue, "configure", &error),
+        }
+    }
 
-            self.mcc = Some(valid_addresses.mcc);
-            self.mnc = Some(valid_addresses.mnc);
+    fn request_lower_mac_channel(&self, queue: &mut MessageQueue, channel: RfChannelNumber) {
+        queue.push_back(SapMsg {
+            sap: Sap::TmvSap,
+            src: TetraEntity::Umac,
+            dest: TetraEntity::Lmac,
+            msg: SapMsgInner::TmvConfigureReq(TmvConfigureReq {
+                carrier_num: Some(channel.0),
+                ..Default::default()
+            }),
+        });
+    }
 
-            // Attempt to update scrambling code (if cc is also known)
-            self.update_scrambing_and_submit_to_lmac(queue);
+    fn observe_tlmc_channel(&mut self, queue: &mut MessageQueue, carrier_num: u16, rssi_dbfs: f32) {
+        self.last_tlmc_rx = Some(self.dltime);
+        let endpoint_id = self.tlmc.configuration().endpoint_id.unwrap_or(0);
+        if let Some(indication) = self.tlmc.resource_transition(
+            endpoint_id,
+            LowerLayerResourceAvailability::Available,
+            LowerLayerResourceReason::RecoveryOfRadioResources,
+        ) {
+            Self::queue_tlmc(queue, SapMsgInner::TlmcConfigureInd(indication));
+        }
+
+        let raw = if rssi_dbfs.is_finite() {
+            rssi_dbfs.round().clamp(i16::MIN as f32, i16::MAX as f32) as i16
         } else {
-            tracing::warn!("rx_tlmc_configure_req: No valid addresses provided");
+            i16::MIN
+        };
+        let channel = RfChannelNumber(carrier_num);
+        let measurement = MeasurementValue::raw(raw);
+        let quality = Some(QualityIndication { raw });
+
+        let due = self
+            .last_tlmc_measurement
+            .map(|last| last.age(self.dltime) >= 72)
+            .unwrap_or(true);
+        if due {
+            let indication = self.tlmc.record_measurement(MeasurementReport {
+                endpoint_id: Some(endpoint_id),
+                channel_number: Some(channel),
+                path_loss_c1: Some(measurement),
+                path_loss_c2: None,
+                path_loss_c3: None,
+                path_loss_c4: None,
+                path_loss_c5: None,
+                quality,
+            });
+            Self::queue_tlmc(queue, SapMsgInner::TlmcMeasurementInd(indication));
+            self.last_tlmc_measurement = Some(self.dltime);
+        }
+
+        if self.tlmc.is_monitored(channel) {
+            match self.tlmc.record_monitor(channel, measurement, quality, Vec::new()) {
+                Ok(indication) => Self::queue_tlmc(queue, SapMsgInner::TlmcMonitorInd(indication)),
+                Err(error) => Self::report_tlmc_error(queue, "monitor", &error),
+            }
+        }
+
+        let pending_scan = self.tlmc.pending_scan().cloned();
+        if let Some(request) = pending_scan.filter(|request| request.channel_number == channel) {
+            match self.tlmc.complete_scan(
+                request.request_id,
+                channel,
+                measurement,
+                Layer2Report::Success,
+                Vec::new(),
+                None,
+                CellServiceLevel::NormalService,
+            ) {
+                Ok(confirm) => {
+                    self.tlmc_scan_started = None;
+                    Self::queue_tlmc(queue, SapMsgInner::TlmcScanConf(confirm));
+                }
+                Err(error) => Self::report_tlmc_error(queue, "scan completion", &error),
+            }
+        }
+
+        let pending_select = self.tlmc.pending_select().cloned();
+        if let Some(request) = pending_select.filter(|request| request.channel_number == channel) {
+            match self.tlmc.complete_select(
+                channel,
+                Some(measurement),
+                request.main_carrier_number,
+                Some(Layer2Report::Success),
+                SelectionResult::Success,
+                None,
+            ) {
+                Ok(confirm) => {
+                    self.tlmc_select_started = None;
+                    Self::queue_tlmc(queue, SapMsgInner::TlmcSelectConf(confirm));
+                }
+                Err(error) => Self::report_tlmc_error(queue, "selection completion", &error),
+            }
+        }
+    }
+
+    fn observe_tlmc_sysinfo(&mut self, queue: &mut MessageQueue, carrier_num: u16) {
+        let channel = RfChannelNumber(carrier_num);
+        let pending = self.tlmc.pending_cell_read().cloned();
+        if let Some(request) = pending.filter(|request| request.channel_number == channel) {
+            match self
+                .tlmc
+                .complete_cell_read(request.request_id, channel, Layer2Report::Success)
+            {
+                Ok(confirm) => {
+                    self.tlmc_cell_read_started = None;
+                    Self::queue_tlmc(queue, SapMsgInner::TlmcCellReadConf(confirm));
+                }
+                Err(error) => Self::report_tlmc_error(queue, "cell read completion", &error),
+            }
+        }
+    }
+
+    fn expire_tlmc_operations(&mut self, queue: &mut MessageQueue, now: TdmaTime) {
+        const OPERATION_TIMEOUT_SLOTS: i32 = 432;
+
+        let scan_expired = self
+            .tlmc_scan_started
+            .map(|started| started.age(now) > OPERATION_TIMEOUT_SLOTS)
+            .unwrap_or(false);
+        if scan_expired {
+            self.tlmc_scan_started = None;
+            if let Some(request) = self.tlmc.pending_scan().cloned() {
+                let threshold = request.threshold_level.unwrap_or(MeasurementValue::raw(i16::MIN));
+                match self.tlmc.complete_scan(
+                    request.request_id,
+                    request.channel_number,
+                    threshold,
+                    Layer2Report::ServiceTemporarilyUnavailable,
+                    Vec::new(),
+                    None,
+                    CellServiceLevel::NoService,
+                ) {
+                    Ok(confirm) => Self::queue_tlmc(queue, SapMsgInner::TlmcScanConf(confirm)),
+                    Err(error) => Self::report_tlmc_error(queue, "scan timeout", &error),
+                }
+            }
+        }
+
+        let cell_read_expired = self
+            .tlmc_cell_read_started
+            .map(|started| started.age(now) > OPERATION_TIMEOUT_SLOTS)
+            .unwrap_or(false);
+        if cell_read_expired {
+            self.tlmc_cell_read_started = None;
+            if let Some(request) = self.tlmc.pending_cell_read().cloned() {
+                match self.tlmc.complete_cell_read(
+                    request.request_id,
+                    request.channel_number,
+                    Layer2Report::ServiceTemporarilyUnavailable,
+                ) {
+                    Ok(confirm) => Self::queue_tlmc(queue, SapMsgInner::TlmcCellReadConf(confirm)),
+                    Err(error) => Self::report_tlmc_error(queue, "cell read timeout", &error),
+                }
+            }
+        }
+
+        let select_expired = self
+            .tlmc_select_started
+            .map(|started| started.age(now) > OPERATION_TIMEOUT_SLOTS)
+            .unwrap_or(false);
+        if select_expired {
+            self.tlmc_select_started = None;
+            if let Some(request) = self.tlmc.pending_select().cloned() {
+                match self.tlmc.complete_select(
+                    request.channel_number,
+                    request.threshold_level,
+                    request.main_carrier_number,
+                    Some(Layer2Report::ServiceTemporarilyUnavailable),
+                    SelectionResult::Other(1),
+                    None,
+                ) {
+                    Ok(confirm) => Self::queue_tlmc(queue, SapMsgInner::TlmcSelectConf(confirm)),
+                    Err(error) => Self::report_tlmc_error(queue, "selection timeout", &error),
+                }
+            }
         }
     }
 
     fn rx_tlmc_prim(&mut self, queue: &mut MessageQueue, message: SapMsg) {
         tracing::trace!("rx_tlmc_prim");
+        let source = message.src;
         match message.msg {
-            SapMsgInner::TlmcConfigureReq(_) => {
-                self.rx_tlmc_configure_req(queue, message);
+            SapMsgInner::TlmcConfigureReq(prim) => {
+                self.rx_tlmc_configure_req(
+                    queue,
+                    SapMsg::new(
+                        Sap::TlmcSap,
+                        TetraEntity::Mle,
+                        TetraEntity::Umac,
+                        SapMsgInner::TlmcConfigureReq(prim),
+                    ),
+                );
             }
-            _ => {
-                tracing::error!("BUG: unexpected message or state -- routing error");
-                return;
+            SapMsgInner::TlmcMonitorListReq(prim) => self.tlmc.set_monitor_list(prim),
+            SapMsgInner::TlmcAssessmentListReq(prim) => self.tlmc.set_assessment_list(prim),
+            SapMsgInner::TlmcScanReq(prim) => {
+                let channel = prim.channel_number;
+                match self.tlmc.begin_scan(prim) {
+                    Ok(()) => {
+                        self.tlmc_scan_started = Some(self.dltime);
+                        self.request_lower_mac_channel(queue, channel);
+                    }
+                    Err(error) => Self::report_tlmc_error(queue, "scan", &error),
+                }
+            }
+            SapMsgInner::TlmcCellReadReq(prim) => {
+                let channel = prim.channel_number;
+                match self.tlmc.begin_cell_read(prim) {
+                    Ok(()) => {
+                        self.tlmc_cell_read_started = Some(self.dltime);
+                        self.request_lower_mac_channel(queue, channel);
+                    }
+                    Err(error) => Self::report_tlmc_error(queue, "cell read", &error),
+                }
+            }
+            SapMsgInner::TlmcSelectReq(prim) => {
+                let channel = prim.channel_number;
+                match self.tlmc.begin_select(prim) {
+                    Ok(()) => {
+                        self.tlmc_select_started = Some(self.dltime);
+                        self.request_lower_mac_channel(queue, channel);
+                    }
+                    Err(error) => Self::report_tlmc_error(queue, "select", &error),
+                }
+            }
+            SapMsgInner::TlmcSelectResp(prim) => {
+                if let Err(error) = self.tlmc.respond_select(prim) {
+                    Self::report_tlmc_error(queue, "select response", &error);
+                }
+            }
+            other => {
+                tracing::warn!("TLMC: UMAC received unexpected primitive from {:?}: {:?}", source, other);
+                Self::queue_tlmc(
+                    queue,
+                    SapMsgInner::TlmcReportInd(TlmcReportInd {
+                        request_handle: None,
+                        report: Layer2Report::ServiceNotSupported,
+                        endpoint_id: None,
+                        nsapi: None,
+                    }),
+                );
             }
         }
     }
+
 }
 
 impl TetraEntityTrait for UmacMs {
     fn entity(&self) -> TetraEntity {
         TetraEntity::Umac
+    }
+
+    fn tick_start(&mut self, queue: &mut MessageQueue, ts: TdmaTime) {
+        self.dltime = ts;
+        self.expire_tlmc_operations(queue, ts);
+        let lost = self
+            .last_tlmc_rx
+            .map(|last| last.age(ts) > 432)
+            .unwrap_or(false);
+        if lost {
+            self.last_tlmc_rx = None;
+            let endpoint_id = self.tlmc.configuration().endpoint_id.unwrap_or(0);
+            if let Some(indication) = self.tlmc.resource_transition(
+                endpoint_id,
+                LowerLayerResourceAvailability::Unavailable,
+                LowerLayerResourceReason::LossOfRadioResources,
+            ) {
+                Self::queue_tlmc(queue, SapMsgInner::TlmcConfigureInd(indication));
+            }
+        }
     }
 
     fn rx_prim(&mut self, queue: &mut MessageQueue, message: SapMsg) {

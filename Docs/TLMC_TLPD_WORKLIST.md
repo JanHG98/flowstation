@@ -1,8 +1,8 @@
 # SWMI Foundation 1 – TLMC/TLPD-Arbeitsliste
 
-## Status nach Paket B
+## Status nach Paket C
 
-Paket B ist umgesetzt:
+Paket B und Paket C sind umgesetzt:
 
 - **18 normative TLMC-Primitive** besitzen konkrete Strukturen und `SapMsgInner`-Varianten;
 - **27 LTPD-Primitive** besitzen konkrete Strukturen und `SapMsgInner`-Varianten;
@@ -10,9 +10,12 @@ Paket B ist umgesetzt:
 - gemeinsame Mobilitäts-, RF-, QoS-, Channel-Change- und SNDCP-Typen liegen in `tetra_saps::common`;
 - Scan-, Selection-, MLE-Cell-, Channel-Change- und LTPD-Link-Zustände sind explizit modelliert;
 - Unit- und Integrationstests sowie ein dependency-freier statischer Checker sind vorhanden;
-- `rx_tlmc_prim()` und `rx_tlpd_prim()` besitzen weiterhin noch keine vollständige Runtime-Routinglogik.
+- `rx_tlmc_prim()` besitzt nun eine vollständige Package-C-Routinglogik in UMAC-MS, defensives BS-Verhalten und einen nicht panikenden MLE-Consumer;
+- Configure, Ressourcenstatus, Measurement, Monitor, Assessment, Scan, Cell Read und Select besitzen eine explizite Runtime;
+- Scan, Cell Read und Select besitzen korrelierte Zustände sowie negative Timeouts;
+- `rx_tlpd_prim()` besitzt weiterhin noch keine vollständige Paket-D-Runtime.
 
-Die genauen Einzelzeilen stehen in `Docs/SAP_PRIMITIVE_MATRIX.md`, `Docs/IMPLEMENTATION_GAPS.md` und `Docs/SWMI_FOUNDATION_1_PACKAGE_B.md`.
+Die genauen Einzelzeilen stehen in `Docs/SAP_PRIMITIVE_MATRIX.md`, `Docs/IMPLEMENTATION_GAPS.md` und `Docs/SWMI_FOUNDATION_1_PACKAGE_B.md` und `Docs/SWMI_FOUNDATION_1_PACKAGE_C.md`.
 
 ## Paket B – Typen: abgeschlossen
 
@@ -109,16 +112,20 @@ LtpdContextKey
 
 `LtpdContextKey` muss mindestens Teilnehmer, Endpoint, Link und SNDCP-Kontext eindeutig unterscheiden können.
 
-## Paket C – TLMC Runtime: vorgesehene Reihenfolge
+## Paket C – TLMC Runtime: abgeschlossen ✅
 
-1. Configure
-2. Ressourcenverlust/-wiederkehr
-3. Measurement und Monitor
-4. Scan
-5. Cell Read
-6. Assessment
-7. Select
-8. Channel-Change-Antworten
+1. Configure ✅
+2. Ressourcenverlust/-wiederkehr ✅
+3. Measurement und Monitor ✅
+4. Scan ✅
+5. Cell Read ✅
+6. Assessment ✅
+7. Select ✅
+8. Channel-Change-Antworten ✅
+9. bounded Operationstimeouts ✅
+10. read-only Diagnose-Snapshot für die spätere TBS-WebUI ✅
+
+Die Runtime liegt in `crates/tetra-entities/src/umac/tlmc_runtime.rs`. Der experimentelle MS-Lower-Layer erhält für Scan/Select bereits den Zielträger über `TmvConfigureReq`; ein hardwareabhängiges dynamisches SDR-Retuning bleibt ein gesonderter Adapterpunkt.
 
 ## Paket D – TLPD Runtime: vorgesehene Reihenfolge
 
@@ -147,7 +154,7 @@ Für jede Primitive:
 
 ## Management- und WebUI-Auswirkung
 
-TLMC und TLPD bleiben funknahe In-Process-Komponenten der TBS und erhalten keinen eigenen LXC. Deshalb entsteht in Paket B bis E keine separate TLMC- oder TLPD-WebUI.
+TLMC und TLPD bleiben funknahe In-Process-Komponenten der TBS und erhalten keinen eigenen LXC. Deshalb entsteht in Paket B bis E keine separate TLMC- oder TLPD-WebUI beziehungsweise kein eigener Container.
 
 Diagnosewerte aus diesen Schichten müssen jedoch später über die TBS-WebUI und den Node Gateway sichtbar werden, insbesondere:
 
@@ -159,7 +166,7 @@ Diagnosewerte aus diesen Schichten müssen jedoch später über die TBS-WebUI un
 
 Die zukünftigen Backend-Dienste folgen dem Standard in `Docs/BACKEND_WEBUI_STANDARD.md`.
 
-## Nicht Bestandteil von Paket B
+## Nicht Bestandteil von Paket C
 
 - noch keine Multi-TBS-Netzwerkverbindung;
 - noch kein LXC-Dienst;
@@ -167,4 +174,4 @@ Die zukünftigen Backend-Dienste folgen dem Standard in `Docs/BACKEND_WEBUI_STAN
 - noch keine vollständige D-NEW-CELL-/RESTORE-Runtime;
 - noch kein vollständiger Packet Core.
 
-Paket B schafft die typsichere Grundlage, auf der Paket C und D ohne erneute grundlegende Datenmodelländerung aufgebaut werden können. Diese Grundlage ist jetzt umgesetzt.
+Paket B hat die typsichere Grundlage geschaffen; Paket C aktiviert darauf die TLMC-Runtime. Als nächstes folgt Paket D mit dem vollständigen LTPD-Lifecycle und Context Routing.

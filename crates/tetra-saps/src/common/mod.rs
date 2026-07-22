@@ -801,7 +801,7 @@ pub enum ChannelChangeState {
     },
 }
 
-/// Local scan state used before Package C adds runtime transitions.
+/// Local scan state used by the Package C TLMC runtime.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum TlmcScanState {
     #[default]
@@ -824,7 +824,7 @@ pub enum TlmcScanState {
     },
 }
 
-/// Local selection state used before Package C adds runtime transitions.
+/// Local selection state used by the Package C TLMC runtime.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum TlmcSelectionState {
     #[default]

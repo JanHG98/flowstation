@@ -35,8 +35,8 @@
 | CMCE Individual Call | vorhandene Individual-Call-State-Typen prüfen und formalisieren | Phase 5 |
 | SNDCP Context State | PDP-State vorhanden; vollständige Context-Transitionen folgen | Phase 11 |
 | LTPD Link State | Typfundament mit `LtpdLinkState` vorhanden; Runtime fehlt | Paket D |
-| LLC Link State | implizite Linkzustände und Timer explizit dokumentieren | Paket C/D |
-| Channel Change State | Typfundament mit `ChannelChangeState` vorhanden; Runtime fehlt | Paket C/Phase 3 |
+| LLC Link State | implizite Linkzustände und Timer explizit dokumentieren | Paket D |
+| Channel Change State | TLMC Select/Response-Lifecycle vorhanden; MLE-Zellwechseltransitionen fehlen | Phase 3 |
 
 ## Nächster manueller Review
 

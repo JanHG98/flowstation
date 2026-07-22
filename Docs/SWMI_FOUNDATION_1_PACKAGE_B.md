@@ -2,7 +2,7 @@
 
 ## Status
 
-**Umgesetzt.** Paket B ersetzt die bisherigen leeren beziehungsweise generischen TLMC-/TLPD-Platzhalter durch ein gemeinsames, typisiertes Datenmodell. Die eigentlichen TLMC- und TLPD-Zustandsübergänge folgen in Paket C und Paket D.
+**Umgesetzt.** Paket B ersetzt die bisherigen leeren beziehungsweise generischen TLMC-/TLPD-Platzhalter durch ein gemeinsames, typisiertes Datenmodell. Die TLMC-Zustandsübergänge sind inzwischen in Paket C umgesetzt; die TLPD-Runtime folgt in Paket D.
 
 ## Ziel des Pakets
 
@@ -136,7 +136,7 @@ Typisiert wurden:
 
 Alle benötigten TLMC- und LTPD-Primitiven besitzen nun eine eigene Variante. Der `Display`-Fallback panikt nicht mehr bei einer neuen Variante, sondern verwendet eine Debug-Darstellung.
 
-Damit kann Paket C die Runtimepfade schrittweise aktivieren, ohne bei jeder Primitive erneut den gemeinsamen Message-Bus umbauen zu müssen.
+Darauf hat Paket C die TLMC-Runtime aktiviert, ohne den gemeinsamen Message-Bus erneut grundlegend umzubauen.
 
 ## Tests und Prüfhilfen
 
@@ -169,7 +169,7 @@ cargo test -p tetra-saps
 
 Paket B erzeugt keinen neuen Container. TLMC und TLPD bleiben Teil der zeitkritischen TBS-Runtime.
 
-Die neuen Typen sind aber bewusst so strukturiert, dass Paket C/D später folgende Diagnosewerte an TBS-WebUI und Node Gateway liefern können:
+Die neuen Typen sind bewusst so strukturiert, dass Paket C/D folgende Diagnosewerte an TBS-WebUI und Node Gateway liefern können:
 
 - aktiver Scan und dessen Fortschritt;
 - überwachte RF-Kanäle;
@@ -197,7 +197,7 @@ Noch nicht enthalten:
 
 ## Nächster Schritt
 
-**Paket C – TLMC Runtime** beginnt in dieser Reihenfolge:
+**Paket C – TLMC Runtime** ist umgesetzt worden in dieser Reihenfolge:
 
 1. Configure Request/Indication/Confirm;
 2. Ressourcenverlust und Ressourcenwiederkehr;

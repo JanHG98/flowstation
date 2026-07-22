@@ -248,11 +248,51 @@ impl MleBs {
         }
     }
 
-    fn rx_tlmc_prim(&mut self, _queue: &mut MessageQueue, _message: SapMsg) {
+    fn rx_tlmc_prim(&mut self, _queue: &mut MessageQueue, message: SapMsg) {
         tracing::trace!("rx_tlmc_prim");
-        // TLMC SAP not implemented yet. Log instead of panicking so an unexpected
-        // primitive doesn't kill the whole MLE worker.
-        unimplemented_log!("rx_tlmc_prim called but TLMC SAP is not implemented");
+        match message.msg {
+            SapMsgInner::TlmcConfigureInd(indication) => {
+                tracing::info!(
+                    "TLMC: endpoint {} resource {:?} ({:?})",
+                    indication.endpoint_id,
+                    indication.lower_layer_resource_availability,
+                    indication.reason
+                );
+            }
+            SapMsgInner::TlmcConfigureConf(confirm) => {
+                tracing::debug!("TLMC: lower-layer configuration confirmed: {:?}", confirm);
+            }
+            SapMsgInner::TlmcMeasurementInd(indication) => {
+                tracing::trace!("TLMC: serving-channel measurement: {:?}", indication.measurement);
+            }
+            SapMsgInner::TlmcMonitorInd(indication) => {
+                tracing::trace!("TLMC: monitor indication: {:?}", indication);
+            }
+            SapMsgInner::TlmcAssessmentInd(indication) => {
+                tracing::trace!("TLMC: assessment indication: {:?}", indication);
+            }
+            SapMsgInner::TlmcScanConf(confirm) => {
+                tracing::debug!("TLMC: scan completed: {:?}", confirm);
+            }
+            SapMsgInner::TlmcScanReportInd(indication) => {
+                tracing::trace!("TLMC: scan report: {:?}", indication);
+            }
+            SapMsgInner::TlmcCellReadConf(confirm) => {
+                tracing::debug!("TLMC: cell read completed: {:?}", confirm);
+            }
+            SapMsgInner::TlmcSelectInd(indication) => {
+                tracing::debug!("TLMC: lower-layer channel-change indication: {:?}", indication);
+            }
+            SapMsgInner::TlmcSelectConf(confirm) => {
+                tracing::debug!("TLMC: selection completed: {:?}", confirm);
+            }
+            SapMsgInner::TlmcReportInd(report) => {
+                tracing::warn!("TLMC: lower-layer report: {:?}", report);
+            }
+            other => {
+                tracing::warn!("TLMC: MLE-BS received unexpected request primitive: {:?}", other);
+            }
+        }
     }
 
     fn rx_lmm_mle_unitdata_req(&mut self, queue: &mut MessageQueue, mut message: SapMsg) {

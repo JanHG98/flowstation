@@ -20,7 +20,9 @@ use tetra_pdus::umac::pdus::mac_sync::MacSync;
 use tetra_pdus::umac::pdus::mac_sysinfo::MacSysinfo;
 use tetra_pdus::umac::pdus::mac_u_blck::MacUBlck;
 use tetra_pdus::umac::pdus::mac_u_signal::MacUSignal;
+use tetra_saps::common::Layer2Report;
 use tetra_saps::control::call_control::{CallControl, Circuit};
+use tetra_saps::tlmc::TlmcReportInd;
 use tetra_saps::lcmc::enums::alloc_type::ChanAllocType;
 use tetra_saps::lcmc::enums::ul_dl_assignment::UlDlAssignment;
 use tetra_saps::lcmc::fields::chan_alloc_req::CmceChanAllocReq;
@@ -35,6 +37,7 @@ use crate::lmac::components::scrambler;
 use crate::umac::subcomp::bs_frag::BsFragger;
 use crate::umac::subcomp::bs_sched::{BsChannelScheduler, CarrierDownlinkMode, PrecomputedUmacPdus, TCH_S_CAP};
 use crate::umac::subcomp::fillbits;
+use crate::umac::tlmc_runtime::{TlmcRuntime, TlmcRuntimeSnapshot};
 use crate::{MessagePrio, MessageQueue, TetraEntityTrait};
 
 use super::subcomp::bs_defrag::BsDefrag;
@@ -68,6 +71,9 @@ pub struct UmacBs {
     ul_signal_owner: [Option<u32>; 8],
     /// Delay traffic-slot circuit closes until queued FACCH/STCH release signalling drains.
     pending_circuit_closes: [PendingCircuitClose; 8],
+    /// Defensive TLMC runtime for shared stack tests and diagnostics. ETSI cell
+    /// scanning/selection primitives are MS-side and are rejected on a BS.
+    tlmc: TlmcRuntime,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -115,7 +121,13 @@ impl UmacBs {
             last_ul_voice: [None; 8],
             ul_signal_owner: [None; 8],
             pending_circuit_closes: [PendingCircuitClose::default(); 8],
+            tlmc: TlmcRuntime::new(),
         }
+    }
+
+    /// Read-only TLMC state for diagnostics, tests and the future TBS WebUI.
+    pub fn tlmc_snapshot(&self) -> TlmcRuntimeSnapshot {
+        self.tlmc.snapshot()
     }
 
     fn main_carrier(&self) -> u16 {
@@ -2060,6 +2072,47 @@ impl UmacBs {
         }
     }
 
+    fn queue_tlmc_to_mle(queue: &mut MessageQueue, msg: SapMsgInner) {
+        queue.push_back(SapMsg {
+            sap: Sap::TlmcSap,
+            src: TetraEntity::Umac,
+            dest: TetraEntity::Mle,
+            msg,
+        });
+    }
+
+    fn rx_tlmc_prim(&mut self, queue: &mut MessageQueue, message: SapMsg) {
+        match message.msg {
+            SapMsgInner::TlmcConfigureReq(request) => match self.tlmc.apply_configure(request) {
+                Ok(confirm) => Self::queue_tlmc_to_mle(queue, SapMsgInner::TlmcConfigureConf(confirm)),
+                Err(error) => {
+                    tracing::warn!("TLMC: BS configure rejected: {}", error);
+                    Self::queue_tlmc_to_mle(
+                        queue,
+                        SapMsgInner::TlmcReportInd(TlmcReportInd {
+                            request_handle: None,
+                            report: Layer2Report::Reject,
+                            endpoint_id: None,
+                            nsapi: None,
+                        }),
+                    );
+                }
+            },
+            other => {
+                tracing::warn!("TLMC: {:?} is MS-side and is not executed by UMAC-BS", other);
+                Self::queue_tlmc_to_mle(
+                    queue,
+                    SapMsgInner::TlmcReportInd(TlmcReportInd {
+                        request_handle: None,
+                        report: Layer2Report::ServiceNotSupported,
+                        endpoint_id: None,
+                        nsapi: None,
+                    }),
+                );
+            }
+        }
+    }
+
     fn rx_control(&mut self, queue: &mut MessageQueue, message: SapMsg) {
         tracing::trace!("rx_control");
         let SapMsgInner::CmceCallControl(prim) = message.msg else {
@@ -2164,7 +2217,7 @@ impl TetraEntityTrait for UmacBs {
                 self.rx_tlmb_prim(queue, message);
             }
             Sap::TlmcSap => {
-                unimplemented!();
+                self.rx_tlmc_prim(queue, message);
             }
             Sap::Control => {
                 self.rx_control(queue, message);
