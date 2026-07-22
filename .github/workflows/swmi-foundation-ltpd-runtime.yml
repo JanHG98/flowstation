@@ -1,0 +1,37 @@
+name: SWMI Foundation TLPD Runtime
+
+on:
+  push:
+    paths:
+      - 'crates/tetra-saps/src/ltpd/**'
+      - 'crates/tetra-entities/src/mle/ltpd_runtime.rs'
+      - 'crates/tetra-entities/src/mle/mle_bs.rs'
+      - 'crates/tetra-entities/src/sndcp/sndcp_bs.rs'
+      - 'crates/tetra-entities/tests/test_ltpd_runtime.rs'
+      - 'tools/check_ltpd_runtime.py'
+      - '.github/workflows/swmi-foundation-ltpd-runtime.yml'
+  pull_request:
+    paths:
+      - 'crates/tetra-saps/src/ltpd/**'
+      - 'crates/tetra-entities/src/mle/ltpd_runtime.rs'
+      - 'crates/tetra-entities/src/mle/mle_bs.rs'
+      - 'crates/tetra-entities/src/sndcp/sndcp_bs.rs'
+      - 'crates/tetra-entities/tests/test_ltpd_runtime.rs'
+      - 'tools/check_ltpd_runtime.py'
+
+jobs:
+  ltpd-runtime:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Static architecture checks
+        run: python3 tools/check_ltpd_runtime.py
+      - name: Type foundation checks
+        run: python3 tools/check_swmi_foundation_types.py
+      - name: Format check
+        run: cargo fmt --all -- --check
+      - name: TLPD runtime tests
+        run: cargo test -p tetra-entities --test test_ltpd_runtime
+      - name: SAP tests
+        run: cargo test -p tetra-saps

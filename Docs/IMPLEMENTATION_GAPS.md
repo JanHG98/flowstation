@@ -6,10 +6,10 @@
 | Kategorie | Treffer |
 | --- | --- |
 | TODO/FIXME | 219 |
-| Todo-Typ | 238 |
+| Todo-Typ | 239 |
 | panic! | 80 |
 | unimplemented! | 56 |
-| unimplemented_log! | 112 |
+| unimplemented_log! | 111 |
 | unreachable! | 31 |
 
 ## Priorität für SWMI Foundation 1
@@ -64,32 +64,31 @@
 | LMM | LmmMlePrepareReq | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/lmm/mod.rs` |
 | LMM | LmmMleReportInd | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/lmm/mod.rs` |
 | LMM | LmmMleUpdateReq | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/lmm/mod.rs` |
-| LTPD | LtpdMleActivityReq | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/ltpd/mod.rs` |
-| LTPD | LtpdMleBreakInd | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/ltpd/mod.rs` |
-| LTPD | LtpdMleBusyInd | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/ltpd/mod.rs` |
-| LTPD | LtpdMleCancelReq | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/ltpd/mod.rs` |
-| LTPD | LtpdMleCloseInd | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/ltpd/mod.rs` |
-| LTPD | LtpdMleConfigureInd | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/ltpd/mod.rs` |
-| LTPD | LtpdMleConfigureReq | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/ltpd/mod.rs` |
-| LTPD | LtpdMleConnectConfirm | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/ltpd/mod.rs` |
+| LTPD | LtpdMleActivityReq | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/ltpd/mod.rs` |
+| LTPD | LtpdMleBreakInd | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/ltpd/mod.rs` |
+| LTPD | LtpdMleBusyInd | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/ltpd/mod.rs` |
+| LTPD | LtpdMleCancelReq | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/ltpd/mod.rs` |
+| LTPD | LtpdMleCloseInd | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/ltpd/mod.rs` |
+| LTPD | LtpdMleConfigureInd | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/ltpd/mod.rs` |
+| LTPD | LtpdMleConfigureReq | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/ltpd/mod.rs` |
+| LTPD | LtpdMleConnectConfirm | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/ltpd/mod.rs` |
 | LTPD | LtpdMleConnectInd | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/ltpd/mod.rs` |
-| LTPD | LtpdMleConnectReq | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/ltpd/mod.rs` |
-| LTPD | LtpdMleConnectResp | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/ltpd/mod.rs` |
-| LTPD | LtpdMleDisableInd | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/ltpd/mod.rs` |
-| LTPD | LtpdMleDisconnectInd | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/ltpd/mod.rs` |
-| LTPD | LtpdMleDisconnectReq | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/ltpd/mod.rs` |
-| LTPD | LtpdMleEnableInd | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/ltpd/mod.rs` |
-| LTPD | LtpdMleIdleInd | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/ltpd/mod.rs` |
-| LTPD | LtpdMleInfoInd | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/ltpd/mod.rs` |
-| LTPD | LtpdMleOpenInd | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/ltpd/mod.rs` |
-| LTPD | LtpdMleReceiveInd | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/ltpd/mod.rs` |
-| LTPD | LtpdMleReconnectConfirm | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/ltpd/mod.rs` |
+| LTPD | LtpdMleConnectReq | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/ltpd/mod.rs` |
+| LTPD | LtpdMleConnectResp | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/ltpd/mod.rs` |
+| LTPD | LtpdMleDisableInd | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/ltpd/mod.rs` |
+| LTPD | LtpdMleDisconnectInd | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/ltpd/mod.rs` |
+| LTPD | LtpdMleDisconnectReq | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/ltpd/mod.rs` |
+| LTPD | LtpdMleEnableInd | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/ltpd/mod.rs` |
+| LTPD | LtpdMleIdleInd | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/ltpd/mod.rs` |
+| LTPD | LtpdMleInfoInd | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/ltpd/mod.rs` |
+| LTPD | LtpdMleOpenInd | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/ltpd/mod.rs` |
+| LTPD | LtpdMleReceiveInd | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/ltpd/mod.rs` |
+| LTPD | LtpdMleReconnectConfirm | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/ltpd/mod.rs` |
 | LTPD | LtpdMleReconnectInd | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/ltpd/mod.rs` |
-| LTPD | LtpdMleReconnectReq | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/ltpd/mod.rs` |
-| LTPD | LtpdMleReleaseReq | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/ltpd/mod.rs` |
-| LTPD | LtpdMleReportInd | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/ltpd/mod.rs` |
-| LTPD | LtpdMleResumeInd | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/ltpd/mod.rs` |
-| LTPD | LtpdMleUnitdataReq | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/ltpd/mod.rs` |
+| LTPD | LtpdMleReconnectReq | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/ltpd/mod.rs` |
+| LTPD | LtpdMleReleaseReq | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/ltpd/mod.rs` |
+| LTPD | LtpdMleReportInd | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/ltpd/mod.rs` |
+| LTPD | LtpdMleResumeInd | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/ltpd/mod.rs` |
 | TLA | TlCancelReq | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/tla/mod.rs` |
 | TLA | TlConnectConf | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/tla/mod.rs` |
 | TLA | TlConnectInd | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/tla/mod.rs` |
@@ -283,26 +282,26 @@
 | unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/lmac/lmac_ms.rs` | 253 | `unimplemented_log!("TmvUnitdataReq")` |
 | TODO/FIXME | technische Schuld | Runtime | `crates/tetra-entities/src/lmac/lmac_ms.rs` | 292 | `assert!(mod_time == ts, "time out of sync"); // TODO handle properly` |
 | TODO/FIXME | technische Schuld | Runtime | `crates/tetra-entities/src/mle/components/mle_router.rs` | 30 | `//         // TODO FIXME: Re-enable handle insertion once we start using this` |
-| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 65 | `unimplemented_log!("DNewCell")` |
-| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 68 | `unimplemented_log!("DPrepareFail")` |
-| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 71 | `unimplemented_log!("DNwrkBroadcast")` |
-| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 74 | `unimplemented_log!("DNwrkBroadcastExt")` |
-| TODO/FIXME | technische Schuld | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 75 | `} // TODO FIXME CHECK this option and assocaited int` |
-| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 77 | `unimplemented_log!("DRestoreAck")` |
-| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 80 | `unimplemented_log!("DRestoreFail")` |
-| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 83 | `unimplemented_log!("DChannelResponse")` |
-| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 86 | `unimplemented_log!("ExtPdu")` |
-| TODO/FIXME | technische Schuld | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 211 | `chan_change_resp_req: false, // TODO FIXME` |
-| TODO/FIXME | technische Schuld | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 212 | `chan_change_handle: None,    // TODO FIXME` |
-| TODO/FIXME | technische Schuld | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 229 | `chan_change_resp_req: false, // TODO FIXME` |
-| TODO/FIXME | technische Schuld | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 230 | `chan_change_handle: None,    // TODO FIXME` |
-| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 246 | `unimplemented_log!("MleProtocolDiscriminator::TetraManagementEntity");` |
-| TODO/FIXME | technische Schuld | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 329 | `subscriber_class: 0, // TODO fixme` |
-| TODO/FIXME | technische Schuld | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 334 | `req_handle: 0, // TODO FIXME; should we pass the same handle here?` |
-| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 357 | `unimplemented_log!("rx_tlpd_prim called but TLPD SAP is not implemented");` |
-| TODO/FIXME | technische Schuld | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 397 | `subscriber_class: 0, // TODO fixme` |
-| TODO/FIXME | technische Schuld | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 424 | `subscriber_class: 0, // TODO fixme` |
-| TODO/FIXME | technische Schuld | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 429 | `req_handle: 0, // TODO FIXME` |
+| Todo-Typ | Typ-Platzhalter | Runtime | `crates/tetra-entities/src/mle/ltpd_runtime.rs` | 629 | `Layer2Service::Acknowledged \| Layer2Service::Todo => {` |
+| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 121 | `unimplemented_log!("DNewCell")` |
+| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 124 | `unimplemented_log!("DPrepareFail")` |
+| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 127 | `unimplemented_log!("DNwrkBroadcast")` |
+| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 130 | `unimplemented_log!("DNwrkBroadcastExt")` |
+| TODO/FIXME | technische Schuld | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 131 | `} // TODO FIXME CHECK this option and assocaited int` |
+| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 133 | `unimplemented_log!("DRestoreAck")` |
+| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 136 | `unimplemented_log!("DRestoreFail")` |
+| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 139 | `unimplemented_log!("DChannelResponse")` |
+| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 142 | `unimplemented_log!("ExtPdu")` |
+| TODO/FIXME | technische Schuld | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 274 | `chan_change_resp_req: false, // TODO FIXME` |
+| TODO/FIXME | technische Schuld | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 275 | `chan_change_handle: None,    // TODO FIXME` |
+| TODO/FIXME | technische Schuld | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 299 | `chan_change_resp_req: false, // TODO FIXME` |
+| TODO/FIXME | technische Schuld | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 300 | `chan_change_handle: None,    // TODO FIXME` |
+| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 316 | `unimplemented_log!("MleProtocolDiscriminator::TetraManagementEntity");` |
+| TODO/FIXME | technische Schuld | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 403 | `subscriber_class: 0, // TODO fixme` |
+| TODO/FIXME | technische Schuld | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 408 | `req_handle: 0, // TODO FIXME; should we pass the same handle here?` |
+| TODO/FIXME | technische Schuld | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 466 | `subscriber_class: 0, // TODO fixme` |
+| TODO/FIXME | technische Schuld | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 493 | `subscriber_class: 0, // TODO fixme` |
+| TODO/FIXME | technische Schuld | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 498 | `req_handle: 0, // TODO FIXME` |
 | unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mle/mle_ms.rs` | 62 | `unimplemented_log!("DNewCell")` |
 | unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mle/mle_ms.rs` | 65 | `unimplemented_log!("DPrepareFail")` |
 | unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mle/mle_ms.rs` | 68 | `unimplemented_log!("DNwrkBroadcast")` |
@@ -436,10 +435,10 @@
 | panic! | prüfen | Runtime | `crates/tetra-entities/src/sndcp/protocol.rs` | 1504 | `let SnPdu::Reconnect(decoded) = decoded else { panic!("wrong PDU") };` |
 | unreachable! | prüfen | Runtime | `crates/tetra-entities/src/sndcp/qos.rs` | 102 | `_ => unreachable!(),` |
 | unreachable! | prüfen | Runtime | `crates/tetra-entities/src/sndcp/qos.rs` | 118 | `_ => unreachable!(),` |
-| Todo-Typ | Typ-Platzhalter | Runtime | `crates/tetra-entities/src/sndcp/sndcp_bs.rs` | 11 | `use tetra_core::{BitBuffer, Sap, TdmaTime, TimeslotOwner, Todo};` |
-| Todo-Typ | Typ-Platzhalter | Runtime | `crates/tetra-entities/src/sndcp/sndcp_bs.rs` | 39 | `const SECONDARY_CARRIER_HINT: Todo = -2;` |
-| Todo-Typ | Typ-Platzhalter | Runtime | `crates/tetra-entities/src/sndcp/sndcp_bs.rs` | 330 | `fn carrier_hint(logical_ts: u8) -> Option<Todo> {` |
-| unreachable! | prüfen | Runtime | `crates/tetra-entities/src/sndcp/sndcp_bs.rs` | 1823 | `ContextAvailability::Reserved(_) => unreachable!(),` |
+| Todo-Typ | Typ-Platzhalter | Runtime | `crates/tetra-entities/src/sndcp/sndcp_bs.rs` | 11 | `use tetra_core::{BitBuffer, Layer2Service, Sap, TdmaTime, TimeslotOwner, Todo};` |
+| Todo-Typ | Typ-Platzhalter | Runtime | `crates/tetra-entities/src/sndcp/sndcp_bs.rs` | 42 | `const SECONDARY_CARRIER_HINT: Todo = -2;` |
+| Todo-Typ | Typ-Platzhalter | Runtime | `crates/tetra-entities/src/sndcp/sndcp_bs.rs` | 379 | `fn carrier_hint(logical_ts: u8) -> Option<Todo> {` |
+| unreachable! | prüfen | Runtime | `crates/tetra-entities/src/sndcp/sndcp_bs.rs` | 1851 | `ContextAvailability::Reserved(_) => unreachable!(),` |
 | unreachable! | prüfen | Runtime | `crates/tetra-entities/src/sndcp/state.rs` | 480 | `_ => unreachable!(),` |
 | unreachable! | prüfen | Runtime | `crates/tetra-entities/src/sndcp/state.rs` | 503 | `_ => unreachable!(),` |
 | unreachable! | prüfen | Runtime | `crates/tetra-entities/src/sndcp/state.rs` | 527 | `_ => unreachable!(),` |

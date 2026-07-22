@@ -1257,3 +1257,8 @@ Für jede Phase, in der ein neuer Containerdienst entsteht, gelten zusätzlich:
 - unabhängige Erreichbarkeit bei ausgefallenem Control Room;
 - UI- und API-Tests;
 - dokumentierter HTTPS-Zugriff im Managementnetz.
+
+
+## Funkstack-Voraussetzung: SWMI Foundation 1 – Paket D
+
+Die lokale TLPD-Runtime ist abgeschlossen. Sie bleibt auf der TBS und stellt Diagnose-Snapshots für die spätere TBS-WebUI und den Node Gateway bereit. Es entsteht kein eigener Backend-Container.

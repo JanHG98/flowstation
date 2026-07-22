@@ -953,8 +953,16 @@
       "text": "//         // TODO FIXME: Re-enable handle insertion once we start using this"
     },
     {
+      "category": "Todo-Typ",
+      "line": 629,
+      "path": "crates/tetra-entities/src/mle/ltpd_runtime.rs",
+      "scope": "Runtime",
+      "severity": "Typ-Platzhalter",
+      "text": "Layer2Service::Acknowledged | Layer2Service::Todo => {"
+    },
+    {
       "category": "unimplemented_log!",
-      "line": 65,
+      "line": 121,
       "path": "crates/tetra-entities/src/mle/mle_bs.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -962,7 +970,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 68,
+      "line": 124,
       "path": "crates/tetra-entities/src/mle/mle_bs.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -970,7 +978,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 71,
+      "line": 127,
       "path": "crates/tetra-entities/src/mle/mle_bs.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -978,7 +986,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 74,
+      "line": 130,
       "path": "crates/tetra-entities/src/mle/mle_bs.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -986,7 +994,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 75,
+      "line": 131,
       "path": "crates/tetra-entities/src/mle/mle_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -994,7 +1002,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 77,
+      "line": 133,
       "path": "crates/tetra-entities/src/mle/mle_bs.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -1002,7 +1010,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 80,
+      "line": 136,
       "path": "crates/tetra-entities/src/mle/mle_bs.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -1010,7 +1018,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 83,
+      "line": 139,
       "path": "crates/tetra-entities/src/mle/mle_bs.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -1018,7 +1026,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 86,
+      "line": 142,
       "path": "crates/tetra-entities/src/mle/mle_bs.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -1026,7 +1034,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 211,
+      "line": 274,
       "path": "crates/tetra-entities/src/mle/mle_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -1034,7 +1042,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 212,
+      "line": 275,
       "path": "crates/tetra-entities/src/mle/mle_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -1042,7 +1050,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 229,
+      "line": 299,
       "path": "crates/tetra-entities/src/mle/mle_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -1050,7 +1058,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 230,
+      "line": 300,
       "path": "crates/tetra-entities/src/mle/mle_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -1058,7 +1066,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 246,
+      "line": 316,
       "path": "crates/tetra-entities/src/mle/mle_bs.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -1066,7 +1074,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 329,
+      "line": 403,
       "path": "crates/tetra-entities/src/mle/mle_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -1074,23 +1082,15 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 334,
+      "line": 408,
       "path": "crates/tetra-entities/src/mle/mle_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
       "text": "req_handle: 0, // TODO FIXME; should we pass the same handle here?"
     },
     {
-      "category": "unimplemented_log!",
-      "line": 357,
-      "path": "crates/tetra-entities/src/mle/mle_bs.rs",
-      "scope": "Runtime",
-      "severity": "offener Runtime-Pfad",
-      "text": "unimplemented_log!(\"rx_tlpd_prim called but TLPD SAP is not implemented\");"
-    },
-    {
       "category": "TODO/FIXME",
-      "line": 397,
+      "line": 466,
       "path": "crates/tetra-entities/src/mle/mle_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -1098,7 +1098,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 424,
+      "line": 493,
       "path": "crates/tetra-entities/src/mle/mle_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -1106,7 +1106,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 429,
+      "line": 498,
       "path": "crates/tetra-entities/src/mle/mle_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -2182,11 +2182,11 @@
       "path": "crates/tetra-entities/src/sndcp/sndcp_bs.rs",
       "scope": "Runtime",
       "severity": "Typ-Platzhalter",
-      "text": "use tetra_core::{BitBuffer, Sap, TdmaTime, TimeslotOwner, Todo};"
+      "text": "use tetra_core::{BitBuffer, Layer2Service, Sap, TdmaTime, TimeslotOwner, Todo};"
     },
     {
       "category": "Todo-Typ",
-      "line": 39,
+      "line": 42,
       "path": "crates/tetra-entities/src/sndcp/sndcp_bs.rs",
       "scope": "Runtime",
       "severity": "Typ-Platzhalter",
@@ -2194,7 +2194,7 @@
     },
     {
       "category": "Todo-Typ",
-      "line": 330,
+      "line": 379,
       "path": "crates/tetra-entities/src/sndcp/sndcp_bs.rs",
       "scope": "Runtime",
       "severity": "Typ-Platzhalter",
@@ -2202,7 +2202,7 @@
     },
     {
       "category": "unreachable!",
-      "line": 1823,
+      "line": 1851,
       "path": "crates/tetra-entities/src/sndcp/sndcp_bs.rs",
       "scope": "Runtime",
       "severity": "prüfen",
@@ -7756,83 +7756,83 @@
     },
     {
       "constructed": 0,
-      "handled": 0,
+      "handled": 1,
       "path": "crates/tetra-saps/src/ltpd/mod.rs",
       "primitive": "LtpdMleActivityReq",
       "sap": "LTPD",
       "sapmsg_variant": "ja",
-      "status": "Variante vorhanden, Runtime-Pfad fehlt",
+      "status": "nur Empfang/Handler sichtbar",
       "tests": 4
     },
     {
       "constructed": 0,
-      "handled": 0,
+      "handled": 2,
       "path": "crates/tetra-saps/src/ltpd/mod.rs",
       "primitive": "LtpdMleBreakInd",
       "sap": "LTPD",
       "sapmsg_variant": "ja",
-      "status": "Variante vorhanden, Runtime-Pfad fehlt",
-      "tests": 0
+      "status": "nur Empfang/Handler sichtbar",
+      "tests": 1
     },
     {
       "constructed": 0,
-      "handled": 0,
+      "handled": 2,
       "path": "crates/tetra-saps/src/ltpd/mod.rs",
       "primitive": "LtpdMleBusyInd",
       "sap": "LTPD",
       "sapmsg_variant": "ja",
-      "status": "Variante vorhanden, Runtime-Pfad fehlt",
+      "status": "nur Empfang/Handler sichtbar",
       "tests": 0
     },
     {
       "constructed": 0,
-      "handled": 0,
+      "handled": 1,
       "path": "crates/tetra-saps/src/ltpd/mod.rs",
       "primitive": "LtpdMleCancelReq",
       "sap": "LTPD",
       "sapmsg_variant": "ja",
-      "status": "Variante vorhanden, Runtime-Pfad fehlt",
+      "status": "nur Empfang/Handler sichtbar",
       "tests": 0
     },
     {
       "constructed": 0,
-      "handled": 0,
+      "handled": 2,
       "path": "crates/tetra-saps/src/ltpd/mod.rs",
       "primitive": "LtpdMleCloseInd",
       "sap": "LTPD",
       "sapmsg_variant": "ja",
-      "status": "Variante vorhanden, Runtime-Pfad fehlt",
+      "status": "nur Empfang/Handler sichtbar",
       "tests": 0
     },
     {
       "constructed": 0,
-      "handled": 0,
+      "handled": 2,
       "path": "crates/tetra-saps/src/ltpd/mod.rs",
       "primitive": "LtpdMleConfigureInd",
       "sap": "LTPD",
       "sapmsg_variant": "ja",
-      "status": "Variante vorhanden, Runtime-Pfad fehlt",
+      "status": "nur Empfang/Handler sichtbar",
       "tests": 0
     },
     {
       "constructed": 0,
-      "handled": 0,
+      "handled": 1,
       "path": "crates/tetra-saps/src/ltpd/mod.rs",
       "primitive": "LtpdMleConfigureReq",
       "sap": "LTPD",
       "sapmsg_variant": "ja",
-      "status": "Variante vorhanden, Runtime-Pfad fehlt",
+      "status": "nur Empfang/Handler sichtbar",
       "tests": 0
     },
     {
       "constructed": 0,
-      "handled": 0,
+      "handled": 3,
       "path": "crates/tetra-saps/src/ltpd/mod.rs",
       "primitive": "LtpdMleConnectConfirm",
       "sap": "LTPD",
       "sapmsg_variant": "ja",
-      "status": "Variante vorhanden, Runtime-Pfad fehlt",
-      "tests": 0
+      "status": "nur Empfang/Handler sichtbar",
+      "tests": 1
     },
     {
       "constructed": 0,
@@ -7846,113 +7846,113 @@
     },
     {
       "constructed": 0,
-      "handled": 0,
+      "handled": 1,
       "path": "crates/tetra-saps/src/ltpd/mod.rs",
       "primitive": "LtpdMleConnectReq",
       "sap": "LTPD",
       "sapmsg_variant": "ja",
-      "status": "Variante vorhanden, Runtime-Pfad fehlt",
-      "tests": 0
+      "status": "nur Empfang/Handler sichtbar",
+      "tests": 3
     },
     {
       "constructed": 0,
-      "handled": 0,
+      "handled": 1,
       "path": "crates/tetra-saps/src/ltpd/mod.rs",
       "primitive": "LtpdMleConnectResp",
       "sap": "LTPD",
       "sapmsg_variant": "ja",
-      "status": "Variante vorhanden, Runtime-Pfad fehlt",
+      "status": "nur Empfang/Handler sichtbar",
       "tests": 0
     },
     {
       "constructed": 0,
-      "handled": 0,
+      "handled": 2,
       "path": "crates/tetra-saps/src/ltpd/mod.rs",
       "primitive": "LtpdMleDisableInd",
       "sap": "LTPD",
       "sapmsg_variant": "ja",
-      "status": "Variante vorhanden, Runtime-Pfad fehlt",
+      "status": "nur Empfang/Handler sichtbar",
       "tests": 0
     },
     {
       "constructed": 0,
-      "handled": 0,
+      "handled": 2,
       "path": "crates/tetra-saps/src/ltpd/mod.rs",
       "primitive": "LtpdMleDisconnectInd",
       "sap": "LTPD",
       "sapmsg_variant": "ja",
-      "status": "Variante vorhanden, Runtime-Pfad fehlt",
-      "tests": 0
+      "status": "nur Empfang/Handler sichtbar",
+      "tests": 1
     },
     {
       "constructed": 0,
-      "handled": 0,
+      "handled": 1,
       "path": "crates/tetra-saps/src/ltpd/mod.rs",
       "primitive": "LtpdMleDisconnectReq",
       "sap": "LTPD",
       "sapmsg_variant": "ja",
-      "status": "Variante vorhanden, Runtime-Pfad fehlt",
-      "tests": 0
+      "status": "nur Empfang/Handler sichtbar",
+      "tests": 3
     },
     {
       "constructed": 0,
-      "handled": 0,
+      "handled": 2,
       "path": "crates/tetra-saps/src/ltpd/mod.rs",
       "primitive": "LtpdMleEnableInd",
       "sap": "LTPD",
       "sapmsg_variant": "ja",
-      "status": "Variante vorhanden, Runtime-Pfad fehlt",
+      "status": "nur Empfang/Handler sichtbar",
       "tests": 0
     },
     {
       "constructed": 0,
-      "handled": 0,
+      "handled": 2,
       "path": "crates/tetra-saps/src/ltpd/mod.rs",
       "primitive": "LtpdMleIdleInd",
       "sap": "LTPD",
       "sapmsg_variant": "ja",
-      "status": "Variante vorhanden, Runtime-Pfad fehlt",
+      "status": "nur Empfang/Handler sichtbar",
       "tests": 0
     },
     {
       "constructed": 0,
-      "handled": 0,
+      "handled": 2,
       "path": "crates/tetra-saps/src/ltpd/mod.rs",
       "primitive": "LtpdMleInfoInd",
       "sap": "LTPD",
       "sapmsg_variant": "ja",
-      "status": "Variante vorhanden, Runtime-Pfad fehlt",
+      "status": "nur Empfang/Handler sichtbar",
       "tests": 0
     },
     {
       "constructed": 0,
-      "handled": 0,
+      "handled": 2,
       "path": "crates/tetra-saps/src/ltpd/mod.rs",
       "primitive": "LtpdMleOpenInd",
       "sap": "LTPD",
       "sapmsg_variant": "ja",
-      "status": "Variante vorhanden, Runtime-Pfad fehlt",
+      "status": "nur Empfang/Handler sichtbar",
       "tests": 0
     },
     {
       "constructed": 0,
-      "handled": 0,
+      "handled": 1,
       "path": "crates/tetra-saps/src/ltpd/mod.rs",
       "primitive": "LtpdMleReceiveInd",
       "sap": "LTPD",
       "sapmsg_variant": "ja",
-      "status": "Variante vorhanden, Runtime-Pfad fehlt",
+      "status": "nur Empfang/Handler sichtbar",
       "tests": 0
     },
     {
       "constructed": 0,
-      "handled": 0,
+      "handled": 2,
       "path": "crates/tetra-saps/src/ltpd/mod.rs",
       "primitive": "LtpdMleReconnectConfirm",
       "sap": "LTPD",
       "sapmsg_variant": "ja",
-      "status": "Variante vorhanden, Runtime-Pfad fehlt",
-      "tests": 0
+      "status": "nur Empfang/Handler sichtbar",
+      "tests": 1
     },
     {
       "constructed": 0,
@@ -7966,63 +7966,63 @@
     },
     {
       "constructed": 0,
-      "handled": 0,
+      "handled": 1,
       "path": "crates/tetra-saps/src/ltpd/mod.rs",
       "primitive": "LtpdMleReconnectReq",
       "sap": "LTPD",
       "sapmsg_variant": "ja",
-      "status": "Variante vorhanden, Runtime-Pfad fehlt",
-      "tests": 0
+      "status": "nur Empfang/Handler sichtbar",
+      "tests": 3
     },
     {
       "constructed": 0,
-      "handled": 0,
+      "handled": 1,
       "path": "crates/tetra-saps/src/ltpd/mod.rs",
       "primitive": "LtpdMleReleaseReq",
       "sap": "LTPD",
       "sapmsg_variant": "ja",
-      "status": "Variante vorhanden, Runtime-Pfad fehlt",
+      "status": "nur Empfang/Handler sichtbar",
       "tests": 0
     },
     {
       "constructed": 0,
-      "handled": 0,
+      "handled": 4,
       "path": "crates/tetra-saps/src/ltpd/mod.rs",
       "primitive": "LtpdMleReportInd",
       "sap": "LTPD",
       "sapmsg_variant": "ja",
-      "status": "Variante vorhanden, Runtime-Pfad fehlt",
-      "tests": 0
+      "status": "nur Empfang/Handler sichtbar",
+      "tests": 2
     },
     {
       "constructed": 0,
-      "handled": 0,
+      "handled": 2,
       "path": "crates/tetra-saps/src/ltpd/mod.rs",
       "primitive": "LtpdMleResumeInd",
       "sap": "LTPD",
       "sapmsg_variant": "ja",
-      "status": "Variante vorhanden, Runtime-Pfad fehlt",
-      "tests": 0
+      "status": "nur Empfang/Handler sichtbar",
+      "tests": 1
     },
     {
       "constructed": 4,
-      "handled": 1,
+      "handled": 2,
       "path": "crates/tetra-saps/src/ltpd/mod.rs",
       "primitive": "LtpdMleUnitdataInd",
       "sap": "LTPD",
       "sapmsg_variant": "ja",
       "status": "bidirektional sichtbar",
-      "tests": 0
+      "tests": 1
     },
     {
-      "constructed": 0,
-      "handled": 0,
+      "constructed": 1,
+      "handled": 3,
       "path": "crates/tetra-saps/src/ltpd/mod.rs",
       "primitive": "LtpdMleUnitdataReq",
       "sap": "LTPD",
       "sapmsg_variant": "ja",
-      "status": "Variante vorhanden, Runtime-Pfad fehlt",
-      "tests": 0
+      "status": "bidirektional sichtbar",
+      "tests": 3
     },
     {
       "constructed": 0,
@@ -8312,7 +8312,7 @@
       "sap": "TLMC",
       "sapmsg_variant": "ja",
       "status": "nur Empfang/Handler sichtbar",
-      "tests": 3
+      "tests": 8
     },
     {
       "constructed": 1,
@@ -8651,7 +8651,7 @@
       "layer": "SAP/COMMON",
       "name": "LtpdLinkState",
       "path": "crates/tetra-saps/src/common/mod.rs",
-      "test_references": 0,
+      "test_references": 1,
       "variants": 10
     },
     {

@@ -8,11 +8,14 @@ use crate::net_telemetry::events::{PacketDataContextTelemetry, PacketDataGateway
 use tetra_config::bluestation::SharedConfig;
 use tetra_core::address::TetraAddress;
 use tetra_core::tetra_entities::TetraEntity;
-use tetra_core::{BitBuffer, Sap, TdmaTime, TimeslotOwner, Todo};
+use tetra_core::{BitBuffer, Layer2Service, Sap, TdmaTime, TimeslotOwner, Todo};
 use tetra_saps::lcmc::enums::{alloc_type::ChanAllocType, ul_dl_assignment::UlDlAssignment};
 use tetra_saps::lcmc::fields::chan_alloc_req::CmceChanAllocReq;
-use tetra_saps::ltpd::LtpdMleUnitdataInd;
-use tetra_saps::tla::{TlaTlDataReqBl, TlaTlUnitdataReqBl};
+use tetra_saps::common::{
+    ChannelAdvice, DataClass, DataPriority as LtpdDataPriority, LtpdLinkState,
+    PduPriority, RequestHandle, ScheduledDataStatus, StealingPermission, TransferResult,
+};
+use tetra_saps::ltpd::{LtpdMleUnitdataInd, LtpdMleUnitdataReq};
 use tetra_saps::control::brew::BrewSubscriberAction;
 use tetra_saps::{SapMsg, SapMsgInner};
 
@@ -179,6 +182,17 @@ struct AutomaticBinding {
     expires_at: Instant,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SndcpLtpdSnapshot {
+    pub network: Option<(u16, u16)>,
+    pub link_state: LtpdLinkState,
+    pub busy: bool,
+    pub disabled: bool,
+    pub last_report: Option<(RequestHandle, TransferResult)>,
+    pub successful_transfers: u64,
+    pub failed_transfers: u64,
+}
+
 pub struct Sndcp {
     config: SharedConfig,
     contexts: ContextTable,
@@ -198,6 +212,14 @@ pub struct Sndcp {
     last_timer_sweep: Instant,
     last_telemetry_emit: Instant,
     telemetry: Option<TelemetrySink>,
+    next_ltpd_handle: u32,
+    ltpd_network: Option<(u16, u16)>,
+    ltpd_link_state: LtpdLinkState,
+    ltpd_busy: bool,
+    ltpd_disabled: bool,
+    ltpd_last_report: Option<(RequestHandle, TransferResult)>,
+    ltpd_successful_transfers: u64,
+    ltpd_failed_transfers: u64,
 }
 
 impl Sndcp {
@@ -226,7 +248,34 @@ impl Sndcp {
             last_timer_sweep: now,
             last_telemetry_emit: now.checked_sub(Duration::from_secs(2)).unwrap_or(now),
             telemetry,
+            next_ltpd_handle: 1,
+            ltpd_network: None,
+            ltpd_link_state: LtpdLinkState::Null,
+            ltpd_busy: false,
+            ltpd_disabled: false,
+            ltpd_last_report: None,
+            ltpd_successful_transfers: 0,
+            ltpd_failed_transfers: 0,
         }
+    }
+
+    /// Read-only TLPD client state for the TBS WebUI and packet-data diagnostics.
+    pub fn ltpd_snapshot(&self) -> SndcpLtpdSnapshot {
+        SndcpLtpdSnapshot {
+            network: self.ltpd_network,
+            link_state: self.ltpd_link_state,
+            busy: self.ltpd_busy,
+            disabled: self.ltpd_disabled,
+            last_report: self.ltpd_last_report,
+            successful_transfers: self.ltpd_successful_transfers,
+            failed_transfers: self.ltpd_failed_transfers,
+        }
+    }
+
+    fn allocate_ltpd_handle(&mut self) -> RequestHandle {
+        let handle = RequestHandle(self.next_ltpd_handle);
+        self.next_ltpd_handle = self.next_ltpd_handle.wrapping_add(1).max(1);
+        handle
     }
 
     fn profile_enabled(&self) -> bool {
@@ -470,68 +519,69 @@ impl Sndcp {
         Some(bearer.logical_ts)
     }
 
+    fn queue_ltpd_to(
+        &mut self,
+        queue: &mut MessageQueue,
+        route: SubscriberRoute,
+        sn_pdu: &BitBuffer,
+        acknowledged: bool,
+        chan_alloc: Option<CmceChanAllocReq>,
+    ) {
+        let handle = self.allocate_ltpd_handle();
+        queue.push_back(SapMsg {
+            sap: Sap::TlpdSap,
+            src: TetraEntity::Sndcp,
+            dest: TetraEntity::Mle,
+            msg: SapMsgInner::LtpdMleUnitdataReq(LtpdMleUnitdataReq {
+                sdu: BitBuffer::from_bitbuffer(sn_pdu),
+                handle,
+                address: Some(route.main_address),
+                layer2service: if acknowledged {
+                    Layer2Service::Acknowledged
+                } else {
+                    Layer2Service::Unacknowledged
+                },
+                unacknowledged_basic_link_repetitions: 0,
+                pdu_priority: PduPriority::default(),
+                endpoint_id: route.endpoint_id,
+                link_id: route.link_id,
+                stealing_permission: StealingPermission::NotRequired,
+                stealing_repeats_flag: false,
+                channel_advice: ChannelAdvice::NotRequested,
+                data_class_information: DataClass::NonClassified,
+                data_priority: LtpdDataPriority::Undefined,
+                mle_data_priority_flag: false,
+                packet_data_flag: true,
+                scheduled_data_status: ScheduledDataStatus::NotScheduled,
+                maximum_schedule_interval_slots: None,
+                fcs_flag: false,
+                chan_alloc,
+            }),
+        });
+    }
+
     fn queue_acked_to(
-        &self,
+        &mut self,
         queue: &mut MessageQueue,
         route: SubscriberRoute,
         sn_pdu: &BitBuffer,
         chan_alloc: Option<CmceChanAllocReq>,
     ) {
-        queue.push_back(SapMsg {
-            sap: Sap::TlaSap,
-            src: TetraEntity::Sndcp,
-            dest: TetraEntity::Llc,
-            msg: SapMsgInner::TlaTlDataReqBl(TlaTlDataReqBl {
-                main_address: route.main_address,
-                link_id: route.link_id,
-                endpoint_id: route.endpoint_id,
-                tl_sdu: Self::wrap_sndcp(sn_pdu),
-                stealing_permission: false,
-                subscriber_class: 0,
-                fcs_flag: false,
-                air_interface_encryption: None,
-                stealing_repeats_flag: None,
-                data_class_info: None,
-                req_handle: 0,
-                graceful_degradation: None,
-                chan_alloc,
-                tx_reporter: None,
-            }),
-        });
+        self.queue_ltpd_to(queue, route, sn_pdu, true, chan_alloc);
     }
 
     fn queue_unacked_to(
-        &self,
+        &mut self,
         queue: &mut MessageQueue,
         route: SubscriberRoute,
         sn_pdu: &BitBuffer,
         chan_alloc: Option<CmceChanAllocReq>,
     ) {
-        queue.push_back(SapMsg {
-            sap: Sap::TlaSap,
-            src: TetraEntity::Sndcp,
-            dest: TetraEntity::Llc,
-            msg: SapMsgInner::TlaTlUnitdataReqBl(TlaTlUnitdataReqBl {
-                main_address: route.main_address,
-                link_id: route.link_id,
-                endpoint_id: route.endpoint_id,
-                tl_sdu: Self::wrap_sndcp(sn_pdu),
-                stealing_permission: false,
-                subscriber_class: 0,
-                fcs_flag: false,
-                air_interface_encryption: None,
-                packet_data_flag: true,
-                n_tlsdu_repeats: 0,
-                data_class_info: None,
-                req_handle: 0,
-                chan_alloc,
-                tx_reporter: None,
-            }),
-        });
+        self.queue_ltpd_to(queue, route, sn_pdu, false, chan_alloc);
     }
 
     fn queue_acked(
-        &self,
+        &mut self,
         queue: &mut MessageQueue,
         ind: &LtpdMleUnitdataInd,
         sn_pdu: &BitBuffer,
@@ -550,60 +600,38 @@ impl Sndcp {
     }
 
     fn queue_unacked(
-        &self,
+        &mut self,
         queue: &mut MessageQueue,
         ind: &LtpdMleUnitdataInd,
         sn_pdu: &BitBuffer,
         chan_alloc: Option<CmceChanAllocReq>,
     ) {
-        queue.push_back(SapMsg {
-            sap: Sap::TlaSap,
-            src: TetraEntity::Sndcp,
-            dest: TetraEntity::Llc,
-            msg: SapMsgInner::TlaTlUnitdataReqBl(TlaTlUnitdataReqBl {
+        self.queue_unacked_to(
+            queue,
+            SubscriberRoute {
                 main_address: ind.received_tetra_address,
                 link_id: ind.link_id,
                 endpoint_id: ind.endpoint_id,
-                tl_sdu: Self::wrap_sndcp(sn_pdu),
-                stealing_permission: false,
-                subscriber_class: 0,
-                fcs_flag: false,
-                air_interface_encryption: None,
-                packet_data_flag: true,
-                n_tlsdu_repeats: 0,
-                data_class_info: None,
-                req_handle: 0,
-                chan_alloc,
-                tx_reporter: None,
-            }),
-        });
+            },
+            sn_pdu,
+            chan_alloc,
+        );
     }
 
-    fn queue_quit(&self, queue: &mut MessageQueue, ind: &LtpdMleUnitdataInd, logical_ts: u8) {
-        queue.push_back(SapMsg {
-            sap: Sap::TlaSap,
-            src: TetraEntity::Sndcp,
-            dest: TetraEntity::Llc,
-            msg: SapMsgInner::TlaTlUnitdataReqBl(TlaTlUnitdataReqBl {
+    fn queue_quit(&mut self, queue: &mut MessageQueue, ind: &LtpdMleUnitdataInd, logical_ts: u8) {
+        self.queue_unacked_to(
+            queue,
+            SubscriberRoute {
                 main_address: ind.received_tetra_address,
                 link_id: ind.link_id,
                 endpoint_id: ind.endpoint_id,
-                tl_sdu: BitBuffer::new(0),
-                stealing_permission: false,
-                subscriber_class: 0,
-                fcs_flag: false,
-                air_interface_encryption: None,
-                packet_data_flag: true,
-                n_tlsdu_repeats: 0,
-                data_class_info: None,
-                req_handle: 0,
-                chan_alloc: Some(Self::quit_allocation(logical_ts)),
-                tx_reporter: None,
-            }),
-        });
+            },
+            &BitBuffer::new(0),
+            Some(Self::quit_allocation(logical_ts)),
+        );
     }
 
-    fn emit_reply(&self, queue: &mut MessageQueue, ind: &LtpdMleUnitdataInd, reply: &CachedReply) {
+    fn emit_reply(&mut self, queue: &mut MessageQueue, ind: &LtpdMleUnitdataInd, reply: &CachedReply) {
         if let ChannelAction::Quit(logical_ts) = reply.channel_action
             && reply.sn_pdu.get_len() == 0
         {
@@ -2279,16 +2307,110 @@ impl TetraEntityTrait for Sndcp {
     }
 
     fn rx_prim(&mut self, queue: &mut MessageQueue, message: SapMsg) {
-        if let SapMsgInner::MmSubscriberUpdate(update) = &message.msg {
-            if update.action == BrewSubscriberAction::Deregister {
-                self.cleanup_subscriber(update.issi, "MM deregistration");
+        match &message.msg {
+            SapMsgInner::MmSubscriberUpdate(update) => {
+                if update.action == BrewSubscriberAction::Deregister {
+                    self.cleanup_subscriber(update.issi, "MM deregistration");
+                }
+                return;
             }
-            return;
+            SapMsgInner::LtpdMleOpenInd(indication) => {
+                self.ltpd_network = Some((indication.mcc, indication.mnc));
+                self.ltpd_link_state = LtpdLinkState::Open;
+                return;
+            }
+            SapMsgInner::LtpdMleCloseInd(_) => {
+                self.ltpd_network = None;
+                self.ltpd_link_state = LtpdLinkState::Closed;
+                return;
+            }
+            SapMsgInner::LtpdMleBreakInd(_) => {
+                self.ltpd_link_state = LtpdLinkState::Broken;
+                return;
+            }
+            SapMsgInner::LtpdMleResumeInd(indication) => {
+                self.ltpd_network = Some((indication.mcc, indication.mnc));
+                self.ltpd_link_state = LtpdLinkState::Open;
+                return;
+            }
+            SapMsgInner::LtpdMleBusyInd(_) => {
+                self.ltpd_busy = true;
+                self.ltpd_link_state = LtpdLinkState::Busy;
+                return;
+            }
+            SapMsgInner::LtpdMleIdleInd(_) => {
+                self.ltpd_busy = false;
+                if !self.ltpd_disabled {
+                    self.ltpd_link_state = LtpdLinkState::Connected;
+                }
+                return;
+            }
+            SapMsgInner::LtpdMleDisableInd(_) => {
+                self.ltpd_disabled = true;
+                self.ltpd_link_state = LtpdLinkState::Disabled;
+                return;
+            }
+            SapMsgInner::LtpdMleEnableInd(_) => {
+                self.ltpd_disabled = false;
+                self.ltpd_link_state = LtpdLinkState::Open;
+                return;
+            }
+            SapMsgInner::LtpdMleConnectConfirm(confirm) => {
+                self.ltpd_link_state = if confirm.setup_report == tetra_saps::common::SetupReport::Success {
+                    LtpdLinkState::Connected
+                } else {
+                    LtpdLinkState::Closed
+                };
+                return;
+            }
+            SapMsgInner::LtpdMleDisconnectInd(_) => {
+                self.ltpd_link_state = LtpdLinkState::Closed;
+                return;
+            }
+            SapMsgInner::LtpdMleReconnectConfirm(confirm) => {
+                self.ltpd_link_state = if confirm.reconnection_result
+                    == tetra_saps::common::ReconnectionResult::Success
+                {
+                    LtpdLinkState::Connected
+                } else {
+                    LtpdLinkState::Broken
+                };
+                return;
+            }
+            SapMsgInner::LtpdMleReportInd(report) => {
+                self.ltpd_last_report = Some((report.handle, report.transfer_result));
+                if matches!(
+                    report.transfer_result,
+                    TransferResult::SuccessMoreDataBuffered | TransferResult::SuccessBufferEmpty
+                ) {
+                    self.ltpd_successful_transfers = self.ltpd_successful_transfers.saturating_add(1);
+                } else {
+                    self.ltpd_failed_transfers = self.ltpd_failed_transfers.saturating_add(1);
+                }
+                return;
+            }
+            SapMsgInner::LtpdMleConfigureInd(indication) => {
+                tracing::warn!("SNDCP: lower-layer conflict: {:?}", indication);
+                return;
+            }
+            SapMsgInner::LtpdMleInfoInd(indication) => {
+                tracing::debug!("SNDCP: MLE cell information: {:?}", indication);
+                return;
+            }
+            SapMsgInner::LtpdMleReceiveInd(indication) => {
+                tracing::trace!("SNDCP: receive activity: {:?}", indication);
+                return;
+            }
+            SapMsgInner::LtpdMleUnitdataInd(_) => {}
+            other => {
+                tracing::debug!("SNDCP: unhandled primitive {:?}", other);
+                return;
+            }
         }
         let SapMsgInner::LtpdMleUnitdataInd(ind) = &message.msg else {
-            tracing::debug!("SNDCP: unhandled primitive {:?}", message.msg);
             return;
         };
+        self.ltpd_link_state = LtpdLinkState::Connected;
         if !self.profile_enabled() {
             tracing::debug!("SNDCP: profile disabled; PDU ignored");
             return;

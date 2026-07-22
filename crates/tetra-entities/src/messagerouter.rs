@@ -44,6 +44,14 @@ impl MessageQueue {
     pub fn pop_front(&mut self) -> Option<SapMsg> {
         self.messages.pop_front()
     }
+
+    pub fn len(&self) -> usize {
+        self.messages.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.messages.is_empty()
+    }
 }
 
 pub struct MessageRouter {

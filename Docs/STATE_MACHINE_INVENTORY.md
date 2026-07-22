@@ -17,7 +17,7 @@
 | NET_TTS | TtsState | 6 | 0 | `crates/tetra-entities/src/net_tts/types.rs` |
 | PHY | SynthesisBufferState | 3 | 0 | `crates/tetra-entities/src/phy/components/fcfb.rs` |
 | SAP/COMMON | ChannelChangeState | 6 | 0 | `crates/tetra-saps/src/common/mod.rs` |
-| SAP/COMMON | LtpdLinkState | 10 | 0 | `crates/tetra-saps/src/common/mod.rs` |
+| SAP/COMMON | LtpdLinkState | 10 | 1 | `crates/tetra-saps/src/common/mod.rs` |
 | SAP/COMMON | MleCellState | 10 | 0 | `crates/tetra-saps/src/common/mod.rs` |
 | SAP/COMMON | TlmcScanState | 5 | 3 | `crates/tetra-saps/src/common/mod.rs` |
 | SAP/COMMON | TlmcSelectionState | 5 | 0 | `crates/tetra-saps/src/common/mod.rs` |
@@ -34,8 +34,8 @@
 | CMCE Group Call | vorhandene Call-State-Typen prüfen und formalisieren | Phase 5 |
 | CMCE Individual Call | vorhandene Individual-Call-State-Typen prüfen und formalisieren | Phase 5 |
 | SNDCP Context State | PDP-State vorhanden; vollständige Context-Transitionen folgen | Phase 11 |
-| LTPD Link State | Typfundament mit `LtpdLinkState` vorhanden; Runtime fehlt | Paket D |
-| LLC Link State | implizite Linkzustände und Timer explizit dokumentieren | Paket D |
+| LTPD Link State | Context Registry, bidirektionales UNITDATA und Lifecycle-Runtime vorhanden | Paket D ✅ |
+| LLC Link State | TLPD nutzt Basic-Link-Adapter; vollständige LLC-Advanced-Link-State-Machine bleibt offen | Paket E/Phase 3 |
 | Channel Change State | TLMC Select/Response-Lifecycle vorhanden; MLE-Zellwechseltransitionen fehlen | Phase 3 |
 
 ## Nächster manueller Review

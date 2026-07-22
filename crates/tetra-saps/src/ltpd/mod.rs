@@ -1,10 +1,12 @@
 //! LTPD-SAP primitives between MLE and SNDCP.
 //!
-//! This module contains only the typed local service interface.  Runtime state
-//! transitions and transport through MLE are implemented in later Foundation 1
-//! packages.
+//! This module defines the typed local service interface used by the Package D
+//! runtime in MLE and SNDCP. Timing-sensitive transport remains inside the TBS
+//! process; only read-only diagnostics are intended to cross the management boundary.
 
 use tetra_core::{BitBuffer, EndpointId, Layer2Service, LinkId, TetraAddress};
+
+use crate::lcmc::fields::chan_alloc_req::CmceChanAllocReq;
 
 use crate::common::{
     CallReleaseInstruction, ChannelAdvice, ChannelChangeDecision, ChannelChangeHandle, DataClass, DataPriority,
@@ -236,6 +238,8 @@ pub struct LtpdMleResumeInd {
 pub struct LtpdMleUnitdataReq {
     pub sdu: BitBuffer,
     pub handle: RequestHandle,
+    /// Optional route hint. MLE uses it to rebuild a local context after restart.
+    pub address: Option<TetraAddress>,
     pub layer2service: Layer2Service,
     pub unacknowledged_basic_link_repetitions: u8,
     pub pdu_priority: PduPriority,
@@ -251,6 +255,8 @@ pub struct LtpdMleUnitdataReq {
     pub scheduled_data_status: ScheduledDataStatus,
     pub maximum_schedule_interval_slots: Option<u32>,
     pub fcs_flag: bool,
+    /// Optional dynamic PDCH allocation carried down to LLC/UMAC.
+    pub chan_alloc: Option<CmceChanAllocReq>,
 }
 
 /// SNDCP data received from a peer entity.

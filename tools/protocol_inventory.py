@@ -570,8 +570,8 @@ def render_states(records: list[StateRecord]) -> str:
         ("CMCE Group Call", "vorhandene Call-State-Typen prüfen und formalisieren", "Phase 5"),
         ("CMCE Individual Call", "vorhandene Individual-Call-State-Typen prüfen und formalisieren", "Phase 5"),
         ("SNDCP Context State", "PDP-State vorhanden; vollständige Context-Transitionen folgen", "Phase 11"),
-        ("LTPD Link State", "Typfundament mit `LtpdLinkState` vorhanden; Runtime fehlt", "Paket D"),
-        ("LLC Link State", "implizite Linkzustände und Timer explizit dokumentieren", "Paket D"),
+        ("LTPD Link State", "Context Registry, bidirektionales UNITDATA und Lifecycle-Runtime vorhanden", "Paket D ✅"),
+        ("LLC Link State", "TLPD nutzt Basic-Link-Adapter; vollständige LLC-Advanced-Link-State-Machine bleibt offen", "Paket E/Phase 3"),
         ("Channel Change State", "TLMC Select/Response-Lifecycle vorhanden; MLE-Zellwechseltransitionen fehlen", "Phase 3"),
     ]
     return "\n".join(
@@ -616,7 +616,7 @@ def render_summary(pdus: list[PduRecord], saps: list[SapRecord], gaps: list[GapR
             "",
             "## Ergebnis",
             "",
-            "Paket A stellt die reproduzierbare Inventur bereit. Paket B ergänzt die typisierten TLMC-/TLPD-Primitive und grundlegenden Zustände. Paket C aktiviert darauf die lokale TLMC-Runtime mit Configure, Ressourcenstatus, Measurement, Monitor, Assessment, Scan, Cell Read, Select, Timeouts und Diagnose-Snapshot. Die Matrix bleibt die laufend aktualisierte Bestandsaufnahme für die folgenden Runtime-Pakete.",
+            "Paket A stellt die reproduzierbare Inventur bereit. Paket B ergänzt die typisierten TLMC-/TLPD-Primitive und grundlegenden Zustände. Paket C aktiviert die lokale TLMC-Runtime. Paket D ergänzt bidirektionales SNDCP-Routing über MLE, Context Registry, Configure, Connect/Disconnect, Break/Resume, Reconnect, Reports und Diagnose-Snapshots. Die Matrix bleibt die laufend aktualisierte Bestandsaufnahme für die folgenden Runtime-Pakete.",
             "",
             table(
                 ["Messgröße", "Stand"],
@@ -657,7 +657,7 @@ def render_summary(pdus: list[PduRecord], saps: list[SapRecord], gaps: list[GapR
             "",
             "## Nächster Arbeitsschritt",
             "",
-            "Paket C ist abgeschlossen. Als Nächstes implementiert Paket D die vollständige LTPD-Runtime mit bidirektionalem MLE-UNITDATA, Context Registry, Configure, Connect/Disconnect, Break/Resume, Reconnect und sauberem Release/Report.",
+            "Paket D ist abgeschlossen. Als Nächstes folgt Paket E mit Foundation-Abnahme, zusätzlichen negativen Lifecycle-Tests und einem Zwei-Zellen-Testharness als Vorbereitung für D-NEW-CELL und RESTORE.",
             "",
         ]
     )

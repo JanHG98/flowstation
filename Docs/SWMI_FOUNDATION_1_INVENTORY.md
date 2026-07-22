@@ -3,7 +3,7 @@
 
 ## Ergebnis
 
-Paket A stellt die reproduzierbare Inventur bereit. Paket B ergänzt die typisierten TLMC-/TLPD-Primitive und grundlegenden Zustände. Paket C aktiviert darauf die lokale TLMC-Runtime mit Configure, Ressourcenstatus, Measurement, Monitor, Assessment, Scan, Cell Read, Select, Timeouts und Diagnose-Snapshot. Die Matrix bleibt die laufend aktualisierte Bestandsaufnahme für die folgenden Runtime-Pakete.
+Paket A stellt die reproduzierbare Inventur bereit. Paket B ergänzt die typisierten TLMC-/TLPD-Primitive und grundlegenden Zustände. Paket C aktiviert die lokale TLMC-Runtime. Paket D ergänzt bidirektionales SNDCP-Routing über MLE, Context Registry, Configure, Connect/Disconnect, Break/Resume, Reconnect, Reports und Diagnose-Snapshots. Die Matrix bleibt die laufend aktualisierte Bestandsaufnahme für die folgenden Runtime-Pakete.
 
 | Messgröße | Stand |
 | --- | --- |
@@ -41,4 +41,4 @@ Die Matrix bewertet den Quellcode konservativ. Ein Codec ohne offensichtlichen P
 
 ## Nächster Arbeitsschritt
 
-Paket C ist abgeschlossen. Als Nächstes implementiert Paket D die vollständige LTPD-Runtime mit bidirektionalem MLE-UNITDATA, Context Registry, Configure, Connect/Disconnect, Break/Resume, Reconnect und sauberem Release/Report.
+Paket D ist abgeschlossen. Als Nächstes folgt Paket E mit Foundation-Abnahme, zusätzlichen negativen Lifecycle-Tests und einem Zwei-Zellen-Testharness als Vorbereitung für D-NEW-CELL und RESTORE.

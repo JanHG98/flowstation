@@ -1,11 +1,15 @@
 use crate::mle::components::broadcast::MleBroadcast;
+use crate::mle::ltpd_runtime::{LtpdRuntime, LtpdRuntimeRole, LtpdRuntimeSnapshot};
 use crate::{MessageQueue, TetraEntityTrait};
 use tetra_config::bluestation::SharedConfig;
 use tetra_core::tetra_entities::TetraEntity;
 use tetra_core::{BitBuffer, Layer2Service, Sap, TdmaTime, unimplemented_log};
 use tetra_saps::lcmc::LcmcMleUnitdataInd;
 use tetra_saps::lmm::LmmMleUnitdataInd;
-use tetra_saps::common::{ChannelChangeHandle, ReceivedAddressType};
+use tetra_saps::common::{
+    ChannelChangeHandle, LowerLayerResourceAvailability, MleBroadcastParameters,
+    PermittedTemporaryServices, ReceivedAddressType,
+};
 use tetra_saps::ltpd::LtpdMleUnitdataInd;
 use tetra_saps::tla::{TlaTlDataReqBl, TlaTlUnitdataReqBl};
 use tetra_saps::{SapMsg, SapMsgInner};
@@ -16,6 +20,8 @@ use tetra_pdus::mle::enums::mle_protocol_discriminator::MleProtocolDiscriminator
 pub struct MleBs {
     config: SharedConfig,
     broadcast: MleBroadcast,
+    ltpd: LtpdRuntime,
+    current_time: TdmaTime,
 }
 
 /// Multiframes at which D-NWRK-BROADCAST is sent within each hyperframe.
@@ -29,7 +35,57 @@ const MLE_BROADCAST_FRAME: u8 = 1;
 impl MleBs {
     pub fn new(config: SharedConfig) -> Self {
         let broadcast = MleBroadcast::new(config.clone());
-        Self { config, broadcast }
+        let ltpd = {
+            let cfg = config.config();
+            LtpdRuntime::new(
+                LtpdRuntimeRole::Swmi,
+                cfg.net.mcc,
+                cfg.net.mnc,
+                MleBroadcastParameters {
+                    mcc: Some(cfg.net.mcc),
+                    mnc: Some(cfg.net.mnc),
+                    location_area: Some(cfg.cell.location_area),
+                    colour_code: Some(cfg.cell.colour_code),
+                    main_carrier: Some(cfg.cell.main_carrier),
+                    packet_data_supported: Some(cfg.cell.sndcp_service),
+                    data_priority_supported: Some(true),
+                },
+            )
+        };
+        Self {
+            config,
+            broadcast,
+            ltpd,
+            current_time: TdmaTime::default(),
+        }
+    }
+
+    /// Read-only packet-data SAP state for the TBS WebUI and future Node Gateway.
+    pub fn ltpd_snapshot(&self) -> LtpdRuntimeSnapshot {
+        self.ltpd.snapshot()
+    }
+
+    /// Notify SNDCP that lower-layer packet-data resources disappeared.
+    pub fn ltpd_notify_break(&mut self, queue: &mut MessageQueue) {
+        self.ltpd.notify_break(queue);
+    }
+
+    /// Notify SNDCP that lower-layer packet-data resources are available again.
+    pub fn ltpd_notify_resume(&mut self, queue: &mut MessageQueue) {
+        self.ltpd.notify_resume(queue);
+    }
+
+    pub fn ltpd_set_busy(&mut self, queue: &mut MessageQueue, busy: bool) {
+        self.ltpd.set_busy(queue, busy);
+    }
+
+    pub fn ltpd_set_disabled(
+        &mut self,
+        queue: &mut MessageQueue,
+        disabled: bool,
+        permitted_services: PermittedTemporaryServices,
+    ) {
+        self.ltpd.set_disabled(queue, disabled, permitted_services);
     }
 
     fn rx_tla_mle_pdu(&mut self, _queue: &mut MessageQueue, message: SapMsg) {
@@ -134,6 +190,13 @@ impl MleBs {
 
         match pdu_type {
             MleProtocolDiscriminator::Sndcp => {
+                self.ltpd.observe_inbound(
+                    prim.main_address,
+                    prim.endpoint_id,
+                    prim.link_id,
+                    prim.air_interface_encryption != 0,
+                    self.current_time,
+                );
                 let indication = LtpdMleUnitdataInd {
                     sdu,
                     endpoint_id: prim.endpoint_id,
@@ -220,6 +283,13 @@ impl MleBs {
                 queue.push_back(msg);
             }
             MleProtocolDiscriminator::Sndcp => {
+                self.ltpd.observe_inbound(
+                    prim.main_address,
+                    prim.endpoint_id,
+                    prim.link_id,
+                    prim.air_interface_encryption != 0,
+                    self.current_time,
+                );
                 let m = LtpdMleUnitdataInd {
                     sdu,
                     endpoint_id: prim.endpoint_id,
@@ -248,7 +318,7 @@ impl MleBs {
         }
     }
 
-    fn rx_tlmc_prim(&mut self, _queue: &mut MessageQueue, message: SapMsg) {
+    fn rx_tlmc_prim(&mut self, queue: &mut MessageQueue, message: SapMsg) {
         tracing::trace!("rx_tlmc_prim");
         match message.msg {
             SapMsgInner::TlmcConfigureInd(indication) => {
@@ -258,6 +328,10 @@ impl MleBs {
                     indication.lower_layer_resource_availability,
                     indication.reason
                 );
+                match indication.lower_layer_resource_availability {
+                    LowerLayerResourceAvailability::Available => self.ltpd.notify_resume(queue),
+                    LowerLayerResourceAvailability::Unavailable => self.ltpd.notify_break(queue),
+                }
             }
             SapMsgInner::TlmcConfigureConf(confirm) => {
                 tracing::debug!("TLMC: lower-layer configuration confirmed: {:?}", confirm);
@@ -352,14 +426,9 @@ impl MleBs {
         }
     }
 
-    fn rx_tlpd_prim(&mut self, _queue: &mut MessageQueue, _message: SapMsg) {
+    fn rx_tlpd_prim(&mut self, queue: &mut MessageQueue, message: SapMsg) {
         tracing::trace!("rx_tlpd_prim");
-        unimplemented_log!("rx_tlpd_prim called but TLPD SAP is not implemented");
-        // match &message.msg {
-        //     _ => {
-        //         panic!();
-        //     }
-        // }
+        self.ltpd.handle_primitive(queue, message, self.current_time);
     }
 
     fn rx_lcmc_mle_unitdata_req(&mut self, queue: &mut MessageQueue, mut message: SapMsg) {
@@ -456,6 +525,8 @@ impl TetraEntityTrait for MleBs {
     }
 
     fn tick_start(&mut self, queue: &mut MessageQueue, ts: TdmaTime) {
+        self.current_time = ts;
+        self.ltpd.tick(queue, ts);
         // Broadcast D-NWRK-BROADCAST twice per hyperframe (~30.6s interval) if timezone is configured.
         // Two evenly-spaced slots [20, 50] avoid congestion with other hyperframe-triggered events
         // and give terminals a faster time/date update after cold attach.

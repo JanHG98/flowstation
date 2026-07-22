@@ -1,6 +1,6 @@
 # SWMI Foundation 1 – TLMC/TLPD-Arbeitsliste
 
-## Status nach Paket C
+## Status nach Paket D
 
 Paket B und Paket C sind umgesetzt:
 
@@ -13,7 +13,11 @@ Paket B und Paket C sind umgesetzt:
 - `rx_tlmc_prim()` besitzt nun eine vollständige Package-C-Routinglogik in UMAC-MS, defensives BS-Verhalten und einen nicht panikenden MLE-Consumer;
 - Configure, Ressourcenstatus, Measurement, Monitor, Assessment, Scan, Cell Read und Select besitzen eine explizite Runtime;
 - Scan, Cell Read und Select besitzen korrelierte Zustände sowie negative Timeouts;
-- `rx_tlpd_prim()` besitzt weiterhin noch keine vollständige Paket-D-Runtime.
+- `rx_tlpd_prim()` besitzt eine vollständige lokale Paket-D-Runtime;
+- SNDCP sendet Paketdaten nicht mehr direkt an LLC, sondern über LTPD und MLE;
+- Context Routing, Route Recovery, Transfer Reports und Link-Lifecycle sind aktiv;
+- TLMC-Ressourcenkanten erzeugen LTPD Break/Resume;
+- MLE und SNDCP stellen read-only TLPD-Diagnose-Snapshots bereit.
 
 Die genauen Einzelzeilen stehen in `Docs/SAP_PRIMITIVE_MATRIX.md`, `Docs/IMPLEMENTATION_GAPS.md` und `Docs/SWMI_FOUNDATION_1_PACKAGE_B.md` und `Docs/SWMI_FOUNDATION_1_PACKAGE_C.md`.
 
@@ -127,16 +131,19 @@ LtpdContextKey
 
 Die Runtime liegt in `crates/tetra-entities/src/umac/tlmc_runtime.rs`. Der experimentelle MS-Lower-Layer erhält für Scan/Select bereits den Zielträger über `TmvConfigureReq`; ein hardwareabhängiges dynamisches SDR-Retuning bleibt ein gesonderter Adapterpunkt.
 
-## Paket D – TLPD Runtime: vorgesehene Reihenfolge
+## Paket D – TLPD Runtime: abgeschlossen ✅
 
-1. vollständiges `MLE-UNITDATA` in beide Richtungen
-2. Configure
-3. Connect/Disconnect
-4. Break/Resume
-5. Reconnect
-6. Context Routing
-7. Report/Cancel/Release
-8. Open/Close/Idle/Info und Activity/Busy
+1. vollständiges `MLE-UNITDATA` in beide Richtungen ✅
+2. Configure ✅
+3. Connect/Disconnect ✅
+4. Break/Resume ✅
+5. Reconnect ✅
+6. Context Routing und Route Recovery ✅
+7. Report/Cancel/Release ✅
+8. Open/Close/Idle/Info und Activity/Busy/Enable/Disable ✅
+9. read-only Diagnose-Snapshots für TBS-WebUI und Node Gateway ✅
+
+Die Runtime liegt in `crates/tetra-entities/src/mle/ltpd_runtime.rs`. SNDCP-Antworten laufen jetzt über `Sap::TlpdSap` zu MLE und erst dort weiter zu LLC.
 
 ## Paket E – Mindesttests
 
@@ -174,4 +181,4 @@ Die zukünftigen Backend-Dienste folgen dem Standard in `Docs/BACKEND_WEBUI_STAN
 - noch keine vollständige D-NEW-CELL-/RESTORE-Runtime;
 - noch kein vollständiger Packet Core.
 
-Paket B hat die typsichere Grundlage geschaffen; Paket C aktiviert darauf die TLMC-Runtime. Als nächstes folgt Paket D mit dem vollständigen LTPD-Lifecycle und Context Routing.
+Paket B hat die typsichere Grundlage geschaffen, Paket C die TLMC-Runtime und Paket D den vollständigen lokalen TLPD-Lifecycle aktiviert. Als Nächstes folgt Paket E mit Abnahme, Robustheit und dem Zwei-Zellen-Testharness.
