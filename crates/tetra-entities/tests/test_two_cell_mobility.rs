@@ -126,6 +126,7 @@ fn prepare_on_old_cell_and_restore_on_target_cell_are_isolated() {
         MleCellChangeControl::AcknowledgeRestore {
             subscriber,
             cmce_sdu: BitBuffer::from_bitstr("11100011"),
+            chan_alloc: None,
         },
     );
     let mut downlink = take_mle_downlink(harness.drain(TestCell::B));

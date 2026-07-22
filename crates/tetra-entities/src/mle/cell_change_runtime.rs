@@ -22,7 +22,10 @@ use tetra_saps::common::{
     CellIdentity, MleChannelCommandValid, MleChannelRequestReason,
     MleChannelRequestRetryDelay, MleChannelResponseType, MleFailCause,
 };
-use tetra_saps::control::mle_cell_change::MleCellChangeControl;
+use tetra_saps::{
+    control::mle_cell_change::MleCellChangeControl,
+    lcmc::fields::chan_alloc_req::CmceChanAllocReq,
+};
 
 /// Upper bound for a local cell-change decision.  432 slots are about 6.12 s
 /// and deliberately match the robustness window used by the TLPD foundation.
@@ -110,6 +113,8 @@ pub struct MleCellChangeOutbound {
     /// Encoded MLE PDU body.  The outer three-bit MLE protocol discriminator
     /// is added by `MleBs` before handing the SDU to LLC.
     pub pdu: BitBuffer,
+    /// Optional channel allocation that must accompany this MLE response at LLC/MAC.
+    pub chan_alloc: Option<CmceChanAllocReq>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -293,6 +298,7 @@ impl MleCellChangeRuntime {
             MleCellChangeControl::AcknowledgeRestore {
                 subscriber,
                 cmce_sdu,
+                chan_alloc,
             } => {
                 let transaction = self.transaction_for_phase(
                     subscriber,
@@ -305,7 +311,7 @@ impl MleCellChangeRuntime {
                 self.counters.restore_acknowledgements =
                     self.counters.restore_acknowledgements.saturating_add(1);
                 let pdu = Self::encode_d_restore_ack(cmce_sdu)?;
-                Ok(Self::outbound(subscriber, route, pdu))
+                Ok(Self::outbound_with_allocation(subscriber, route, pdu, chan_alloc))
             }
             MleCellChangeControl::RejectRestore { subscriber, cause } => {
                 let transaction = self.transaction_for_phase(
@@ -451,11 +457,21 @@ impl MleCellChangeRuntime {
         route: (EndpointId, LinkId),
         pdu: BitBuffer,
     ) -> MleCellChangeOutbound {
+        Self::outbound_with_allocation(subscriber, route, pdu, None)
+    }
+
+    fn outbound_with_allocation(
+        subscriber: TetraAddress,
+        route: (EndpointId, LinkId),
+        pdu: BitBuffer,
+        chan_alloc: Option<CmceChanAllocReq>,
+    ) -> MleCellChangeOutbound {
         MleCellChangeOutbound {
             subscriber,
             endpoint_id: route.0,
             link_id: route.1,
             pdu,
+            chan_alloc,
         }
     }
 

@@ -41,7 +41,7 @@
 | LcmcMleRestoreReq | nein | 0 | 0 | 0 | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/lcmc/mod.rs` |
 | LcmcMleResumeInd | nein | 0 | 0 | 0 | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/lcmc/mod.rs` |
 | LcmcMleUnitdataInd | ja | 3 | 27 | 26 | bidirektional sichtbar | `crates/tetra-saps/src/lcmc/mod.rs` |
-| LcmcMleUnitdataReq | ja | 18 | 5 | 22 | bidirektional sichtbar | `crates/tetra-saps/src/lcmc/mod.rs` |
+| LcmcMleUnitdataReq | ja | 18 | 6 | 22 | bidirektional sichtbar | `crates/tetra-saps/src/lcmc/mod.rs` |
 
 ## LMM
 

@@ -4,11 +4,11 @@ use crate::{MessageQueue, TetraEntityTrait};
 use tetra_config::bluestation::SharedConfig;
 use tetra_core::tetra_entities::TetraEntity;
 use tetra_core::{Sap, TdmaTime, unimplemented_log};
-use tetra_saps::common::MleFailCause;
 use tetra_saps::control::mle_cell_change::MleCellChangeControl;
 use tetra_saps::{SapMsg, SapMsgInner};
 
 use super::components::pc_bs::{ControlRoute, LcmcRoute, PcBs};
+use super::call_restore_runtime::{CallRestoreContext, CallRestoreRuntimeSnapshot};
 use super::subentities::cc_bs::CcBsSubentity;
 use super::subentities::sds_bs::{SdsBsSubentity, SdsPendingAction};
 use super::subentities::ss_bs::SsBsSubentity;
@@ -203,29 +203,67 @@ impl CmceBs {
         };
     }
 
-    /// Conservative baseline until CMCE call-restore state is implemented.
-    /// The indication is consumed deliberately and produces a standards-defined
-    /// D-RESTORE-FAIL instead of panicking or leaving the radio waiting forever.
+    /// Handle an MLE U-RESTORE indication and return the embedded CMCE response
+    /// through D-RESTORE-ACK, or a standards-defined D-RESTORE-FAIL when no call
+    /// context can be restored on this cell.
     pub fn rx_lcmc_mle_restore_ind(&mut self, queue: &mut MessageQueue, message: SapMsg) {
         let SapMsgInner::LcmcMleRestoreInd(indication) = message.msg else {
             tracing::error!("CMCE: invalid primitive routed to restore indication handler");
             return;
         };
-        tracing::warn!(
-            subscriber = %indication.subscriber,
-            endpoint_id = indication.endpoint_id,
-            link_id = indication.link_id,
-            "CMCE: call-restore state machine is not active yet; rejecting U-RESTORE cleanly"
-        );
-        queue.push_back(SapMsg {
-            sap: Sap::Control,
-            src: TetraEntity::Cmce,
-            dest: TetraEntity::Mle,
-            msg: SapMsgInner::MleCellChangeControl(MleCellChangeControl::RejectRestore {
-                subscriber: indication.subscriber,
-                cause: MleFailCause::RestorationCannotBeDoneOnCell,
-            }),
-        });
+
+        match self.cc.handle_mle_call_restore(
+            queue,
+            indication.subscriber,
+            indication.endpoint_id,
+            indication.link_id,
+            indication.previous_mcc,
+            indication.previous_mnc,
+            indication.previous_location_area,
+            indication.sdu,
+        ) {
+            super::subentities::cc_bs::MleCallRestoreDecision::Acknowledge {
+                cmce_sdu,
+                chan_alloc,
+            } => {
+                queue.push_back(SapMsg {
+                    sap: Sap::Control,
+                    src: TetraEntity::Cmce,
+                    dest: TetraEntity::Mle,
+                    msg: SapMsgInner::MleCellChangeControl(MleCellChangeControl::AcknowledgeRestore {
+                        subscriber: indication.subscriber,
+                        cmce_sdu,
+                        chan_alloc,
+                    }),
+                });
+            }
+            super::subentities::cc_bs::MleCallRestoreDecision::Reject(cause) => {
+                queue.push_back(SapMsg {
+                    sap: Sap::Control,
+                    src: TetraEntity::Cmce,
+                    dest: TetraEntity::Mle,
+                    msg: SapMsgInner::MleCellChangeControl(MleCellChangeControl::RejectRestore {
+                        subscriber: indication.subscriber,
+                        cause,
+                    }),
+                });
+            }
+        }
+    }
+
+    /// Read-only restore diagnostics for the TBS WebUI and Node Gateway.
+    pub fn call_restore_snapshot(&self) -> CallRestoreRuntimeSnapshot {
+        self.cc.call_restore_snapshot()
+    }
+
+    /// Install a call context received from the source TBS or future call core.
+    pub fn install_call_restore_context(&mut self, context: CallRestoreContext) {
+        self.cc.install_call_restore_context(context);
+    }
+
+    /// Export an active local call as a transferable restore context.
+    pub fn export_call_restore_context(&self, call_id: u16) -> Option<CallRestoreContext> {
+        self.cc.export_call_restore_context(call_id)
     }
 }
 

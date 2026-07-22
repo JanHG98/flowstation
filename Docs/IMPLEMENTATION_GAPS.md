@@ -7,7 +7,7 @@
 | --- | --- |
 | TODO/FIXME | 208 |
 | Todo-Typ | 240 |
-| panic! | 82 |
+| panic! | 83 |
 | unimplemented! | 46 |
 | unimplemented_log! | 107 |
 | unreachable! | 31 |
@@ -180,10 +180,10 @@
 | panic! | prüfen | Runtime | `crates/tetra-core/src/typed_pdu_fields.rs` | 194 | `_ => panic!(), // Never happens` |
 | unimplemented! | kritisch | Runtime | `crates/tetra-core/src/typed_pdu_fields.rs` | 641 | `unimplemented!("can't generically write a type4 field");` |
 | unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/cmce/cmce_bs.rs` | 201 | `unimplemented_log!("{:?}", pdu_type);` |
-| panic! | prüfen | Runtime | `crates/tetra-entities/src/cmce/cmce_bs.rs` | 291 | `panic!("Unexpected message on LcmcSap: {:?}", message.msg);` |
-| unreachable! | prüfen | Runtime | `crates/tetra-entities/src/cmce/cmce_bs.rs` | 300 | `unreachable!();` |
-| panic! | prüfen | Runtime | `crates/tetra-entities/src/cmce/cmce_bs.rs` | 309 | `panic!("Unexpected control message: {:?}", message.msg);` |
-| panic! | prüfen | Runtime | `crates/tetra-entities/src/cmce/cmce_bs.rs` | 313 | `panic!("Unexpected SAP: {:?}", message.sap);` |
+| panic! | prüfen | Runtime | `crates/tetra-entities/src/cmce/cmce_bs.rs` | 329 | `panic!("Unexpected message on LcmcSap: {:?}", message.msg);` |
+| unreachable! | prüfen | Runtime | `crates/tetra-entities/src/cmce/cmce_bs.rs` | 338 | `unreachable!();` |
+| panic! | prüfen | Runtime | `crates/tetra-entities/src/cmce/cmce_bs.rs` | 347 | `panic!("Unexpected control message: {:?}", message.msg);` |
+| panic! | prüfen | Runtime | `crates/tetra-entities/src/cmce/cmce_bs.rs` | 351 | `panic!("Unexpected SAP: {:?}", message.sap);` |
 | TODO/FIXME | technische Schuld | Runtime | `crates/tetra-entities/src/cmce/components/circuit_mgr.rs` | 148 | `// TODO FIXME we may do a bit smarter allocation here` |
 | TODO/FIXME | technische Schuld | Runtime | `crates/tetra-entities/src/cmce/components/circuit_mgr.rs` | 186 | `circuit_mode: CircuitModeType::TchS, // TODO: only speech supported for now` |
 | TODO/FIXME | technische Schuld | Runtime | `crates/tetra-entities/src/cmce/components/circuit_mgr.rs` | 187 | `// endpoint_id: 0, // TODO, we don't use endpoints as of yet` |
@@ -193,26 +193,26 @@
 | panic! | prüfen | Runtime | `crates/tetra-entities/src/cmce/components/circuit_mgr.rs` | 356 | `_ => panic!(),` |
 | TODO/FIXME | technische Schuld | Runtime | `crates/tetra-entities/src/cmce/subentities/cc_bs/dtmf.rs` | 3 | `// TODO: This should probably be in U/D-Info` |
 | Todo-Typ | Typ-Platzhalter | Runtime | `crates/tetra-entities/src/cmce/subentities/cc_bs/pdu.rs` | 1 | `use tetra_core::Todo;` |
-| Todo-Typ | Typ-Platzhalter | Runtime | `crates/tetra-entities/src/cmce/subentities/cc_bs/pdu.rs` | 63 | `/// `Todo` is the signed carrier-hint type used by `CmceChanAllocReq`, while a real TETRA carrier number is never negative.` |
-| Todo-Typ | Typ-Platzhalter | Runtime | `crates/tetra-entities/src/cmce/subentities/cc_bs/pdu.rs` | 65 | `pub(super) const SECONDARY_CARRIER_HINT: Todo = -2;` |
-| Todo-Typ | Typ-Platzhalter | Runtime | `crates/tetra-entities/src/cmce/subentities/cc_bs/pdu.rs` | 80 | `pub(super) fn carrier_hint_for_logical_ts(logical_ts: u8) -> Option<Todo> {` |
-| Todo-Typ | Typ-Platzhalter | Runtime | `crates/tetra-entities/src/cmce/subentities/cc_bs/pdu.rs` | 155 | `// (the `Todo` default) is wrong and can stall/retry at LLC. The legacy `main` code` |
-| panic! | prüfen | Runtime | `crates/tetra-entities/src/cmce/subentities/cc_bs/pdu.rs` | 649 | `panic!()` |
-| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/cmce/subentities/cc_bs/pdu.rs` | 969 | `unimplemented_log!("Area selection not supported: {}", pdu.area_selection);` |
-| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/cmce/subentities/cc_bs/pdu.rs` | 978 | `unimplemented_log!(` |
-| TODO/FIXME | technische Schuld | Runtime | `crates/tetra-entities/src/cmce/subentities/cc_bs/pdu.rs` | 985 | `//     // TODO FIXME implement parsing` |
-| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/cmce/subentities/cc_bs/pdu.rs` | 992 | `unimplemented_log!("clir_control not supported: {}", pdu.clir_control);` |
-| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/cmce/subentities/cc_bs/pdu.rs` | 995 | `unimplemented_log!("U-SETUP called party not set (no SSI, short number or external number)");` |
-| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/cmce/subentities/cc_bs/pdu.rs` | 998 | `unimplemented_log!(` |
-| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/cmce/subentities/cc_bs/pdu.rs` | 1005 | `unimplemented_log!("facility not supported: {:?}", v);` |
-| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/cmce/subentities/cc_bs/pdu.rs` | 1008 | `unimplemented_log!("dm_ms_address not supported: {:?}", v);` |
-| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/cmce/subentities/cc_bs/pdu.rs` | 1011 | `unimplemented_log!("proprietary not supported: {:?}", v);` |
+| Todo-Typ | Typ-Platzhalter | Runtime | `crates/tetra-entities/src/cmce/subentities/cc_bs/pdu.rs` | 64 | `/// `Todo` is the signed carrier-hint type used by `CmceChanAllocReq`, while a real TETRA carrier number is never negative.` |
+| Todo-Typ | Typ-Platzhalter | Runtime | `crates/tetra-entities/src/cmce/subentities/cc_bs/pdu.rs` | 66 | `pub(super) const SECONDARY_CARRIER_HINT: Todo = -2;` |
+| Todo-Typ | Typ-Platzhalter | Runtime | `crates/tetra-entities/src/cmce/subentities/cc_bs/pdu.rs` | 81 | `pub(super) fn carrier_hint_for_logical_ts(logical_ts: u8) -> Option<Todo> {` |
+| Todo-Typ | Typ-Platzhalter | Runtime | `crates/tetra-entities/src/cmce/subentities/cc_bs/pdu.rs` | 156 | `// (the `Todo` default) is wrong and can stall/retry at LLC. The legacy `main` code` |
+| panic! | prüfen | Runtime | `crates/tetra-entities/src/cmce/subentities/cc_bs/pdu.rs` | 682 | `panic!()` |
+| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/cmce/subentities/cc_bs/pdu.rs` | 1002 | `unimplemented_log!("Area selection not supported: {}", pdu.area_selection);` |
+| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/cmce/subentities/cc_bs/pdu.rs` | 1011 | `unimplemented_log!(` |
+| TODO/FIXME | technische Schuld | Runtime | `crates/tetra-entities/src/cmce/subentities/cc_bs/pdu.rs` | 1018 | `//     // TODO FIXME implement parsing` |
+| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/cmce/subentities/cc_bs/pdu.rs` | 1025 | `unimplemented_log!("clir_control not supported: {}", pdu.clir_control);` |
+| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/cmce/subentities/cc_bs/pdu.rs` | 1028 | `unimplemented_log!("U-SETUP called party not set (no SSI, short number or external number)");` |
+| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/cmce/subentities/cc_bs/pdu.rs` | 1031 | `unimplemented_log!(` |
+| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/cmce/subentities/cc_bs/pdu.rs` | 1038 | `unimplemented_log!("facility not supported: {:?}", v);` |
+| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/cmce/subentities/cc_bs/pdu.rs` | 1041 | `unimplemented_log!("dm_ms_address not supported: {:?}", v);` |
+| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/cmce/subentities/cc_bs/pdu.rs` | 1044 | `unimplemented_log!("proprietary not supported: {:?}", v);` |
 | panic! | prüfen | Runtime | `crates/tetra-entities/src/cmce/subentities/cc_bs/procedures/setup.rs` | 368 | `panic!()` |
 | panic! | prüfen | Runtime | `crates/tetra-entities/src/cmce/subentities/cc_bs/procedures/setup.rs` | 528 | `panic!()` |
 | panic! | prüfen | Runtime | `crates/tetra-entities/src/cmce/subentities/cc_bs/procedures/setup.rs` | 844 | `panic!()` |
 | panic! | prüfen | Runtime | `crates/tetra-entities/src/cmce/subentities/cc_bs/procedures/uplink.rs` | 432 | `panic!()` |
-| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/cmce/subentities/cc_bs/procedures/uplink.rs` | 741 | `unimplemented_log!(` |
-| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/cmce/subentities/cc_bs/procedures/uplink.rs` | 857 | `unimplemented_log!(` |
+| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/cmce/subentities/cc_bs/procedures/uplink.rs` | 749 | `unimplemented_log!(` |
+| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/cmce/subentities/cc_bs/procedures/uplink.rs` | 865 | `unimplemented_log!(` |
 | panic! | prüfen | Runtime | `crates/tetra-entities/src/cmce/subentities/cc_bs/state/mod.rs` | 134 | `.unwrap_or_else(\|err\| panic!("invalid CMCE CC formal transition: {:?} + {:?}", err.state, err.event))` |
 | TODO/FIXME | technische Schuld | Runtime | `crates/tetra-entities/src/cmce/subentities/cc_ms.rs` | 32 | `// TODO FIXME: Besides these PDUs, we can also receive several signals (BUSY ind, CLOSE ind, etc)` |
 | unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/cmce/subentities/cc_ms.rs` | 35 | `unimplemented_log!("{}", pdu_type);` |
@@ -542,6 +542,7 @@
 | panic! | Test-Assertion | Test | `crates/tetra-entities/tests/test_mm_bs.rs` | 336 | `panic!(` |
 | panic! | Test-Assertion | Test | `crates/tetra-entities/tests/test_mm_bs.rs` | 419 | `panic!("Expected LmmMleUnitdataReq");` |
 | panic! | Test-Assertion | Test | `crates/tetra-entities/tests/test_sds_bs.rs` | 494 | `panic!("Expected CmceSdsData message at Brew sink");` |
+| panic! | Test-Assertion | Test | `crates/tetra-entities/tests/test_two_cell_call_restore.rs` | 136 | `panic!("no D-RESTORE-ACK/D-CALL RESTORE found");` |
 | panic! | Test-Assertion | Test | `crates/tetra-entities/tests/test_two_cell_mobility.rs` | 42 | `panic!("no MLE downlink found in LLC sink");` |
 | panic! | Test-Assertion | Test | `crates/tetra-entities/tests/test_umac_bs.rs` | 200 | `panic!("expected TMA-UNITDATA indication");` |
 | TODO/FIXME | technische Schuld | Runtime | `crates/tetra-pdus/src/cmce/fields/basic_service_information.rs` | 69 | `// TODO REVIEW: conditional write of slots_per_frame` |

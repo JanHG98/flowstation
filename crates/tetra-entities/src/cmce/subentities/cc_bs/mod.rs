@@ -36,6 +36,10 @@ use tetra_saps::{
     },
 };
 
+use crate::cmce::call_restore_runtime::{
+    CallRestoreContext, CallRestoreRuntime, CallRestoreRuntimeSnapshot, GroupCallRestoreContext,
+    IndividualCallRestoreContext,
+};
 use crate::net_brew as brew;
 use crate::{
     MessageQueue,
@@ -58,6 +62,7 @@ mod timers;
 use lifecycle::{BrewNotification, CallTimeslot, GroupFloorGrant};
 use pdu::is_emergency_priority;
 use procedures::{GroupTransitionError, IndividualTransitionError};
+pub(in crate::cmce) use procedures::MleCallRestoreDecision;
 use state::{
     ActiveCall, CachedSetup, CallOrigin, CcFormalEvent, CcFormalState, GroupCallState, IndividualCall, IndividualCallState,
     LOCAL_ECHO_ISSI, TxDemandQueueResult,
@@ -80,6 +85,8 @@ pub struct CcBsSubentity {
     group_listeners: HashMap<u32, usize>,
     /// Recently removed affiliations (ISSI, GSSI) kept alive briefly to absorb Brew resync races.
     recent_deaffiliations: HashMap<(u32, u32), TdmaTime>,
+    /// Local CMCE call-restore context and transaction registry.
+    call_restore: CallRestoreRuntime,
     /// Dashboard telemetry sink (call-lifecycle events). `None` when telemetry is disabled.
     telemetry: Option<crate::net_telemetry::TelemetrySink>,
 }

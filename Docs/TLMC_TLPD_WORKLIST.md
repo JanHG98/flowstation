@@ -219,3 +219,33 @@ Auf der Foundation wurden nun die konventionellen MLE-Zellwechsel-PDUs und die l
 - Zwei-Zellen-Prepare/Restore-Abnahmepfad ✅
 
 Details stehen in `Docs/SWMI_MOBILITY_1_PACKAGE_A.md`.
+
+
+## SWMI Mobility 1 – Paket B: abgeschlossen ✅
+
+Auf der MLE-Zellwechselbasis wurde die lokale CMCE-Call-Restore-State-Machine ergänzt:
+
+- Gruppenruf-Restore ✅
+- Individualruf-Restore ✅
+- `Active → Restore → Active` für Call Legs ✅
+- Priorität, Floor, Call Origin und T310-Zeitbezug erhalten ✅
+- lokale Channel Allocation bis `D-RESTORE-ACK` ✅
+- Call-ID-Kollision und einheitlicher Alias ✅
+- Replay und Duplicate Guard ✅
+- Congestion Queue mit `Callqueued` ✅
+- späteres Fortsetzen über `D-TX GRANTED` mit Allocation ✅
+- Timeout, Reject und Cleanup ✅
+- read-only Snapshot für TBS-WebUI/Node Gateway ✅
+- Zwei-Zellen-Tests für Gruppen- und Individualruf ✅
+
+Das aktuell unterstützte Profil ist unverschlüsselte TCH/S-Sprache. Der netzweite Medienpfad zwischen physischen TBS folgt mit Call Core und Media Switch.
+
+### Ergänzung Paket B – vollständige Transmission-Grant-Semantik ✅
+
+- Gruppenruf-Listener erhalten bei aktivem anderem Sprecher `GrantedToOtherUser` statt `NotGranted` ✅
+- Duplex-Individualrufe erhalten beim Restore `Granted`, unabhängig vom Request-to-transmit-Bit ✅
+- Simplex-Floor wird nur bei eigener Sendeanforderung übernommen ✅
+- Verzichtet der bisherige Sprecher auf erneute Übertragung, wird der Floor kontrolliert freigegeben ✅
+- `U-TX DEMAND` während `Callqueued` setzt beziehungsweise erneuert `RequestQueued` ✅
+- `U-TX CEASED` während `Callqueued` storniert die Sendeanforderung ✅
+- Queue-Aktionen und Request-Zustand stehen im WebUI-fähigen Restore-Snapshot bereit ✅

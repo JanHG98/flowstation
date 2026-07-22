@@ -178,7 +178,7 @@
     },
     {
       "category": "panic!",
-      "line": 291,
+      "line": 329,
       "path": "crates/tetra-entities/src/cmce/cmce_bs.rs",
       "scope": "Runtime",
       "severity": "prüfen",
@@ -186,7 +186,7 @@
     },
     {
       "category": "unreachable!",
-      "line": 300,
+      "line": 338,
       "path": "crates/tetra-entities/src/cmce/cmce_bs.rs",
       "scope": "Runtime",
       "severity": "prüfen",
@@ -194,7 +194,7 @@
     },
     {
       "category": "panic!",
-      "line": 309,
+      "line": 347,
       "path": "crates/tetra-entities/src/cmce/cmce_bs.rs",
       "scope": "Runtime",
       "severity": "prüfen",
@@ -202,7 +202,7 @@
     },
     {
       "category": "panic!",
-      "line": 313,
+      "line": 351,
       "path": "crates/tetra-entities/src/cmce/cmce_bs.rs",
       "scope": "Runtime",
       "severity": "prüfen",
@@ -282,7 +282,7 @@
     },
     {
       "category": "Todo-Typ",
-      "line": 63,
+      "line": 64,
       "path": "crates/tetra-entities/src/cmce/subentities/cc_bs/pdu.rs",
       "scope": "Runtime",
       "severity": "Typ-Platzhalter",
@@ -290,7 +290,7 @@
     },
     {
       "category": "Todo-Typ",
-      "line": 65,
+      "line": 66,
       "path": "crates/tetra-entities/src/cmce/subentities/cc_bs/pdu.rs",
       "scope": "Runtime",
       "severity": "Typ-Platzhalter",
@@ -298,7 +298,7 @@
     },
     {
       "category": "Todo-Typ",
-      "line": 80,
+      "line": 81,
       "path": "crates/tetra-entities/src/cmce/subentities/cc_bs/pdu.rs",
       "scope": "Runtime",
       "severity": "Typ-Platzhalter",
@@ -306,7 +306,7 @@
     },
     {
       "category": "Todo-Typ",
-      "line": 155,
+      "line": 156,
       "path": "crates/tetra-entities/src/cmce/subentities/cc_bs/pdu.rs",
       "scope": "Runtime",
       "severity": "Typ-Platzhalter",
@@ -314,7 +314,7 @@
     },
     {
       "category": "panic!",
-      "line": 649,
+      "line": 682,
       "path": "crates/tetra-entities/src/cmce/subentities/cc_bs/pdu.rs",
       "scope": "Runtime",
       "severity": "prüfen",
@@ -322,7 +322,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 969,
+      "line": 1002,
       "path": "crates/tetra-entities/src/cmce/subentities/cc_bs/pdu.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -330,7 +330,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 978,
+      "line": 1011,
       "path": "crates/tetra-entities/src/cmce/subentities/cc_bs/pdu.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -338,7 +338,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 985,
+      "line": 1018,
       "path": "crates/tetra-entities/src/cmce/subentities/cc_bs/pdu.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -346,7 +346,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 992,
+      "line": 1025,
       "path": "crates/tetra-entities/src/cmce/subentities/cc_bs/pdu.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -354,7 +354,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 995,
+      "line": 1028,
       "path": "crates/tetra-entities/src/cmce/subentities/cc_bs/pdu.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -362,7 +362,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 998,
+      "line": 1031,
       "path": "crates/tetra-entities/src/cmce/subentities/cc_bs/pdu.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -370,7 +370,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 1005,
+      "line": 1038,
       "path": "crates/tetra-entities/src/cmce/subentities/cc_bs/pdu.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -378,7 +378,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 1008,
+      "line": 1041,
       "path": "crates/tetra-entities/src/cmce/subentities/cc_bs/pdu.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -386,7 +386,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 1011,
+      "line": 1044,
       "path": "crates/tetra-entities/src/cmce/subentities/cc_bs/pdu.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -426,7 +426,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 741,
+      "line": 749,
       "path": "crates/tetra-entities/src/cmce/subentities/cc_bs/procedures/uplink.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -434,7 +434,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 857,
+      "line": 865,
       "path": "crates/tetra-entities/src/cmce/subentities/cc_bs/procedures/uplink.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -3071,6 +3071,14 @@
       "scope": "Test",
       "severity": "Test-Assertion",
       "text": "panic!(\"Expected CmceSdsData message at Brew sink\");"
+    },
+    {
+      "category": "panic!",
+      "line": 136,
+      "path": "crates/tetra-entities/tests/test_two_cell_call_restore.rs",
+      "scope": "Test",
+      "severity": "Test-Assertion",
+      "text": "panic!(\"no D-RESTORE-ACK/D-CALL RESTORE found\");"
     },
     {
       "category": "panic!",
@@ -5788,9 +5796,9 @@
       "phase": "Phase 5 – CMCE Restore",
       "relevance": "Calls, Single-/Multi-Site",
       "runtime": "offene Hinweise",
-      "runtime_references": 10,
-      "test_references": 0,
-      "tests": "fehlt"
+      "runtime_references": 13,
+      "test_references": 3,
+      "tests": "vorhanden"
     },
     {
       "blockers": [
@@ -5939,7 +5947,7 @@
       "phase": "Phase 5/13 – Call Control/SS",
       "relevance": "Calls, Single-/Multi-Site",
       "runtime": "offene Hinweise",
-      "runtime_references": 38,
+      "runtime_references": 40,
       "test_references": 16,
       "tests": "vorhanden"
     },
@@ -6015,7 +6023,7 @@
       "phase": "Phase 5/13 – Call Control/SS",
       "relevance": "Calls, Single-/Multi-Site",
       "runtime": "offene Hinweise",
-      "runtime_references": 39,
+      "runtime_references": 40,
       "test_references": 25,
       "tests": "vorhanden"
     },
@@ -6091,9 +6099,9 @@
       "phase": "Phase 5 – CMCE Restore",
       "relevance": "Calls, Single-/Multi-Site",
       "runtime": "offene Hinweise",
-      "runtime_references": 10,
-      "test_references": 0,
-      "tests": "fehlt"
+      "runtime_references": 23,
+      "test_references": 11,
+      "tests": "vorhanden"
     },
     {
       "blockers": [
@@ -6476,8 +6484,8 @@
       "phase": "Phase 3 – MLE/Zellwechsel",
       "relevance": "Multi-Site, Zellwechsel",
       "runtime": "ohne offensichtlichen Blocker",
-      "runtime_references": 17,
-      "test_references": 8,
+      "runtime_references": 19,
+      "test_references": 10,
       "tests": "vorhanden"
     },
     {
@@ -6560,8 +6568,8 @@
       "phase": "Phase 3 – MLE/Zellwechsel",
       "relevance": "Multi-Site, Zellwechsel",
       "runtime": "ohne offensichtlichen Blocker",
-      "runtime_references": 21,
-      "test_references": 11,
+      "runtime_references": 23,
+      "test_references": 13,
       "tests": "vorhanden"
     },
     {
@@ -7330,7 +7338,7 @@
     },
     {
       "constructed": 18,
-      "handled": 5,
+      "handled": 6,
       "path": "crates/tetra-saps/src/lcmc/mod.rs",
       "primitive": "LcmcMleUnitdataReq",
       "sap": "LCMC",
@@ -8522,7 +8530,7 @@
     }
   ],
   "summary": {
-    "gap_count": 714,
+    "gap_count": 715,
     "pdu_count": 77,
     "sap_primitive_count": 129,
     "state_type_count": 17

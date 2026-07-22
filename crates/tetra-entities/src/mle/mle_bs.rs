@@ -426,7 +426,7 @@ impl MleBs {
                 data_class_info: None,
                 req_handle: 0,
                 graceful_degradation: None,
-                chan_alloc: None,
+                chan_alloc: outbound.chan_alloc,
                 tx_reporter: None,
             }),
         });

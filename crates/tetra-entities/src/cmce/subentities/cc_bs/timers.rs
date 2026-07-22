@@ -34,6 +34,20 @@ impl CcBsSubentity {
         // ISSI/GSSI. Keep those listeners alive for a tiny grace window, then re-check whether
         // active network calls still have a real listener.
         self.expire_brew_affiliation_grace(queue);
+        // A restoration may complete without a bearer when the cell is congested. Retry
+        // queued call legs before expiring them; successful retries are followed by an
+        // individually addressed D-TX GRANTED carrying the new channel allocation.
+        self.drive_queued_call_restores(queue);
+
+        for key in self.call_restore.tick(dltime) {
+            tracing::warn!(
+                subscriber = %key.subscriber,
+                call_id = key.old_call_id,
+                "CMCE: call-restore transaction timed out"
+            );
+            self.send_timed_out_restore_release(queue, key);
+        }
+
 
         // ETSI T310 equivalent for active calls.
         self.check_call_timeout_expiry(queue);

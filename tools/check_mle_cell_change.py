@@ -130,10 +130,14 @@ def main() -> None:
         [
             "pub fn rx_lcmc_mle_restore_ind",
             "SapMsgInner::LcmcMleRestoreInd",
+            "handle_mle_call_restore",
+            "MleCallRestoreDecision::Acknowledge",
+            "MleCellChangeControl::AcknowledgeRestore",
+            "chan_alloc",
+            "MleCallRestoreDecision::Reject",
             "MleCellChangeControl::RejectRestore",
-            "RestorationCannotBeDoneOnCell",
         ],
-        "CMCE conservative restore fallback",
+        "CMCE call-restore handoff",
     )
 
     pdu_files = [
@@ -213,7 +217,8 @@ def main() -> None:
     print("  typed uplink/downlink MLE cell-change PDUs: present")
     print("  infrastructure transaction registry and timeouts: present")
     print("  MM/CMCE indications and local control responses: present")
-    print("  conservative CMCE restore rejection until call-restore phase: present")
+    print("  CMCE call-restore acknowledgement/rejection handoff: present")
+    print("  channel allocation propagation through D-RESTORE-ACK: present")
     print("  TBS WebUI-ready diagnostic snapshot: present")
     print("  two-cell prepare/restore acceptance path: present")
 

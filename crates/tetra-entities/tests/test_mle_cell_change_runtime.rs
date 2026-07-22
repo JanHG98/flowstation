@@ -16,6 +16,10 @@ use tetra_saps::common::{
     MleChannelRequestRetryDelay, MleChannelResponseType, MleFailCause,
 };
 use tetra_saps::control::mle_cell_change::MleCellChangeControl;
+use tetra_saps::lcmc::{
+    enums::{alloc_type::ChanAllocType, ul_dl_assignment::UlDlAssignment},
+    fields::chan_alloc_req::CmceChanAllocReq,
+};
 
 fn subscriber(issi: u32) -> TetraAddress {
     TetraAddress::new(issi, SsiType::Issi)
@@ -111,16 +115,30 @@ fn restore_acknowledgement_and_failure_use_the_learned_local_route() {
         now,
     );
 
+    let expected_allocation = CmceChanAllocReq {
+        usage: Some(9),
+        alloc_type: ChanAllocType::Replace,
+        carrier: None,
+        timeslots: [false, true, false, false],
+        ul_dl_assigned: UlDlAssignment::Both,
+    };
     let outbound = runtime
         .handle_control(
             MleCellChangeControl::AcknowledgeRestore {
                 subscriber: address,
                 cmce_sdu: BitBuffer::from_bitstr("11110000"),
+                chan_alloc: Some(expected_allocation.clone()),
             },
             now.add_timeslots(1),
         )
         .unwrap();
     assert_eq!((outbound.endpoint_id, outbound.link_id), (7, 8));
+    let allocation = outbound.chan_alloc.expect("D-RESTORE-ACK lost channel allocation");
+    assert_eq!(allocation.usage, expected_allocation.usage);
+    assert_eq!(allocation.alloc_type, expected_allocation.alloc_type);
+    assert_eq!(allocation.timeslots, expected_allocation.timeslots);
+    assert_eq!(allocation.ul_dl_assigned, expected_allocation.ul_dl_assigned);
+    assert!(allocation.carrier.is_none());
     let mut body = outbound.pdu;
     let decoded = DRestoreAck::from_bitbuf(&mut body).unwrap();
     assert_eq!(decoded.sdu.unwrap().dump_bin_unformatted(), "11110000");

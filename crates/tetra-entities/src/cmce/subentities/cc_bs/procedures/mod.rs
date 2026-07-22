@@ -9,3 +9,4 @@ mod uplink;
 
 pub(super) use group::GroupTransitionError;
 pub(super) use individual::IndividualTransitionError;
+pub(in crate::cmce) use restoration::MleCallRestoreDecision;

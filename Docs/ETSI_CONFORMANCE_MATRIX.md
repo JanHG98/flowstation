@@ -9,7 +9,7 @@
 - Schichten: CMCE 30, LLC 4, MLE 13, MM 14, UMAC 16
 - Parser und Encoder beide ohne offensichtlichen Blocker: **61**
 - mindestens ein Codec-Pfad teilweise oder fehlend: **16**
-- PDU-Dateien ohne nachgewiesenen Testverweis: **45**
+- PDU-Dateien ohne nachgewiesenen Testverweis: **43**
 
 ## Bewertungslegende
 
@@ -27,7 +27,7 @@
 | CmceFunctionNotSupported | nicht klassifiziert | teilweise | teilweise | blockiert | vorhanden | vorhanden | Phase 5/13 – Call Control/SS | `crates/tetra-pdus/src/cmce/pdus/cmce_function_not_supported.rs` |
 | DAlert | Downlink | vorhanden | vorhanden | offene Hinweise | fehlt | nicht nachgewiesen | Phase 5/13 – Call Control/SS | `crates/tetra-pdus/src/cmce/pdus/d_alert.rs` |
 | DCallProceeding | Downlink | vorhanden | vorhanden | offene Hinweise | fehlt | nicht nachgewiesen | Phase 5/13 – Call Control/SS | `crates/tetra-pdus/src/cmce/pdus/d_call_proceeding.rs` |
-| DCallRestore | Downlink | vorhanden | vorhanden | offene Hinweise | fehlt | nicht nachgewiesen | Phase 5 – CMCE Restore | `crates/tetra-pdus/src/cmce/pdus/d_call_restore.rs` |
+| DCallRestore | Downlink | vorhanden | vorhanden | offene Hinweise | vorhanden | nicht nachgewiesen | Phase 5 – CMCE Restore | `crates/tetra-pdus/src/cmce/pdus/d_call_restore.rs` |
 | DConnect | Downlink | vorhanden | vorhanden | offene Hinweise | vorhanden | vorhanden | Phase 5/13 – Call Control/SS | `crates/tetra-pdus/src/cmce/pdus/d_connect.rs` |
 | DConnectAcknowledge | Downlink | vorhanden | vorhanden | offene Hinweise | vorhanden | vorhanden | Phase 5/13 – Call Control/SS | `crates/tetra-pdus/src/cmce/pdus/d_connect_acknowledge.rs` |
 | DDisconnect | Downlink | vorhanden | vorhanden | offene Hinweise | fehlt | nicht nachgewiesen | Phase 5/13 – Call Control/SS | `crates/tetra-pdus/src/cmce/pdus/d_disconnect.rs` |
@@ -43,7 +43,7 @@
 | DTxInterrupt | Downlink | vorhanden | vorhanden | offene Hinweise | fehlt | nicht nachgewiesen | Phase 5/13 – Call Control/SS | `crates/tetra-pdus/src/cmce/pdus/d_tx_interrupt.rs` |
 | DTxWait | Downlink | vorhanden | vorhanden | offene Hinweise | fehlt | nicht nachgewiesen | Phase 5/13 – Call Control/SS | `crates/tetra-pdus/src/cmce/pdus/d_tx_wait.rs` |
 | UAlert | Uplink | vorhanden | vorhanden | offene Hinweise | fehlt | nicht nachgewiesen | Phase 5/13 – Call Control/SS | `crates/tetra-pdus/src/cmce/pdus/u_alert.rs` |
-| UCallRestore | Uplink | vorhanden | vorhanden | offene Hinweise | fehlt | nicht nachgewiesen | Phase 5 – CMCE Restore | `crates/tetra-pdus/src/cmce/pdus/u_call_restore.rs` |
+| UCallRestore | Uplink | vorhanden | vorhanden | offene Hinweise | vorhanden | nicht nachgewiesen | Phase 5 – CMCE Restore | `crates/tetra-pdus/src/cmce/pdus/u_call_restore.rs` |
 | UConnect | Uplink | vorhanden | vorhanden | offene Hinweise | vorhanden | vorhanden | Phase 5/13 – Call Control/SS | `crates/tetra-pdus/src/cmce/pdus/u_connect.rs` |
 | UDisconnect | Uplink | vorhanden | vorhanden | offene Hinweise | vorhanden | vorhanden | Phase 5/13 – Call Control/SS | `crates/tetra-pdus/src/cmce/pdus/u_disconnect.rs` |
 | UFacility | Uplink | vorhanden | vorhanden | offene Hinweise | vorhanden | vorhanden | Phase 5/13 – Call Control/SS | `crates/tetra-pdus/src/cmce/pdus/u_facility.rs` |

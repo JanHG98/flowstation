@@ -125,7 +125,7 @@ LcmcMleRestoreInd
 
 an CMCE geleitet. Sie enthält zusätzlich Teilnehmer, Endpoint, Link und die optional gemeldete alte Netzidentität.
 
-Da die vollständige CMCE-Call-Restore-State-Machine erst in einer späteren Phase folgt, besitzt `CmceBs` jetzt einen konservativen Fallback: Eine reale Restore-Indikation wird sauber mit `D-RESTORE-FAIL` abgewiesen, statt zu panicen oder bis zu einem zufälligen Timeout zu hängen. Der positive `D-RESTORE-ACK`-Pfad ist bereits vollständig vorhanden und wird im Test beziehungsweise später vom Call Control ausgelöst.
+Die zunächst in Paket A enthaltene konservative Ablehnung wurde mit `SWMI Mobility 1 – Paket B` ersetzt. CMCE verarbeitet die Restore-Indikation nun über die Gruppen- beziehungsweise Individualruf-State-Machine und liefert abhängig von Context, Ressourcen und Dienstprofil ein positives `D-RESTORE-ACK` oder einen definierten Restore-Fehler.
 
 ## Timeouts
 
@@ -202,9 +202,11 @@ Noch nicht Bestandteil dieses Pakets:
 - netzweite Call Legs;
 - zwei reale TBS über RF.
 
-## Nächster Schritt
+## Folgeschritte
 
-Als nächstes folgt `SWMI Mobility 1 – Paket B`:
+`SWMI Mobility 1 – Paket B` ergänzt die vollständige lokale CMCE-Call-Restore-State-Machine für Gruppen- und Individualrufe.
+
+Danach folgt `SWMI Mobility 1 – Paket C`:
 
 1. explizite MLE-Cell-State-Machine für Serving, Preparing, Changing und Restoring;
 2. Verbindung zu TLMC Select/Configure;

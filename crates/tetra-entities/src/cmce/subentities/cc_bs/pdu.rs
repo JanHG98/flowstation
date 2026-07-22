@@ -13,6 +13,7 @@ impl CcBsSubentity {
             subscriber_groups: HashMap::new(),
             group_listeners: HashMap::new(),
             recent_deaffiliations: HashMap::new(),
+            call_restore: CallRestoreRuntime::new(),
             telemetry: None,
         }
     }
@@ -187,11 +188,25 @@ impl CcBsSubentity {
 
     pub(super) fn build_sapmsg_direct(
         sdu: BitBuffer,
+        dltime: TdmaTime,
+        address: TetraAddress,
+        handle: u32,
+        link_id: u32,
+        endpoint_id: u32,
+    ) -> SapMsg {
+        Self::build_sapmsg_direct_with_allocation(
+            sdu, dltime, address, handle, link_id, endpoint_id, None,
+        )
+    }
+
+    pub(super) fn build_sapmsg_direct_with_allocation(
+        sdu: BitBuffer,
         _dltime: TdmaTime,
         address: TetraAddress,
         handle: u32,
         link_id: u32,
         endpoint_id: u32,
+        chan_alloc: Option<CmceChanAllocReq>,
     ) -> SapMsg {
         SapMsg {
             sap: Sap::LcmcSap,
@@ -210,7 +225,7 @@ impl CcBsSubentity {
                 layer2_qos: 0,
                 stealing_permission: false,
                 stealing_repeats_flag: false,
-                chan_alloc: None,
+                chan_alloc,
                 main_address: address,
                 tx_reporter: None,
             }),
@@ -303,13 +318,31 @@ impl CcBsSubentity {
         transmission_grant: TransmissionGrant,
         call_status: Option<CallStatus>,
     ) -> BitBuffer {
+        Self::build_d_call_restore_extended(
+            call_identifier,
+            transmission_grant,
+            None,
+            None,
+            call_status,
+        )
+    }
+
+    pub(super) fn build_d_call_restore_extended(
+        call_identifier: u16,
+        transmission_grant: TransmissionGrant,
+        new_call_identifier: Option<u16>,
+        call_time_out: Option<CallTimeout>,
+        call_status: Option<CallStatus>,
+    ) -> BitBuffer {
         let pdu = DCallRestore {
             call_identifier,
             transmission_grant: transmission_grant.into_raw() as u8,
             transmission_request_permission: false,
-            reset_call_time_out_timer_t310_: true,
-            new_call_identifier: None,
-            call_time_out: None,
+            // T310 continues across call restoration unless the SwMI explicitly
+            // supplies a replacement timeout value.
+            reset_call_time_out_timer_t310_: call_time_out.is_some(),
+            new_call_identifier: new_call_identifier.map(u64::from),
+            call_time_out: call_time_out.map(CallTimeout::into_raw),
             call_status: call_status.map(CallStatus::into_raw),
             modify: None,
             notification_indicator: None,
@@ -320,7 +353,7 @@ impl CcBsSubentity {
         };
         tracing::info!("-> {:?}", pdu);
 
-        let mut sdu = BitBuffer::new_autoexpand(48);
+        let mut sdu = BitBuffer::new_autoexpand(64);
         pdu.to_bitbuf(&mut sdu).expect("Failed to serialize DCallRestore");
         sdu.seek(0);
         sdu
@@ -1291,6 +1324,7 @@ impl CcBsSubentity {
 
         // Clean up
         self.cached_setups.remove(&call_id);
+        self.call_restore.remove_context(call_id);
         let was_active = self.active_calls.remove(&call_id).is_some();
 
         // Dashboard telemetry: group call released (normal disconnect, timeout, hangtime or
@@ -1327,6 +1361,7 @@ impl CcBsSubentity {
             call.begin_release(disconnect_cause);
         }
 
+        self.call_restore.remove_context(call_id);
         let Some(call) = self.individual_calls.remove(&call_id) else {
             tracing::warn!("No individual call for call_id={}", call_id);
             return;

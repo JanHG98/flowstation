@@ -5,6 +5,8 @@
 
 use tetra_core::{BitBuffer, TetraAddress};
 
+use crate::lcmc::fields::chan_alloc_req::CmceChanAllocReq;
+
 use crate::common::{
     CellIdentity, MleChannelCommandValid, MleChannelRequestReason,
     MleChannelRequestRetryDelay, MleChannelResponseType, MleFailCause,
@@ -26,6 +28,8 @@ pub enum MleCellChangeControl {
     AcknowledgeRestore {
         subscriber: TetraAddress,
         cmce_sdu: BitBuffer,
+        /// Optional local traffic-channel allocation accompanying D-RESTORE-ACK.
+        chan_alloc: Option<CmceChanAllocReq>,
     },
     RejectRestore {
         subscriber: TetraAddress,

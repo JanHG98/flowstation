@@ -455,6 +455,10 @@ impl CcBsSubentity {
     ) {
         let call_id = pdu.call_identifier;
 
+        if self.handle_queued_restore_tx_ceased(sender, call_id) {
+            return;
+        }
+
         if let Some(call_snapshot) = self.individual_calls.get(&call_id).cloned() {
             if !call_snapshot.is_active() {
                 tracing::debug!("U-TX CEASED for inactive individual call_id={}, ignoring", call_id);
@@ -591,6 +595,10 @@ impl CcBsSubentity {
         pdu: UTxDemand,
     ) {
         let call_id = pdu.call_identifier;
+
+        if self.handle_queued_restore_tx_demand(queue, requesting_party, call_id) {
+            return;
+        }
 
         if let Some(call_snapshot) = self.individual_calls.get(&call_id).cloned() {
             if !call_snapshot.is_active() {
