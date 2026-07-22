@@ -10,7 +10,7 @@
 | CMCE | CcFormalState | 6 | 0 | `crates/tetra-entities/src/cmce/subentities/cc_bs/state/mod.rs` |
 | CMCE | GroupCallState | 2 | 0 | `crates/tetra-entities/src/cmce/subentities/cc_bs/state/mod.rs` |
 | CMCE | IndividualCallState | 5 | 0 | `crates/tetra-entities/src/cmce/subentities/cc_bs/state/mod.rs` |
-| MM | MmClientState | 3 | 0 | `crates/tetra-entities/src/mm/components/client_state.rs` |
+| MM | MmClientState | 3 | 4 | `crates/tetra-entities/src/mm/components/client_state.rs` |
 | NET_ASTERISK | DialogState | 4 | 0 | `crates/tetra-entities/src/net_asterisk/entity.rs` |
 | NET_AUDIO_PLAYER | AudioPlayerState | 7 | 0 | `crates/tetra-entities/src/net_audio_player/types.rs` |
 | NET_ECHOLINK | QsoState | 3 | 0 | `crates/tetra-entities/src/net_echolink/mod.rs` |

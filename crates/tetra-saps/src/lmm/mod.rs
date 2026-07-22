@@ -125,6 +125,17 @@ pub struct LmmMlePrepareConfirm {
     pub handle: Todo,
 }
 
+/// Infrastructure-side indication emitted by MLE when a U-PREPARE PDU carries
+/// an embedded MM forward-registration request.
+#[derive(Debug, Clone)]
+pub struct LmmMlePrepareInd {
+    pub sdu: BitBuffer,
+    pub subscriber: TetraAddress,
+    pub endpoint_id: u32,
+    pub link_id: u32,
+    pub cell_identifier_ca: Option<u8>,
+}
+
 #[derive(Debug, Clone)]
 pub struct LmmMleReportInd {
     pub handle: MleHandle,

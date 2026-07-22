@@ -21,7 +21,7 @@ use tetra_saps::common::{
 };
 use tetra_saps::control::mle_cell_change::MleCellChangeControl;
 use tetra_saps::lcmc::{LcmcMleRestoreInd, LcmcMleUnitdataInd};
-use tetra_saps::lmm::LmmMleUnitdataInd;
+use tetra_saps::lmm::{LmmMlePrepareInd, LmmMleUnitdataInd};
 use tetra_saps::ltpd::LtpdMleUnitdataInd;
 use tetra_saps::tla::{TlaTlDataReqBl, TlaTlUnitdataReqBl};
 use tetra_saps::{SapMsg, SapMsgInner};
@@ -145,10 +145,12 @@ impl MleBs {
                             sap: Sap::LmmSap,
                             src: TetraEntity::Mle,
                             dest: TetraEntity::Mm,
-                            msg: SapMsgInner::LmmMleUnitdataInd(LmmMleUnitdataInd {
+                            msg: SapMsgInner::LmmMlePrepareInd(LmmMlePrepareInd {
                                 sdu: mm_sdu,
-                                handle: 0,
-                                received_address: subscriber,
+                                subscriber,
+                                endpoint_id,
+                                link_id,
+                                cell_identifier_ca: pdu.cell_identifier_ca,
                             }),
                         });
                     }

@@ -5,7 +5,7 @@
 
 ## Übersicht
 
-- erfasste Primitive: **129**
+- erfasste Primitive: **130**
 - nicht in `SapMsgInner` verdrahtet: **62**
 - vorhandene Variante ohne sichtbaren Runtime-Pfad: **6**
 - Primitive ohne Testverweis: **97**
@@ -66,10 +66,11 @@
 | LmmMleLinkInd | nein | 0 | 0 | 0 | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/lmm/mod.rs` |
 | LmmMleLinkReq | nein | 0 | 0 | 0 | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/lmm/mod.rs` |
 | LmmMlePrepareConfirm | nein | 0 | 0 | 0 | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/lmm/mod.rs` |
+| LmmMlePrepareInd | ja | 1 | 1 | 3 | bidirektional sichtbar | `crates/tetra-saps/src/lmm/mod.rs` |
 | LmmMlePrepareReq | nein | 0 | 0 | 0 | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/lmm/mod.rs` |
 | LmmMleReportInd | nein | 0 | 0 | 0 | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/lmm/mod.rs` |
-| LmmMleUnitdataInd | ja | 4 | 10 | 6 | bidirektional sichtbar | `crates/tetra-saps/src/lmm/mod.rs` |
-| LmmMleUnitdataReq | ja | 9 | 4 | 9 | bidirektional sichtbar | `crates/tetra-saps/src/lmm/mod.rs` |
+| LmmMleUnitdataInd | ja | 3 | 10 | 9 | bidirektional sichtbar | `crates/tetra-saps/src/lmm/mod.rs` |
+| LmmMleUnitdataReq | ja | 10 | 4 | 11 | bidirektional sichtbar | `crates/tetra-saps/src/lmm/mod.rs` |
 | LmmMleUpdateReq | nein | 0 | 0 | 0 | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/lmm/mod.rs` |
 
 ## LTPD

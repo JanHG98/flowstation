@@ -87,6 +87,7 @@ pub enum SapMsgInner {
     TlaTlUnitdataReqBl(TlaTlUnitdataReqBl),
 
     // LMM-SAP (MLE-MM)
+    LmmMlePrepareInd(LmmMlePrepareInd),
     LmmMleUnitdataInd(LmmMleUnitdataInd),
     LmmMleUnitdataReq(LmmMleUnitdataReq),
 
@@ -185,6 +186,8 @@ impl Display for SapMsgInner {
             // TMB-SAP
             SapMsgInner::TlmbSyncInd(_) => write!(f, "TmbSyncInd"),
             SapMsgInner::TlmbSysinfoInd(_) => write!(f, "TmbSysinfoInd"),
+
+            SapMsgInner::LmmMlePrepareInd(_) => write!(f, "LmmMlePrepareInd"),
 
             // Control/Brew
             SapMsgInner::MmSubscriberUpdate(_) => write!(f, "MmSubscriberUpdate"),

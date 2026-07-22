@@ -2,6 +2,7 @@ use std::collections::{HashMap, VecDeque};
 use std::path::PathBuf;
 
 use crate::mm::components::recovery_cache::{RecoveryCache, TerminalRecord};
+use crate::mm::mobility_runtime::{MmMobilityRuntime, MmMobilityRuntimeSnapshot, MmMobilityTimeout};
 use crate::net_control::{ControlCommand, ControlEndpoint};
 use crate::net_telemetry::channel::TelemetrySink;
 use crate::{MessageQueue, TetraEntityTrait, net_brew};
@@ -9,10 +10,12 @@ use tetra_config::bluestation::SharedConfig;
 use tetra_core::tetra_entities::TetraEntity;
 use tetra_core::{BitBuffer, Layer2Service, Sap, TdmaTime, TetraAddress, unimplemented_log};
 use tetra_saps::control::brew::{BrewSubscriberAction, MmSubscriberUpdate};
-use tetra_saps::lmm::LmmMleUnitdataReq;
+use tetra_saps::common::{MleChannelCommandValid, MleFailCause};
+use tetra_saps::control::mle_cell_change::MleCellChangeControl;
+use tetra_saps::lmm::{LmmMlePrepareInd, LmmMleUnitdataReq};
 use tetra_saps::{SapMsg, SapMsgInner};
 
-use crate::mm::components::client_state::{ClientMgrErr, MmClientMgr, MmClientState};
+use crate::mm::components::client_state::{ClientMgrErr, MmClientMgr, MmClientMobilityContext, MmClientState};
 use crate::mm::components::not_supported::make_ul_mm_pdu_function_not_supported;
 use tetra_pdus::mm::enums::energy_saving_mode::EnergySavingMode;
 use tetra_pdus::mm::enums::location_update_type::LocationUpdateType;
@@ -29,6 +32,7 @@ use tetra_pdus::mm::pdus::d_attach_detach_group_identity::DAttachDetachGroupIden
 use tetra_pdus::mm::pdus::d_attach_detach_group_identity_acknowledgement::DAttachDetachGroupIdentityAcknowledgement;
 use tetra_pdus::mm::pdus::d_location_update_accept::DLocationUpdateAccept;
 use tetra_pdus::mm::pdus::d_location_update_command::DLocationUpdateCommand;
+use tetra_pdus::mm::pdus::d_location_update_proceeding::DLocationUpdateProceeding;
 use tetra_pdus::mm::pdus::d_location_update_reject::DLocationUpdateReject;
 use tetra_pdus::mm::pdus::d_mm_status::DMmStatus;
 use tetra_pdus::mm::pdus::u_attach_detach_group_identity::UAttachDetachGroupIdentity;
@@ -61,6 +65,11 @@ pub struct MmBs {
     /// ghost while it re-registers (see `maybe_reactive_recovery`). Independent of `recovery`
     /// above — populated even when the proactive cache is disabled.
     reactive_recovery_cooldown: HashMap<u32, std::time::Instant>,
+
+    // MM migration / forward-registration state. This remains local air-interface
+    // state; a future mobility-core transports exported contexts between nodes.
+    mobility: MmMobilityRuntime,
+    current_time: TdmaTime,
 }
 
 /// Safety cap on `reactive_recovery_cooldown` so a churn of distinct unknown ISSIs can't grow it
@@ -80,7 +89,38 @@ impl MmBs {
             recovery_attempts: HashMap::new(),
             recovery_last_frame: None,
             reactive_recovery_cooldown: HashMap::new(),
+            mobility: MmMobilityRuntime::new(),
+            current_time: TdmaTime::default(),
         }
+    }
+
+    pub fn mobility_snapshot(&self) -> MmMobilityRuntimeSnapshot {
+        self.mobility.snapshot(self.current_time)
+    }
+
+    pub fn export_mobility_context(&self, issi: u32) -> Option<MmClientMobilityContext> {
+        self.client_mgr.export_mobility_context(issi)
+    }
+
+    pub fn import_mobility_context(&mut self, local_issi: u32, context: &MmClientMobilityContext) {
+        self.client_mgr.import_mobility_context(local_issi, context);
+        self.config.state_write().subscribers.register(local_issi);
+        for &gssi in &context.groups {
+            self.config.state_write().subscribers.affiliate(local_issi, gssi);
+        }
+    }
+
+    pub fn provide_migration_context(
+        &mut self,
+        vassi: u32,
+        context: MmClientMobilityContext,
+    ) -> Result<(), crate::mm::mobility_runtime::MmMobilityError> {
+        self.mobility
+            .provide_migration_context(vassi, context, self.current_time)
+    }
+
+    pub fn take_forward_context(&mut self, issi: u32) -> Option<MmClientMobilityContext> {
+        self.mobility.take_forward_context(issi)
     }
 
     /// Initialise restart recovery from the resolved cache path. Called once at startup from the
@@ -454,32 +494,98 @@ impl MmBs {
         // isn't replayed to forever. No-op when recovery is disabled / ISSI not pending.
         self.recovery_confirm(prim.received_address.ssi);
 
-        // Migration not supported: ETSI 16.4.1.1 case b) requires identity exchange via
-        // D-LOCATION-UPDATE-PROCEEDING which we don't implement. Reject with cause
-        // "Migration not supported" (12, Table 16.81) so the MS can act on it.
-        if pdu.location_update_type == LocationUpdateType::MigratingLocationUpdating
-            || pdu.location_update_type == LocationUpdateType::ServiceRestorationMigratingLocationUpdating
-        {
-            // Terminal wants to migrate to another network (e.g. SmartConnect).
-            // We don't implement D-LOCATION-UPDATE-PROCEEDING identity exchange (ETSI §16.4.1.1 case b),
-            // so we can't accept migration formally. But we MUST release the terminal from Brew
-            // so the destination network can register it without identity conflict.
-            // Send REJECT so terminal knows to try the other network, but first deregister from Brew.
-            let issi = prim.received_address.ssi;
-            tracing::info!("MM: ISSI {} migrating to another network — releasing from Brew", issi);
-            let detached = self.client_mgr.remove_client(issi);
-            if let Some(client) = detached {
-                self.config.state_write().subscribers.deregister(issi);
-                if !client.groups.is_empty() {
-                    let groups: Vec<u32> = client.groups.iter().copied().collect();
-                    self.emit_subscriber_update(queue, issi, groups, BrewSubscriberAction::Deaffiliate);
+        // Migration, first stage: a migrating MS initially addresses the cell with its USSI and
+        // supplies its home MNI.  Allocate a local VASSI and answer with
+        // D-LOCATION-UPDATE-PROCEEDING.  The second, DemandLocationUpdating request is then sent
+        // under that VASSI and completes registration below.
+        if matches!(
+            pdu.location_update_type,
+            LocationUpdateType::MigratingLocationUpdating
+                | LocationUpdateType::ServiceRestorationMigratingLocationUpdating
+        ) {
+            let subscriber = prim.received_address;
+            let handle = prim.handle;
+            let client_mgr = &self.client_mgr;
+            let allocation = self.mobility.begin_migration(
+                subscriber,
+                handle,
+                &pdu,
+                self.current_time,
+                |candidate| client_mgr.client_is_known(candidate),
+            );
+            match allocation {
+                Ok((vassi, home_mni)) => {
+                    tracing::info!(
+                        "MM: migration proceeding for {} — allocated VASSI {} (home MNI {})",
+                        subscriber,
+                        vassi,
+                        home_mni
+                    );
+                    Self::send_d_location_update_proceeding(
+                        queue,
+                        subscriber,
+                        handle,
+                        vassi,
+                        home_mni,
+                    );
                 }
-                self.emit_subscriber_update(queue, issi, Vec::new(), BrewSubscriberAction::Deregister);
+                Err(error) => {
+                    tracing::warn!(?error, %subscriber, "MM: rejecting migration request");
+                    Self::send_d_location_update_reject_cause(
+                        queue,
+                        subscriber.ssi,
+                        handle,
+                        pdu.location_update_type,
+                        pdu.address_extension,
+                        match error {
+                            crate::mm::mobility_runtime::MmMobilityError::MissingHomeMni => {
+                                RejectCause::MandatoryElementError
+                            }
+                            crate::mm::mobility_runtime::MmMobilityError::VassiPoolExhausted => {
+                                RejectCause::Congestion
+                            }
+                            _ => RejectCause::NetworkFailure,
+                        },
+                    );
+                }
             }
-            self.recovery_mark_dirty();
-            Self::send_d_location_update_reject(queue, issi, prim.handle, pdu.location_update_type, pdu.address_extension);
             return;
         }
+
+        // Migration, second stage: after D-LOCATION-UPDATE-PROCEEDING the MS immediately sends a
+        // DemandLocationUpdating request using the allocated VASSI.  Validate the home identity
+        // and optionally install a context imported from another TBS/Core before continuing through
+        // the ordinary registration and group-affiliation path.
+        let migration_completion = if pdu.location_update_type == LocationUpdateType::DemandLocationUpdating
+            && self.mobility.has_pending_vassi(prim.received_address.ssi)
+        {
+            match self
+                .mobility
+                .complete_migration(prim.received_address.ssi, &pdu, self.current_time)
+            {
+                Ok(completion) => {
+                    if let Some(context) = &completion.imported_context {
+                        self.client_mgr
+                            .import_mobility_context(completion.local_issi, context);
+                    }
+                    Some(completion)
+                }
+                Err(error) => {
+                    tracing::warn!(?error, "MM: migration identity validation failed");
+                    Self::send_d_location_update_reject_cause(
+                        queue,
+                        prim.received_address.ssi,
+                        prim.handle,
+                        pdu.location_update_type,
+                        pdu.address_extension,
+                        RejectCause::MessageConsistencyError,
+                    );
+                    return;
+                }
+            }
+        } else {
+            None
+        };
 
         // Check if we can satisfy this request, print unsupported stuff
         if !Self::feature_check_u_location_update_demand(&pdu) {
@@ -518,15 +624,31 @@ impl MmBs {
         // The dashboard can override the config whitelist at runtime (state override takes
         // precedence so edits apply without a restart); fall back to the config value when
         // no override is set. An empty list (in either place) means "open network".
+        // For the second stage of migration the radio is addressed with the locally
+        // allocated VASSI. Access control must still be evaluated against the Home
+        // ISSI, otherwise every legitimate migration would fail when a whitelist is
+        // configured and the temporary VASSI is (correctly) absent from it.
+        let authorization_issi = migration_completion
+            .as_ref()
+            .map(|completion| completion.home_issi)
+            .unwrap_or(issi);
         let issi_allowed = {
             let state = self.config.state_read();
             match &state.issi_whitelist_override {
-                Some(list) => list.is_empty() || list.contains(&issi),
-                None => self.config.config().security.is_issi_allowed(issi),
+                Some(list) => list.is_empty() || list.contains(&authorization_issi),
+                None => self
+                    .config
+                    .config()
+                    .security
+                    .is_issi_allowed(authorization_issi),
             }
         };
         if !issi_allowed {
-            tracing::warn!("MM: ISSI {} not in whitelist, rejecting registration", issi);
+            tracing::warn!(
+                "MM: identity {} (local SSI {}) not in whitelist, rejecting registration",
+                authorization_issi,
+                issi
+            );
             Self::send_d_location_update_reject(queue, issi, handle, pdu.location_update_type, pdu.address_extension);
             return;
         }
@@ -869,7 +991,12 @@ impl MmBs {
         // response for an initial ITSI attach: attach in, attach accepted.
         let periodic_secs = self.config.config().cell.periodic_registration_secs;
 
-        let accept_type = if periodic_secs > 0 && !hytera_periodic_accept_compat {
+        let accept_type = if migration_completion.is_some() {
+            // The second migration demand is explicitly acknowledged as DemandLocationUpdating;
+            // do not let the periodic-registration compatibility override hide the completed
+            // two-stage migration procedure.
+            LocationUpdateType::DemandLocationUpdating
+        } else if periodic_secs > 0 && !hytera_periodic_accept_compat {
             LocationUpdateType::PeriodicLocationUpdating
         } else {
             if periodic_secs > 0 && hytera_periodic_accept_compat {
@@ -886,7 +1013,9 @@ impl MmBs {
         let pdu_response = DLocationUpdateAccept {
             location_update_accept_type: accept_type,
             ssi: Some(issi as u64),
-            address_extension: None,
+            address_extension: migration_completion
+                .as_ref()
+                .map(|completion| completion.home_mni as u64),
             subscriber_class: None,
             energy_saving_information: esi,
             scch_information_and_distribution_on_18th_frame: scch_info,
@@ -947,6 +1076,135 @@ impl MmBs {
             tracing::info!("Sending D-LOCATION UPDATE COMMAND to returning MS {} to request group report", issi);
             Self::send_d_location_update_command(queue, issi, handle);
         }
+    }
+
+    fn rx_lmm_mle_prepare_ind(&mut self, queue: &mut MessageQueue, mut indication: LmmMlePrepareInd) {
+        let pdu = match ULocationUpdateDemand::from_bitbuf(&mut indication.sdu) {
+            Ok(pdu) => pdu,
+            Err(error) => {
+                tracing::warn!(?error, %indication.subscriber, "MM: invalid forward-registration PDU in U-PREPARE");
+                queue.push_back(SapMsg {
+                    sap: Sap::Control,
+                    src: TetraEntity::Mm,
+                    dest: TetraEntity::Mle,
+                    msg: SapMsgInner::MleCellChangeControl(MleCellChangeControl::RejectPrepare {
+                        subscriber: indication.subscriber,
+                        cause: MleFailCause::MsNotAllowedOnCell,
+                        mm_sdu: None,
+                    }),
+                });
+                return;
+            }
+        };
+
+        let Some(context) = self.client_mgr.export_mobility_context(indication.subscriber.ssi) else {
+            tracing::warn!(%indication.subscriber, "MM: forward registration requested for unknown subscriber");
+            let reject = DLocationUpdateReject {
+                location_update_type: pdu.location_update_type,
+                reject_cause: RejectCause::ForwardRegistrationFailure as u8,
+                cipher_control: false,
+                ciphering_parameters: None,
+                address_extension: pdu.address_extension,
+                cell_type_control: None,
+                proprietary: None,
+            };
+            let mut mm_sdu = BitBuffer::new_autoexpand(32);
+            let _ = reject.to_bitbuf(&mut mm_sdu);
+            mm_sdu.seek(0);
+            queue.push_back(SapMsg {
+                sap: Sap::Control,
+                src: TetraEntity::Mm,
+                dest: TetraEntity::Mle,
+                msg: SapMsgInner::MleCellChangeControl(MleCellChangeControl::RejectPrepare {
+                    subscriber: indication.subscriber,
+                    cause: MleFailCause::MsNotAllowedOnCell,
+                    mm_sdu: Some(mm_sdu),
+                }),
+            });
+            return;
+        };
+
+        let completion = match self.mobility.begin_forward_registration(
+            indication.subscriber,
+            indication.cell_identifier_ca,
+            &pdu,
+            context.clone(),
+            self.current_time,
+        ) {
+            Ok(completion) => completion,
+            Err(error) => {
+                tracing::warn!(?error, %indication.subscriber, "MM: rejecting forward registration");
+                let reject = DLocationUpdateReject {
+                    location_update_type: pdu.location_update_type,
+                    reject_cause: RejectCause::ForwardRegistrationFailure as u8,
+                    cipher_control: false,
+                    ciphering_parameters: None,
+                    address_extension: pdu.address_extension,
+                    cell_type_control: None,
+                    proprietary: None,
+                };
+                let mut mm_sdu = BitBuffer::new_autoexpand(32);
+                let _ = reject.to_bitbuf(&mut mm_sdu);
+                mm_sdu.seek(0);
+                queue.push_back(SapMsg {
+                    sap: Sap::Control,
+                    src: TetraEntity::Mm,
+                    dest: TetraEntity::Mle,
+                    msg: SapMsgInner::MleCellChangeControl(MleCellChangeControl::RejectPrepare {
+                        subscriber: indication.subscriber,
+                        cause: MleFailCause::MsNotAllowedOnCell,
+                        mm_sdu: Some(mm_sdu),
+                    }),
+                });
+                return;
+            }
+        };
+
+        let energy_saving_information = match context.energy_saving_mode {
+            EnergySavingMode::StayAlive => None,
+            mode => Some(Self::grant_energy_saving(indication.subscriber.ssi, mode)),
+        };
+        let accept = DLocationUpdateAccept {
+            location_update_accept_type: pdu.location_update_type,
+            ssi: Some(indication.subscriber.ssi as u64),
+            address_extension: pdu.address_extension,
+            subscriber_class: None,
+            energy_saving_information,
+            scch_information_and_distribution_on_18th_frame: None,
+            new_registered_area: None,
+            security_downlink: None,
+            group_identity_location_accept: None,
+            default_group_attachment_lifetime: None,
+            authentication_downlink: None,
+            group_identity_security_related_information: None,
+            cell_type_control: None,
+            proprietary: None,
+        };
+        let mut mm_sdu = BitBuffer::new_autoexpand(64);
+        if let Err(error) = accept.to_bitbuf(&mut mm_sdu) {
+            tracing::error!(?error, "MM: failed encoding forward-registration accept");
+            return;
+        }
+        mm_sdu.seek(0);
+        let _ = self
+            .mobility
+            .accept_forward_registration(indication.subscriber.ssi, self.current_time);
+        tracing::info!(
+            "MM: forward registration accepted for {} toward LA {}",
+            indication.subscriber,
+            completion.target_location_area
+        );
+        queue.push_back(SapMsg {
+            sap: Sap::Control,
+            src: TetraEntity::Mm,
+            dest: TetraEntity::Mle,
+            msg: SapMsgInner::MleCellChangeControl(MleCellChangeControl::GrantPrepare {
+                subscriber: indication.subscriber,
+                command: MleChannelCommandValid::ChangeChannelImmediately,
+                target_cell: None,
+                mm_sdu: Some(mm_sdu),
+            }),
+        });
     }
 
     /// Rebuild StackState.ee_monitoring_windows from the live client registry. See the field doc
@@ -1173,11 +1431,23 @@ impl MmBs {
         // (rx_u_location_update_demand). Without this, an unknown ISSI can self-register
         // via the group-attach path below, bypassing the whitelist and growing the client
         // registry without bound.
+        // For the second stage of migration the radio is addressed with the locally
+        // allocated VASSI. Access control must still be evaluated against the Home
+        // ISSI, otherwise every legitimate migration would fail when a whitelist is
+        // configured and the temporary VASSI is (correctly) absent from it.
+        let authorization_issi = migration_completion
+            .as_ref()
+            .map(|completion| completion.home_issi)
+            .unwrap_or(issi);
         let issi_allowed = {
             let state = self.config.state_read();
             match &state.issi_whitelist_override {
-                Some(list) => list.is_empty() || list.contains(&issi),
-                None => self.config.config().security.is_issi_allowed(issi),
+                Some(list) => list.is_empty() || list.contains(&authorization_issi),
+                None => self
+                    .config
+                    .config()
+                    .security
+                    .is_issi_allowed(authorization_issi),
             }
         };
         if !issi_allowed {
@@ -1752,6 +2022,42 @@ impl MmBs {
         queue.push_back(msg);
     }
 
+    fn send_d_location_update_proceeding(
+        queue: &mut MessageQueue,
+        address: TetraAddress,
+        handle: u32,
+        vassi: u32,
+        home_mni: u32,
+    ) {
+        let pdu = DLocationUpdateProceeding {
+            ssi: vassi,
+            address_extension: home_mni,
+            proprietary: None,
+        };
+        let mut sdu = BitBuffer::new_autoexpand(16);
+        if let Err(error) = pdu.to_bitbuf(&mut sdu) {
+            tracing::error!(?error, "MM: failed serializing D-LOCATION-UPDATE-PROCEEDING");
+            return;
+        }
+        sdu.seek(0);
+        queue.push_back(SapMsg {
+            sap: Sap::LmmSap,
+            src: TetraEntity::Mm,
+            dest: TetraEntity::Mle,
+            msg: SapMsgInner::LmmMleUnitdataReq(LmmMleUnitdataReq {
+                sdu,
+                handle,
+                address,
+                layer2service: Layer2Service::Acknowledged,
+                stealing_permission: false,
+                stealing_repeats_flag: false,
+                encryption_flag: false,
+                is_null_pdu: false,
+                tx_reporter: None,
+            }),
+        });
+    }
+
     /// Sends a D-LOCATION UPDATE REJECT PDU (ETSI clause 16.9.2.9)
     fn send_d_location_update_reject(
         queue: &mut MessageQueue,
@@ -1883,9 +2189,7 @@ impl MmBs {
 
     fn feature_check_u_location_update_demand(pdu: &ULocationUpdateDemand) -> bool {
         let mut supported = true;
-        if pdu.location_update_type == LocationUpdateType::MigratingLocationUpdating
-            || pdu.location_update_type == LocationUpdateType::DisabledMsUpdating
-        {
+        if pdu.location_update_type == LocationUpdateType::DisabledMsUpdating {
             unimplemented_log!("Unsupported {}", pdu.location_update_type);
             supported = false;
         }
@@ -1958,6 +2262,48 @@ impl TetraEntityTrait for MmBs {
     }
 
     fn tick_start(&mut self, queue: &mut MessageQueue, ts: TdmaTime) {
+        self.current_time = ts;
+        for timeout in self.mobility.tick(ts) {
+            match timeout {
+                MmMobilityTimeout::Migration {
+                    subscriber,
+                    handle,
+                    location_update_type,
+                    address_extension,
+                } => Self::send_d_location_update_reject_cause(
+                    queue,
+                    subscriber.ssi,
+                    handle,
+                    location_update_type,
+                    address_extension,
+                    RejectCause::ExpiryOfTimer,
+                ),
+                MmMobilityTimeout::ForwardRegistration { subscriber } => {
+                    let reject = DLocationUpdateReject {
+                        location_update_type: LocationUpdateType::ServiceRestorationRoamingLocationUpdating,
+                        reject_cause: RejectCause::ForwardRegistrationFailure as u8,
+                        cipher_control: false,
+                        ciphering_parameters: None,
+                        address_extension: None,
+                        cell_type_control: None,
+                        proprietary: None,
+                    };
+                    let mut mm_sdu = BitBuffer::new_autoexpand(32);
+                    let _ = reject.to_bitbuf(&mut mm_sdu);
+                    mm_sdu.seek(0);
+                    queue.push_back(SapMsg {
+                        sap: Sap::Control,
+                        src: TetraEntity::Mm,
+                        dest: TetraEntity::Mle,
+                        msg: SapMsgInner::MleCellChangeControl(MleCellChangeControl::RejectPrepare {
+                            subscriber,
+                            cause: MleFailCause::NeighbourCellEnquiryUnavailableOrTemporaryBreak,
+                            mm_sdu: Some(mm_sdu),
+                        }),
+                    });
+                }
+            }
+        }
         // Drain control commands addressed to the MM entity. We collect into a Vec first so the
         // immutable borrow on `self.control` is released before the handlers run — DGNA needs
         // `&mut self` (client registry, subscriber state, telemetry).
@@ -2144,6 +2490,9 @@ impl TetraEntityTrait for MmBs {
 
         match message.sap {
             Sap::LmmSap => match message.msg {
+                SapMsgInner::LmmMlePrepareInd(indication) => {
+                    self.rx_lmm_mle_prepare_ind(queue, indication);
+                }
                 SapMsgInner::LmmMleUnitdataInd(_) => {
                     self.rx_lmm_mle_unitdata_ind(queue, message);
                 }

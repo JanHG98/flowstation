@@ -12,7 +12,7 @@ use crate::mm::enums::type34_elem_id_dl::MmType34ElemIdDl;
 /// Response expected: -
 /// Response to: U-LOCATION UPDATE DEMAND
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DLocationUpdateProceeding {
     /// Type1, 24 bits, (V)ASSI of the MS,
     pub ssi: u32,
@@ -22,7 +22,6 @@ pub struct DLocationUpdateProceeding {
     pub proprietary: Option<Type3FieldGeneric>,
 }
 
-#[allow(unreachable_code)] // TODO FIXME review, finalize and remove this
 impl DLocationUpdateProceeding {
     /// Parse from BitBuffer
     pub fn from_bitbuf(buffer: &mut BitBuffer) -> Result<Self, PduParseErr> {

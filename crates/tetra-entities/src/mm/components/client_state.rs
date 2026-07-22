@@ -36,6 +36,20 @@ pub enum MmClientState {
     Detached,
 }
 
+
+#[derive(Debug, Clone)]
+pub struct MmClientMobilityContext {
+    pub issi: u32,
+    pub state: MmClientState,
+    pub groups: Vec<u32>,
+    pub energy_saving_mode: EnergySavingMode,
+    pub monitoring_frame: Option<u8>,
+    pub monitoring_multiframe: Option<u8>,
+    pub class_of_ms: Option<ClassOfMs>,
+    pub last_handle: u32,
+    pub tei: Option<u64>,
+}
+
 pub struct MmClientProperties {
     pub issi: u32,
     pub state: MmClientState,
@@ -362,6 +376,40 @@ impl MmClientMgr {
         if let Some(client) = self.clients.get_mut(&issi) {
             client.last_handle = handle;
         }
+    }
+
+
+    /// Export a subscriber context for forward registration or migration.
+    pub fn export_mobility_context(&self, issi: u32) -> Option<MmClientMobilityContext> {
+        let client = self.clients.get(&issi)?;
+        let mut groups: Vec<u32> = client.groups.iter().copied().collect();
+        groups.sort_unstable();
+        Some(MmClientMobilityContext {
+            issi: client.issi,
+            state: client.state,
+            groups,
+            energy_saving_mode: client.energy_saving_mode,
+            monitoring_frame: client.monitoring_frame,
+            monitoring_multiframe: client.monitoring_multiframe,
+            class_of_ms: client.class_of_ms.clone(),
+            last_handle: client.last_handle,
+            tei: client.tei,
+        })
+    }
+
+    /// Import a transferred subscriber context under the local SSI used by this cell.
+    /// Runtime timestamps and pending-command state are intentionally re-initialised.
+    pub fn import_mobility_context(&mut self, local_issi: u32, context: &MmClientMobilityContext) {
+        let mut client = MmClientProperties::new(local_issi);
+        client.state = MmClientState::Attached;
+        client.energy_saving_mode = context.energy_saving_mode;
+        client.monitoring_frame = context.monitoring_frame;
+        client.monitoring_multiframe = context.monitoring_multiframe;
+        client.class_of_ms = context.class_of_ms.clone();
+        client.last_handle = context.last_handle;
+        client.tei = context.tei;
+        client.groups.extend(context.groups.iter().copied());
+        self.clients.insert(local_issi, client);
     }
 
     /// Project the persistable recovery state of every known client: (issi, groups, energy mode).

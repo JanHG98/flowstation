@@ -1,0 +1,60 @@
+name: SWMI Mobility MM
+
+on:
+  push:
+    paths:
+      - "crates/tetra-core/src/typed_pdu_fields.rs"
+      - "crates/tetra-saps/src/lmm/**"
+      - "crates/tetra-saps/src/sapmsg.rs"
+      - "crates/tetra-pdus/src/mm/**"
+      - "crates/tetra-pdus/tests/test_mm_mobility_pdus.rs"
+      - "crates/tetra-entities/src/mm/**"
+      - "crates/tetra-entities/src/mle/**"
+      - "crates/tetra-entities/tests/test_mm_mobility_runtime.rs"
+      - "crates/tetra-entities/tests/test_two_cell_mm_mobility.rs"
+      - "tools/check_mm_mobility.py"
+      - ".github/workflows/swmi-mobility-mm.yml"
+  pull_request:
+    paths:
+      - "crates/tetra-core/src/typed_pdu_fields.rs"
+      - "crates/tetra-saps/src/lmm/**"
+      - "crates/tetra-saps/src/sapmsg.rs"
+      - "crates/tetra-pdus/src/mm/**"
+      - "crates/tetra-pdus/tests/test_mm_mobility_pdus.rs"
+      - "crates/tetra-entities/src/mm/**"
+      - "crates/tetra-entities/src/mle/**"
+      - "crates/tetra-entities/tests/test_mm_mobility_runtime.rs"
+      - "crates/tetra-entities/tests/test_two_cell_mm_mobility.rs"
+      - "tools/check_mm_mobility.py"
+      - ".github/workflows/swmi-mobility-mm.yml"
+
+jobs:
+  mobility-mm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Static architecture checks
+        run: |
+          python3 tools/check_swmi_foundation_types.py
+          python3 tools/check_tlmc_runtime.py
+          python3 tools/check_ltpd_runtime.py
+          python3 tools/check_foundation_acceptance.py
+          python3 tools/check_mle_cell_change.py
+          python3 tools/check_cmce_call_restore.py
+          python3 tools/check_mm_mobility.py
+          python3 tools/protocol_inventory.py --check
+      - name: Formatting
+        run: cargo fmt --all -- --check
+      - name: MM mobility tests
+        run: |
+          cargo test -p tetra-saps
+          cargo test -p tetra-pdus --test test_mm_mobility_pdus
+          cargo test -p tetra-entities --test test_mm_mobility_runtime
+          cargo test -p tetra-entities --test test_two_cell_mm_mobility
+          cargo test -p tetra-entities --test test_call_restore_runtime
+          cargo test -p tetra-entities --test test_two_cell_call_restore
+      - name: Clippy
+        run: cargo clippy -p tetra-core -p tetra-saps -p tetra-pdus -p tetra-entities --all-targets -- -D warnings

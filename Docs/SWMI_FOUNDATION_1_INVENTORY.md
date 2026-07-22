@@ -8,12 +8,12 @@ Paket A stellt die reproduzierbare Inventur bereit. Paket B ergänzt die typisie
 | Messgröße | Stand |
 | --- | --- |
 | PDU-Module | 77 |
-| PDU-Codecs teilweise/fehlend | 16 |
-| SAP-Primitive | 129 |
+| PDU-Codecs teilweise/fehlend | 15 |
+| SAP-Primitive | 130 |
 | SAP-Primitive nicht in SapMsgInner | 62 |
 | TLMC-Primitive inventarisiert | 18 |
 | LTPD-Primitive inventarisiert | 27 |
-| kritische Runtime-Platzhalter | 46 |
+| kritische Runtime-Platzhalter | 45 |
 | gefundene State-Typen | 17 |
 
 ## Erzeugte Artefakte

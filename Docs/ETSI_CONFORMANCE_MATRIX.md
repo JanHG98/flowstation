@@ -7,9 +7,9 @@
 
 - erfasste PDU-Implementierungen: **77**
 - Schichten: CMCE 30, LLC 4, MLE 13, MM 14, UMAC 16
-- Parser und Encoder beide ohne offensichtlichen Blocker: **61**
-- mindestens ein Codec-Pfad teilweise oder fehlend: **16**
-- PDU-Dateien ohne nachgewiesenen Testverweis: **43**
+- Parser und Encoder beide ohne offensichtlichen Blocker: **62**
+- mindestens ein Codec-Pfad teilweise oder fehlend: **15**
+- PDU-Dateien ohne nachgewiesenen Testverweis: **40**
 
 ## Bewertungslegende
 
@@ -88,10 +88,10 @@
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | DAttachDetachGroupIdentity | Downlink | vorhanden | vorhanden | offene Hinweise | vorhanden | vorhanden | Phase 4 – Mobility Management | `crates/tetra-pdus/src/mm/pdus/d_attach_detach_group_identity.rs` |
 | DAttachDetachGroupIdentityAcknowledgement | Downlink | vorhanden | vorhanden | offene Hinweise | vorhanden | vorhanden | Phase 4 – Mobility Management | `crates/tetra-pdus/src/mm/pdus/d_attach_detach_group_identity_acknowledgement.rs` |
-| DLocationUpdateAccept | Downlink | vorhanden | vorhanden | offene Hinweise | fehlt | nicht nachgewiesen | Phase 4 – Mobility Management | `crates/tetra-pdus/src/mm/pdus/d_location_update_accept.rs` |
+| DLocationUpdateAccept | Downlink | vorhanden | vorhanden | offene Hinweise | vorhanden | vorhanden | Phase 4 – Mobility Management | `crates/tetra-pdus/src/mm/pdus/d_location_update_accept.rs` |
 | DLocationUpdateCommand | Downlink | teilweise | vorhanden | blockiert | vorhanden | vorhanden | Phase 4 – Mobility Management | `crates/tetra-pdus/src/mm/pdus/d_location_update_command.rs` |
-| DLocationUpdateProceeding | Downlink | vorhanden | vorhanden | offene Hinweise | fehlt | nicht nachgewiesen | Phase 4 – Mobility Management | `crates/tetra-pdus/src/mm/pdus/d_location_update_proceeding.rs` |
-| DLocationUpdateReject | Downlink | teilweise | vorhanden | blockiert | fehlt | nicht nachgewiesen | Phase 4 – Mobility Management | `crates/tetra-pdus/src/mm/pdus/d_location_update_reject.rs` |
+| DLocationUpdateProceeding | Downlink | vorhanden | vorhanden | ohne offensichtlichen Blocker | vorhanden | vorhanden | Phase 4 – Mobility Management | `crates/tetra-pdus/src/mm/pdus/d_location_update_proceeding.rs` |
+| DLocationUpdateReject | Downlink | vorhanden | vorhanden | ohne offensichtlichen Blocker | vorhanden | vorhanden | Phase 4 – Mobility Management | `crates/tetra-pdus/src/mm/pdus/d_location_update_reject.rs` |
 | DMmStatus | Downlink | teilweise | teilweise | blockiert | vorhanden | vorhanden | Phase 4 – Mobility Management | `crates/tetra-pdus/src/mm/pdus/d_mm_status.rs` |
 | MmPduFunctionNotSupported | nicht klassifiziert | teilweise | teilweise | blockiert | fehlt | nicht nachgewiesen | Phase 4 – Mobility Management | `crates/tetra-pdus/src/mm/pdus/mm_pdu_function_not_supported.rs` |
 | UAttachDetachGroupIdentity | Uplink | vorhanden | vorhanden | offene Hinweise | fehlt | nicht nachgewiesen | Phase 4 – Mobility Management | `crates/tetra-pdus/src/mm/pdus/u_attach_detach_group_identity.rs` |
