@@ -954,11 +954,27 @@
     },
     {
       "category": "Todo-Typ",
-      "line": 629,
+      "line": 807,
+      "path": "crates/tetra-entities/src/mle/ltpd_runtime.rs",
+      "scope": "Runtime",
+      "severity": "Typ-Platzhalter",
+      "text": "Layer2Service::Acknowledged | Layer2Service::Todo => TxReporter::new(),"
+    },
+    {
+      "category": "Todo-Typ",
+      "line": 855,
       "path": "crates/tetra-entities/src/mle/ltpd_runtime.rs",
       "scope": "Runtime",
       "severity": "Typ-Platzhalter",
       "text": "Layer2Service::Acknowledged | Layer2Service::Todo => {"
+    },
+    {
+      "category": "panic!",
+      "line": 1059,
+      "path": "crates/tetra-entities/src/mle/ltpd_runtime.rs",
+      "scope": "Runtime",
+      "severity": "prüfen",
+      "text": "other => panic!(\"unexpected lower-layer primitive: {:?}\", other),"
     },
     {
       "category": "unimplemented_log!",
@@ -7786,13 +7802,13 @@
     },
     {
       "constructed": 0,
-      "handled": 1,
+      "handled": 3,
       "path": "crates/tetra-saps/src/ltpd/mod.rs",
       "primitive": "LtpdMleCancelReq",
       "sap": "LTPD",
       "sapmsg_variant": "ja",
       "status": "nur Empfang/Handler sichtbar",
-      "tests": 0
+      "tests": 3
     },
     {
       "constructed": 0,
@@ -7892,7 +7908,7 @@
       "sap": "LTPD",
       "sapmsg_variant": "ja",
       "status": "nur Empfang/Handler sichtbar",
-      "tests": 3
+      "tests": 6
     },
     {
       "constructed": 0,
@@ -7922,7 +7938,7 @@
       "sap": "LTPD",
       "sapmsg_variant": "ja",
       "status": "nur Empfang/Handler sichtbar",
-      "tests": 0
+      "tests": 2
     },
     {
       "constructed": 0,
@@ -7946,13 +7962,13 @@
     },
     {
       "constructed": 0,
-      "handled": 2,
+      "handled": 3,
       "path": "crates/tetra-saps/src/ltpd/mod.rs",
       "primitive": "LtpdMleReconnectConfirm",
       "sap": "LTPD",
       "sapmsg_variant": "ja",
       "status": "nur Empfang/Handler sichtbar",
-      "tests": 1
+      "tests": 2
     },
     {
       "constructed": 0,
@@ -7972,7 +7988,7 @@
       "sap": "LTPD",
       "sapmsg_variant": "ja",
       "status": "nur Empfang/Handler sichtbar",
-      "tests": 3
+      "tests": 5
     },
     {
       "constructed": 0,
@@ -7986,13 +8002,13 @@
     },
     {
       "constructed": 0,
-      "handled": 4,
+      "handled": 7,
       "path": "crates/tetra-saps/src/ltpd/mod.rs",
       "primitive": "LtpdMleReportInd",
       "sap": "LTPD",
       "sapmsg_variant": "ja",
       "status": "nur Empfang/Handler sichtbar",
-      "tests": 2
+      "tests": 6
     },
     {
       "constructed": 0,
@@ -8016,7 +8032,7 @@
     },
     {
       "constructed": 1,
-      "handled": 3,
+      "handled": 7,
       "path": "crates/tetra-saps/src/ltpd/mod.rs",
       "primitive": "LtpdMleUnitdataReq",
       "sap": "LTPD",
@@ -8312,7 +8328,7 @@
       "sap": "TLMC",
       "sapmsg_variant": "ja",
       "status": "nur Empfang/Handler sichtbar",
-      "tests": 8
+      "tests": 11
     },
     {
       "constructed": 1,
@@ -8651,7 +8667,7 @@
       "layer": "SAP/COMMON",
       "name": "LtpdLinkState",
       "path": "crates/tetra-saps/src/common/mod.rs",
-      "test_references": 1,
+      "test_references": 6,
       "variants": 10
     },
     {
@@ -8698,7 +8714,7 @@
     }
   ],
   "summary": {
-    "gap_count": 736,
+    "gap_count": 738,
     "pdu_count": 76,
     "sap_primitive_count": 128,
     "state_type_count": 17

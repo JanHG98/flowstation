@@ -13,7 +13,7 @@ use tetra_saps::common::{
     SetupReport, StealingPermission, TransferResult,
 };
 use tetra_saps::ltpd::{
-    LtpdMleConnectReq, LtpdMleDisconnectReq, LtpdMleReconnectReq,
+    LtpdMleCancelReq, LtpdMleConnectReq, LtpdMleDisconnectReq, LtpdMleReconnectReq,
     LtpdMleUnitdataReq,
 };
 use tetra_saps::tla::TlaTlDataIndBl;
@@ -146,19 +146,32 @@ fn downlink_unitdata_is_wrapped_by_mle_and_reported_to_sndcp() {
 
     test.submit_message(unitdata(None, 77, 4, 5));
     test.deliver_all_messages();
-    let messages = test.dump_sinks();
+    let mut messages = test.dump_sinks();
 
-    assert!(messages.iter().any(|message| {
-        matches!(
-            &message.msg,
+    let reporter = messages
+        .iter_mut()
+        .find_map(|message| match &mut message.msg {
             SapMsgInner::TlaTlDataReqBl(request)
                 if request.main_address == address
                     && request.endpoint_id == 4
                     && request.link_id == 5
-                    && request.tl_sdu.peek_bits(3) == Some(0b100)
-        )
-    }));
-    assert!(messages.iter().any(|message| {
+                    && request.tl_sdu.peek_bits(3) == Some(0b100) =>
+            {
+                request.tx_reporter.take()
+            }
+            _ => None,
+        })
+        .expect("LTPD TxReporter missing");
+    assert!(!messages
+        .iter()
+        .any(|message| matches!(&message.msg, SapMsgInner::LtpdMleReportInd(_))));
+
+    reporter.mark_transmitted();
+    reporter.mark_acknowledged();
+    test.router.tick_start();
+    test.deliver_all_messages();
+    let reports = test.dump_sinks();
+    assert!(reports.iter().any(|message| {
         matches!(
             &message.msg,
             SapMsgInner::LtpdMleReportInd(report)
@@ -327,4 +340,154 @@ fn tlmc_resource_edges_drive_break_and_resume() {
     assert!(resumed
         .iter()
         .any(|message| matches!(&message.msg, SapMsgInner::LtpdMleResumeInd(_))));
+}
+
+
+#[test]
+fn duplicate_handle_is_rejected_while_original_transfer_is_pending() {
+    let mut test = ComponentTest::new(StackMode::Bs, None);
+    test.populate_entities(
+        vec![TetraEntity::Mle],
+        vec![TetraEntity::Sndcp, TetraEntity::Llc],
+    );
+    let address = TetraAddress::new(1101, SsiType::Issi);
+    test.submit_message(incoming_sndcp(address, 12, 13));
+    test.deliver_all_messages();
+    let _ = test.dump_sinks();
+
+    test.submit_message(unitdata(None, 90, 12, 13));
+    test.submit_message(unitdata(None, 90, 12, 13));
+    test.deliver_all_messages();
+    let messages = test.dump_sinks();
+
+    assert_eq!(
+        messages
+            .iter()
+            .filter(|message| matches!(&message.msg, SapMsgInner::TlaTlDataReqBl(_)))
+            .count(),
+        1
+    );
+    assert!(messages.iter().any(|message| matches!(
+        &message.msg,
+        SapMsgInner::LtpdMleReportInd(report)
+            if report.handle == RequestHandle(90)
+                && report.transfer_result == TransferResult::Other(2)
+    )));
+
+    let component = test.router.get_entity(TetraEntity::Mle).expect("MLE missing");
+    let mle = component
+        .as_any_mut()
+        .downcast_mut::<MleBs>()
+        .expect("MLE-BS downcast failed");
+    let snapshot = mle.ltpd_snapshot();
+    assert_eq!(snapshot.pending_transfer_count, 1);
+    assert_eq!(snapshot.duplicate_handle_rejections, 1);
+}
+
+#[test]
+fn cancel_removes_pending_transfer_and_reports_failure() {
+    let mut test = ComponentTest::new(StackMode::Bs, None);
+    test.populate_entities(
+        vec![TetraEntity::Mle],
+        vec![TetraEntity::Sndcp, TetraEntity::Llc],
+    );
+    let address = TetraAddress::new(1102, SsiType::Issi);
+    test.submit_message(incoming_sndcp(address, 14, 15));
+    test.deliver_all_messages();
+    let _ = test.dump_sinks();
+
+    test.submit_message(unitdata(None, 91, 14, 15));
+    test.deliver_all_messages();
+    let _ = test.dump_sinks();
+    test.submit_message(SapMsg {
+        sap: Sap::TlpdSap,
+        src: TetraEntity::Sndcp,
+        dest: TetraEntity::Mle,
+        msg: SapMsgInner::LtpdMleCancelReq(LtpdMleCancelReq {
+            handle: RequestHandle(91),
+        }),
+    });
+    test.deliver_all_messages();
+    let messages = test.dump_sinks();
+
+    assert!(messages.iter().any(|message| matches!(
+        &message.msg,
+        SapMsgInner::LtpdMleReportInd(report)
+            if report.handle == RequestHandle(91)
+                && report.transfer_result == TransferResult::FailedRemovedFromBuffer
+    )));
+    let component = test.router.get_entity(TetraEntity::Mle).expect("MLE missing");
+    let mle = component
+        .as_any_mut()
+        .downcast_mut::<MleBs>()
+        .expect("MLE-BS downcast failed");
+    let snapshot = mle.ltpd_snapshot();
+    assert_eq!(snapshot.pending_transfer_count, 0);
+    assert_eq!(snapshot.cancelled_transfers, 1);
+}
+
+#[test]
+fn pending_transfer_times_out_without_llc_or_mac_progress() {
+    let start = TdmaTime::default();
+    let mut test = ComponentTest::new(StackMode::Bs, Some(start));
+    test.populate_entities(
+        vec![TetraEntity::Mle],
+        vec![TetraEntity::Sndcp, TetraEntity::Llc],
+    );
+    let address = TetraAddress::new(1103, SsiType::Issi);
+    test.submit_message(incoming_sndcp(address, 16, 17));
+    test.deliver_all_messages();
+    let _ = test.dump_sinks();
+
+    test.submit_message(unitdata(None, 92, 16, 17));
+    test.deliver_all_messages();
+    let _ = test.dump_sinks();
+    test.router.set_dl_time(start.add_timeslots(432));
+    test.router.tick_start();
+    test.deliver_all_messages();
+    let messages = test.dump_sinks();
+
+    assert!(messages.iter().any(|message| matches!(
+        &message.msg,
+        SapMsgInner::LtpdMleReportInd(report)
+            if report.handle == RequestHandle(92)
+                && report.transfer_result == TransferResult::FailedRemovedFromBuffer
+    )));
+    let component = test.router.get_entity(TetraEntity::Mle).expect("MLE missing");
+    let mle = component
+        .as_any_mut()
+        .downcast_mut::<MleBs>()
+        .expect("MLE-BS downcast failed");
+    assert_eq!(mle.ltpd_snapshot().timed_out_transfers, 1);
+}
+
+#[test]
+fn reconnect_from_already_connected_state_is_rejected() {
+    let mut test = ComponentTest::new(StackMode::Bs, None);
+    test.populate_entities(vec![TetraEntity::Mle], vec![TetraEntity::Sndcp]);
+    let address = TetraAddress::new(1104, SsiType::Issi);
+    test.submit_message(incoming_sndcp(address, 18, 19));
+    test.deliver_all_messages();
+    let _ = test.dump_sinks();
+
+    test.submit_message(SapMsg {
+        sap: Sap::TlpdSap,
+        src: TetraEntity::Sndcp,
+        dest: TetraEntity::Mle,
+        msg: SapMsgInner::LtpdMleReconnectReq(LtpdMleReconnectReq {
+            endpoint_id: 18,
+            link_id: 19,
+            reservation_information: ReservationInfo { octets_available: 128 },
+            pdu_priority: PduPriority::default(),
+            encryption_flag: false,
+            stealing_permission: StealingPermission::NotRequired,
+        }),
+    });
+    test.deliver_all_messages();
+    let messages = test.dump_sinks();
+    assert!(messages.iter().any(|message| matches!(
+        &message.msg,
+        SapMsgInner::LtpdMleReconnectConfirm(confirm)
+            if confirm.reconnection_result == ReconnectionResult::Reject
+    )));
 }

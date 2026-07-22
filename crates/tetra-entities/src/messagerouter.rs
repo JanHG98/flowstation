@@ -52,6 +52,10 @@ impl MessageQueue {
     pub fn is_empty(&self) -> bool {
         self.messages.is_empty()
     }
+
+    pub fn iter(&self) -> impl Iterator<Item = &SapMsg> {
+        self.messages.iter()
+    }
 }
 
 pub struct MessageRouter {

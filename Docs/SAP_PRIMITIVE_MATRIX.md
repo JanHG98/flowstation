@@ -8,7 +8,7 @@
 - erfasste Primitive: **128**
 - nicht in `SapMsgInner` verdrahtet: **62**
 - vorhandene Variante ohne sichtbaren Runtime-Pfad: **6**
-- Primitive ohne Testverweis: **99**
+- Primitive ohne Testverweis: **97**
 
 ## CONTROL
 
@@ -78,7 +78,7 @@
 | LtpdMleActivityReq | ja | 0 | 1 | 4 | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/ltpd/mod.rs` |
 | LtpdMleBreakInd | ja | 0 | 2 | 1 | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/ltpd/mod.rs` |
 | LtpdMleBusyInd | ja | 0 | 2 | 0 | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/ltpd/mod.rs` |
-| LtpdMleCancelReq | ja | 0 | 1 | 0 | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/ltpd/mod.rs` |
+| LtpdMleCancelReq | ja | 0 | 3 | 3 | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/ltpd/mod.rs` |
 | LtpdMleCloseInd | ja | 0 | 2 | 0 | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/ltpd/mod.rs` |
 | LtpdMleConfigureInd | ja | 0 | 2 | 0 | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/ltpd/mod.rs` |
 | LtpdMleConfigureReq | ja | 0 | 1 | 0 | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/ltpd/mod.rs` |
@@ -88,20 +88,20 @@
 | LtpdMleConnectResp | ja | 0 | 1 | 0 | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/ltpd/mod.rs` |
 | LtpdMleDisableInd | ja | 0 | 2 | 0 | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/ltpd/mod.rs` |
 | LtpdMleDisconnectInd | ja | 0 | 2 | 1 | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/ltpd/mod.rs` |
-| LtpdMleDisconnectReq | ja | 0 | 1 | 3 | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/ltpd/mod.rs` |
+| LtpdMleDisconnectReq | ja | 0 | 1 | 6 | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/ltpd/mod.rs` |
 | LtpdMleEnableInd | ja | 0 | 2 | 0 | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/ltpd/mod.rs` |
 | LtpdMleIdleInd | ja | 0 | 2 | 0 | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/ltpd/mod.rs` |
-| LtpdMleInfoInd | ja | 0 | 2 | 0 | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/ltpd/mod.rs` |
+| LtpdMleInfoInd | ja | 0 | 2 | 2 | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/ltpd/mod.rs` |
 | LtpdMleOpenInd | ja | 0 | 2 | 0 | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/ltpd/mod.rs` |
 | LtpdMleReceiveInd | ja | 0 | 1 | 0 | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/ltpd/mod.rs` |
-| LtpdMleReconnectConfirm | ja | 0 | 2 | 1 | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/ltpd/mod.rs` |
+| LtpdMleReconnectConfirm | ja | 0 | 3 | 2 | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/ltpd/mod.rs` |
 | LtpdMleReconnectInd | ja | 0 | 0 | 0 | Variante vorhanden, Runtime-Pfad fehlt | `crates/tetra-saps/src/ltpd/mod.rs` |
-| LtpdMleReconnectReq | ja | 0 | 1 | 3 | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/ltpd/mod.rs` |
+| LtpdMleReconnectReq | ja | 0 | 1 | 5 | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/ltpd/mod.rs` |
 | LtpdMleReleaseReq | ja | 0 | 1 | 0 | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/ltpd/mod.rs` |
-| LtpdMleReportInd | ja | 0 | 4 | 2 | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/ltpd/mod.rs` |
+| LtpdMleReportInd | ja | 0 | 7 | 6 | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/ltpd/mod.rs` |
 | LtpdMleResumeInd | ja | 0 | 2 | 1 | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/ltpd/mod.rs` |
 | LtpdMleUnitdataInd | ja | 4 | 2 | 1 | bidirektional sichtbar | `crates/tetra-saps/src/ltpd/mod.rs` |
-| LtpdMleUnitdataReq | ja | 1 | 3 | 3 | bidirektional sichtbar | `crates/tetra-saps/src/ltpd/mod.rs` |
+| LtpdMleUnitdataReq | ja | 1 | 7 | 3 | bidirektional sichtbar | `crates/tetra-saps/src/ltpd/mod.rs` |
 
 ## TLA
 
@@ -150,7 +150,7 @@
 | TlmcCellReadConf | ja | 0 | 4 | 0 | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/tlmc/mod.rs` |
 | TlmcCellReadReq | ja | 0 | 1 | 0 | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/tlmc/mod.rs` |
 | TlmcConfigureConf | ja | 0 | 4 | 1 | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/tlmc/mod.rs` |
-| TlmcConfigureInd | ja | 0 | 4 | 8 | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/tlmc/mod.rs` |
+| TlmcConfigureInd | ja | 0 | 4 | 11 | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/tlmc/mod.rs` |
 | TlmcConfigureReq | ja | 1 | 4 | 10 | bidirektional sichtbar | `crates/tetra-saps/src/tlmc/mod.rs` |
 | TlmcMeasurementInd | ja | 0 | 3 | 0 | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/tlmc/mod.rs` |
 | TlmcMonitorInd | ja | 0 | 3 | 0 | nur Empfang/Handler sichtbar | `crates/tetra-saps/src/tlmc/mod.rs` |

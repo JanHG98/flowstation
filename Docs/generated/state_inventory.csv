@@ -9,7 +9,7 @@ NET_ECHOLINK,QsoState,crates/tetra-entities/src/net_echolink/mod.rs,3,0
 NET_TTS,TtsState,crates/tetra-entities/src/net_tts/types.rs,6,0
 PHY,SynthesisBufferState,crates/tetra-entities/src/phy/components/fcfb.rs,3,0
 SAP/COMMON,ChannelChangeState,crates/tetra-saps/src/common/mod.rs,6,0
-SAP/COMMON,LtpdLinkState,crates/tetra-saps/src/common/mod.rs,10,1
+SAP/COMMON,LtpdLinkState,crates/tetra-saps/src/common/mod.rs,10,6
 SAP/COMMON,MleCellState,crates/tetra-saps/src/common/mod.rs,10,0
 SAP/COMMON,TlmcScanState,crates/tetra-saps/src/common/mod.rs,5,3
 SAP/COMMON,TlmcSelectionState,crates/tetra-saps/src/common/mod.rs,5,0

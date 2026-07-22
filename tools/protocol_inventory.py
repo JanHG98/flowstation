@@ -565,13 +565,13 @@ def render_gaps(gaps: list[GapRecord], saps: list[SapRecord], pdus: list[PduReco
 
 def render_states(records: list[StateRecord]) -> str:
     required = [
-        ("MLE Cell State", "Typfundament mit `MleCellState` vorhanden; Runtime-Transitionen fehlen", "Paket C/Phase 3"),
+        ("MLE Cell State", "Typfundament mit `MleCellState` vorhanden; Runtime-Transitionen folgen mit den MLE-Zellwechsel-PDUs", "Foundation 2/Phase 3"),
         ("MM Registration State", "teilweise über Client-/Registration-Zustände vorhanden", "Phase 4"),
         ("CMCE Group Call", "vorhandene Call-State-Typen prüfen und formalisieren", "Phase 5"),
         ("CMCE Individual Call", "vorhandene Individual-Call-State-Typen prüfen und formalisieren", "Phase 5"),
         ("SNDCP Context State", "PDP-State vorhanden; vollständige Context-Transitionen folgen", "Phase 11"),
-        ("LTPD Link State", "Context Registry, bidirektionales UNITDATA und Lifecycle-Runtime vorhanden", "Paket D ✅"),
-        ("LLC Link State", "TLPD nutzt Basic-Link-Adapter; vollständige LLC-Advanced-Link-State-Machine bleibt offen", "Paket E/Phase 3"),
+        ("LTPD Link State", "Context Registry, TxReporter-gestützte Transfers, Replay-Schutz und Lifecycle-Runtime vorhanden", "Paket E ✅"),
+        ("LLC Link State", "TxReporter bindet LTPD an reale LLC/MAC-Übertragung; vollständige Advanced-Link-State-Machine bleibt offen", "Phase 3"),
         ("Channel Change State", "TLMC Select/Response-Lifecycle vorhanden; MLE-Zellwechseltransitionen fehlen", "Phase 3"),
     ]
     return "\n".join(
@@ -616,7 +616,7 @@ def render_summary(pdus: list[PduRecord], saps: list[SapRecord], gaps: list[GapR
             "",
             "## Ergebnis",
             "",
-            "Paket A stellt die reproduzierbare Inventur bereit. Paket B ergänzt die typisierten TLMC-/TLPD-Primitive und grundlegenden Zustände. Paket C aktiviert die lokale TLMC-Runtime. Paket D ergänzt bidirektionales SNDCP-Routing über MLE, Context Registry, Configure, Connect/Disconnect, Break/Resume, Reconnect, Reports und Diagnose-Snapshots. Die Matrix bleibt die laufend aktualisierte Bestandsaufnahme für die folgenden Runtime-Pakete.",
+            "Paket A stellt die reproduzierbare Inventur bereit. Paket B ergänzt die typisierten TLMC-/TLPD-Primitive und grundlegenden Zustände. Paket C aktiviert die lokale TLMC-Runtime. Paket D ergänzt bidirektionales SNDCP-Routing und den lokalen Link-Lifecycle. Paket E schließt Foundation 1 mit TxReporter-gestützten Transferergebnissen, Duplicate- und Replay-Schutz, Cancel/Timeout-Robustheit, negativen Zustandsübergängen und einem wiederverwendbaren Zwei-Zellen-Testharness ab. Die Matrix bleibt die laufend aktualisierte Bestandsaufnahme für die folgenden MLE- und Multi-Site-Pakete.",
             "",
             table(
                 ["Messgröße", "Stand"],
@@ -657,7 +657,7 @@ def render_summary(pdus: list[PduRecord], saps: list[SapRecord], gaps: list[GapR
             "",
             "## Nächster Arbeitsschritt",
             "",
-            "Paket D ist abgeschlossen. Als Nächstes folgt Paket E mit Foundation-Abnahme, zusätzlichen negativen Lifecycle-Tests und einem Zwei-Zellen-Testharness als Vorbereitung für D-NEW-CELL und RESTORE.",
+            "Paket E schließt SWMI Foundation 1 ab. Als Nächstes folgt die MLE-Zellwechselbasis mit vollständigen Codecs und Zustandsübergängen für D-NEW-CELL, D-PREPARE-FAIL, U/D-RESTORE und D-CHANNEL-RESPONSE.",
             "",
         ]
     )

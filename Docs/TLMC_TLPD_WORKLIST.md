@@ -1,6 +1,6 @@
 # SWMI Foundation 1 – TLMC/TLPD-Arbeitsliste
 
-## Status nach Paket D
+## Status nach Paket E
 
 Paket B und Paket C sind umgesetzt:
 
@@ -18,6 +18,9 @@ Paket B und Paket C sind umgesetzt:
 - Context Routing, Route Recovery, Transfer Reports und Link-Lifecycle sind aktiv;
 - TLMC-Ressourcenkanten erzeugen LTPD Break/Resume;
 - MLE und SNDCP stellen read-only TLPD-Diagnose-Snapshots bereit.
+- Transferergebnisse werden über `TxReporter` bis zur tatsächlichen Übertragung beziehungsweise Bestätigung verfolgt.
+- Duplicate- und Replay-Handles, Cancel, Timeouts und negative Lifecycle-Transitionen sind abgesichert.
+- ein wiederverwendbarer Zwei-Zellen-Testharness prüft getrennte Zellzustände, Context-Transfer und Fehlerisolation.
 
 Die genauen Einzelzeilen stehen in `Docs/SAP_PRIMITIVE_MATRIX.md`, `Docs/IMPLEMENTATION_GAPS.md` und `Docs/SWMI_FOUNDATION_1_PACKAGE_B.md` und `Docs/SWMI_FOUNDATION_1_PACKAGE_C.md`.
 
@@ -145,19 +148,33 @@ Die Runtime liegt in `crates/tetra-entities/src/umac/tlmc_runtime.rs`. Der exper
 
 Die Runtime liegt in `crates/tetra-entities/src/mle/ltpd_runtime.rs`. SNDCP-Antworten laufen jetzt über `Sap::TlpdSap` zu MLE und erst dort weiter zu LLC.
 
-## Paket E – Mindesttests
+## Paket E – Abnahme und Robustheit: abgeschlossen ✅
 
-Für jede Primitive:
+1. Konstruktion und Routing der TLMC-/TLPD-Primitive ✅
+2. Erhalt von Handle, Link-ID und Endpoint-ID ✅
+3. TxReporter-gestützte Transferergebnisse ✅
+4. unbekannter Context und ungültiger Zustand ✅
+5. Duplicate Request und Replay Guard ✅
+6. Cancel und verspätetes Cancel ✅
+7. gebundene Transfer-Timeouts ✅
+8. Break/Disable/Close/Release räumen Pending-Transfers auf ✅
+9. negative Connect/Disconnect/Reconnect-Transitionen ✅
+10. Zwei-Zellen-Testharness mit Context-Isolation und Ressourcenfehlern ✅
+11. read-only Robustheitszähler für TBS-WebUI und Node Gateway ✅
 
-- Konstruktion und Routing über `SapMsgInner`;
-- korrekte Quelle, Ziel und SAP;
-- Erhalt von Handle, Link-ID und Endpoint-ID;
-- ungültiger Zustand;
-- unbekannter Kontext;
-- doppeltes Request;
-- Timeout;
-- Recovery;
-- mindestens ein Roundtrip- oder Golden-Vector-Test, wo eine Air-PDU beteiligt ist.
+Die Foundation-Tests liegen in:
+
+```text
+crates/tetra-entities/tests/test_tlmc_runtime.rs
+crates/tetra-entities/tests/test_ltpd_runtime.rs
+crates/tetra-entities/tests/test_two_cell_foundation.rs
+```
+
+Der Zwei-Zellen-Harness liegt unter:
+
+```text
+crates/tetra-entities/tests/common/two_cell.rs
+```
 
 ## Management- und WebUI-Auswirkung
 
@@ -181,4 +198,4 @@ Die zukünftigen Backend-Dienste folgen dem Standard in `Docs/BACKEND_WEBUI_STAN
 - noch keine vollständige D-NEW-CELL-/RESTORE-Runtime;
 - noch kein vollständiger Packet Core.
 
-Paket B hat die typsichere Grundlage geschaffen, Paket C die TLMC-Runtime und Paket D den vollständigen lokalen TLPD-Lifecycle aktiviert. Als Nächstes folgt Paket E mit Abnahme, Robustheit und dem Zwei-Zellen-Testharness.
+Paket B hat die typsichere Grundlage geschaffen, Paket C die TLMC-Runtime, Paket D den lokalen TLPD-Lifecycle und Paket E die Robustheits- und Zwei-Zellen-Abnahme umgesetzt. SWMI Foundation 1 ist damit abgeschlossen. Als Nächstes folgen die vollständigen MLE-Zellwechsel- und Restore-PDUs.

@@ -1,5 +1,7 @@
 # SWMI Foundation 1 – Paket D: TLPD Runtime
 
+> **Hinweis:** Paket E ersetzt die vorläufige sofortige Erfolgsmeldung nach LLC-Queue-Übergabe durch eine `TxReporter`-gestützte Abschlusslogik mit Duplicate-/Replay-Schutz, Cancel und Timeout. Die Paket-D-Beschreibung dokumentiert den damaligen Zwischenschritt.
+
 ## Status
 
 **Umgesetzt.** Paket D aktiviert den in Paket B typisierten LTPD-SAP als lokale Runtime zwischen SNDCP, MLE und LLC.

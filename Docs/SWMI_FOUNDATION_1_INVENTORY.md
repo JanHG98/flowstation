@@ -3,7 +3,7 @@
 
 ## Ergebnis
 
-Paket A stellt die reproduzierbare Inventur bereit. Paket B ergänzt die typisierten TLMC-/TLPD-Primitive und grundlegenden Zustände. Paket C aktiviert die lokale TLMC-Runtime. Paket D ergänzt bidirektionales SNDCP-Routing über MLE, Context Registry, Configure, Connect/Disconnect, Break/Resume, Reconnect, Reports und Diagnose-Snapshots. Die Matrix bleibt die laufend aktualisierte Bestandsaufnahme für die folgenden Runtime-Pakete.
+Paket A stellt die reproduzierbare Inventur bereit. Paket B ergänzt die typisierten TLMC-/TLPD-Primitive und grundlegenden Zustände. Paket C aktiviert die lokale TLMC-Runtime. Paket D ergänzt bidirektionales SNDCP-Routing und den lokalen Link-Lifecycle. Paket E schließt Foundation 1 mit TxReporter-gestützten Transferergebnissen, Duplicate- und Replay-Schutz, Cancel/Timeout-Robustheit, negativen Zustandsübergängen und einem wiederverwendbaren Zwei-Zellen-Testharness ab. Die Matrix bleibt die laufend aktualisierte Bestandsaufnahme für die folgenden MLE- und Multi-Site-Pakete.
 
 | Messgröße | Stand |
 | --- | --- |
@@ -41,4 +41,4 @@ Die Matrix bewertet den Quellcode konservativ. Ein Codec ohne offensichtlichen P
 
 ## Nächster Arbeitsschritt
 
-Paket D ist abgeschlossen. Als Nächstes folgt Paket E mit Foundation-Abnahme, zusätzlichen negativen Lifecycle-Tests und einem Zwei-Zellen-Testharness als Vorbereitung für D-NEW-CELL und RESTORE.
+Paket E schließt SWMI Foundation 1 ab. Als Nächstes folgt die MLE-Zellwechselbasis mit vollständigen Codecs und Zustandsübergängen für D-NEW-CELL, D-PREPARE-FAIL, U/D-RESTORE und D-CHANNEL-RESPONSE.

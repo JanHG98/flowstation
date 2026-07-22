@@ -118,7 +118,9 @@ TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/lmac/lmac_ms.rs,1
 unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/lmac/lmac_ms.rs,253,"unimplemented_log!(""TmvUnitdataReq"")"
 TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/lmac/lmac_ms.rs,292,"assert!(mod_time == ts, ""time out of sync""); // TODO handle properly"
 TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/mle/components/mle_router.rs,30,//         // TODO FIXME: Re-enable handle insertion once we start using this
-Todo-Typ,Typ-Platzhalter,Runtime,crates/tetra-entities/src/mle/ltpd_runtime.rs,629,Layer2Service::Acknowledged | Layer2Service::Todo => {
+Todo-Typ,Typ-Platzhalter,Runtime,crates/tetra-entities/src/mle/ltpd_runtime.rs,807,"Layer2Service::Acknowledged | Layer2Service::Todo => TxReporter::new(),"
+Todo-Typ,Typ-Platzhalter,Runtime,crates/tetra-entities/src/mle/ltpd_runtime.rs,855,Layer2Service::Acknowledged | Layer2Service::Todo => {
+panic!,prüfen,Runtime,crates/tetra-entities/src/mle/ltpd_runtime.rs,1059,"other => panic!(""unexpected lower-layer primitive: {:?}"", other),"
 unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/mle/mle_bs.rs,121,"unimplemented_log!(""DNewCell"")"
 unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/mle/mle_bs.rs,124,"unimplemented_log!(""DPrepareFail"")"
 unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/mle/mle_bs.rs,127,"unimplemented_log!(""DNwrkBroadcast"")"
