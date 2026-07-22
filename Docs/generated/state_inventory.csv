@@ -1,0 +1,12 @@
+layer,name,path,variants,test_references
+CMCE,CcFormalState,crates/tetra-entities/src/cmce/subentities/cc_bs/state/mod.rs,6,0
+CMCE,GroupCallState,crates/tetra-entities/src/cmce/subentities/cc_bs/state/mod.rs,2,0
+CMCE,IndividualCallState,crates/tetra-entities/src/cmce/subentities/cc_bs/state/mod.rs,5,0
+MM,MmClientState,crates/tetra-entities/src/mm/components/client_state.rs,3,0
+NET_ASTERISK,DialogState,crates/tetra-entities/src/net_asterisk/entity.rs,4,0
+NET_AUDIO_PLAYER,AudioPlayerState,crates/tetra-entities/src/net_audio_player/types.rs,7,0
+NET_ECHOLINK,QsoState,crates/tetra-entities/src/net_echolink/mod.rs,3,0
+NET_TTS,TtsState,crates/tetra-entities/src/net_tts/types.rs,6,0
+PHY,SynthesisBufferState,crates/tetra-entities/src/phy/components/fcfb.rs,3,0
+SNDCP,PdpState,crates/tetra-entities/src/sndcp/state.rs,4,0
+UMAC,DefragBufferState,crates/tetra-entities/src/umac/subcomp/defrag.rs,3,0

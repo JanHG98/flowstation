@@ -1,0 +1,127 @@
+sap,primitive,path,sapmsg_variant,constructed,handled,tests,status
+CONTROL,CmceSdsData,crates/tetra-saps/src/control/sds.rs,ja,4,3,16,bidirektional sichtbar
+CONTROL,MmSubscriberUpdate,crates/tetra-saps/src/control/brew.rs,ja,12,5,12,bidirektional sichtbar
+LCMC,LcmcMleActivityReq,crates/tetra-saps/src/lcmc/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+LCMC,LcmcMleBreakInd,crates/tetra-saps/src/lcmc/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+LCMC,LcmcMleBusyInd,crates/tetra-saps/src/lcmc/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+LCMC,LcmcMleCancelReq,crates/tetra-saps/src/lcmc/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+LCMC,LcmcMleCloseInd,crates/tetra-saps/src/lcmc/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+LCMC,LcmcMleConfigureInd,crates/tetra-saps/src/lcmc/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+LCMC,LcmcMleConfigureReq,crates/tetra-saps/src/lcmc/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+LCMC,LcmcMleDisableInd,crates/tetra-saps/src/lcmc/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+LCMC,LcmcMleEnableInd,crates/tetra-saps/src/lcmc/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+LCMC,LcmcMleIdentitiesReq,crates/tetra-saps/src/lcmc/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+LCMC,LcmcMleIdleInd,crates/tetra-saps/src/lcmc/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+LCMC,LcmcMleInfoInd,crates/tetra-saps/src/lcmc/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+LCMC,LcmcMleOpenInd,crates/tetra-saps/src/lcmc/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+LCMC,LcmcMleReopenInd,crates/tetra-saps/src/lcmc/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+LCMC,LcmcMleReportInd,crates/tetra-saps/src/lcmc/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+LCMC,LcmcMleRestoreConf,crates/tetra-saps/src/lcmc/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+LCMC,LcmcMleRestoreReq,crates/tetra-saps/src/lcmc/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+LCMC,LcmcMleResumeInd,crates/tetra-saps/src/lcmc/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+LCMC,LcmcMleUnitdataInd,crates/tetra-saps/src/lcmc/mod.rs,ja,3,27,26,bidirektional sichtbar
+LCMC,LcmcMleUnitdataReq,crates/tetra-saps/src/lcmc/mod.rs,ja,18,5,22,bidirektional sichtbar
+LMM,LmmMleActivateConf,crates/tetra-saps/src/lmm/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+LMM,LmmMleActivateInd,crates/tetra-saps/src/lmm/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+LMM,LmmMleActivateReq,crates/tetra-saps/src/lmm/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+LMM,LmmMleActivityReq,crates/tetra-saps/src/lmm/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+LMM,LmmMleBusyReq,crates/tetra-saps/src/lmm/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+LMM,LmmMleCancelReq,crates/tetra-saps/src/lmm/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+LMM,LmmMleCloseReq,crates/tetra-saps/src/lmm/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+LMM,LmmMleConfigureInd,crates/tetra-saps/src/lmm/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+LMM,LmmMleConfigureReq,crates/tetra-saps/src/lmm/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+LMM,LmmMleDeactivateReq,crates/tetra-saps/src/lmm/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+LMM,LmmMleDisableReq,crates/tetra-saps/src/lmm/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+LMM,LmmMleEnableReq,crates/tetra-saps/src/lmm/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+LMM,LmmMleIdentitiesReq,crates/tetra-saps/src/lmm/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+LMM,LmmMleIdleReq,crates/tetra-saps/src/lmm/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+LMM,LmmMleInfoInd,crates/tetra-saps/src/lmm/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+LMM,LmmMleInfoReq,crates/tetra-saps/src/lmm/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+LMM,LmmMleLinkInd,crates/tetra-saps/src/lmm/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+LMM,LmmMleLinkReq,crates/tetra-saps/src/lmm/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+LMM,LmmMlePrepareReq,crates/tetra-saps/src/lmm/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+LMM,LmmMleReportInd,crates/tetra-saps/src/lmm/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+LMM,LmmMleUnitdataInd,crates/tetra-saps/src/lmm/mod.rs,ja,3,10,5,bidirektional sichtbar
+LMM,LmmMleUnitdataReq,crates/tetra-saps/src/lmm/mod.rs,ja,9,4,9,bidirektional sichtbar
+LMM,LmmMleUpdateReq,crates/tetra-saps/src/lmm/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+LTPD,LtpdMleActivityReq,crates/tetra-saps/src/ltpd/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+LTPD,LtpdMleBreakInd,crates/tetra-saps/src/ltpd/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+LTPD,LtpdMleBusyInd,crates/tetra-saps/src/ltpd/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+LTPD,LtpdMleCancelReq,crates/tetra-saps/src/ltpd/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+LTPD,LtpdMleCloseInd,crates/tetra-saps/src/ltpd/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+LTPD,LtpdMleConfigureInd,crates/tetra-saps/src/ltpd/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+LTPD,LtpdMleConfigureReq,crates/tetra-saps/src/ltpd/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+LTPD,LtpdMleConnectInd,crates/tetra-saps/src/ltpd/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+LTPD,LtpdMleConnectReq,crates/tetra-saps/src/ltpd/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+LTPD,LtpdMleConnectResp,crates/tetra-saps/src/ltpd/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+LTPD,LtpdMleDisableInd,crates/tetra-saps/src/ltpd/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+LTPD,LtpdMleDisconnectInd,crates/tetra-saps/src/ltpd/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+LTPD,LtpdMleDisconnectReq,crates/tetra-saps/src/ltpd/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+LTPD,LtpdMleEnableInd,crates/tetra-saps/src/ltpd/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+LTPD,LtpdMleIdleInd,crates/tetra-saps/src/ltpd/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+LTPD,LtpdMleInfoInd,crates/tetra-saps/src/ltpd/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+LTPD,LtpdMleOpenInd,crates/tetra-saps/src/ltpd/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+LTPD,LtpdMleReceiveInd,crates/tetra-saps/src/ltpd/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+LTPD,LtpdMleReconnectInd,crates/tetra-saps/src/ltpd/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+LTPD,LtpdMleReconnectReq,crates/tetra-saps/src/ltpd/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+LTPD,LtpdMleReleaseReq,crates/tetra-saps/src/ltpd/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+LTPD,LtpdMleReportInd,crates/tetra-saps/src/ltpd/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+LTPD,LtpdMleResumeInd,crates/tetra-saps/src/ltpd/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+LTPD,LtpdMleUnitdataInd,crates/tetra-saps/src/ltpd/mod.rs,ja,4,1,0,bidirektional sichtbar
+LTPD,LtpdMleUnitdataReq,crates/tetra-saps/src/ltpd/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+TLA,TlCancelReq,crates/tetra-saps/src/tla/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+TLA,TlConnectConf,crates/tetra-saps/src/tla/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+TLA,TlConnectInd,crates/tetra-saps/src/tla/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+TLA,TlConnectReq,crates/tetra-saps/src/tla/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+TLA,TlConnectResp,crates/tetra-saps/src/tla/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+TLA,TlDisconnectConf,crates/tetra-saps/src/tla/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+TLA,TlDisconnectInd,crates/tetra-saps/src/tla/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+TLA,TlDisconnectReq,crates/tetra-saps/src/tla/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+TLA,TlReceiveInd,crates/tetra-saps/src/tla/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+TLA,TlReconnectReq,crates/tetra-saps/src/tla/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+TLA,TlReconnectResp,crates/tetra-saps/src/tla/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+TLA,TlReleaseInd,crates/tetra-saps/src/tla/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+TLA,TlReleaseReq,crates/tetra-saps/src/tla/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+TLA,TlaTlReportInd,crates/tetra-saps/src/tla/mod.rs,ja,0,0,0,"Variante vorhanden, Runtime-Pfad fehlt"
+TLE,TleCancelReq,crates/tetra-saps/src/tle/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+TLE,TleReportInd,crates/tetra-saps/src/tle/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+TLE,TleUnitdataConf,crates/tetra-saps/src/tle/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+TLE,TleUnitdataInd,crates/tetra-saps/src/tle/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+TLE,TleUnitdataReq,crates/tetra-saps/src/tle/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+TLMB,TlmbSyncInd,crates/tetra-saps/src/tlmb/mod.rs,ja,1,2,0,bidirektional sichtbar
+TLMB,TlmbSyncReq,crates/tetra-saps/src/tlmb/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+TLMB,TlmbSysinfoInd,crates/tetra-saps/src/tlmb/mod.rs,ja,1,2,0,bidirektional sichtbar
+TLMB,TlmbSysinfoReq,crates/tetra-saps/src/tlmb/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+TLMC,TlmcAssessmentInd,crates/tetra-saps/src/tlmc/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+TLMC,TlmcAssessmentListReq,crates/tetra-saps/src/tlmc/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+TLMC,TlmcCellReadConf,crates/tetra-saps/src/tlmc/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+TLMC,TlmcCellReadInd,crates/tetra-saps/src/tlmc/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+TLMC,TlmcConfigureConf,crates/tetra-saps/src/tlmc/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+TLMC,TlmcConfigureInd,crates/tetra-saps/src/tlmc/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+TLMC,TlmcConfigureReq,crates/tetra-saps/src/tlmc/mod.rs,ja,1,2,0,bidirektional sichtbar
+TLMC,TlmcMeasurementInd,crates/tetra-saps/src/tlmc/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+TLMC,TlmcMonitorInd,crates/tetra-saps/src/tlmc/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+TLMC,TlmcMonitorListReq,crates/tetra-saps/src/tlmc/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+TLMC,TlmcReportInd,crates/tetra-saps/src/tlmc/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+TLMC,TlmcScanConf,crates/tetra-saps/src/tlmc/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+TLMC,TlmcScanReportInd,crates/tetra-saps/src/tlmc/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+TLMC,TlmcScanReq,crates/tetra-saps/src/tlmc/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+TLMC,TlmcSelectConf,crates/tetra-saps/src/tlmc/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+TLMC,TlmcSelectInd,crates/tetra-saps/src/tlmc/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+TLMC,TlmcSelectReq,crates/tetra-saps/src/tlmc/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+TLMC,TlmcSelectResp,crates/tetra-saps/src/tlmc/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+TLMC,TmcTlConfigureReq,crates/tetra-saps/src/tlmc/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+TMA,TmaCancelReq,crates/tetra-saps/src/tma/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+TMA,TmaReleaseInd,crates/tetra-saps/src/tma/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+TMA,TmaReportInd,crates/tetra-saps/src/tma/mod.rs,ja,1,1,0,bidirektional sichtbar
+TMA,TmaUnitdataInd,crates/tetra-saps/src/tma/mod.rs,ja,8,3,8,bidirektional sichtbar
+TMA,TmaUnitdataReq,crates/tetra-saps/src/tma/mod.rs,ja,5,2,11,bidirektional sichtbar
+TMD,TmdCircuitDataInd,crates/tetra-saps/src/tmd/mod.rs,ja,5,5,0,bidirektional sichtbar
+TMD,TmdCircuitDataReq,crates/tetra-saps/src/tmd/mod.rs,ja,4,1,3,bidirektional sichtbar
+TMV,TmvConfigureConf,crates/tetra-saps/src/tmv/mod.rs,ja,0,0,0,"Variante vorhanden, Runtime-Pfad fehlt"
+TMV,TmvConfigureReq,crates/tetra-saps/src/tmv/mod.rs,ja,5,4,0,bidirektional sichtbar
+TMV,TmvUnitdataInd,crates/tetra-saps/src/tmv/mod.rs,ja,3,27,26,bidirektional sichtbar
+TMV,TmvUnitdataReq,crates/tetra-saps/src/tmv/mod.rs,ja,1,3,2,bidirektional sichtbar
+TNMM,TnmmTestDemand,crates/tetra-saps/src/tnmm/mod.rs,ja,0,0,0,"Variante vorhanden, Runtime-Pfad fehlt"
+TNMM,TnmmTestResponse,crates/tetra-saps/src/tnmm/mod.rs,ja,0,0,0,"Variante vorhanden, Runtime-Pfad fehlt"
+TP,TpUnitdataInd,crates/tetra-saps/src/tp/mod.rs,ja,1,2,0,bidirektional sichtbar

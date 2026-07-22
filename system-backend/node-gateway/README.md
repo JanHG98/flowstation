@@ -15,3 +15,25 @@ Der Node Gateway ist der zentrale Einstiegspunkt für alle NetCore-TBS-Instanzen
 
 - Keine fachliche Teilnehmer-, Gruppen- oder Ruflogik
 - Kein Sprachtransport und keine dauerhafte Fachdatenhaltung
+
+## WebUI zur Verwaltung
+
+Der Node Gateway erhält eine eigene, direkt im Dienst ausgelieferte Verwaltungsoberfläche.
+
+### Geplante Ansichten
+
+- verbundene und getrennte TBS-Nodes
+- Session-, Heartbeat- und Reconnect-Status
+- Zertifikate, Node-Identitäten und Protokollversionen
+- Capabilities und Kompatibilitätswarnungen
+- Command- und Telemetriefluss
+- Abhängigkeiten, Logs, Konfiguration und Wartungsmodus
+
+### Kritische Aktionen
+
+- Node trennen oder sperren
+- Zertifikat widerrufen beziehungsweise erneuern
+- Wartungsmodus setzen
+- kontrollierten Reconnect anfordern
+
+Alle schreibenden Aktionen werden rollenbasiert geschützt und auditiert.

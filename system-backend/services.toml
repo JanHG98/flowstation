@@ -1,0 +1,89 @@
+version = 1
+
+[webui_defaults]
+required = true
+scheme = "https"
+management_port = 8443
+api_base = "/api/v1"
+health_live = "/health/live"
+health_ready = "/health/ready"
+metrics = "/metrics"
+openapi = "/openapi.json"
+independent_from_control_room = true
+same_process_or_package = true
+
+[[services]]
+name = "node-gateway"
+webui = true
+
+[[services]]
+name = "subscriber-core"
+webui = true
+
+[[services]]
+name = "group-core"
+webui = true
+
+[[services]]
+name = "mobility-core"
+webui = true
+
+[[services]]
+name = "call-control"
+webui = true
+
+[[services]]
+name = "media-switch"
+webui = true
+
+[[services]]
+name = "sds-router"
+webui = true
+
+[[services]]
+name = "packet-core"
+webui = true
+
+[[services]]
+name = "ip-gateway"
+webui = true
+
+[[services]]
+name = "security-core"
+webui = true
+restricted_management_network = true
+
+[[services]]
+name = "kmf"
+webui = true
+restricted_management_network = true
+raw_secret_display = false
+
+[[services]]
+name = "transit"
+webui = true
+
+[[services]]
+name = "control-room"
+webui = true
+
+[[services]]
+name = "application-gateway"
+webui = true
+
+[[services]]
+name = "media-library"
+webui = true
+
+[[services]]
+name = "recorder"
+webui = true
+
+[[services]]
+name = "observability"
+webui = true
+
+[[services]]
+name = "shared"
+webui = false
+reason = "Library directory, not a deployable container"

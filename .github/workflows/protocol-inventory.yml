@@ -1,0 +1,35 @@
+name: Protocol inventory
+
+on:
+  push:
+    paths:
+      - "crates/**"
+      - "bins/**"
+      - "system-backend/**"
+      - "tools/protocol_inventory.py"
+      - "Docs/*INVENTORY*.md"
+      - "Docs/ETSI_CONFORMANCE_MATRIX.md"
+      - "Docs/SAP_PRIMITIVE_MATRIX.md"
+      - "Docs/IMPLEMENTATION_GAPS.md"
+      - "Docs/generated/**"
+      - ".github/workflows/protocol-inventory.yml"
+  pull_request:
+    paths:
+      - "crates/**"
+      - "bins/**"
+      - "system-backend/**"
+      - "tools/protocol_inventory.py"
+      - "Docs/*INVENTORY*.md"
+      - "Docs/ETSI_CONFORMANCE_MATRIX.md"
+      - "Docs/SAP_PRIMITIVE_MATRIX.md"
+      - "Docs/IMPLEMENTATION_GAPS.md"
+      - "Docs/generated/**"
+      - ".github/workflows/protocol-inventory.yml"
+
+jobs:
+  inventory:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify generated protocol inventory
+        run: python3 tools/protocol_inventory.py --check

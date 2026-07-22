@@ -28,6 +28,12 @@ Grundsatz:
 
 > Erst müssen alle notwendigen lokalen Protokollwege funktionieren. Danach werden Zuständigkeiten aus der TBS herausgelöst. Nicht umgekehrt.
 
+## Verbindliche Management-Ebene
+
+Jeder später eigenständig laufende LXC- oder VM-Dienst erhält eine eigene WebUI. Die WebUI wird mit dem jeweiligen Dienst ausgeliefert und bleibt unabhängig vom Control Room erreichbar. Gemeinsame Vorgaben stehen in `Docs/BACKEND_WEBUI_STANDARD.md`.
+
+Die WebUI gehört ab der ersten Implementierung eines Dienstes zu dessen Definition of Done; sie wird nicht als spätere kosmetische Zusatzphase behandelt.
+
 ---
 
 # 2. Normative Grundlage
@@ -127,9 +133,9 @@ Alle bisher implizit in Handlern verteilten Zustände werden explizit beschriebe
 * LLC Link State,
 * Channel Change State.
 
-### 3.4 Keine neuen Dienste
+### 3.4 Noch keine neuen Runtime-Dienste
 
-In dieser Phase werden noch keine LXC-Dienste und keine neue SwMI-Architektur gebaut.
+In dieser Phase werden noch keine LXC-Dienste gestartet. Die verbindliche WebUI-Architektur, Service-Matrix und gemeinsamen Management-Endpunkte werden jedoch bereits festgelegt, damit jeder spätere Dienst von Beginn an verwaltbar entwickelt wird.
 
 ## Abnahmekriterium
 
@@ -1162,14 +1168,31 @@ Der unmittelbar nächste Entwicklungsblock lautet:
 
 ## Milestone: `SWMI Foundation 1 – TLMC/TLPD`
 
-### Paket A – Inventur
+### Paket A – Inventur ✅ abgeschlossen am 22.07.2026
 
-* vollständige ETSI-PDU-/Primitive-Matrix,
-* alle `Todo`,
-* alle `unimplemented_log!`,
-* alle nicht erreichbaren SAP-Pfade,
-* alle Panic-Pfade,
-* alle fehlenden Tests.
+Umgesetzt wurden:
+
+* vollständige statische PDU-/Primitive-Matrix,
+* Inventur aller `Todo`-Typen und TODO/FIXME-Hinweise,
+* Inventur aller aktiven `unimplemented!`, `unimplemented_log!`, `panic!` und `unreachable!`-Pfade,
+* statische Ermittlung nicht oder nur einseitig erreichbarer SAP-Pfade,
+* Ermittlung fehlender PDU-/Primitive-Testverweise,
+* Zustandsmaschinen-Inventur,
+* maschinenlesbare JSON-/CSV-Exporte,
+* reproduzierbarer Generator und CI-Konsistenzprüfung.
+
+Ergebnisse:
+
+* `Docs/SWMI_FOUNDATION_1_INVENTORY.md`
+* `Docs/ETSI_CONFORMANCE_MATRIX.md`
+* `Docs/SAP_PRIMITIVE_MATRIX.md`
+* `Docs/IMPLEMENTATION_GAPS.md`
+* `Docs/STATE_MACHINE_INVENTORY.md`
+* `Docs/TLMC_TLPD_WORKLIST.md`
+* `Docs/generated/`
+* `tools/protocol_inventory.py`
+
+Hinweis: Paket A ist eine statische und reproduzierbare Bestandsaufnahme. Es behauptet noch keine ETSI-Konformität und ersetzt weder Golden Vectors noch On-Air-Tests.
 
 ### Paket B – Typen
 
@@ -1222,3 +1245,15 @@ SNDCP bidirektional durch MLE und LLC transportiert werden kann
 ```
 
 Erst danach beginnt Milestone 2 mit D-NEW-CELL, D-PREPARE-FAIL, D-RESTORE und D-CHANNEL-RESPONSE.
+
+# Verbindliche WebUI-Abnahme ab der ersten LXC-Phase
+
+Für jede Phase, in der ein neuer Containerdienst entsteht, gelten zusätzlich:
+
+- eigene WebUI im jeweiligen `system-backend/<dienst>/`-Paket;
+- Übersicht, Fachverwaltung, Health, Abhängigkeiten, Audit, Konfiguration und Wartung;
+- versionierte Verwaltungs-API;
+- RBAC für alle schreibenden Aktionen;
+- unabhängige Erreichbarkeit bei ausgefallenem Control Room;
+- UI- und API-Tests;
+- dokumentierter HTTPS-Zugriff im Managementnetz.

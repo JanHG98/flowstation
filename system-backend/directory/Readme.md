@@ -98,3 +98,9 @@ Logs live ansehen:
 ```bash
 journalctl -u netcore-directory -f
 ```
+
+---
+## WebUI-Standard
+
+Die vorhandene WebUI bleibt Bestandteil dieses Dienstes und wird bei der späteren Konsolidierung an `Docs/BACKEND_WEBUI_STANDARD.md` angepasst: HTTPS, Rollen, Audit, Health-Endpunkte, Konfigurationsvalidierung und unabhängige Verwaltung.
+

@@ -89,3 +89,8 @@ file /tmp/netcore-tts-test.wav
 
 The service binds only to localhost. Keep it that way unless a reverse proxy,
 authentication policy and firewall are deliberately configured.
+
+## Geplante WebUI
+
+Falls der TTS-Dienst als eigener Container weitergeführt wird, erhält er eine WebUI für installierte Stimmen, Synthesetests, Vorlagen, Warteschlange, Storage und Health. Sie folgt `Docs/BACKEND_WEBUI_STANDARD.md`.
+
