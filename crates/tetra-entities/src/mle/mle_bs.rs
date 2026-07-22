@@ -1,26 +1,36 @@
+use crate::mle::cell_change_runtime::{
+    MleCellChangeOutbound, MleCellChangeRuntime, MleCellChangeRuntimeSnapshot,
+};
 use crate::mle::components::broadcast::MleBroadcast;
 use crate::mle::ltpd_runtime::{LtpdRuntime, LtpdRuntimeRole, LtpdRuntimeSnapshot};
 use crate::{MessageQueue, TetraEntityTrait};
 use tetra_config::bluestation::SharedConfig;
 use tetra_core::tetra_entities::TetraEntity;
-use tetra_core::{BitBuffer, Layer2Service, Sap, TdmaTime, unimplemented_log};
-use tetra_saps::lcmc::LcmcMleUnitdataInd;
-use tetra_saps::lmm::LmmMleUnitdataInd;
+use tetra_core::{
+    BitBuffer, EndpointId, Layer2Service, LinkId, Sap, TdmaTime, TetraAddress,
+    unimplemented_log,
+};
+use tetra_pdus::mle::enums::mle_pdu_type_ul::MlePduTypeUl;
+use tetra_pdus::mle::enums::mle_protocol_discriminator::MleProtocolDiscriminator;
+use tetra_pdus::mle::pdus::u_channel_request::UChannelRequest;
+use tetra_pdus::mle::pdus::u_prepare::UPrepare;
+use tetra_pdus::mle::pdus::u_restore::URestore;
 use tetra_saps::common::{
     ChannelChangeHandle, LowerLayerResourceAvailability, MleBroadcastParameters,
     PermittedTemporaryServices, ReceivedAddressType,
 };
+use tetra_saps::control::mle_cell_change::MleCellChangeControl;
+use tetra_saps::lcmc::{LcmcMleRestoreInd, LcmcMleUnitdataInd};
+use tetra_saps::lmm::LmmMleUnitdataInd;
 use tetra_saps::ltpd::LtpdMleUnitdataInd;
 use tetra_saps::tla::{TlaTlDataReqBl, TlaTlUnitdataReqBl};
 use tetra_saps::{SapMsg, SapMsgInner};
-
-use tetra_pdus::mle::enums::mle_pdu_type_dl::MlePduTypeDl;
-use tetra_pdus::mle::enums::mle_protocol_discriminator::MleProtocolDiscriminator;
 
 pub struct MleBs {
     config: SharedConfig,
     broadcast: MleBroadcast,
     ltpd: LtpdRuntime,
+    cell_change: MleCellChangeRuntime,
     current_time: TdmaTime,
 }
 
@@ -56,6 +66,7 @@ impl MleBs {
             config,
             broadcast,
             ltpd,
+            cell_change: MleCellChangeRuntime::new(),
             current_time: TdmaTime::default(),
         }
     }
@@ -63,6 +74,11 @@ impl MleBs {
     /// Read-only packet-data SAP state for the TBS WebUI and future Node Gateway.
     pub fn ltpd_snapshot(&self) -> LtpdRuntimeSnapshot {
         self.ltpd.snapshot()
+    }
+
+    /// Read-only cell-change state for the local TBS WebUI and future Node Gateway.
+    pub fn cell_change_snapshot(&self) -> MleCellChangeRuntimeSnapshot {
+        self.cell_change.snapshot(self.current_time)
     }
 
     /// Notify SNDCP that lower-layer packet-data resources disappeared.
@@ -88,59 +104,116 @@ impl MleBs {
         self.ltpd.set_disabled(queue, disabled, permitted_services);
     }
 
-    fn rx_tla_mle_pdu(&mut self, _queue: &mut MessageQueue, message: SapMsg) {
-        tracing::trace!("rx_tla_mle_pdu");
+    fn rx_tla_mle_pdu(
+        &mut self,
+        queue: &mut MessageQueue,
+        subscriber: TetraAddress,
+        endpoint_id: EndpointId,
+        link_id: LinkId,
+        mut sdu: BitBuffer,
+    ) {
+        tracing::trace!(
+            %subscriber,
+            endpoint_id,
+            link_id,
+            "MLE: received infrastructure-side cell-change PDU"
+        );
 
-        // Extract tm_sdu from whatever primitive we have
-        let tm_sdu = {
-            match message.msg {
-                SapMsgInner::TlaTlDataIndBl(prim) => prim.tl_sdu,
-                _ => {
-                    tracing::error!("BUG: unexpected message or state -- routing error");
-                    return;
-                }
-            }
-        };
-        let Some(sdu) = tm_sdu else {
-            tracing::debug!("rx_tla_mle_pdu: no tm_sdu");
-            return;
-        };
-
-        // Determine which type of TL-SDU we have and call handler function
         let Some(bits) = sdu.peek_bits(3) else {
-            tracing::warn!("insufficient bits: {}", sdu.dump_bin());
+            tracing::warn!("MLE: cell-change PDU is shorter than the PDU type");
+            self.cell_change.record_parse_error();
             return;
         };
-        let Ok(pdu_type) = MlePduTypeDl::try_from(bits) else {
-            tracing::warn!("invalid pdu type: {} in {}", bits, sdu.dump_bin());
+        let Ok(pdu_type) = MlePduTypeUl::try_from(bits) else {
+            tracing::warn!("MLE: invalid uplink PDU type {} in {}", bits, sdu.dump_bin());
+            self.cell_change.record_parse_error();
             return;
         };
 
         match pdu_type {
-            MlePduTypeDl::DNewCell => {
-                unimplemented_log!("DNewCell")
+            MlePduTypeUl::UPrepare => match UPrepare::from_bitbuf(&mut sdu) {
+                Ok(pdu) => {
+                    self.cell_change.observe_prepare(
+                        subscriber,
+                        endpoint_id,
+                        link_id,
+                        &pdu,
+                        self.current_time,
+                    );
+                    if let Some(mm_sdu) = pdu.sdu {
+                        queue.push_back(SapMsg {
+                            sap: Sap::LmmSap,
+                            src: TetraEntity::Mle,
+                            dest: TetraEntity::Mm,
+                            msg: SapMsgInner::LmmMleUnitdataInd(LmmMleUnitdataInd {
+                                sdu: mm_sdu,
+                                handle: 0,
+                                received_address: subscriber,
+                            }),
+                        });
+                    }
+                }
+                Err(error) => {
+                    tracing::warn!(?error, %subscriber, "MLE: failed to parse U-PREPARE");
+                    self.cell_change.record_parse_error();
+                }
+            },
+            MlePduTypeUl::URestore => match URestore::from_bitbuf(&mut sdu) {
+                Ok(pdu) => {
+                    self.cell_change.observe_restore(
+                        subscriber,
+                        endpoint_id,
+                        link_id,
+                        &pdu,
+                        self.current_time,
+                    );
+                    if let Some(cmce_sdu) = pdu.sdu {
+                        queue.push_back(SapMsg {
+                            sap: Sap::LcmcSap,
+                            src: TetraEntity::Mle,
+                            dest: TetraEntity::Cmce,
+                            msg: SapMsgInner::LcmcMleRestoreInd(LcmcMleRestoreInd {
+                                sdu: cmce_sdu,
+                                subscriber,
+                                endpoint_id,
+                                link_id,
+                                previous_mcc: pdu.mcc,
+                                previous_mnc: pdu.mnc,
+                                previous_location_area: pdu.la,
+                            }),
+                        });
+                    } else {
+                        tracing::warn!(%subscriber, "MLE: U-RESTORE contains no CMCE restore SDU");
+                    }
+                }
+                Err(error) => {
+                    tracing::warn!(?error, %subscriber, "MLE: failed to parse U-RESTORE");
+                    self.cell_change.record_parse_error();
+                }
+            },
+            MlePduTypeUl::UChannelRequest => match UChannelRequest::from_bitbuf(&mut sdu) {
+                Ok(pdu) => self.cell_change.observe_channel_request(
+                    subscriber,
+                    endpoint_id,
+                    link_id,
+                    &pdu,
+                    self.current_time,
+                ),
+                Err(error) => {
+                    tracing::warn!(?error, %subscriber, "MLE: failed to parse U-CHANNEL-REQUEST");
+                    self.cell_change.record_parse_error();
+                }
+            },
+            MlePduTypeUl::UPrepareDa => {
+                unimplemented_log!("U-PREPARE-DA remains outside the conventional-access baseline")
             }
-            MlePduTypeDl::DPrepareFail => {
-                unimplemented_log!("DPrepareFail")
+            MlePduTypeUl::UIrregularChannelAdvice => {
+                unimplemented_log!("U-IRREGULAR-CHANNEL-ADVICE")
             }
-            MlePduTypeDl::DNwrkBroadcast => {
-                unimplemented_log!("DNwrkBroadcast")
+            MlePduTypeUl::UChannelClassAdvice => {
+                unimplemented_log!("U-CHANNEL-CLASS-ADVICE")
             }
-            MlePduTypeDl::DNwrkBroadcastExt => {
-                unimplemented_log!("DNwrkBroadcastExt")
-            } // TODO FIXME CHECK this option and assocaited int
-            MlePduTypeDl::DRestoreAck => {
-                unimplemented_log!("DRestoreAck")
-            }
-            MlePduTypeDl::DRestoreFail => {
-                unimplemented_log!("DRestoreFail")
-            }
-            MlePduTypeDl::DChannelResponse => {
-                unimplemented_log!("DChannelResponse")
-            }
-            MlePduTypeDl::ExtPdu => {
-                unimplemented_log!("ExtPdu")
-            }
+            MlePduTypeUl::ExtPdu => unimplemented_log!("MLE uplink extension PDU"),
         }
     }
 
@@ -310,11 +383,59 @@ impl MleBs {
                 queue.push_back(msg);
             }
             MleProtocolDiscriminator::Mle => {
-                self.rx_tla_mle_pdu(queue, message);
+                self.rx_tla_mle_pdu(
+                    queue,
+                    prim.main_address,
+                    prim.endpoint_id,
+                    prim.link_id,
+                    sdu,
+                );
             }
             MleProtocolDiscriminator::TetraManagementEntity => {
                 unimplemented_log!("MleProtocolDiscriminator::TetraManagementEntity");
             }
+        }
+    }
+
+    fn queue_cell_change_outbound(
+        &mut self,
+        queue: &mut MessageQueue,
+        mut outbound: MleCellChangeOutbound,
+    ) {
+        outbound.pdu.seek(0);
+        let pdu_len = outbound.pdu.get_len();
+        let mut tl_sdu = BitBuffer::new(3 + pdu_len);
+        tl_sdu.write_bits(MleProtocolDiscriminator::Mle.into_raw(), 3);
+        tl_sdu.copy_bits(&mut outbound.pdu, pdu_len);
+        tl_sdu.seek(0);
+
+        queue.push_back(SapMsg {
+            sap: Sap::TlaSap,
+            src: TetraEntity::Mle,
+            dest: TetraEntity::Llc,
+            msg: SapMsgInner::TlaTlDataReqBl(TlaTlDataReqBl {
+                main_address: outbound.subscriber,
+                link_id: outbound.link_id,
+                endpoint_id: outbound.endpoint_id,
+                tl_sdu,
+                stealing_permission: false,
+                subscriber_class: 0,
+                fcs_flag: false,
+                air_interface_encryption: None,
+                stealing_repeats_flag: None,
+                data_class_info: None,
+                req_handle: 0,
+                graceful_degradation: None,
+                chan_alloc: None,
+                tx_reporter: None,
+            }),
+        });
+    }
+
+    fn rx_cell_change_control(&mut self, queue: &mut MessageQueue, control: MleCellChangeControl) {
+        match self.cell_change.handle_control(control, self.current_time) {
+            Ok(outbound) => self.queue_cell_change_outbound(queue, outbound),
+            Err(error) => tracing::warn!(?error, "MLE: rejected cell-change control command"),
         }
     }
 
@@ -527,6 +648,10 @@ impl TetraEntityTrait for MleBs {
     fn tick_start(&mut self, queue: &mut MessageQueue, ts: TdmaTime) {
         self.current_time = ts;
         self.ltpd.tick(queue, ts);
+        let timed_out = self.cell_change.tick(ts);
+        for outbound in timed_out {
+            self.queue_cell_change_outbound(queue, outbound);
+        }
         // Broadcast D-NWRK-BROADCAST twice per hyperframe (~30.6s interval) if timezone is configured.
         // Two evenly-spaced slots [20, 50] avoid congestion with other hyperframe-triggered events
         // and give terminals a faster time/date update after cold attach.
@@ -559,6 +684,14 @@ impl TetraEntityTrait for MleBs {
             Sap::LcmcSap => {
                 self.rx_lcmc_prim(queue, message);
             }
+            Sap::Control => match message.msg {
+                SapMsgInner::MleCellChangeControl(control) => {
+                    self.rx_cell_change_control(queue, control);
+                }
+                other => {
+                    tracing::warn!(?other, "MLE: unsupported control primitive");
+                }
+            },
             _ => {
                 tracing::error!("BUG: unexpected message or state -- routing error");
                 return;

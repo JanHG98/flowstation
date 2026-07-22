@@ -9,5 +9,8 @@ pub mod d_prepare_fail;
 pub mod d_restore_ack;
 pub mod d_restore_fail;
 pub mod u_channel_class_advice;
+pub mod u_channel_request;
 pub mod u_prepare;
 pub mod u_restore;
+
+mod trailing_sdu;

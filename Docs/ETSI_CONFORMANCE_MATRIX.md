@@ -5,11 +5,11 @@
 
 ## Übersicht
 
-- erfasste PDU-Implementierungen: **76**
-- Schichten: CMCE 30, LLC 4, MLE 12, MM 14, UMAC 16
-- Parser und Encoder beide ohne offensichtlichen Blocker: **55**
-- mindestens ein Codec-Pfad teilweise oder fehlend: **21**
-- PDU-Dateien ohne nachgewiesenen Testverweis: **52**
+- erfasste PDU-Implementierungen: **77**
+- Schichten: CMCE 30, LLC 4, MLE 13, MM 14, UMAC 16
+- Parser und Encoder beide ohne offensichtlichen Blocker: **61**
+- mindestens ein Codec-Pfad teilweise oder fehlend: **16**
+- PDU-Dateien ohne nachgewiesenen Testverweis: **45**
 
 ## Bewertungslegende
 
@@ -68,18 +68,19 @@
 
 | PDU | Richtung | Parser | Encoder | Runtime | Tests | Golden Vector | Phase | Datei |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| DChannelResponse | Downlink | vorhanden | vorhanden | offene Hinweise | fehlt | nicht nachgewiesen | Phase 3 – MLE/Zellwechsel | `crates/tetra-pdus/src/mle/pdus/d_channel_response.rs` |
+| DChannelResponse | Downlink | vorhanden | vorhanden | ohne offensichtlichen Blocker | vorhanden | vorhanden | Phase 3 – MLE/Zellwechsel | `crates/tetra-pdus/src/mle/pdus/d_channel_response.rs` |
 | DMleSync | Downlink | vorhanden | vorhanden | ohne offensichtlichen Blocker | fehlt | nicht nachgewiesen | Phase 3 – MLE/Zellwechsel | `crates/tetra-pdus/src/mle/pdus/d_mle_sync.rs` |
 | DMleSysinfo | Downlink | vorhanden | vorhanden | ohne offensichtlichen Blocker | fehlt | nicht nachgewiesen | Phase 3 – MLE/Zellwechsel | `crates/tetra-pdus/src/mle/pdus/d_mle_sysinfo.rs` |
-| DNewCell | Downlink | teilweise | teilweise | blockiert | fehlt | nicht nachgewiesen | Phase 3 – MLE/Zellwechsel | `crates/tetra-pdus/src/mle/pdus/d_new_cell.rs` |
+| DNewCell | Downlink | vorhanden | vorhanden | ohne offensichtlichen Blocker | vorhanden | vorhanden | Phase 3 – MLE/Zellwechsel | `crates/tetra-pdus/src/mle/pdus/d_new_cell.rs` |
 | DNwrkBroadcast | Downlink | vorhanden | vorhanden | ohne offensichtlichen Blocker | fehlt | nicht nachgewiesen | Phase 3 – MLE/Zellwechsel | `crates/tetra-pdus/src/mle/pdus/d_nwrk_broadcast.rs` |
 | DNwrkBroadcastRemove | Downlink | teilweise | teilweise | blockiert | fehlt | nicht nachgewiesen | Phase 3 – MLE/Zellwechsel | `crates/tetra-pdus/src/mle/pdus/d_nwrk_broadcast_remove.rs` |
-| DPrepareFail | Downlink | teilweise | teilweise | blockiert | fehlt | nicht nachgewiesen | Phase 3 – MLE/Zellwechsel | `crates/tetra-pdus/src/mle/pdus/d_prepare_fail.rs` |
-| DRestoreAck | Downlink | teilweise | teilweise | blockiert | fehlt | nicht nachgewiesen | Phase 3 – MLE/Zellwechsel | `crates/tetra-pdus/src/mle/pdus/d_restore_ack.rs` |
-| DRestoreFail | Downlink | vorhanden | vorhanden | offene Hinweise | fehlt | nicht nachgewiesen | Phase 3 – MLE/Zellwechsel | `crates/tetra-pdus/src/mle/pdus/d_restore_fail.rs` |
+| DPrepareFail | Downlink | vorhanden | vorhanden | ohne offensichtlichen Blocker | vorhanden | vorhanden | Phase 3 – MLE/Zellwechsel | `crates/tetra-pdus/src/mle/pdus/d_prepare_fail.rs` |
+| DRestoreAck | Downlink | vorhanden | vorhanden | ohne offensichtlichen Blocker | vorhanden | vorhanden | Phase 3 – MLE/Zellwechsel | `crates/tetra-pdus/src/mle/pdus/d_restore_ack.rs` |
+| DRestoreFail | Downlink | vorhanden | vorhanden | ohne offensichtlichen Blocker | vorhanden | vorhanden | Phase 3 – MLE/Zellwechsel | `crates/tetra-pdus/src/mle/pdus/d_restore_fail.rs` |
 | UChannelClassAdvice | Uplink | teilweise | teilweise | blockiert | fehlt | nicht nachgewiesen | Phase 3 – MLE/Zellwechsel | `crates/tetra-pdus/src/mle/pdus/u_channel_class_advice.rs` |
-| UPrepare | Uplink | teilweise | teilweise | blockiert | fehlt | nicht nachgewiesen | Phase 3 – MLE/Zellwechsel | `crates/tetra-pdus/src/mle/pdus/u_prepare.rs` |
-| URestore | Uplink | teilweise | teilweise | blockiert | fehlt | nicht nachgewiesen | Phase 3 – MLE/Zellwechsel | `crates/tetra-pdus/src/mle/pdus/u_restore.rs` |
+| UChannelRequest | Uplink | vorhanden | vorhanden | ohne offensichtlichen Blocker | vorhanden | vorhanden | Phase 3 – MLE/Zellwechsel | `crates/tetra-pdus/src/mle/pdus/u_channel_request.rs` |
+| UPrepare | Uplink | vorhanden | vorhanden | ohne offensichtlichen Blocker | vorhanden | vorhanden | Phase 3 – MLE/Zellwechsel | `crates/tetra-pdus/src/mle/pdus/u_prepare.rs` |
+| URestore | Uplink | vorhanden | vorhanden | ohne offensichtlichen Blocker | vorhanden | vorhanden | Phase 3 – MLE/Zellwechsel | `crates/tetra-pdus/src/mle/pdus/u_restore.rs` |
 
 ## MM
 

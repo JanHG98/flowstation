@@ -140,6 +140,19 @@ pub struct LcmcMleReportInd {
     pub channel_change_handle: Todo,
 }
 
+/// MLE-RESTORE indication: the infrastructure MLE received U-RESTORE after a cell
+/// change and passes the embedded CMCE U-CALL RESTORE PDU to Call Control.
+#[derive(Debug, Clone)]
+pub struct LcmcMleRestoreInd {
+    pub sdu: BitBuffer,
+    pub subscriber: TetraAddress,
+    pub endpoint_id: EndpointId,
+    pub link_id: LinkId,
+    pub previous_mcc: Option<u16>,
+    pub previous_mnc: Option<u16>,
+    pub previous_location_area: Option<u16>,
+}
+
 /// MLE-RESTORE request: this primitive shall be used by the CMCE to restore a call after a successful cell reselection
 #[derive(Debug, Clone)]
 pub struct LcmcMleRestoreReq {

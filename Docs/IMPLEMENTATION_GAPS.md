@@ -5,11 +5,11 @@
 
 | Kategorie | Treffer |
 | --- | --- |
-| TODO/FIXME | 219 |
+| TODO/FIXME | 208 |
 | Todo-Typ | 240 |
-| panic! | 81 |
-| unimplemented! | 56 |
-| unimplemented_log! | 111 |
+| panic! | 82 |
+| unimplemented! | 46 |
+| unimplemented_log! | 107 |
 | unreachable! | 31 |
 
 ## Priorität für SWMI Foundation 1
@@ -140,13 +140,8 @@
 | CMCE | CmceFunctionNotSupported | teilweise | teilweise | FIXME, TODO, unimplemented! | `crates/tetra-pdus/src/cmce/pdus/cmce_function_not_supported.rs` |
 | CMCE | DSdsData | teilweise | vorhanden | unreachable! | `crates/tetra-pdus/src/cmce/pdus/d_sds_data.rs` |
 | CMCE | USdsData | teilweise | vorhanden | unreachable! | `crates/tetra-pdus/src/cmce/pdus/u_sds_data.rs` |
-| MLE | DNewCell | teilweise | teilweise | FIXME, TODO, unimplemented! | `crates/tetra-pdus/src/mle/pdus/d_new_cell.rs` |
 | MLE | DNwrkBroadcastRemove | teilweise | teilweise | FIXME, TODO, unimplemented! | `crates/tetra-pdus/src/mle/pdus/d_nwrk_broadcast_remove.rs` |
-| MLE | DPrepareFail | teilweise | teilweise | FIXME, TODO, unimplemented! | `crates/tetra-pdus/src/mle/pdus/d_prepare_fail.rs` |
-| MLE | DRestoreAck | teilweise | teilweise | FIXME, TODO, unimplemented! | `crates/tetra-pdus/src/mle/pdus/d_restore_ack.rs` |
 | MLE | UChannelClassAdvice | teilweise | teilweise | FIXME, TODO, unimplemented! | `crates/tetra-pdus/src/mle/pdus/u_channel_class_advice.rs` |
-| MLE | UPrepare | teilweise | teilweise | FIXME, TODO, unimplemented! | `crates/tetra-pdus/src/mle/pdus/u_prepare.rs` |
-| MLE | URestore | teilweise | teilweise | FIXME, TODO, unimplemented! | `crates/tetra-pdus/src/mle/pdus/u_restore.rs` |
 | MM | DLocationUpdateCommand | teilweise | vorhanden | FIXME, TODO, unimplemented! | `crates/tetra-pdus/src/mm/pdus/d_location_update_command.rs` |
 | MM | DLocationUpdateReject | teilweise | vorhanden | FIXME, TODO, unimplemented! | `crates/tetra-pdus/src/mm/pdus/d_location_update_reject.rs` |
 | MM | DMmStatus | teilweise | teilweise | unimplemented! | `crates/tetra-pdus/src/mm/pdus/d_mm_status.rs` |
@@ -184,11 +179,11 @@
 | panic! | prüfen | Runtime | `crates/tetra-core/src/tx_receipt.rs` | 114 | `panic!(` |
 | panic! | prüfen | Runtime | `crates/tetra-core/src/typed_pdu_fields.rs` | 194 | `_ => panic!(), // Never happens` |
 | unimplemented! | kritisch | Runtime | `crates/tetra-core/src/typed_pdu_fields.rs` | 641 | `unimplemented!("can't generically write a type4 field");` |
-| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/cmce/cmce_bs.rs` | 199 | `unimplemented_log!("{:?}", pdu_type);` |
-| panic! | prüfen | Runtime | `crates/tetra-entities/src/cmce/cmce_bs.rs` | 261 | `panic!("Unexpected message on LcmcSap: {:?}", message.msg);` |
-| unreachable! | prüfen | Runtime | `crates/tetra-entities/src/cmce/cmce_bs.rs` | 270 | `unreachable!();` |
-| panic! | prüfen | Runtime | `crates/tetra-entities/src/cmce/cmce_bs.rs` | 279 | `panic!("Unexpected control message: {:?}", message.msg);` |
-| panic! | prüfen | Runtime | `crates/tetra-entities/src/cmce/cmce_bs.rs` | 283 | `panic!("Unexpected SAP: {:?}", message.sap);` |
+| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/cmce/cmce_bs.rs` | 201 | `unimplemented_log!("{:?}", pdu_type);` |
+| panic! | prüfen | Runtime | `crates/tetra-entities/src/cmce/cmce_bs.rs` | 291 | `panic!("Unexpected message on LcmcSap: {:?}", message.msg);` |
+| unreachable! | prüfen | Runtime | `crates/tetra-entities/src/cmce/cmce_bs.rs` | 300 | `unreachable!();` |
+| panic! | prüfen | Runtime | `crates/tetra-entities/src/cmce/cmce_bs.rs` | 309 | `panic!("Unexpected control message: {:?}", message.msg);` |
+| panic! | prüfen | Runtime | `crates/tetra-entities/src/cmce/cmce_bs.rs` | 313 | `panic!("Unexpected SAP: {:?}", message.sap);` |
 | TODO/FIXME | technische Schuld | Runtime | `crates/tetra-entities/src/cmce/components/circuit_mgr.rs` | 148 | `// TODO FIXME we may do a bit smarter allocation here` |
 | TODO/FIXME | technische Schuld | Runtime | `crates/tetra-entities/src/cmce/components/circuit_mgr.rs` | 186 | `circuit_mode: CircuitModeType::TchS, // TODO: only speech supported for now` |
 | TODO/FIXME | technische Schuld | Runtime | `crates/tetra-entities/src/cmce/components/circuit_mgr.rs` | 187 | `// endpoint_id: 0, // TODO, we don't use endpoints as of yet` |
@@ -285,25 +280,20 @@
 | Todo-Typ | Typ-Platzhalter | Runtime | `crates/tetra-entities/src/mle/ltpd_runtime.rs` | 807 | `Layer2Service::Acknowledged \| Layer2Service::Todo => TxReporter::new(),` |
 | Todo-Typ | Typ-Platzhalter | Runtime | `crates/tetra-entities/src/mle/ltpd_runtime.rs` | 855 | `Layer2Service::Acknowledged \| Layer2Service::Todo => {` |
 | panic! | prüfen | Runtime | `crates/tetra-entities/src/mle/ltpd_runtime.rs` | 1059 | `other => panic!("unexpected lower-layer primitive: {:?}", other),` |
-| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 121 | `unimplemented_log!("DNewCell")` |
-| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 124 | `unimplemented_log!("DPrepareFail")` |
-| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 127 | `unimplemented_log!("DNwrkBroadcast")` |
-| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 130 | `unimplemented_log!("DNwrkBroadcastExt")` |
-| TODO/FIXME | technische Schuld | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 131 | `} // TODO FIXME CHECK this option and assocaited int` |
-| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 133 | `unimplemented_log!("DRestoreAck")` |
-| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 136 | `unimplemented_log!("DRestoreFail")` |
-| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 139 | `unimplemented_log!("DChannelResponse")` |
-| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 142 | `unimplemented_log!("ExtPdu")` |
-| TODO/FIXME | technische Schuld | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 274 | `chan_change_resp_req: false, // TODO FIXME` |
-| TODO/FIXME | technische Schuld | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 275 | `chan_change_handle: None,    // TODO FIXME` |
-| TODO/FIXME | technische Schuld | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 299 | `chan_change_resp_req: false, // TODO FIXME` |
-| TODO/FIXME | technische Schuld | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 300 | `chan_change_handle: None,    // TODO FIXME` |
-| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 316 | `unimplemented_log!("MleProtocolDiscriminator::TetraManagementEntity");` |
-| TODO/FIXME | technische Schuld | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 403 | `subscriber_class: 0, // TODO fixme` |
-| TODO/FIXME | technische Schuld | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 408 | `req_handle: 0, // TODO FIXME; should we pass the same handle here?` |
-| TODO/FIXME | technische Schuld | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 466 | `subscriber_class: 0, // TODO fixme` |
-| TODO/FIXME | technische Schuld | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 493 | `subscriber_class: 0, // TODO fixme` |
-| TODO/FIXME | technische Schuld | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 498 | `req_handle: 0, // TODO FIXME` |
+| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 208 | `unimplemented_log!("U-PREPARE-DA remains outside the conventional-access baseline")` |
+| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 211 | `unimplemented_log!("U-IRREGULAR-CHANNEL-ADVICE")` |
+| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 214 | `unimplemented_log!("U-CHANNEL-CLASS-ADVICE")` |
+| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 216 | `MlePduTypeUl::ExtPdu => unimplemented_log!("MLE uplink extension PDU"),` |
+| TODO/FIXME | technische Schuld | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 347 | `chan_change_resp_req: false, // TODO FIXME` |
+| TODO/FIXME | technische Schuld | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 348 | `chan_change_handle: None,    // TODO FIXME` |
+| TODO/FIXME | technische Schuld | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 372 | `chan_change_resp_req: false, // TODO FIXME` |
+| TODO/FIXME | technische Schuld | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 373 | `chan_change_handle: None,    // TODO FIXME` |
+| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 395 | `unimplemented_log!("MleProtocolDiscriminator::TetraManagementEntity");` |
+| TODO/FIXME | technische Schuld | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 524 | `subscriber_class: 0, // TODO fixme` |
+| TODO/FIXME | technische Schuld | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 529 | `req_handle: 0, // TODO FIXME; should we pass the same handle here?` |
+| TODO/FIXME | technische Schuld | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 587 | `subscriber_class: 0, // TODO fixme` |
+| TODO/FIXME | technische Schuld | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 614 | `subscriber_class: 0, // TODO fixme` |
+| TODO/FIXME | technische Schuld | Runtime | `crates/tetra-entities/src/mle/mle_bs.rs` | 619 | `req_handle: 0, // TODO FIXME` |
 | unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mle/mle_ms.rs` | 62 | `unimplemented_log!("DNewCell")` |
 | unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mle/mle_ms.rs` | 65 | `unimplemented_log!("DPrepareFail")` |
 | unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mle/mle_ms.rs` | 68 | `unimplemented_log!("DNwrkBroadcast")` |
@@ -552,6 +542,7 @@
 | panic! | Test-Assertion | Test | `crates/tetra-entities/tests/test_mm_bs.rs` | 336 | `panic!(` |
 | panic! | Test-Assertion | Test | `crates/tetra-entities/tests/test_mm_bs.rs` | 419 | `panic!("Expected LmmMleUnitdataReq");` |
 | panic! | Test-Assertion | Test | `crates/tetra-entities/tests/test_sds_bs.rs` | 494 | `panic!("Expected CmceSdsData message at Brew sink");` |
+| panic! | Test-Assertion | Test | `crates/tetra-entities/tests/test_two_cell_mobility.rs` | 42 | `panic!("no MLE downlink found in LLC sink");` |
 | panic! | Test-Assertion | Test | `crates/tetra-entities/tests/test_umac_bs.rs` | 200 | `panic!("expected TMA-UNITDATA indication");` |
 | TODO/FIXME | technische Schuld | Runtime | `crates/tetra-pdus/src/cmce/fields/basic_service_information.rs` | 69 | `// TODO REVIEW: conditional write of slots_per_frame` |
 | TODO/FIXME | technische Schuld | Runtime | `crates/tetra-pdus/src/cmce/fields/basic_service_information.rs` | 73 | `// TODO REVIEW: conditional write of speech_service` |
@@ -589,11 +580,6 @@
 | TODO/FIXME | technische Schuld | Runtime | `crates/tetra-pdus/src/cmce/pdus/u_status.rs` | 35 | `#[allow(unreachable_code)] // TODO FIXME review, finalize and remove this` |
 | TODO/FIXME | technische Schuld | Runtime | `crates/tetra-pdus/src/cmce/pdus/u_tx_ceased.rs` | 24 | `#[allow(unreachable_code)] // TODO FIXME review, finalize and remove this` |
 | TODO/FIXME | technische Schuld | Runtime | `crates/tetra-pdus/src/cmce/pdus/u_tx_demand.rs` | 31 | `#[allow(unreachable_code)] // TODO FIXME review, finalize and remove this` |
-| TODO/FIXME | technische Schuld | Runtime | `crates/tetra-pdus/src/mle/pdus/d_channel_response.rs` | 28 | `#[allow(unreachable_code)] // TODO FIXME review, finalize and remove this` |
-| TODO/FIXME | technische Schuld | Runtime | `crates/tetra-pdus/src/mle/pdus/d_new_cell.rs` | 22 | `#[allow(unreachable_code)] // TODO FIXME review, finalize and remove this` |
-| unimplemented! | kritisch | Runtime | `crates/tetra-pdus/src/mle/pdus/d_new_cell.rs` | 43 | `unimplemented!(); // read closing obit` |
-| TODO/FIXME | technische Schuld | Runtime | `crates/tetra-pdus/src/mle/pdus/d_new_cell.rs` | 66 | `// TODO FIXME: sdu handling` |
-| unimplemented! | kritisch | Runtime | `crates/tetra-pdus/src/mle/pdus/d_new_cell.rs` | 69 | `unimplemented!();` |
 | TODO/FIXME | technische Schuld | Runtime | `crates/tetra-pdus/src/mle/pdus/d_nwrk_broadcast_remove.rs` | 43 | `#[allow(unreachable_code)] // TODO FIXME review, finalize and remove this` |
 | unimplemented! | kritisch | Runtime | `crates/tetra-pdus/src/mle/pdus/d_nwrk_broadcast_remove.rs` | 60 | `unimplemented!();` |
 | unimplemented! | kritisch | Runtime | `crates/tetra-pdus/src/mle/pdus/d_nwrk_broadcast_remove.rs` | 65 | `unimplemented!();` |
@@ -601,26 +587,11 @@
 | unimplemented! | kritisch | Runtime | `crates/tetra-pdus/src/mle/pdus/d_nwrk_broadcast_remove.rs` | 123 | `unimplemented!();` |
 | unimplemented! | kritisch | Runtime | `crates/tetra-pdus/src/mle/pdus/d_nwrk_broadcast_remove.rs` | 131 | `unimplemented!();` |
 | unimplemented! | kritisch | Runtime | `crates/tetra-pdus/src/mle/pdus/d_nwrk_broadcast_remove.rs` | 136 | `unimplemented!();` |
-| TODO/FIXME | technische Schuld | Runtime | `crates/tetra-pdus/src/mle/pdus/d_prepare_fail.rs` | 22 | `#[allow(unreachable_code)] // TODO FIXME review, finalize and remove this` |
-| unimplemented! | kritisch | Runtime | `crates/tetra-pdus/src/mle/pdus/d_prepare_fail.rs` | 43 | `unimplemented!(); // read closing obit` |
-| TODO/FIXME | technische Schuld | Runtime | `crates/tetra-pdus/src/mle/pdus/d_prepare_fail.rs` | 63 | `// TODO FIXME: sdu handling` |
-| unimplemented! | kritisch | Runtime | `crates/tetra-pdus/src/mle/pdus/d_prepare_fail.rs` | 66 | `unimplemented!();` |
-| TODO/FIXME | technische Schuld | Runtime | `crates/tetra-pdus/src/mle/pdus/d_restore_ack.rs` | 20 | `#[allow(unreachable_code)] // TODO FIXME review, finalize and remove this` |
-| unimplemented! | kritisch | Runtime | `crates/tetra-pdus/src/mle/pdus/d_restore_ack.rs` | 39 | `unimplemented!(); // read closing obit` |
-| TODO/FIXME | technische Schuld | Runtime | `crates/tetra-pdus/src/mle/pdus/d_restore_ack.rs` | 57 | `// TODO FIXME: sdu handling` |
-| unimplemented! | kritisch | Runtime | `crates/tetra-pdus/src/mle/pdus/d_restore_ack.rs` | 60 | `unimplemented!();` |
-| TODO/FIXME | technische Schuld | Runtime | `crates/tetra-pdus/src/mle/pdus/d_restore_fail.rs` | 19 | `#[allow(unreachable_code)] // TODO FIXME review, finalize and remove this` |
 | TODO/FIXME | technische Schuld | Runtime | `crates/tetra-pdus/src/mle/pdus/u_channel_class_advice.rs` | 35 | `#[allow(unreachable_code)] // TODO FIXME review, finalize and remove this` |
 | unimplemented! | kritisch | Runtime | `crates/tetra-pdus/src/mle/pdus/u_channel_class_advice.rs` | 46 | `unimplemented!();` |
 | unimplemented! | kritisch | Runtime | `crates/tetra-pdus/src/mle/pdus/u_channel_class_advice.rs` | 51 | `unimplemented!();` |
 | unimplemented! | kritisch | Runtime | `crates/tetra-pdus/src/mle/pdus/u_channel_class_advice.rs` | 60 | `unimplemented!();` |
 | unimplemented! | kritisch | Runtime | `crates/tetra-pdus/src/mle/pdus/u_channel_class_advice.rs` | 108 | `unimplemented!();` |
-| TODO/FIXME | technische Schuld | Runtime | `crates/tetra-pdus/src/mle/pdus/u_prepare.rs` | 22 | `#[allow(unreachable_code)] // TODO FIXME review, finalize and remove this` |
-| unimplemented! | kritisch | Runtime | `crates/tetra-pdus/src/mle/pdus/u_prepare.rs` | 37 | `unimplemented!();` |
-| unimplemented! | kritisch | Runtime | `crates/tetra-pdus/src/mle/pdus/u_prepare.rs` | 66 | `unimplemented!();` |
-| TODO/FIXME | technische Schuld | Runtime | `crates/tetra-pdus/src/mle/pdus/u_restore.rs` | 28 | `#[allow(unreachable_code)] // TODO FIXME review, finalize and remove this` |
-| unimplemented! | kritisch | Runtime | `crates/tetra-pdus/src/mle/pdus/u_restore.rs` | 46 | `unimplemented!();` |
-| unimplemented! | kritisch | Runtime | `crates/tetra-pdus/src/mle/pdus/u_restore.rs` | 81 | `unimplemented!();` |
 | TODO/FIXME | technische Schuld | Runtime | `crates/tetra-pdus/src/mm/fields/group_identity_location_accept.rs` | 19 | `#[allow(unreachable_code)] // TODO FIXME review, finalize and remove this` |
 | TODO/FIXME | technische Schuld | Runtime | `crates/tetra-pdus/src/mm/fields/group_identity_location_demand.rs` | 25 | `#[allow(unreachable_code)] // TODO FIXME review, finalize and remove this` |
 | TODO/FIXME | technische Schuld | Runtime | `crates/tetra-pdus/src/mm/pdus/d_attach_detach_group_identity.rs` | 35 | `#[allow(unreachable_code)] // TODO FIXME review, finalize and remove this` |
@@ -713,16 +684,16 @@
 | Todo-Typ | Typ-Platzhalter | Runtime | `crates/tetra-saps/src/lcmc/mod.rs` | 137 | `pub handle: Todo,` |
 | Todo-Typ | Typ-Platzhalter | Runtime | `crates/tetra-saps/src/lcmc/mod.rs` | 138 | `pub transfer_result: Todo,` |
 | Todo-Typ | Typ-Platzhalter | Runtime | `crates/tetra-saps/src/lcmc/mod.rs` | 140 | `pub channel_change_handle: Todo,` |
-| Todo-Typ | Typ-Platzhalter | Runtime | `crates/tetra-saps/src/lcmc/mod.rs` | 146 | `pub sdu: Todo,` |
-| Todo-Typ | Typ-Platzhalter | Runtime | `crates/tetra-saps/src/lcmc/mod.rs` | 147 | `pub handle: Todo,` |
-| Todo-Typ | Typ-Platzhalter | Runtime | `crates/tetra-saps/src/lcmc/mod.rs` | 149 | `pub pdu_prio: Todo,` |
-| Todo-Typ | Typ-Platzhalter | Runtime | `crates/tetra-saps/src/lcmc/mod.rs` | 158 | `pub sdu: Todo,` |
-| Todo-Typ | Typ-Platzhalter | Runtime | `crates/tetra-saps/src/lcmc/mod.rs` | 159 | `pub handle: Todo,` |
-| Todo-Typ | Typ-Platzhalter | Runtime | `crates/tetra-saps/src/lcmc/mod.rs` | 167 | `pub mcc: Todo, // current network` |
-| Todo-Typ | Typ-Platzhalter | Runtime | `crates/tetra-saps/src/lcmc/mod.rs` | 168 | `pub mnc: Todo, // current network` |
-| Todo-Typ | Typ-Platzhalter | Runtime | `crates/tetra-saps/src/lcmc/mod.rs` | 180 | `pub pdu_prio: Todo,` |
-| Todo-Typ | Typ-Platzhalter | Runtime | `crates/tetra-saps/src/lcmc/mod.rs` | 181 | `pub layer2_qos: Todo,` |
-| Todo-Typ | Typ-Platzhalter | Runtime | `crates/tetra-saps/src/lcmc/mod.rs` | 206 | `pub chan_change_handle: Option<Todo>,` |
+| Todo-Typ | Typ-Platzhalter | Runtime | `crates/tetra-saps/src/lcmc/mod.rs` | 159 | `pub sdu: Todo,` |
+| Todo-Typ | Typ-Platzhalter | Runtime | `crates/tetra-saps/src/lcmc/mod.rs` | 160 | `pub handle: Todo,` |
+| Todo-Typ | Typ-Platzhalter | Runtime | `crates/tetra-saps/src/lcmc/mod.rs` | 162 | `pub pdu_prio: Todo,` |
+| Todo-Typ | Typ-Platzhalter | Runtime | `crates/tetra-saps/src/lcmc/mod.rs` | 171 | `pub sdu: Todo,` |
+| Todo-Typ | Typ-Platzhalter | Runtime | `crates/tetra-saps/src/lcmc/mod.rs` | 172 | `pub handle: Todo,` |
+| Todo-Typ | Typ-Platzhalter | Runtime | `crates/tetra-saps/src/lcmc/mod.rs` | 180 | `pub mcc: Todo, // current network` |
+| Todo-Typ | Typ-Platzhalter | Runtime | `crates/tetra-saps/src/lcmc/mod.rs` | 181 | `pub mnc: Todo, // current network` |
+| Todo-Typ | Typ-Platzhalter | Runtime | `crates/tetra-saps/src/lcmc/mod.rs` | 193 | `pub pdu_prio: Todo,` |
+| Todo-Typ | Typ-Platzhalter | Runtime | `crates/tetra-saps/src/lcmc/mod.rs` | 194 | `pub layer2_qos: Todo,` |
+| Todo-Typ | Typ-Platzhalter | Runtime | `crates/tetra-saps/src/lcmc/mod.rs` | 219 | `pub chan_change_handle: Option<Todo>,` |
 | Todo-Typ | Typ-Platzhalter | Runtime | `crates/tetra-saps/src/lmm/mod.rs` | 3 | `use tetra_core::{BitBuffer, Layer2Service, MleHandle, TetraAddress, Todo, TxReporter};` |
 | Todo-Typ | Typ-Platzhalter | Runtime | `crates/tetra-saps/src/lmm/mod.rs` | 12 | `pub cell_type_prefs: Option<Todo>,` |
 | Todo-Typ | Typ-Platzhalter | Runtime | `crates/tetra-saps/src/lmm/mod.rs` | 17 | `pub cell_availability: Todo,` |
@@ -765,7 +736,7 @@
 | Todo-Typ | Typ-Platzhalter | Runtime | `crates/tetra-saps/src/lmm/mod.rs` | 161 | `pub ra: Todo,` |
 | Todo-Typ | Typ-Platzhalter | Runtime | `crates/tetra-saps/src/lmm/mod.rs` | 162 | `pub cell_type_prefs: Option<Todo>,` |
 | Todo-Typ | Typ-Platzhalter | Runtime | `crates/tetra-saps/src/lmm/mod.rs` | 163 | `pub registration_result: Todo,` |
-| TODO/FIXME | technische Schuld | Runtime | `crates/tetra-saps/src/sapmsg.rs` | 28 | `// TODO FIXME and all that stuff` |
+| TODO/FIXME | technische Schuld | Runtime | `crates/tetra-saps/src/sapmsg.rs` | 29 | `// TODO FIXME and all that stuff` |
 | Todo-Typ | Typ-Platzhalter | Runtime | `crates/tetra-saps/src/tla/mod.rs` | 2 | `use tetra_core::{BitBuffer, EndpointId, LinkId, TetraAddress, Todo, TxReporter};` |
 | Todo-Typ | Typ-Platzhalter | Runtime | `crates/tetra-saps/src/tla/mod.rs` | 8 | `pub handle: Todo,` |
 | Todo-Typ | Typ-Platzhalter | Runtime | `crates/tetra-saps/src/tla/mod.rs` | 14 | `// address_type: Todo,` |

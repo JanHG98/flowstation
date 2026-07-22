@@ -4,6 +4,8 @@ use crate::{MessageQueue, TetraEntityTrait};
 use tetra_config::bluestation::SharedConfig;
 use tetra_core::tetra_entities::TetraEntity;
 use tetra_core::{Sap, TdmaTime, unimplemented_log};
+use tetra_saps::common::MleFailCause;
+use tetra_saps::control::mle_cell_change::MleCellChangeControl;
 use tetra_saps::{SapMsg, SapMsgInner};
 
 use super::components::pc_bs::{ControlRoute, LcmcRoute, PcBs};
@@ -200,6 +202,31 @@ impl CmceBs {
             }
         };
     }
+
+    /// Conservative baseline until CMCE call-restore state is implemented.
+    /// The indication is consumed deliberately and produces a standards-defined
+    /// D-RESTORE-FAIL instead of panicking or leaving the radio waiting forever.
+    pub fn rx_lcmc_mle_restore_ind(&mut self, queue: &mut MessageQueue, message: SapMsg) {
+        let SapMsgInner::LcmcMleRestoreInd(indication) = message.msg else {
+            tracing::error!("CMCE: invalid primitive routed to restore indication handler");
+            return;
+        };
+        tracing::warn!(
+            subscriber = %indication.subscriber,
+            endpoint_id = indication.endpoint_id,
+            link_id = indication.link_id,
+            "CMCE: call-restore state machine is not active yet; rejecting U-RESTORE cleanly"
+        );
+        queue.push_back(SapMsg {
+            sap: Sap::Control,
+            src: TetraEntity::Cmce,
+            dest: TetraEntity::Mle,
+            msg: SapMsgInner::MleCellChangeControl(MleCellChangeControl::RejectRestore {
+                subscriber: indication.subscriber,
+                cause: MleFailCause::RestorationCannotBeDoneOnCell,
+            }),
+        });
+    }
 }
 
 impl TetraEntityTrait for CmceBs {
@@ -256,6 +283,9 @@ impl TetraEntityTrait for CmceBs {
             Sap::LcmcSap => match message.msg {
                 SapMsgInner::LcmcMleUnitdataInd(_) => {
                     self.rx_lcmc_mle_unitdata_ind(queue, message);
+                }
+                SapMsgInner::LcmcMleRestoreInd(_) => {
+                    self.rx_lcmc_mle_restore_ind(queue, message);
                 }
                 _ => {
                     panic!("Unexpected message on LcmcSap: {:?}", message.msg);

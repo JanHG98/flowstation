@@ -170,7 +170,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 199,
+      "line": 201,
       "path": "crates/tetra-entities/src/cmce/cmce_bs.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -178,7 +178,7 @@
     },
     {
       "category": "panic!",
-      "line": 261,
+      "line": 291,
       "path": "crates/tetra-entities/src/cmce/cmce_bs.rs",
       "scope": "Runtime",
       "severity": "prüfen",
@@ -186,7 +186,7 @@
     },
     {
       "category": "unreachable!",
-      "line": 270,
+      "line": 300,
       "path": "crates/tetra-entities/src/cmce/cmce_bs.rs",
       "scope": "Runtime",
       "severity": "prüfen",
@@ -194,7 +194,7 @@
     },
     {
       "category": "panic!",
-      "line": 279,
+      "line": 309,
       "path": "crates/tetra-entities/src/cmce/cmce_bs.rs",
       "scope": "Runtime",
       "severity": "prüfen",
@@ -202,7 +202,7 @@
     },
     {
       "category": "panic!",
-      "line": 283,
+      "line": 313,
       "path": "crates/tetra-entities/src/cmce/cmce_bs.rs",
       "scope": "Runtime",
       "severity": "prüfen",
@@ -978,79 +978,39 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 121,
+      "line": 208,
       "path": "crates/tetra-entities/src/mle/mle_bs.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
-      "text": "unimplemented_log!(\"DNewCell\")"
+      "text": "unimplemented_log!(\"U-PREPARE-DA remains outside the conventional-access baseline\")"
     },
     {
       "category": "unimplemented_log!",
-      "line": 124,
+      "line": 211,
       "path": "crates/tetra-entities/src/mle/mle_bs.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
-      "text": "unimplemented_log!(\"DPrepareFail\")"
+      "text": "unimplemented_log!(\"U-IRREGULAR-CHANNEL-ADVICE\")"
     },
     {
       "category": "unimplemented_log!",
-      "line": 127,
+      "line": 214,
       "path": "crates/tetra-entities/src/mle/mle_bs.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
-      "text": "unimplemented_log!(\"DNwrkBroadcast\")"
+      "text": "unimplemented_log!(\"U-CHANNEL-CLASS-ADVICE\")"
     },
     {
       "category": "unimplemented_log!",
-      "line": 130,
+      "line": 216,
       "path": "crates/tetra-entities/src/mle/mle_bs.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
-      "text": "unimplemented_log!(\"DNwrkBroadcastExt\")"
+      "text": "MlePduTypeUl::ExtPdu => unimplemented_log!(\"MLE uplink extension PDU\"),"
     },
     {
       "category": "TODO/FIXME",
-      "line": 131,
-      "path": "crates/tetra-entities/src/mle/mle_bs.rs",
-      "scope": "Runtime",
-      "severity": "technische Schuld",
-      "text": "} // TODO FIXME CHECK this option and assocaited int"
-    },
-    {
-      "category": "unimplemented_log!",
-      "line": 133,
-      "path": "crates/tetra-entities/src/mle/mle_bs.rs",
-      "scope": "Runtime",
-      "severity": "offener Runtime-Pfad",
-      "text": "unimplemented_log!(\"DRestoreAck\")"
-    },
-    {
-      "category": "unimplemented_log!",
-      "line": 136,
-      "path": "crates/tetra-entities/src/mle/mle_bs.rs",
-      "scope": "Runtime",
-      "severity": "offener Runtime-Pfad",
-      "text": "unimplemented_log!(\"DRestoreFail\")"
-    },
-    {
-      "category": "unimplemented_log!",
-      "line": 139,
-      "path": "crates/tetra-entities/src/mle/mle_bs.rs",
-      "scope": "Runtime",
-      "severity": "offener Runtime-Pfad",
-      "text": "unimplemented_log!(\"DChannelResponse\")"
-    },
-    {
-      "category": "unimplemented_log!",
-      "line": 142,
-      "path": "crates/tetra-entities/src/mle/mle_bs.rs",
-      "scope": "Runtime",
-      "severity": "offener Runtime-Pfad",
-      "text": "unimplemented_log!(\"ExtPdu\")"
-    },
-    {
-      "category": "TODO/FIXME",
-      "line": 274,
+      "line": 347,
       "path": "crates/tetra-entities/src/mle/mle_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -1058,7 +1018,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 275,
+      "line": 348,
       "path": "crates/tetra-entities/src/mle/mle_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -1066,7 +1026,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 299,
+      "line": 372,
       "path": "crates/tetra-entities/src/mle/mle_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -1074,7 +1034,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 300,
+      "line": 373,
       "path": "crates/tetra-entities/src/mle/mle_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -1082,7 +1042,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 316,
+      "line": 395,
       "path": "crates/tetra-entities/src/mle/mle_bs.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -1090,7 +1050,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 403,
+      "line": 524,
       "path": "crates/tetra-entities/src/mle/mle_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -1098,7 +1058,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 408,
+      "line": 529,
       "path": "crates/tetra-entities/src/mle/mle_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -1106,7 +1066,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 466,
+      "line": 587,
       "path": "crates/tetra-entities/src/mle/mle_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -1114,7 +1074,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 493,
+      "line": 614,
       "path": "crates/tetra-entities/src/mle/mle_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -1122,7 +1082,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 498,
+      "line": 619,
       "path": "crates/tetra-entities/src/mle/mle_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -3114,6 +3074,14 @@
     },
     {
       "category": "panic!",
+      "line": 42,
+      "path": "crates/tetra-entities/tests/test_two_cell_mobility.rs",
+      "scope": "Test",
+      "severity": "Test-Assertion",
+      "text": "panic!(\"no MLE downlink found in LLC sink\");"
+    },
+    {
+      "category": "panic!",
       "line": 200,
       "path": "crates/tetra-entities/tests/test_umac_bs.rs",
       "scope": "Test",
@@ -3410,46 +3378,6 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 28,
-      "path": "crates/tetra-pdus/src/mle/pdus/d_channel_response.rs",
-      "scope": "Runtime",
-      "severity": "technische Schuld",
-      "text": "#[allow(unreachable_code)] // TODO FIXME review, finalize and remove this"
-    },
-    {
-      "category": "TODO/FIXME",
-      "line": 22,
-      "path": "crates/tetra-pdus/src/mle/pdus/d_new_cell.rs",
-      "scope": "Runtime",
-      "severity": "technische Schuld",
-      "text": "#[allow(unreachable_code)] // TODO FIXME review, finalize and remove this"
-    },
-    {
-      "category": "unimplemented!",
-      "line": 43,
-      "path": "crates/tetra-pdus/src/mle/pdus/d_new_cell.rs",
-      "scope": "Runtime",
-      "severity": "kritisch",
-      "text": "unimplemented!(); // read closing obit"
-    },
-    {
-      "category": "TODO/FIXME",
-      "line": 66,
-      "path": "crates/tetra-pdus/src/mle/pdus/d_new_cell.rs",
-      "scope": "Runtime",
-      "severity": "technische Schuld",
-      "text": "// TODO FIXME: sdu handling"
-    },
-    {
-      "category": "unimplemented!",
-      "line": 69,
-      "path": "crates/tetra-pdus/src/mle/pdus/d_new_cell.rs",
-      "scope": "Runtime",
-      "severity": "kritisch",
-      "text": "unimplemented!();"
-    },
-    {
-      "category": "TODO/FIXME",
       "line": 43,
       "path": "crates/tetra-pdus/src/mle/pdus/d_nwrk_broadcast_remove.rs",
       "scope": "Runtime",
@@ -3506,78 +3434,6 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 22,
-      "path": "crates/tetra-pdus/src/mle/pdus/d_prepare_fail.rs",
-      "scope": "Runtime",
-      "severity": "technische Schuld",
-      "text": "#[allow(unreachable_code)] // TODO FIXME review, finalize and remove this"
-    },
-    {
-      "category": "unimplemented!",
-      "line": 43,
-      "path": "crates/tetra-pdus/src/mle/pdus/d_prepare_fail.rs",
-      "scope": "Runtime",
-      "severity": "kritisch",
-      "text": "unimplemented!(); // read closing obit"
-    },
-    {
-      "category": "TODO/FIXME",
-      "line": 63,
-      "path": "crates/tetra-pdus/src/mle/pdus/d_prepare_fail.rs",
-      "scope": "Runtime",
-      "severity": "technische Schuld",
-      "text": "// TODO FIXME: sdu handling"
-    },
-    {
-      "category": "unimplemented!",
-      "line": 66,
-      "path": "crates/tetra-pdus/src/mle/pdus/d_prepare_fail.rs",
-      "scope": "Runtime",
-      "severity": "kritisch",
-      "text": "unimplemented!();"
-    },
-    {
-      "category": "TODO/FIXME",
-      "line": 20,
-      "path": "crates/tetra-pdus/src/mle/pdus/d_restore_ack.rs",
-      "scope": "Runtime",
-      "severity": "technische Schuld",
-      "text": "#[allow(unreachable_code)] // TODO FIXME review, finalize and remove this"
-    },
-    {
-      "category": "unimplemented!",
-      "line": 39,
-      "path": "crates/tetra-pdus/src/mle/pdus/d_restore_ack.rs",
-      "scope": "Runtime",
-      "severity": "kritisch",
-      "text": "unimplemented!(); // read closing obit"
-    },
-    {
-      "category": "TODO/FIXME",
-      "line": 57,
-      "path": "crates/tetra-pdus/src/mle/pdus/d_restore_ack.rs",
-      "scope": "Runtime",
-      "severity": "technische Schuld",
-      "text": "// TODO FIXME: sdu handling"
-    },
-    {
-      "category": "unimplemented!",
-      "line": 60,
-      "path": "crates/tetra-pdus/src/mle/pdus/d_restore_ack.rs",
-      "scope": "Runtime",
-      "severity": "kritisch",
-      "text": "unimplemented!();"
-    },
-    {
-      "category": "TODO/FIXME",
-      "line": 19,
-      "path": "crates/tetra-pdus/src/mle/pdus/d_restore_fail.rs",
-      "scope": "Runtime",
-      "severity": "technische Schuld",
-      "text": "#[allow(unreachable_code)] // TODO FIXME review, finalize and remove this"
-    },
-    {
-      "category": "TODO/FIXME",
       "line": 35,
       "path": "crates/tetra-pdus/src/mle/pdus/u_channel_class_advice.rs",
       "scope": "Runtime",
@@ -3612,54 +3468,6 @@
       "category": "unimplemented!",
       "line": 108,
       "path": "crates/tetra-pdus/src/mle/pdus/u_channel_class_advice.rs",
-      "scope": "Runtime",
-      "severity": "kritisch",
-      "text": "unimplemented!();"
-    },
-    {
-      "category": "TODO/FIXME",
-      "line": 22,
-      "path": "crates/tetra-pdus/src/mle/pdus/u_prepare.rs",
-      "scope": "Runtime",
-      "severity": "technische Schuld",
-      "text": "#[allow(unreachable_code)] // TODO FIXME review, finalize and remove this"
-    },
-    {
-      "category": "unimplemented!",
-      "line": 37,
-      "path": "crates/tetra-pdus/src/mle/pdus/u_prepare.rs",
-      "scope": "Runtime",
-      "severity": "kritisch",
-      "text": "unimplemented!();"
-    },
-    {
-      "category": "unimplemented!",
-      "line": 66,
-      "path": "crates/tetra-pdus/src/mle/pdus/u_prepare.rs",
-      "scope": "Runtime",
-      "severity": "kritisch",
-      "text": "unimplemented!();"
-    },
-    {
-      "category": "TODO/FIXME",
-      "line": 28,
-      "path": "crates/tetra-pdus/src/mle/pdus/u_restore.rs",
-      "scope": "Runtime",
-      "severity": "technische Schuld",
-      "text": "#[allow(unreachable_code)] // TODO FIXME review, finalize and remove this"
-    },
-    {
-      "category": "unimplemented!",
-      "line": 46,
-      "path": "crates/tetra-pdus/src/mle/pdus/u_restore.rs",
-      "scope": "Runtime",
-      "severity": "kritisch",
-      "text": "unimplemented!();"
-    },
-    {
-      "category": "unimplemented!",
-      "line": 81,
-      "path": "crates/tetra-pdus/src/mle/pdus/u_restore.rs",
       "scope": "Runtime",
       "severity": "kritisch",
       "text": "unimplemented!();"
@@ -4402,7 +4210,7 @@
     },
     {
       "category": "Todo-Typ",
-      "line": 146,
+      "line": 159,
       "path": "crates/tetra-saps/src/lcmc/mod.rs",
       "scope": "Runtime",
       "severity": "Typ-Platzhalter",
@@ -4410,7 +4218,7 @@
     },
     {
       "category": "Todo-Typ",
-      "line": 147,
+      "line": 160,
       "path": "crates/tetra-saps/src/lcmc/mod.rs",
       "scope": "Runtime",
       "severity": "Typ-Platzhalter",
@@ -4418,7 +4226,7 @@
     },
     {
       "category": "Todo-Typ",
-      "line": 149,
+      "line": 162,
       "path": "crates/tetra-saps/src/lcmc/mod.rs",
       "scope": "Runtime",
       "severity": "Typ-Platzhalter",
@@ -4426,7 +4234,7 @@
     },
     {
       "category": "Todo-Typ",
-      "line": 158,
+      "line": 171,
       "path": "crates/tetra-saps/src/lcmc/mod.rs",
       "scope": "Runtime",
       "severity": "Typ-Platzhalter",
@@ -4434,27 +4242,11 @@
     },
     {
       "category": "Todo-Typ",
-      "line": 159,
+      "line": 172,
       "path": "crates/tetra-saps/src/lcmc/mod.rs",
       "scope": "Runtime",
       "severity": "Typ-Platzhalter",
       "text": "pub handle: Todo,"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 167,
-      "path": "crates/tetra-saps/src/lcmc/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub mcc: Todo, // current network"
-    },
-    {
-      "category": "Todo-Typ",
-      "line": 168,
-      "path": "crates/tetra-saps/src/lcmc/mod.rs",
-      "scope": "Runtime",
-      "severity": "Typ-Platzhalter",
-      "text": "pub mnc: Todo, // current network"
     },
     {
       "category": "Todo-Typ",
@@ -4462,7 +4254,7 @@
       "path": "crates/tetra-saps/src/lcmc/mod.rs",
       "scope": "Runtime",
       "severity": "Typ-Platzhalter",
-      "text": "pub pdu_prio: Todo,"
+      "text": "pub mcc: Todo, // current network"
     },
     {
       "category": "Todo-Typ",
@@ -4470,11 +4262,27 @@
       "path": "crates/tetra-saps/src/lcmc/mod.rs",
       "scope": "Runtime",
       "severity": "Typ-Platzhalter",
+      "text": "pub mnc: Todo, // current network"
+    },
+    {
+      "category": "Todo-Typ",
+      "line": 193,
+      "path": "crates/tetra-saps/src/lcmc/mod.rs",
+      "scope": "Runtime",
+      "severity": "Typ-Platzhalter",
+      "text": "pub pdu_prio: Todo,"
+    },
+    {
+      "category": "Todo-Typ",
+      "line": 194,
+      "path": "crates/tetra-saps/src/lcmc/mod.rs",
+      "scope": "Runtime",
+      "severity": "Typ-Platzhalter",
       "text": "pub layer2_qos: Todo,"
     },
     {
       "category": "Todo-Typ",
-      "line": 206,
+      "line": 219,
       "path": "crates/tetra-saps/src/lcmc/mod.rs",
       "scope": "Runtime",
       "severity": "Typ-Platzhalter",
@@ -4818,7 +4626,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 28,
+      "line": 29,
       "path": "crates/tetra-saps/src/sapmsg.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -6541,23 +6349,20 @@
       "tests": "fehlt"
     },
     {
-      "blockers": [
-        "FIXME",
-        "TODO"
-      ],
+      "blockers": [],
       "direction": "Downlink",
       "encoder": "vorhanden",
-      "golden_vector": "nicht nachgewiesen",
+      "golden_vector": "vorhanden",
       "layer": "MLE",
       "name": "DChannelResponse",
       "parser": "vorhanden",
       "path": "crates/tetra-pdus/src/mle/pdus/d_channel_response.rs",
       "phase": "Phase 3 – MLE/Zellwechsel",
       "relevance": "Multi-Site, Zellwechsel",
-      "runtime": "offene Hinweise",
-      "runtime_references": 9,
-      "test_references": 0,
-      "tests": "fehlt"
+      "runtime": "ohne offensichtlichen Blocker",
+      "runtime_references": 15,
+      "test_references": 6,
+      "tests": "vorhanden"
     },
     {
       "blockers": [],
@@ -6592,24 +6397,20 @@
       "tests": "fehlt"
     },
     {
-      "blockers": [
-        "FIXME",
-        "TODO",
-        "unimplemented!"
-      ],
+      "blockers": [],
       "direction": "Downlink",
-      "encoder": "teilweise",
-      "golden_vector": "nicht nachgewiesen",
+      "encoder": "vorhanden",
+      "golden_vector": "vorhanden",
       "layer": "MLE",
       "name": "DNewCell",
-      "parser": "teilweise",
+      "parser": "vorhanden",
       "path": "crates/tetra-pdus/src/mle/pdus/d_new_cell.rs",
       "phase": "Phase 3 – MLE/Zellwechsel",
       "relevance": "Multi-Site, Zellwechsel",
-      "runtime": "blockiert",
-      "runtime_references": 9,
-      "test_references": 0,
-      "tests": "fehlt"
+      "runtime": "ohne offensichtlichen Blocker",
+      "runtime_references": 17,
+      "test_references": 8,
+      "tests": "vorhanden"
     },
     {
       "blockers": [],
@@ -6623,7 +6424,7 @@
       "phase": "Phase 3 – MLE/Zellwechsel",
       "relevance": "Multi-Site, Zellwechsel",
       "runtime": "ohne offensichtlichen Blocker",
-      "runtime_references": 14,
+      "runtime_references": 12,
       "test_references": 0,
       "tests": "fehlt"
     },
@@ -6648,63 +6449,52 @@
       "tests": "fehlt"
     },
     {
-      "blockers": [
-        "FIXME",
-        "TODO",
-        "unimplemented!"
-      ],
+      "blockers": [],
       "direction": "Downlink",
-      "encoder": "teilweise",
-      "golden_vector": "nicht nachgewiesen",
+      "encoder": "vorhanden",
+      "golden_vector": "vorhanden",
       "layer": "MLE",
       "name": "DPrepareFail",
-      "parser": "teilweise",
+      "parser": "vorhanden",
       "path": "crates/tetra-pdus/src/mle/pdus/d_prepare_fail.rs",
       "phase": "Phase 3 – MLE/Zellwechsel",
       "relevance": "Multi-Site, Zellwechsel",
-      "runtime": "blockiert",
-      "runtime_references": 9,
-      "test_references": 0,
-      "tests": "fehlt"
+      "runtime": "ohne offensichtlichen Blocker",
+      "runtime_references": 15,
+      "test_references": 6,
+      "tests": "vorhanden"
     },
     {
-      "blockers": [
-        "FIXME",
-        "TODO",
-        "unimplemented!"
-      ],
+      "blockers": [],
       "direction": "Downlink",
-      "encoder": "teilweise",
-      "golden_vector": "nicht nachgewiesen",
+      "encoder": "vorhanden",
+      "golden_vector": "vorhanden",
       "layer": "MLE",
       "name": "DRestoreAck",
-      "parser": "teilweise",
+      "parser": "vorhanden",
       "path": "crates/tetra-pdus/src/mle/pdus/d_restore_ack.rs",
       "phase": "Phase 3 – MLE/Zellwechsel",
       "relevance": "Multi-Site, Zellwechsel",
-      "runtime": "blockiert",
-      "runtime_references": 9,
-      "test_references": 0,
-      "tests": "fehlt"
+      "runtime": "ohne offensichtlichen Blocker",
+      "runtime_references": 17,
+      "test_references": 8,
+      "tests": "vorhanden"
     },
     {
-      "blockers": [
-        "FIXME",
-        "TODO"
-      ],
+      "blockers": [],
       "direction": "Downlink",
       "encoder": "vorhanden",
-      "golden_vector": "nicht nachgewiesen",
+      "golden_vector": "vorhanden",
       "layer": "MLE",
       "name": "DRestoreFail",
       "parser": "vorhanden",
       "path": "crates/tetra-pdus/src/mle/pdus/d_restore_fail.rs",
       "phase": "Phase 3 – MLE/Zellwechsel",
       "relevance": "Multi-Site, Zellwechsel",
-      "runtime": "offene Hinweise",
-      "runtime_references": 9,
-      "test_references": 0,
-      "tests": "fehlt"
+      "runtime": "ohne offensichtlichen Blocker",
+      "runtime_references": 13,
+      "test_references": 4,
+      "tests": "vorhanden"
     },
     {
       "blockers": [
@@ -6722,49 +6512,57 @@
       "phase": "Phase 3 – MLE/Zellwechsel",
       "relevance": "Multi-Site, Zellwechsel",
       "runtime": "blockiert",
-      "runtime_references": 5,
+      "runtime_references": 6,
       "test_references": 0,
       "tests": "fehlt"
     },
     {
-      "blockers": [
-        "FIXME",
-        "TODO",
-        "unimplemented!"
-      ],
+      "blockers": [],
       "direction": "Uplink",
-      "encoder": "teilweise",
-      "golden_vector": "nicht nachgewiesen",
+      "encoder": "vorhanden",
+      "golden_vector": "vorhanden",
+      "layer": "MLE",
+      "name": "UChannelRequest",
+      "parser": "vorhanden",
+      "path": "crates/tetra-pdus/src/mle/pdus/u_channel_request.rs",
+      "phase": "Phase 3 – MLE/Zellwechsel",
+      "relevance": "Multi-Site, Zellwechsel",
+      "runtime": "ohne offensichtlichen Blocker",
+      "runtime_references": 17,
+      "test_references": 7,
+      "tests": "vorhanden"
+    },
+    {
+      "blockers": [],
+      "direction": "Uplink",
+      "encoder": "vorhanden",
+      "golden_vector": "vorhanden",
       "layer": "MLE",
       "name": "UPrepare",
-      "parser": "teilweise",
+      "parser": "vorhanden",
       "path": "crates/tetra-pdus/src/mle/pdus/u_prepare.rs",
       "phase": "Phase 3 – MLE/Zellwechsel",
       "relevance": "Multi-Site, Zellwechsel",
-      "runtime": "blockiert",
-      "runtime_references": 5,
-      "test_references": 0,
-      "tests": "fehlt"
+      "runtime": "ohne offensichtlichen Blocker",
+      "runtime_references": 20,
+      "test_references": 10,
+      "tests": "vorhanden"
     },
     {
-      "blockers": [
-        "FIXME",
-        "TODO",
-        "unimplemented!"
-      ],
+      "blockers": [],
       "direction": "Uplink",
-      "encoder": "teilweise",
-      "golden_vector": "nicht nachgewiesen",
+      "encoder": "vorhanden",
+      "golden_vector": "vorhanden",
       "layer": "MLE",
       "name": "URestore",
-      "parser": "teilweise",
+      "parser": "vorhanden",
       "path": "crates/tetra-pdus/src/mle/pdus/u_restore.rs",
       "phase": "Phase 3 – MLE/Zellwechsel",
       "relevance": "Multi-Site, Zellwechsel",
-      "runtime": "blockiert",
-      "runtime_references": 5,
-      "test_references": 0,
-      "tests": "fehlt"
+      "runtime": "ohne offensichtlichen Blocker",
+      "runtime_references": 21,
+      "test_references": 11,
+      "tests": "vorhanden"
     },
     {
       "blockers": [
@@ -7491,6 +7289,16 @@
       "tests": 0
     },
     {
+      "constructed": 1,
+      "handled": 2,
+      "path": "crates/tetra-saps/src/lcmc/mod.rs",
+      "primitive": "LcmcMleRestoreInd",
+      "sap": "LCMC",
+      "sapmsg_variant": "ja",
+      "status": "bidirektional sichtbar",
+      "tests": 1
+    },
+    {
       "constructed": 0,
       "handled": 0,
       "path": "crates/tetra-saps/src/lcmc/mod.rs",
@@ -7741,14 +7549,14 @@
       "tests": 0
     },
     {
-      "constructed": 3,
+      "constructed": 4,
       "handled": 10,
       "path": "crates/tetra-saps/src/lmm/mod.rs",
       "primitive": "LmmMleUnitdataInd",
       "sap": "LMM",
       "sapmsg_variant": "ja",
       "status": "bidirektional sichtbar",
-      "tests": 5
+      "tests": 6
     },
     {
       "constructed": 9,
@@ -8714,9 +8522,9 @@
     }
   ],
   "summary": {
-    "gap_count": 738,
-    "pdu_count": 76,
-    "sap_primitive_count": 128,
+    "gap_count": 714,
+    "pdu_count": 77,
+    "sap_primitive_count": 129,
     "state_type_count": 17
   }
 }

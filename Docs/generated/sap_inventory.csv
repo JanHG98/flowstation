@@ -17,6 +17,7 @@ LCMC,LcmcMleOpenInd,crates/tetra-saps/src/lcmc/mod.rs,nein,0,0,0,nicht in SapMsg
 LCMC,LcmcMleReopenInd,crates/tetra-saps/src/lcmc/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
 LCMC,LcmcMleReportInd,crates/tetra-saps/src/lcmc/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
 LCMC,LcmcMleRestoreConf,crates/tetra-saps/src/lcmc/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
+LCMC,LcmcMleRestoreInd,crates/tetra-saps/src/lcmc/mod.rs,ja,1,2,1,bidirektional sichtbar
 LCMC,LcmcMleRestoreReq,crates/tetra-saps/src/lcmc/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
 LCMC,LcmcMleResumeInd,crates/tetra-saps/src/lcmc/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
 LCMC,LcmcMleUnitdataInd,crates/tetra-saps/src/lcmc/mod.rs,ja,3,27,26,bidirektional sichtbar
@@ -42,7 +43,7 @@ LMM,LmmMleLinkReq,crates/tetra-saps/src/lmm/mod.rs,nein,0,0,0,nicht in SapMsgInn
 LMM,LmmMlePrepareConfirm,crates/tetra-saps/src/lmm/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
 LMM,LmmMlePrepareReq,crates/tetra-saps/src/lmm/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
 LMM,LmmMleReportInd,crates/tetra-saps/src/lmm/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
-LMM,LmmMleUnitdataInd,crates/tetra-saps/src/lmm/mod.rs,ja,3,10,5,bidirektional sichtbar
+LMM,LmmMleUnitdataInd,crates/tetra-saps/src/lmm/mod.rs,ja,4,10,6,bidirektional sichtbar
 LMM,LmmMleUnitdataReq,crates/tetra-saps/src/lmm/mod.rs,ja,9,4,9,bidirektional sichtbar
 LMM,LmmMleUpdateReq,crates/tetra-saps/src/lmm/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
 LTPD,LtpdMleActivityReq,crates/tetra-saps/src/ltpd/mod.rs,ja,0,1,4,nur Empfang/Handler sichtbar

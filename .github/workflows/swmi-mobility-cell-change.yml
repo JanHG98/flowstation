@@ -1,0 +1,59 @@
+name: SWMI Mobility Cell Change
+
+on:
+  push:
+    paths:
+      - "crates/tetra-saps/src/common/mod.rs"
+      - "crates/tetra-saps/src/control/mle_cell_change.rs"
+      - "crates/tetra-saps/src/lcmc/mod.rs"
+      - "crates/tetra-saps/src/sapmsg.rs"
+      - "crates/tetra-pdus/src/mle/**"
+      - "crates/tetra-pdus/tests/test_mle_cell_change_pdus.rs"
+      - "crates/tetra-entities/src/mle/**"
+      - "crates/tetra-entities/tests/test_mle_cell_change_runtime.rs"
+      - "crates/tetra-entities/tests/test_two_cell_mobility.rs"
+      - "crates/tetra-entities/tests/common/**"
+      - "tools/check_mle_cell_change.py"
+      - ".github/workflows/swmi-mobility-cell-change.yml"
+  pull_request:
+    paths:
+      - "crates/tetra-saps/src/common/mod.rs"
+      - "crates/tetra-saps/src/control/mle_cell_change.rs"
+      - "crates/tetra-saps/src/lcmc/mod.rs"
+      - "crates/tetra-saps/src/sapmsg.rs"
+      - "crates/tetra-pdus/src/mle/**"
+      - "crates/tetra-pdus/tests/test_mle_cell_change_pdus.rs"
+      - "crates/tetra-entities/src/mle/**"
+      - "crates/tetra-entities/tests/test_mle_cell_change_runtime.rs"
+      - "crates/tetra-entities/tests/test_two_cell_mobility.rs"
+      - "crates/tetra-entities/tests/common/**"
+      - "tools/check_mle_cell_change.py"
+      - ".github/workflows/swmi-mobility-cell-change.yml"
+
+jobs:
+  mobility-cell-change:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Static architecture checks
+        run: |
+          python3 tools/check_swmi_foundation_types.py
+          python3 tools/check_tlmc_runtime.py
+          python3 tools/check_ltpd_runtime.py
+          python3 tools/check_foundation_acceptance.py
+          python3 tools/check_mle_cell_change.py
+          python3 tools/protocol_inventory.py --check
+      - name: Formatting
+        run: cargo fmt --all -- --check
+      - name: Mobility tests
+        run: |
+          cargo test -p tetra-saps
+          cargo test -p tetra-pdus --test test_mle_cell_change_pdus
+          cargo test -p tetra-entities --test test_mle_cell_change_runtime
+          cargo test -p tetra-entities --test test_two_cell_foundation
+          cargo test -p tetra-entities --test test_two_cell_mobility
+      - name: Clippy
+        run: cargo clippy -p tetra-saps -p tetra-pdus -p tetra-entities --all-targets -- -D warnings

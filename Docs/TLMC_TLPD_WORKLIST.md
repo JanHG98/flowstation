@@ -199,3 +199,23 @@ Die zukünftigen Backend-Dienste folgen dem Standard in `Docs/BACKEND_WEBUI_STAN
 - noch kein vollständiger Packet Core.
 
 Paket B hat die typsichere Grundlage geschaffen, Paket C die TLMC-Runtime, Paket D den lokalen TLPD-Lifecycle und Paket E die Robustheits- und Zwei-Zellen-Abnahme umgesetzt. SWMI Foundation 1 ist damit abgeschlossen. Als Nächstes folgen die vollständigen MLE-Zellwechsel- und Restore-PDUs.
+
+## SWMI Mobility 1 – Paket A: abgeschlossen ✅
+
+Auf der Foundation wurden nun die konventionellen MLE-Zellwechsel-PDUs und die lokale Infrastruktur-Runtime ergänzt:
+
+- `U-PREPARE` ✅
+- `D-NEW-CELL` ✅
+- `D-PREPARE-FAIL` ✅
+- `U-RESTORE` ✅
+- `D-RESTORE-ACK` ✅
+- `D-RESTORE-FAIL` ✅
+- `U-CHANNEL-REQUEST` ✅
+- `D-CHANNEL-RESPONSE` ✅
+- lokale Endpoint-/Link-gebundene Transaktionsregistry ✅
+- MM- und CMCE-Indikationen ✅
+- negative Timeouts ✅
+- read-only Snapshot für TBS-WebUI/Node Gateway ✅
+- Zwei-Zellen-Prepare/Restore-Abnahmepfad ✅
+
+Details stehen in `Docs/SWMI_MOBILITY_1_PACKAGE_A.md`.

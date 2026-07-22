@@ -5,7 +5,7 @@
 
 ## Übersicht
 
-- erfasste Primitive: **128**
+- erfasste Primitive: **129**
 - nicht in `SapMsgInner` verdrahtet: **62**
 - vorhandene Variante ohne sichtbaren Runtime-Pfad: **6**
 - Primitive ohne Testverweis: **97**
@@ -37,6 +37,7 @@
 | LcmcMleReopenInd | nein | 0 | 0 | 0 | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/lcmc/mod.rs` |
 | LcmcMleReportInd | nein | 0 | 0 | 0 | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/lcmc/mod.rs` |
 | LcmcMleRestoreConf | nein | 0 | 0 | 0 | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/lcmc/mod.rs` |
+| LcmcMleRestoreInd | ja | 1 | 2 | 1 | bidirektional sichtbar | `crates/tetra-saps/src/lcmc/mod.rs` |
 | LcmcMleRestoreReq | nein | 0 | 0 | 0 | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/lcmc/mod.rs` |
 | LcmcMleResumeInd | nein | 0 | 0 | 0 | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/lcmc/mod.rs` |
 | LcmcMleUnitdataInd | ja | 3 | 27 | 26 | bidirektional sichtbar | `crates/tetra-saps/src/lcmc/mod.rs` |
@@ -67,7 +68,7 @@
 | LmmMlePrepareConfirm | nein | 0 | 0 | 0 | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/lmm/mod.rs` |
 | LmmMlePrepareReq | nein | 0 | 0 | 0 | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/lmm/mod.rs` |
 | LmmMleReportInd | nein | 0 | 0 | 0 | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/lmm/mod.rs` |
-| LmmMleUnitdataInd | ja | 3 | 10 | 5 | bidirektional sichtbar | `crates/tetra-saps/src/lmm/mod.rs` |
+| LmmMleUnitdataInd | ja | 4 | 10 | 6 | bidirektional sichtbar | `crates/tetra-saps/src/lmm/mod.rs` |
 | LmmMleUnitdataReq | ja | 9 | 4 | 9 | bidirektional sichtbar | `crates/tetra-saps/src/lmm/mod.rs` |
 | LmmMleUpdateReq | nein | 0 | 0 | 0 | nicht in SapMsgInner verdrahtet | `crates/tetra-saps/src/lmm/mod.rs` |
 

@@ -756,6 +756,201 @@ pub struct MleBroadcastParameters {
     pub data_priority_supported: Option<bool>,
 }
 
+/// Command carried by D-NEW-CELL (ETSI EN 300 392-2, clause 18.5.6).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MleChannelCommandValid {
+    FollowMacChannelChange,
+    ChangeChannelImmediately,
+    NoChannelChange,
+    Reserved,
+}
+
+impl MleChannelCommandValid {
+    pub const fn from_raw(value: u8) -> Self {
+        match value & 0b11 {
+            0 => Self::FollowMacChannelChange,
+            1 => Self::ChangeChannelImmediately,
+            2 => Self::NoChannelChange,
+            _ => Self::Reserved,
+        }
+    }
+
+    pub const fn into_raw(self) -> u8 {
+        match self {
+            Self::FollowMacChannelChange => 0,
+            Self::ChangeChannelImmediately => 1,
+            Self::NoChannelChange => 2,
+            Self::Reserved => 3,
+        }
+    }
+}
+
+/// Failure cause shared by D-PREPARE-FAIL and D-RESTORE-FAIL (clause 18.5.7).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MleFailCause {
+    NeighbourCellEnquiryUnavailableOrTemporaryBreak,
+    CellReselectionTypeNotSupported,
+    MsNotAllowedOnCell,
+    RestorationCannotBeDoneOnCell,
+}
+
+impl MleFailCause {
+    pub const fn from_raw(value: u8) -> Self {
+        match value & 0b11 {
+            0 => Self::NeighbourCellEnquiryUnavailableOrTemporaryBreak,
+            1 => Self::CellReselectionTypeNotSupported,
+            2 => Self::MsNotAllowedOnCell,
+            _ => Self::RestorationCannotBeDoneOnCell,
+        }
+    }
+
+    pub const fn into_raw(self) -> u8 {
+        match self {
+            Self::NeighbourCellEnquiryUnavailableOrTemporaryBreak => 0,
+            Self::CellReselectionTypeNotSupported => 1,
+            Self::MsNotAllowedOnCell => 2,
+            Self::RestorationCannotBeDoneOnCell => 3,
+        }
+    }
+}
+
+/// Acceptance result in D-CHANNEL-RESPONSE (clause 18.5.6c).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MleChannelResponseType {
+    Accepted,
+    Rejected,
+}
+
+impl MleChannelResponseType {
+    pub const fn from_raw(value: u8) -> Self {
+        if value & 1 == 0 {
+            Self::Accepted
+        } else {
+            Self::Rejected
+        }
+    }
+
+    pub const fn into_raw(self) -> u8 {
+        match self {
+            Self::Accepted => 0,
+            Self::Rejected => 1,
+        }
+    }
+}
+
+/// Reason supplied by U-CHANNEL-REQUEST and repeated in D-CHANNEL-RESPONSE.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MleChannelRequestReason {
+    Unspecified,
+    CurrentChannelRadioRelinquishable,
+    CurrentChannelRadioImprovable,
+    HigherLevelOfServiceRequested,
+    Reserved(u8),
+}
+
+impl MleChannelRequestReason {
+    pub const fn from_raw(value: u8) -> Self {
+        match value & 0b111 {
+            0 => Self::Unspecified,
+            1 => Self::CurrentChannelRadioRelinquishable,
+            2 => Self::CurrentChannelRadioImprovable,
+            3 => Self::HigherLevelOfServiceRequested,
+            other => Self::Reserved(other),
+        }
+    }
+
+    pub const fn into_raw(self) -> u8 {
+        match self {
+            Self::Unspecified => 0,
+            Self::CurrentChannelRadioRelinquishable => 1,
+            Self::CurrentChannelRadioImprovable => 2,
+            Self::HigherLevelOfServiceRequested => 3,
+            Self::Reserved(value) => value & 0b111,
+        }
+    }
+}
+
+/// Minimum retry delay encoded in D-CHANNEL-RESPONSE (clause 18.5.6b).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MleChannelRequestRetryDelay {
+    NoDelay,
+    Seconds5,
+    Seconds10,
+    Seconds15,
+    Seconds20,
+    Seconds25,
+    Seconds30,
+    Seconds40,
+    Seconds50,
+    Seconds60,
+    Seconds80,
+    Seconds120,
+    Seconds300,
+    Reserved(u8),
+    RetransmissionNotPermitted,
+}
+
+impl MleChannelRequestRetryDelay {
+    pub const fn from_raw(value: u8) -> Self {
+        match value & 0b1111 {
+            0 => Self::NoDelay,
+            1 => Self::Seconds5,
+            2 => Self::Seconds10,
+            3 => Self::Seconds15,
+            4 => Self::Seconds20,
+            5 => Self::Seconds25,
+            6 => Self::Seconds30,
+            7 => Self::Seconds40,
+            8 => Self::Seconds50,
+            9 => Self::Seconds60,
+            10 => Self::Seconds80,
+            11 => Self::Seconds120,
+            12 => Self::Seconds300,
+            15 => Self::RetransmissionNotPermitted,
+            other => Self::Reserved(other),
+        }
+    }
+
+    pub const fn into_raw(self) -> u8 {
+        match self {
+            Self::NoDelay => 0,
+            Self::Seconds5 => 1,
+            Self::Seconds10 => 2,
+            Self::Seconds15 => 3,
+            Self::Seconds20 => 4,
+            Self::Seconds25 => 5,
+            Self::Seconds30 => 6,
+            Self::Seconds40 => 7,
+            Self::Seconds50 => 8,
+            Self::Seconds60 => 9,
+            Self::Seconds80 => 10,
+            Self::Seconds120 => 11,
+            Self::Seconds300 => 12,
+            Self::Reserved(value) => value & 0b1111,
+            Self::RetransmissionNotPermitted => 15,
+        }
+    }
+
+    pub fn duration(self) -> Option<Duration> {
+        match self {
+            Self::NoDelay => Some(Duration::from_secs(0)),
+            Self::Seconds5 => Some(Duration::from_secs(5)),
+            Self::Seconds10 => Some(Duration::from_secs(10)),
+            Self::Seconds15 => Some(Duration::from_secs(15)),
+            Self::Seconds20 => Some(Duration::from_secs(20)),
+            Self::Seconds25 => Some(Duration::from_secs(25)),
+            Self::Seconds30 => Some(Duration::from_secs(30)),
+            Self::Seconds40 => Some(Duration::from_secs(40)),
+            Self::Seconds50 => Some(Duration::from_secs(50)),
+            Self::Seconds60 => Some(Duration::from_secs(60)),
+            Self::Seconds80 => Some(Duration::from_secs(80)),
+            Self::Seconds120 => Some(Duration::from_secs(120)),
+            Self::Seconds300 => Some(Duration::from_secs(300)),
+            Self::Reserved(_) | Self::RetransmissionNotPermitted => None,
+        }
+    }
+}
+
 /// Explicit MLE cell-selection lifecycle.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum MleCellState {

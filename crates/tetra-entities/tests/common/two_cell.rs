@@ -1,11 +1,17 @@
 use tetra_config::bluestation::StackMode;
 use tetra_core::tetra_entities::TetraEntity;
 use tetra_core::{BitBuffer, Sap, TdmaTime, TetraAddress};
+use tetra_entities::mle::cell_change_runtime::MleCellChangeRuntimeSnapshot;
 use tetra_entities::mle::ltpd_runtime::LtpdRuntimeSnapshot;
 use tetra_entities::mle::mle_bs::MleBs;
+use tetra_pdus::mle::enums::mle_protocol_discriminator::MleProtocolDiscriminator;
+use tetra_pdus::mle::pdus::u_channel_request::UChannelRequest;
+use tetra_pdus::mle::pdus::u_prepare::UPrepare;
+use tetra_pdus::mle::pdus::u_restore::URestore;
 use tetra_saps::common::{
     LowerLayerResourceAvailability, LowerLayerResourceReason, PduPriority,
 };
+use tetra_saps::control::mle_cell_change::MleCellChangeControl;
 use tetra_saps::ltpd::LtpdMleDisconnectReq;
 use tetra_saps::tla::TlaTlDataIndBl;
 use tetra_saps::tlmc::TlmcConfigureInd;
@@ -160,6 +166,105 @@ impl TwoCellHarness {
             }),
         });
         self.cell_mut(cell).deliver_all_messages();
+    }
+
+    fn submit_mle_body(
+        &mut self,
+        cell: TestCell,
+        address: TetraAddress,
+        endpoint_id: u32,
+        link_id: u32,
+        mut body: BitBuffer,
+    ) {
+        body.seek(0);
+        let body_len = body.get_len();
+        let mut sdu = BitBuffer::new(3 + body_len);
+        sdu.write_bits(MleProtocolDiscriminator::Mle.into_raw(), 3);
+        sdu.copy_bits(&mut body, body_len);
+        sdu.seek(0);
+        self.cell_mut(cell).submit_message(SapMsg {
+            sap: Sap::TlaSap,
+            src: TetraEntity::Llc,
+            dest: TetraEntity::Mle,
+            msg: SapMsgInner::TlaTlDataIndBl(TlaTlDataIndBl {
+                main_address: address,
+                link_id,
+                endpoint_id,
+                new_endpoint_id: None,
+                css_endpoint_id: None,
+                tl_sdu: Some(sdu),
+                scrambling_code: 0,
+                fcs_flag: false,
+                air_interface_encryption: 0,
+                chan_change_resp_req: false,
+                chan_change_handle: None,
+                chan_info: None,
+                req_handle: 0,
+            }),
+        });
+        self.cell_mut(cell).deliver_all_messages();
+    }
+
+    pub fn submit_u_prepare(
+        &mut self,
+        cell: TestCell,
+        address: TetraAddress,
+        endpoint_id: u32,
+        link_id: u32,
+        pdu: UPrepare,
+    ) {
+        let mut body = BitBuffer::new_autoexpand(128);
+        pdu.to_bitbuf(&mut body).expect("encode U-PREPARE");
+        self.submit_mle_body(cell, address, endpoint_id, link_id, body);
+    }
+
+    pub fn submit_u_restore(
+        &mut self,
+        cell: TestCell,
+        address: TetraAddress,
+        endpoint_id: u32,
+        link_id: u32,
+        pdu: URestore,
+    ) {
+        let mut body = BitBuffer::new_autoexpand(128);
+        pdu.to_bitbuf(&mut body).expect("encode U-RESTORE");
+        self.submit_mle_body(cell, address, endpoint_id, link_id, body);
+    }
+
+    pub fn submit_u_channel_request(
+        &mut self,
+        cell: TestCell,
+        address: TetraAddress,
+        endpoint_id: u32,
+        link_id: u32,
+        pdu: UChannelRequest,
+    ) {
+        let mut body = BitBuffer::new_autoexpand(96);
+        pdu.to_bitbuf(&mut body).expect("encode U-CHANNEL-REQUEST");
+        self.submit_mle_body(cell, address, endpoint_id, link_id, body);
+    }
+
+    pub fn control_cell_change(&mut self, cell: TestCell, control: MleCellChangeControl) {
+        self.cell_mut(cell).submit_message(SapMsg {
+            sap: Sap::Control,
+            src: TetraEntity::Mm,
+            dest: TetraEntity::Mle,
+            msg: SapMsgInner::MleCellChangeControl(control),
+        });
+        self.cell_mut(cell).deliver_all_messages();
+    }
+
+    pub fn cell_change_snapshot(&mut self, cell: TestCell) -> MleCellChangeRuntimeSnapshot {
+        let component = self
+            .cell_mut(cell)
+            .router
+            .get_entity(TetraEntity::Mle)
+            .expect("MLE missing from two-cell harness");
+        component
+            .as_any_mut()
+            .downcast_mut::<MleBs>()
+            .expect("MLE-BS downcast failed")
+            .cell_change_snapshot()
     }
 
     pub fn ltpd_snapshot(&mut self, cell: TestCell) -> LtpdRuntimeSnapshot {
