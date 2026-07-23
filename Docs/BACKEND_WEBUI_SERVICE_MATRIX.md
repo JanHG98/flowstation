@@ -8,8 +8,8 @@
 | Mobility Core | Registrierungen, Zellen, Migration, Recovery | Kontextfreigabe, Handover-Abbruch |
 | Call Control | Calls, Legs, Floor, Priorität, Restore | Call beenden, Floor entziehen, Pre-emption; im Testpaket bewusst offen ohne Tokens |
 | Media Switch | Streams, Jitter, Routing, TBS-Legs, Recorder-Taps | Stream stummschalten, Puffer leeren, Testframe einspeisen; im Testpaket bewusst offen ohne Tokens |
-| SDS Router | Nachrichten, Queues, Zustelltrace | Nachricht senden, Retry, Queue löschen |
-| Packet Core | PDP Contexts, NSAPI, Durchsatz | Context trennen, Zugriff sperren |
+| SDS Router | Nachrichten, Queues, Zustelltrace | Nachricht senden, Retry, Queue löschen; im Testpaket bewusst offen ohne Tokens |
+| Packet Core | PDP Contexts, NSAPI, READY/STANDBY, Bearer, Fragmentierung und Flow Control | Kontext pagen, modifizieren, beenden oder trennen; im Testpaket bewusst offen ohne Tokens |
 | IP Gateway | Routing, NAT, Firewall, Capture | Firewall ändern, Capture starten |
 | Security Core | Authentisierung, Policies, Sperren | Security Policy, Kontextwiderruf |
 | KMF | Key-Metadaten, OTAR, Crypto Periods | Rotation, OTAR, Restore; keine Rohschlüsselanzeige |

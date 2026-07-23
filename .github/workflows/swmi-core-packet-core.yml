@@ -1,0 +1,43 @@
+name: SWMI Core Packet Core
+
+on:
+  push:
+    paths:
+      - 'system-backend/packet-core/**'
+      - 'crates/tetra-entities/src/sndcp/**'
+      - 'crates/tetra-entities/src/net_control/**'
+      - 'crates/tetra-entities/src/net_control_room/**'
+      - 'bins/bluestation-bs/src/main.rs'
+      - 'tools/check_packet_core.py'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.github/workflows/swmi-core-packet-core.yml'
+  pull_request:
+    paths:
+      - 'system-backend/packet-core/**'
+      - 'crates/tetra-entities/src/sndcp/**'
+      - 'crates/tetra-entities/src/net_control/**'
+      - 'crates/tetra-entities/src/net_control_room/**'
+      - 'bins/bluestation-bs/src/main.rs'
+      - 'tools/check_packet_core.py'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+
+jobs:
+  packet-core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Static Packet Core checks
+        run: python3 tools/check_packet_core.py
+      - name: Format
+        run: cargo fmt --all -- --check
+      - name: Tests
+        run: cargo test -p tetra-entities -p netcore-packet-core
+      - name: Release build
+        run: cargo build --release -p netcore-packet-core
+      - name: Clippy
+        run: cargo clippy -p netcore-packet-core --all-targets -- -D warnings

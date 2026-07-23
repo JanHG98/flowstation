@@ -126,7 +126,11 @@ impl CmceBs {
             | ControlCommand::MobilityRemoveContext { .. }
             | ControlCommand::SubscriberAccessPolicyApply { .. }
             | ControlCommand::GroupAccessPolicyApply { .. }
-            | ControlCommand::GroupDgnaApply { .. } => {
+            | ControlCommand::GroupDgnaApply { .. }
+            | ControlCommand::PacketDataContextDeactivate { .. }
+            | ControlCommand::PacketDataContextModify { .. }
+            | ControlCommand::PacketDataWake { .. }
+            | ControlCommand::PacketDataEndOfData { .. } => {
                 tracing::warn!("CMCE: MM command reached CMCE instead of MM; ignoring");
             }
             ControlCommand::Dgna { issi, gssi, attach } => {

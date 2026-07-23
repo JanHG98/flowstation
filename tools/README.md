@@ -33,3 +33,11 @@ Es kann nicht:
 - semantische Korrektheit eines Codecs beweisen,
 - On-Air-Kompatibilität bestätigen,
 - implizite Zustände vollständig rekonstruieren.
+
+## Packet Core
+
+```bash
+python3 tools/check_packet_core.py
+```
+
+Der Check prüft Paketstruktur, Workspace-Einbindung, TBS-Control-Routing, SNDCP-Endpunkt, WebUI/API und Open-Lab-Konfiguration des Packet-Core-LXC.

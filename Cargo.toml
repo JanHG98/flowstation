@@ -21,6 +21,7 @@ members = [
     "system-backend/media-switch",
     "system-backend/recorder",
     "system-backend/sds-router",
+    "system-backend/packet-core",
     #"bins/bluestation-telemetry",
     #"bins/bluestation-control",
     #"bins/pdu-tool",

@@ -1,0 +1,58 @@
+[server]
+bind = "0.0.0.0:8160"
+history_limit = 5000
+
+[node_gateway]
+url = "ws://127.0.0.1:8080/ws/backend"
+reconnect_secs = 5
+
+[storage]
+database_path = "/var/lib/netcore-packet-core/state.json"
+backup_path = "/var/lib/netcore-packet-core/state.json.bak"
+
+[packet]
+# shadow: lokale TBS entscheidet, Core rechnet parallel
+# authoritative: Edge API liefert verbindliche Core-Aktionen
+mode = "shadow"
+ready_timer_secs = 5
+standby_timer_secs = 300
+response_wait_secs = 10
+context_ready_secs = 30
+default_mtu = 1500
+max_n_pdu_bytes = 65535
+max_contexts_per_subscriber = 14
+max_total_contexts = 4096
+strict_source_address = true
+preserve_context_on_node_loss = true
+
+[address_pool]
+network_prefix = [10, 44, 0]
+first_host = 2
+last_host = 254
+gateway = "10.44.0.1"
+allow_static = true
+
+[fragmentation]
+timeout_secs = 30
+max_datagrams = 256
+max_total_bytes = 8388608
+max_fragments_per_datagram = 512
+reject_overlaps = true
+
+[flow_control]
+max_queue_packets_per_context = 64
+max_queue_bytes_per_context = 262144
+queue_ttl_secs = 30
+action_retry_secs = 5
+action_max_attempts = 5
+
+[security]
+mode = "open_lab"
+allow_remote_management = true
+expose_payloads = true
+
+[limits]
+max_body_bytes = 1048576
+max_events = 10000
+max_actions = 10000
+max_payload_bytes = 65535

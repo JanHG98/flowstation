@@ -3,6 +3,7 @@ use std::net::Ipv4Addr;
 use std::time::{Duration, Instant};
 
 use crate::{MessageQueue, TetraEntityTrait};
+use crate::net_control::{ControlCommand, ControlEndpoint, ControlResponse};
 use crate::net_telemetry::{TelemetryEvent, TelemetrySink};
 use crate::net_telemetry::events::{PacketDataContextTelemetry, PacketDataGatewayTelemetry, PdchBearerTelemetry};
 use tetra_config::bluestation::SharedConfig;
@@ -212,6 +213,7 @@ pub struct Sndcp {
     last_timer_sweep: Instant,
     last_telemetry_emit: Instant,
     telemetry: Option<TelemetrySink>,
+    control: Option<ControlEndpoint>,
     next_ltpd_handle: u32,
     ltpd_network: Option<(u16, u16)>,
     ltpd_link_state: LtpdLinkState,
@@ -248,6 +250,7 @@ impl Sndcp {
             last_timer_sweep: now,
             last_telemetry_emit: now.checked_sub(Duration::from_secs(2)).unwrap_or(now),
             telemetry,
+            control: None,
             next_ltpd_handle: 1,
             ltpd_network: None,
             ltpd_link_state: LtpdLinkState::Null,
@@ -256,6 +259,177 @@ impl Sndcp {
             ltpd_last_report: None,
             ltpd_successful_transfers: 0,
             ltpd_failed_transfers: 0,
+        }
+    }
+
+    /// Connect the SNDCP entity to the Node-Gateway/Packet-Core control plane.
+    pub fn set_control(&mut self, endpoint: ControlEndpoint) {
+        self.control = Some(endpoint);
+    }
+
+    fn respond_packet_action(
+        responder: &Option<ControlEndpoint>,
+        handle: u32,
+        action: &str,
+        issi: u32,
+        nsapi: Option<u8>,
+        success: bool,
+        message: impl Into<String>,
+    ) {
+        if let Some(endpoint) = responder {
+            endpoint.respond(ControlResponse::PacketDataActionResult {
+                handle,
+                action: action.to_string(),
+                issi,
+                nsapi,
+                success,
+                message: message.into(),
+            });
+        }
+    }
+
+    fn process_control_commands(&mut self, queue: &mut MessageQueue) {
+        let responder = self.control.clone();
+        let mut commands = Vec::new();
+        if let Some(endpoint) = &self.control {
+            while let Some(command) = endpoint.try_recv() {
+                commands.push(command);
+            }
+        }
+
+        for command in commands {
+            match command {
+                ControlCommand::PacketDataContextDeactivate { handle, issi, nsapi, reason } => {
+                    let Some(route) = self.routes.get(&issi).copied() else {
+                        Self::respond_packet_action(&responder, handle, "deactivate", issi, nsapi, false, "subscriber has no local SNDCP route");
+                        continue;
+                    };
+                    let exists = match nsapi {
+                        Some(nsapi) => self.contexts.get(ContextKey { issi, nsapi }).is_some(),
+                        None => self.contexts.contexts_for_issi(issi) > 0,
+                    };
+                    if !exists {
+                        Self::respond_packet_action(&responder, handle, "deactivate", issi, nsapi, false, "PDP context not found");
+                        continue;
+                    }
+                    let pdu = Self::encoded(SnPdu::DeactivateDemand(Deactivate {
+                        deactivation_type: if nsapi.is_some() { 1 } else { 0 },
+                        nsapi,
+                        optional: Self::zero_optional(),
+                    }));
+                    self.queue_acked_to(queue, route, &pdu, None);
+                    self.last_activity = format!("Packet Core deactivate {} {:?}: {}", issi, nsapi, reason);
+                    Self::respond_packet_action(&responder, handle, "deactivate", issi, nsapi, true, "SN-DEACTIVATE PDP CONTEXT DEMAND queued");
+                }
+                ControlCommand::PacketDataContextModify {
+                    handle,
+                    issi,
+                    nsapi,
+                    available,
+                    usage_active,
+                    priority,
+                    mtu,
+                } => {
+                    let key = ContextKey { issi, nsapi };
+                    let Some(route) = self.routes.get(&issi).copied() else {
+                        Self::respond_packet_action(&responder, handle, "modify", issi, Some(nsapi), false, "subscriber has no local SNDCP route");
+                        continue;
+                    };
+                    let Some(context) = self.contexts.get_mut(key) else {
+                        Self::respond_packet_action(&responder, handle, "modify", issi, Some(nsapi), false, "PDP context not found");
+                        continue;
+                    };
+                    if let Some(value) = available {
+                        context.availability = if value { ContextAvailability::Available } else { ContextAvailability::ScheduleSuspended };
+                    }
+                    if let Some(value) = usage_active {
+                        context.usage = if value { ContextUsage::Active } else { ContextUsage::ContextPaused };
+                    }
+                    if let Some(value) = priority {
+                        context.pdu_priority_max = value.min(7);
+                    }
+                    if let Some(value) = mtu {
+                        context.mtu_octets = usize::from(value).max(128);
+                    }
+                    if let Some(value) = available {
+                        let pdu = Self::encoded(SnPdu::Modify(Modify::Availability {
+                            nsapi,
+                            availability: if value { 0 } else { 1 },
+                            optional: Self::zero_optional(),
+                        }));
+                        self.queue_acked_to(queue, route, &pdu, None);
+                    }
+                    if usage_active == Some(false) {
+                        let pdu = Self::encoded(SnPdu::Modify(Modify::Usage {
+                            nsapi,
+                            usage: 1,
+                            optional: Self::zero_optional(),
+                        }));
+                        self.queue_acked_to(queue, route, &pdu, None);
+                    }
+                    self.last_activity = format!("Packet Core modify {} NSAPI{}", issi, nsapi);
+                    let note = if priority.is_some() || mtu.is_some() || usage_active == Some(true) {
+                        "local context updated; availability/pause changes signalled over air, priority/MTU/resume remain local policy"
+                    } else {
+                        "SN-MODIFY update queued"
+                    };
+                    Self::respond_packet_action(&responder, handle, "modify", issi, Some(nsapi), true, note);
+                }
+                ControlCommand::PacketDataWake { handle, issi, mut nsapis } => {
+                    nsapis.sort_unstable();
+                    nsapis.dedup();
+                    nsapis.retain(|nsapi| (1..=14).contains(nsapi));
+                    let valid = nsapis
+                        .iter()
+                        .copied()
+                        .filter(|nsapi| self.contexts.get(ContextKey { issi, nsapi: *nsapi }).is_some())
+                        .collect::<Vec<_>>();
+                    if valid.is_empty() || !self.routes.contains_key(&issi) {
+                        Self::respond_packet_action(&responder, handle, "wake", issi, None, false, "no routed PDP context found for requested NSAPIs");
+                        continue;
+                    }
+                    for nsapi in &valid {
+                        self.page_context(queue, ContextKey { issi, nsapi: *nsapi });
+                    }
+                    self.last_activity = format!("Packet Core page {} {:?}", issi, valid);
+                    Self::respond_packet_action(&responder, handle, "wake", issi, valid.first().copied(), true, format!("SN-PAGE queued for {} context(s)", valid.len()));
+                }
+                ControlCommand::PacketDataEndOfData { handle, issi, mut nsapis } => {
+                    nsapis.sort_unstable();
+                    nsapis.dedup();
+                    let Some(route) = self.routes.get(&issi).copied() else {
+                        Self::respond_packet_action(&responder, handle, "end_of_data", issi, None, false, "subscriber has no local SNDCP route");
+                        continue;
+                    };
+                    let active = if nsapis.is_empty() {
+                        self.contexts.bearer_nsapis(issi).collect::<Vec<_>>()
+                    } else {
+                        nsapis.into_iter().filter(|nsapi| self.contexts.get(ContextKey { issi, nsapi: *nsapi }).is_some()).collect::<Vec<_>>()
+                    };
+                    if active.is_empty() {
+                        Self::respond_packet_action(&responder, handle, "end_of_data", issi, None, false, "no active PDP context found");
+                        continue;
+                    }
+                    let logical_ts = self.pdch_for_issi(issi);
+                    let pdu = Self::encoded(SnPdu::EndOfData(EndOfData {
+                        immediate_service_change: false,
+                        optional: Self::zero_optional(),
+                    }));
+                    self.queue_acked_to(queue, route, &pdu, logical_ts.map(Self::quit_allocation));
+                    let now = Instant::now();
+                    let standby_timer_code = self.profile().map(|profile| profile.standby_timer_code).unwrap_or(0);
+                    for nsapi in &active {
+                        if let Some(context) = self.contexts.get_mut(ContextKey { issi, nsapi: *nsapi }) {
+                            context.enter_standby(standby_timer_code, now);
+                        }
+                    }
+                    self.contexts.release_bearer_for_issi(issi);
+                    self.release_pdch(issi);
+                    self.last_activity = format!("Packet Core end-of-data {} {:?}", issi, active);
+                    Self::respond_packet_action(&responder, handle, "end_of_data", issi, active.first().copied(), true, "SN-END OF DATA queued and local bearer released");
+                }
+                other => tracing::warn!("SNDCP: ignoring non-packet control command {:?}", other),
+            }
         }
     }
 
@@ -1624,6 +1798,48 @@ impl Sndcp {
         )]
     }
 
+    fn handle_deactivate_accept(
+        &mut self,
+        deactivate: Deactivate,
+        ind: &LtpdMleUnitdataInd,
+    ) -> Vec<CachedReply> {
+        let issi = ind.received_tetra_address.ssi;
+        self.check_network_endpoint_id(issi, deactivate.network_endpoint_id(), "SN-DEACTIVATE ACCEPT");
+        match (deactivate.deactivation_type, deactivate.nsapi) {
+            (0, _) => {
+                self.contexts.remove_all_for_issi(issi);
+                self.contexts.release_bearer_for_issi(issi);
+                self.pending_downlink.retain(|key, _| key.issi != issi);
+                self.page_inflight.retain(|key, _| key.issi != issi);
+                self.automatic_bindings.retain(|_, binding| binding.context.issi != issi);
+            }
+            (1, Some(nsapi)) => {
+                let family = self.contexts.family_nsapis(issi, nsapi);
+                for family_nsapi in &family {
+                    let key = ContextKey { issi, nsapi: *family_nsapi };
+                    self.contexts.remove(key);
+                    self.pending_downlink.remove(&key);
+                    self.page_inflight.remove(&key);
+                    self.automatic_bindings.retain(|_, binding| binding.context != key);
+                }
+                self.contexts.release_bearer_nsapis(issi, &family);
+            }
+            _ => {
+                tracing::warn!("SNDCP: malformed SN-DEACTIVATE ACCEPT from ISSI={}", issi);
+                return Vec::new();
+            }
+        }
+        if !self.contexts.has_bearer(issi) {
+            self.release_pdch(issi);
+        }
+        if self.contexts.contexts_for_issi(issi) == 0 {
+            self.routes.remove(&issi);
+            self.response_cache.retain(|(cached_issi, _), _| *cached_issi != issi);
+        }
+        self.last_activity = format!("PDP deactivation confirmed {}", issi);
+        Vec::new()
+    }
+
     fn handle_end_of_data(
         &mut self,
         end: EndOfData,
@@ -1905,8 +2121,8 @@ impl Sndcp {
             }
             SnPdu::DataPriority(priority) => self.handle_data_priority(priority, ind, profile),
             SnPdu::Modify(modify) => self.handle_modify(modify, ind, profile),
-            SnPdu::DeactivateAccept(_)
-            | SnPdu::ActivateAccept(_)
+            SnPdu::DeactivateAccept(deactivate) => self.handle_deactivate_accept(deactivate, ind),
+            SnPdu::ActivateAccept(_)
             | SnPdu::ActivateReject(_)
             | SnPdu::DataTransmitResponse(_)
             | SnPdu::PageRequest(_) => vec![Self::not_supported(raw_request.peek_bits(4).unwrap_or(15) as u8)],
@@ -2456,6 +2672,7 @@ impl TetraEntityTrait for Sndcp {
     }
 
     fn tick_start(&mut self, queue: &mut MessageQueue, _ts: TdmaTime) {
+        self.process_control_commands(queue);
         if let Some(profile) = self.profile() {
             if profile.gateway_enabled {
                 self.poll_gateway(queue, profile);

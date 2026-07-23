@@ -41,7 +41,7 @@ Langfristig verwenden neue Dienste mit eigener LXC-IP einheitlich:
 https://<LXC-IP>:8443/
 ```
 
-Die bisher umgesetzten Dienste sind ausdrücklich dokumentierte Ausnahmen für die isolierte Testumgebung und verwenden je Dienst einen eigenen HTTP-Port im offenen Labormodus. Die verbindliche Zuordnung steht in `services.toml`; der Recorder verwendet Port 8140 und der SDS Router Port 8150.
+Die bisher umgesetzten Dienste sind ausdrücklich dokumentierte Ausnahmen für die isolierte Testumgebung und verwenden je Dienst einen eigenen HTTP-Port im offenen Labormodus. Die verbindliche Zuordnung steht in `services.toml`; der Recorder verwendet Port 8140, der SDS Router Port 8150 und der Packet Core Port 8160.
 
 ## Bereits deploybare Dienste
 
@@ -55,5 +55,6 @@ Bereits deploybar sind:
 - `media-switch/` – Routing gepackter TETRA-Sprachframes, Port 8130
 - `recorder/` – passive Aufnahme, Integrität, Retention und Export, Port 8140
 - `sds-router/` – SDS-/Statusvermittlung, Store-and-forward und Anwendungsrouten, Port 8150
+- `packet-core/` – PDP-/NSAPI-State-Machine, Mobility Anchoring, Fragmentierung und Flow Control, Port 8160
 
 Alle enthalten Rust-Runtime, REST-API, eigene WebUI, systemd-Unit und Installationsskripte. In der aktuellen Teststufe laufen sie bewusst im deutlich markierten `open_lab`-Modus ohne Tokens, Benutzeranmeldung oder TLS.

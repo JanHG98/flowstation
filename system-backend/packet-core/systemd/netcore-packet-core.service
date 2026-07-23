@@ -1,0 +1,21 @@
+[Unit]
+Description=NetCore Packet Core (OPEN LAB)
+After=network-online.target netcore-node-gateway.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=netcore
+Group=netcore
+ExecStart=/usr/local/bin/netcore-packet-core --config /etc/netcore/packet-core.toml
+Restart=on-failure
+RestartSec=2
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/netcore-packet-core
+Environment=RUST_LOG=netcore_packet_core=info
+
+[Install]
+WantedBy=multi-user.target

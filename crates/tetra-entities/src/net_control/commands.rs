@@ -345,6 +345,39 @@ pub enum ControlCommand {
         dest_ssi: u32,
         pre_coded_status: u16,
     },
+
+    /// Ask the local SNDCP edge to deactivate one PDP context or every context of a subscriber.
+    PacketDataContextDeactivate {
+        handle: u32,
+        issi: u32,
+        nsapi: Option<u8>,
+        reason: String,
+    },
+
+    /// Apply the centrally coordinated availability/usage/priority/MTU view to one local context.
+    PacketDataContextModify {
+        handle: u32,
+        issi: u32,
+        nsapi: u8,
+        available: Option<bool>,
+        usage_active: Option<bool>,
+        priority: Option<u8>,
+        mtu: Option<u16>,
+    },
+
+    /// Page or wake one subscriber for the listed active NSAPIs.
+    PacketDataWake {
+        handle: u32,
+        issi: u32,
+        nsapis: Vec<u8>,
+    },
+
+    /// End the current packet-data transfer and return the listed contexts to STANDBY.
+    PacketDataEndOfData {
+        handle: u32,
+        issi: u32,
+        nsapis: Vec<u8>,
+    },
 }
 
 /// Response sent back after processing a [`ControlCommand`].
@@ -447,6 +480,16 @@ pub enum ControlResponse {
     /// Result of a first-class central SDS or status delivery command.
     SdsDeliveryResponse {
         handle: u32,
+        success: bool,
+        message: String,
+    },
+
+    /// Result of a centrally requested local SNDCP action.
+    PacketDataActionResult {
+        handle: u32,
+        action: String,
+        issi: u32,
+        nsapi: Option<u8>,
         success: bool,
         message: String,
     },

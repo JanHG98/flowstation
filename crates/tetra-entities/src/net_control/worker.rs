@@ -143,6 +143,10 @@ impl<T: NetworkTransport> ControlWorker<T> {
             ControlCommand::ClearEmergency { .. } => TetraEntity::Cmce,
             ControlCommand::CommandA { .. } => TetraEntity::Mm,
             ControlCommand::TestCmdB { .. } => TetraEntity::Cmce,
+            ControlCommand::PacketDataContextDeactivate { .. }
+            | ControlCommand::PacketDataContextModify { .. }
+            | ControlCommand::PacketDataWake { .. }
+            | ControlCommand::PacketDataEndOfData { .. } => TetraEntity::Sndcp,
         }
     }
 

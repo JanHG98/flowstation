@@ -86,6 +86,13 @@ warning = "OPEN LAB: no authentication, no tokens and no TLS; every reachable cl
 [[services]]
 name = "packet-core"
 webui = true
+scheme = "http"
+management_port = 8160
+security_mode = "open_lab"
+token_auth = false
+tls = false
+depends_on = ["node-gateway"]
+warning = "OPEN LAB: no authentication, no tokens and no TLS; every reachable client may inspect payloads, alter PDP contexts and page or deactivate subscribers"
 
 [[services]]
 name = "ip-gateway"

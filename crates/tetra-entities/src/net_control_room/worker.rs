@@ -406,6 +406,10 @@ pub fn route_control_command(command: &ControlCommand) -> TetraEntity {
         ControlCommand::ClearEmergency { .. } => TetraEntity::Cmce,
         ControlCommand::CommandA { .. } => TetraEntity::Mm,
         ControlCommand::TestCmdB { .. } => TetraEntity::Cmce,
+        ControlCommand::PacketDataContextDeactivate { .. }
+        | ControlCommand::PacketDataContextModify { .. }
+        | ControlCommand::PacketDataWake { .. }
+        | ControlCommand::PacketDataEndOfData { .. } => TetraEntity::Sndcp,
     }
 }
 
@@ -416,7 +420,11 @@ fn correlation_key_for_command(command: &ControlCommand) -> Option<CommandCorrel
         | ControlCommand::DeliverSds { handle, .. }
         | ControlCommand::SendStatus { handle, .. }
         | ControlCommand::CommandA { handle, .. }
-        | ControlCommand::TestCmdB { handle, .. } => Some(CommandCorrelationKey::Handle(*handle)),
+        | ControlCommand::TestCmdB { handle, .. }
+        | ControlCommand::PacketDataContextDeactivate { handle, .. }
+        | ControlCommand::PacketDataContextModify { handle, .. }
+        | ControlCommand::PacketDataWake { handle, .. }
+        | ControlCommand::PacketDataEndOfData { handle, .. } => Some(CommandCorrelationKey::Handle(*handle)),
         ControlCommand::KickMs { issi } => Some(CommandCorrelationKey::KickMs(*issi)),
         ControlCommand::MobilityExportContext { handle, .. }
         | ControlCommand::MobilityImportContext { handle, .. }
@@ -469,7 +477,8 @@ fn correlation_key_for_response(response: &ControlResponse) -> Option<CommandCor
     match response {
         ControlResponse::CommandAResponse { handle, .. }
         | ControlResponse::SendSdsResponse { handle, .. }
-        | ControlResponse::SdsDeliveryResponse { handle, .. } => {
+        | ControlResponse::SdsDeliveryResponse { handle, .. }
+        | ControlResponse::PacketDataActionResult { handle, .. } => {
             Some(CommandCorrelationKey::Handle(*handle))
         }
         ControlResponse::KickMsResponse { issi, .. } => Some(CommandCorrelationKey::KickMs(*issi)),
