@@ -118,7 +118,11 @@ impl<T: NetworkTransport> ControlWorker<T> {
             ControlCommand::KickMs { .. } => TetraEntity::Cmce,
             // DGNA is a Mobility Management procedure: group attach/detach state and the
             // D-ATTACH/DETACH GROUP IDENTITY send path both live in the MM entity.
-            ControlCommand::Dgna { .. } => TetraEntity::Mm,
+            ControlCommand::Dgna { .. }
+            | ControlCommand::MobilityExportContext { .. }
+            | ControlCommand::MobilityImportContext { .. }
+            | ControlCommand::MobilityRemoveContext { .. }
+        | ControlCommand::SubscriberAccessPolicyApply { .. } => TetraEntity::Mm,
             ControlCommand::RestartService => TetraEntity::Cmce,
             ControlCommand::ShutdownService => TetraEntity::Cmce,
             ControlCommand::AddLiveSds { .. } => TetraEntity::Cmce,

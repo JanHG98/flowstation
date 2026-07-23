@@ -30,6 +30,8 @@ enum CommandCorrelationKey {
     Handle(u32),
     KickMs(u32),
     Dgna { issi: u32, gssi: u32, attach: bool },
+    Mobility(u32),
+    SubscriberPolicy(u32),
     RestartService,
     ShutdownService,
     LiveSdsAdd { source_issi: u32, protocol_id: u8, text: String },
@@ -324,7 +326,11 @@ pub fn route_control_command(command: &ControlCommand) -> TetraEntity {
         ControlCommand::SendSds { .. } => TetraEntity::Cmce,
         ControlCommand::SendRawSdsType4 { .. } => TetraEntity::Cmce,
         ControlCommand::KickMs { .. } => TetraEntity::Cmce,
-        ControlCommand::Dgna { .. } => TetraEntity::Mm,
+        ControlCommand::Dgna { .. }
+        | ControlCommand::MobilityExportContext { .. }
+        | ControlCommand::MobilityImportContext { .. }
+        | ControlCommand::MobilityRemoveContext { .. }
+        | ControlCommand::SubscriberAccessPolicyApply { .. } => TetraEntity::Mm,
         ControlCommand::RestartService => TetraEntity::Cmce,
         ControlCommand::ShutdownService => TetraEntity::Cmce,
         ControlCommand::AddLiveSds { .. } => TetraEntity::Cmce,
@@ -343,6 +349,14 @@ fn correlation_key_for_command(command: &ControlCommand) -> Option<CommandCorrel
         | ControlCommand::CommandA { handle, .. }
         | ControlCommand::TestCmdB { handle, .. } => Some(CommandCorrelationKey::Handle(*handle)),
         ControlCommand::KickMs { issi } => Some(CommandCorrelationKey::KickMs(*issi)),
+        ControlCommand::MobilityExportContext { handle, .. }
+        | ControlCommand::MobilityImportContext { handle, .. }
+        | ControlCommand::MobilityRemoveContext { handle, .. } => {
+            Some(CommandCorrelationKey::Mobility(*handle))
+        }
+        ControlCommand::SubscriberAccessPolicyApply { handle, .. } => {
+            Some(CommandCorrelationKey::SubscriberPolicy(*handle))
+        }
         ControlCommand::Dgna { issi, gssi, attach } => Some(CommandCorrelationKey::Dgna {
             issi: *issi,
             gssi: *gssi,
@@ -372,6 +386,14 @@ fn correlation_key_for_response(response: &ControlResponse) -> Option<CommandCor
             Some(CommandCorrelationKey::Handle(*handle))
         }
         ControlResponse::KickMsResponse { issi, .. } => Some(CommandCorrelationKey::KickMs(*issi)),
+        ControlResponse::MobilityContextExported { handle, .. }
+        | ControlResponse::MobilityContextImported { handle, .. }
+        | ControlResponse::MobilityContextRemoved { handle, .. } => {
+            Some(CommandCorrelationKey::Mobility(*handle))
+        }
+        ControlResponse::SubscriberAccessPolicyApplied { handle, .. } => {
+            Some(CommandCorrelationKey::SubscriberPolicy(*handle))
+        }
     }
 }
 

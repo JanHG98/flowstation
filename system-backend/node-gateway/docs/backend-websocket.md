@@ -55,19 +55,19 @@ Vollständige TBS-Nachrichten werden weitergereicht:
 Gateway-Ping:
 
 ```json
-{ "kind": "ping" }
+{ "kind": "ping", "request_id": "health-1" }
 ```
 
 TBS anpingen:
 
 ```json
-{ "kind": "ping_node", "node_id": "tbs-test" }
+{ "kind": "ping_node", "request_id": "ping-1", "node_id": "tbs-test" }
 ```
 
 TBS trennen:
 
 ```json
-{ "kind": "disconnect_node", "node_id": "tbs-test" }
+{ "kind": "disconnect_node", "request_id": "disconnect-1", "node_id": "tbs-test" }
 ```
 
 Kommando senden:
@@ -75,6 +75,7 @@ Kommando senden:
 ```json
 {
   "kind": "command",
+  "request_id": "mobility-export-1",
   "node_id": "tbs-test",
   "operator_id": "mobility-core-test",
   "command": {
@@ -85,7 +86,19 @@ Kommando senden:
 }
 ```
 
-Jede Anfrage erhält ein `action_result`.
+Jede Anfrage erhält ein `action_result`. Bei Kommandos enthält die Antwort zusätzlich die vom Gateway vergebene `command_id`:
+
+```json
+{
+  "kind": "action_result",
+  "request_id": "mobility-export-1",
+  "command_id": "de305d54-75b4-431b-adb2-eb6b9e546014",
+  "ok": true,
+  "message": "command queued"
+}
+```
+
+`request_id` wird vom Backend-Dienst vergeben und unverändert zurückgesendet. Dadurch können mehrere zentrale Dienste ihre asynchronen Anfragen zuverlässig korrelieren.
 
 ## Sicherheit
 

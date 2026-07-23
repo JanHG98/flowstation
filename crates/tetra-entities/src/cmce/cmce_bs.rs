@@ -88,6 +88,12 @@ impl CmceBs {
                     cep.respond(ControlResponse::KickMsResponse { issi, success });
                 }
             }
+            ControlCommand::MobilityExportContext { .. }
+            | ControlCommand::MobilityImportContext { .. }
+            | ControlCommand::MobilityRemoveContext { .. }
+            | ControlCommand::SubscriberAccessPolicyApply { .. } => {
+                tracing::warn!("CMCE: MM command reached CMCE instead of MM; ignoring");
+            }
             ControlCommand::Dgna { issi, gssi, attach } => {
                 // The dashboard control channel terminates at CMCE, but DGNA is a Mobility
                 // Management procedure — group attach/detach state and the D-ATTACH/DETACH GROUP

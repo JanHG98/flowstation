@@ -5,6 +5,7 @@ CMCE,IndividualCallState,crates/tetra-entities/src/cmce/subentities/cc_bs/state/
 MM,MmClientState,crates/tetra-entities/src/mm/components/client_state.rs,3,4
 NET_ASTERISK,DialogState,crates/tetra-entities/src/net_asterisk/entity.rs,4,0
 NET_AUDIO_PLAYER,AudioPlayerState,crates/tetra-entities/src/net_audio_player/types.rs,7,0
+NET_CONTROL,MobilityClientState,crates/tetra-entities/src/net_control/commands.rs,3,0
 NET_ECHOLINK,QsoState,crates/tetra-entities/src/net_echolink/mod.rs,3,0
 NET_TTS,TtsState,crates/tetra-entities/src/net_tts/types.rs,6,0
 PHY,SynthesisBufferState,crates/tetra-entities/src/phy/components/fcfb.rs,3,0

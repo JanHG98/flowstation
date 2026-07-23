@@ -1,6 +1,6 @@
 sap,primitive,path,sapmsg_variant,constructed,handled,tests,status
 CONTROL,CmceSdsData,crates/tetra-saps/src/control/sds.rs,ja,4,3,16,bidirektional sichtbar
-CONTROL,MmSubscriberUpdate,crates/tetra-saps/src/control/brew.rs,ja,12,5,12,bidirektional sichtbar
+CONTROL,MmSubscriberUpdate,crates/tetra-saps/src/control/brew.rs,ja,16,5,12,bidirektional sichtbar
 LCMC,LcmcMleActivityReq,crates/tetra-saps/src/lcmc/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
 LCMC,LcmcMleBreakInd,crates/tetra-saps/src/lcmc/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet
 LCMC,LcmcMleBusyInd,crates/tetra-saps/src/lcmc/mod.rs,nein,0,0,0,nicht in SapMsgInner verdrahtet

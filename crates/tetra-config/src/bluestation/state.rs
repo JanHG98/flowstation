@@ -640,6 +640,10 @@ pub struct StackState {
     /// fall back to the config value". The dashboard also writes the new list back to the
     /// TOML so it survives a restart.
     pub issi_whitelist_override: Option<Vec<u32>>,
+    /// Central subscriber policy can explicitly represent deny-all.  This is
+    /// separate from the historical dashboard semantics where an empty list
+    /// means open network.  Dashboard edits always reset this flag to false.
+    pub issi_whitelist_deny_all: bool,
     /// Runtime override for the WX/METAR service (dashboard toggle). See WxRuntimeOverride.
     pub wx_override: Option<WxRuntimeOverride>,
     /// Runtime override for Telegram alerts (dashboard editing). See TelegramRuntimeOverride.
@@ -798,6 +802,7 @@ impl Default for StackState {
             live_sds_queue: VecDeque::new(),
             next_live_sds_id: 1,
             issi_whitelist_override: None,
+            issi_whitelist_deny_all: false,
             wx_override: None,
             telegram_override: None,
             dapnet_override: None,

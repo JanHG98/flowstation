@@ -2,36 +2,39 @@
 
 ## Zweck
 
-Der Subscriber Core ist die zentrale Teilnehmerdatenbank des NetCore-TETRA-Netzes.
+Der Subscriber Core ist die zentrale Teilnehmerdatenbank und Zugangsrichtlinie des NetCore-TETRA-Testnetzes.
 
-## Kernaufgaben
+## Aktueller Funktionsumfang
 
-- ISSI, ITSI und Gerätezuordnungen verwalten
-- Teilnehmernamen, Organisationen und Dienstprofile speichern
-- Berechtigungen, Prioritäten und Sperrstatus bereitstellen
-- Registrierungen freigeben oder ablehnen
+- persistente Teilnehmerprofile als atomar geschriebene JSON-Datenbank
+- ISSI, Home-MCC/MNC, Name, Organisation und Gerätezuordnung
+- Freigabe, Sperre, Rufpriorität und Dienstberechtigungen
+- Standardgruppen als Vorbereitung für den kommenden Group Core
+- Live-Sicht auf registrierte Funkgeräte aus der TBS-Telemetrie
+- automatische Verteilung der Zulassungsrichtlinie an alle verbundenen TBS
+- expliziter Closed-Empty-Modus: keine Profile bedeutet **deny all**, nicht versehentlich offenes Netz
+- JSON-Import/Export und CSV-Export
+- eigene WebUI, REST-API, Metriken und OpenAPI
 
-## Abgrenzung
+## WebUI
 
-Aktuelle Zelle und Erreichbarkeit gehören zum Mobility Core; direkte Funk-PDUs werden hier nicht erzeugt.
+```text
+http://<LXC-IP>:8100/
+```
 
-## WebUI zur Verwaltung
+Die WebUI bietet Teilnehmer-CRUD, Import/Export, Live-Registrierungen, TBS-Synchronisationsstatus und Ereignisprotokoll.
 
-Der Subscriber Core erhält eine eigene Verwaltungsoberfläche für Teilnehmer- und Geräte-Stammdaten.
+## Offener Testmodus
 
-### Geplante Ansichten
+Diese Stufe arbeitet absichtlich ohne Tokens, Login, Passwörter, TLS oder Client-Zertifikate. Jeder erreichbare Client kann Teilnehmer und Zugangsregeln ändern. Nur in einem isolierten Testnetz betreiben.
 
-- Teilnehmer, ISSI/ITSI und zugeordnete Geräte
-- Organisationen, Dienstprofile und Prioritäten
-- Berechtigungen, Sperren und Registrierungsfreigaben
-- Import, Export und Änderungsverlauf
-- Abhängigkeiten, Datenbankzustand und Audit
+## Zugangsmodi
 
-### Kritische Aktionen
+- `allow_list`: nur Profile mit `enabled = true` und `registration_allowed = true`
+- `open_network`: alle ISSIs dürfen registrieren; Profile dienen nur als Stammdaten
 
-- Teilnehmer sperren oder freigeben
-- Gerätezuordnung ändern
-- Dienstprofil und Berechtigungen bearbeiten
-- Datensätze importieren oder exportieren
+Änderungen werden bei `auto_sync = true` sofort an jede verbundene und kompatible TBS verteilt. Entfernte oder gesperrte Teilnehmer können zur sofortigen Re-Registrierung gezwungen werden.
 
-Die Oberfläche zeigt keine kryptografischen Schlüssel an.
+## Architekturgrenze
+
+Aktueller Aufenthaltsort und Context Transfer verbleiben im Mobility Core. Gruppenautorität folgt im Group Core. Kryptografische Schlüssel gehören niemals in diesen Dienst.

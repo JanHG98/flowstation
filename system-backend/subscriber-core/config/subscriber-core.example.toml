@@ -1,0 +1,28 @@
+[server]
+bind = "0.0.0.0:8100"
+history_limit = 2000
+
+[node_gateway]
+url = "ws://127.0.0.1:8080/ws/backend"
+reconnect_secs = 5
+
+[storage]
+database_path = "/var/lib/netcore-subscriber-core/subscribers.json"
+backup_path = "/var/lib/netcore-subscriber-core/subscribers.json.bak"
+
+[access_policy]
+# allow_list: only enabled + registration_allowed profiles may register.
+# open_network: all ISSIs may register; profiles remain metadata only.
+mode = "allow_list"
+auto_sync = true
+disconnect_unauthorized = true
+sync_timeout_secs = 30
+
+[security]
+mode = "open_lab"
+allow_remote_management = true
+
+[limits]
+max_body_bytes = 2097152
+max_subscribers = 100000
+max_groups_per_subscriber = 1024

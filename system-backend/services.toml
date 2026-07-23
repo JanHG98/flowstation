@@ -25,6 +25,12 @@ warning = "Isolated test network only; every reachable client has management acc
 [[services]]
 name = "subscriber-core"
 webui = true
+scheme = "http"
+management_port = 8100
+security_mode = "open_lab"
+token_auth = false
+tls = false
+warning = "Isolated test network only; every reachable client may change subscriber admission policy"
 
 [[services]]
 name = "group-core"
@@ -33,6 +39,12 @@ webui = true
 [[services]]
 name = "mobility-core"
 webui = true
+scheme = "http"
+management_port = 8090
+security_mode = "open_lab"
+token_auth = false
+tls = false
+warning = "Isolated test network only; every reachable client may start context transfers"
 
 [[services]]
 name = "call-control"

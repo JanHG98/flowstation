@@ -83,6 +83,9 @@ pub struct ControlRoomNodeCapabilities {
     /// Node can maintain more than one independently allocated PDCH bearer.
     #[serde(default)]
     pub multi_pdch: bool,
+    /// Node accepts centrally managed subscriber admission policies.
+    #[serde(default)]
+    pub subscriber_policy: bool,
 }
 
 impl ControlRoomNodeCapabilities {
@@ -102,6 +105,7 @@ impl ControlRoomNodeCapabilities {
             packet_data: cfg.cell.wap_ip_sndcp_profile_enabled(),
             legacy_wap_sds: true,
             multi_pdch: cfg.cell.wap_ip_sndcp_profile_enabled(),
+            subscriber_policy: true,
         }
     }
 }

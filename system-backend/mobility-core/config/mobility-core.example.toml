@@ -1,0 +1,21 @@
+[server]
+# WebUI and REST API. Use only inside the isolated test/management network.
+bind = "0.0.0.0:8090"
+history_limit = 2000
+transfer_timeout_secs = 45
+
+[node_gateway]
+# Backend WebSocket of the Node Gateway LXC.
+url = "ws://10.0.1.30:8080/ws/backend"
+reconnect_secs = 5
+
+[security]
+# This package deliberately supports only open_lab.
+# There are no token, password or TLS fields.
+mode = "open_lab"
+allow_remote_management = true
+
+[limits]
+max_body_bytes = 1048576
+max_transfers = 10000
+max_subscribers = 100000

@@ -15,7 +15,7 @@
 | Primitive | SapMsgInner | erzeugt | behandelt | Testtreffer | Status | Definition |
 | --- | --- | --- | --- | --- | --- | --- |
 | CmceSdsData | ja | 4 | 3 | 16 | bidirektional sichtbar | `crates/tetra-saps/src/control/sds.rs` |
-| MmSubscriberUpdate | ja | 12 | 5 | 12 | bidirektional sichtbar | `crates/tetra-saps/src/control/brew.rs` |
+| MmSubscriberUpdate | ja | 16 | 5 | 12 | bidirektional sichtbar | `crates/tetra-saps/src/control/brew.rs` |
 
 ## LCMC
 

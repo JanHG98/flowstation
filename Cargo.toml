@@ -14,6 +14,8 @@ members = [
     "bins/netcore-control-room",
     "system-backend/control-room/operator",
     "system-backend/node-gateway",
+    "system-backend/mobility-core",
+    "system-backend/subscriber-core",
     #"bins/bluestation-telemetry",
     #"bins/bluestation-control",
     #"bins/pdu-tool",

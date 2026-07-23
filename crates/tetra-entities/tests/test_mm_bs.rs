@@ -531,3 +531,70 @@ fn test_restart_recovery_honours_whitelist() {
 
     let _ = std::fs::remove_file(&path);
 }
+
+/// A centrally supplied subscriber policy must be able to represent a closed empty list
+/// (deny-all), unlike the legacy dashboard whitelist where an empty list means open network.
+/// Applying a restrictive revision also forces already-registered unauthorized radios through
+/// the normal MM deregistration/re-registration path when requested.
+#[test]
+fn test_central_subscriber_policy_supports_deny_all_and_disconnects_removed_issis() {
+    debug::setup_logging_verbose();
+    const ALLOWED: u32 = 2260701;
+    const REMOVED: u32 = 2260702;
+
+    let mut test = ComponentTest::new(StackMode::Bs, Some(TdmaTime::default()));
+    test.populate_entities(vec![], vec![TetraEntity::Mle]);
+    let (dispatcher, endpoint) = make_control_link();
+    let mm = MmBs::new(test.get_shared_config(), None, Some(endpoint));
+    test.register_entity(mm);
+
+    register_terminal(&mut test, ALLOWED);
+    register_terminal(&mut test, REMOVED);
+    let _ = test.dump_sinks();
+
+    dispatcher.send(ControlCommand::SubscriberAccessPolicyApply {
+        handle: 7001,
+        revision: 11,
+        allow_all: false,
+        allowed_issis: vec![ALLOWED],
+        disconnect_unauthorized: true,
+    });
+    test.run_stack(Some(4));
+
+    {
+        let state = test.config.state_read();
+        assert_eq!(state.issi_whitelist_override.as_deref(), Some(&[ALLOWED][..]));
+        assert!(!state.issi_whitelist_deny_all);
+        assert!(state.subscribers.is_registered(ALLOWED));
+        assert!(!state.subscribers.is_registered(REMOVED));
+    }
+
+    dispatcher.send(ControlCommand::SubscriberAccessPolicyApply {
+        handle: 7002,
+        revision: 12,
+        allow_all: false,
+        allowed_issis: Vec::new(),
+        disconnect_unauthorized: true,
+    });
+    test.run_stack(Some(4));
+
+    {
+        let state = test.config.state_read();
+        assert_eq!(state.issi_whitelist_override.as_deref(), Some(&[][..]));
+        assert!(state.issi_whitelist_deny_all, "closed empty policy must mean deny-all");
+        assert!(!state.subscribers.is_registered(ALLOWED));
+    }
+
+    dispatcher.send(ControlCommand::SubscriberAccessPolicyApply {
+        handle: 7003,
+        revision: 13,
+        allow_all: true,
+        allowed_issis: vec![ALLOWED, REMOVED],
+        disconnect_unauthorized: false,
+    });
+    test.run_stack(Some(2));
+
+    let state = test.config.state_read();
+    assert_eq!(state.issi_whitelist_override.as_deref(), Some(&[][..]));
+    assert!(!state.issi_whitelist_deny_all, "allow-all must restore open-network semantics");
+}

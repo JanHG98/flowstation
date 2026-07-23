@@ -3,7 +3,10 @@ use std::path::PathBuf;
 
 use crate::mm::components::recovery_cache::{RecoveryCache, TerminalRecord};
 use crate::mm::mobility_runtime::{MmMobilityRuntime, MmMobilityRuntimeSnapshot, MmMobilityTimeout};
-use crate::net_control::{ControlCommand, ControlEndpoint};
+use crate::net_control::{
+    ControlCommand, ControlEndpoint, ControlResponse, MobilityClassOfMs,
+    MobilityClientState, MobilityContextPayload,
+};
 use crate::net_telemetry::channel::TelemetrySink;
 use crate::{MessageQueue, TetraEntityTrait, net_brew};
 use tetra_config::bluestation::SharedConfig;
@@ -23,6 +26,7 @@ use tetra_pdus::mm::enums::mm_pdu_type_ul::MmPduTypeUl;
 use tetra_pdus::mm::enums::reject_cause::RejectCause;
 use tetra_pdus::mm::enums::status_downlink::StatusDownlink;
 use tetra_pdus::mm::enums::status_uplink::StatusUplink;
+use tetra_pdus::mm::fields::class_of_ms::ClassOfMs;
 use tetra_pdus::mm::fields::energy_saving_information::EnergySavingInformation;
 use tetra_pdus::mm::fields::group_identity_attachment::GroupIdentityAttachment;
 use tetra_pdus::mm::fields::group_identity_downlink::GroupIdentityDownlink;
@@ -103,10 +107,152 @@ impl MmBs {
     }
 
     pub fn import_mobility_context(&mut self, local_issi: u32, context: &MmClientMobilityContext) {
+        self.mobility.register_local_identity(local_issi, context.issi);
         self.client_mgr.import_mobility_context(local_issi, context);
         self.config.state_write().subscribers.register(local_issi);
         for &gssi in &context.groups {
             self.config.state_write().subscribers.affiliate(local_issi, gssi);
+        }
+    }
+
+    fn mobility_context_to_payload(context: MmClientMobilityContext) -> MobilityContextPayload {
+        MobilityContextPayload {
+            home_issi: context.issi,
+            state: match context.state {
+                MmClientState::Unknown => MobilityClientState::Unknown,
+                MmClientState::Attached => MobilityClientState::Attached,
+                MmClientState::Detached => MobilityClientState::Detached,
+            },
+            groups: context.groups,
+            energy_saving_mode: context.energy_saving_mode.into_raw() as u8,
+            monitoring_frame: context.monitoring_frame,
+            monitoring_multiframe: context.monitoring_multiframe,
+            class_of_ms: context.class_of_ms.map(|class| MobilityClassOfMs {
+                freq_simplex_duplex: class.freq_simplex_duplex,
+                multislot_phase_mod: class.multislot_phase_mod,
+                concurrent_multicarrier: class.concurrent_multicarrier,
+                voice: class.voice,
+                e2e_encryption_not_supported: class.e2e_encryption_not_supported,
+                circuit_mode_data: class.circuit_mode_data,
+                tetra_packet_data: class.tetra_packet_data,
+                fast_switching: class.fast_switching,
+                dck_encryption: class.dck_encryption,
+                clch_needed: class.clch_needed,
+                concurrent_circuit_mode: class.concurrent_circuit_mode,
+                original_advanced_link: class.original_advanced_link,
+                minimum_mode: class.minimum_mode,
+                carrier_specific_signalling: class.carrier_specific_signalling,
+                authentication: class.authentication,
+                sck_encryption: class.sck_encryption,
+                air_interface_version: class.air_interface_version,
+                common_scch: class.common_scch,
+                reserved_21: class.reserved_21,
+                mac_d_blck: class.mac_d_blck,
+                extended_advanced_link: class.extended_advanced_link,
+                d8psk: class.d8psk,
+            }),
+            last_handle: context.last_handle,
+            tei: context.tei,
+        }
+    }
+
+    fn mobility_payload_to_context(payload: &MobilityContextPayload) -> Result<MmClientMobilityContext, String> {
+        let energy_saving_mode = EnergySavingMode::try_from(payload.energy_saving_mode as u64)
+            .map_err(|_| format!("invalid energy_saving_mode={}", payload.energy_saving_mode))?;
+        Ok(MmClientMobilityContext {
+            issi: payload.home_issi,
+            state: match payload.state {
+                MobilityClientState::Unknown => MmClientState::Unknown,
+                MobilityClientState::Attached => MmClientState::Attached,
+                MobilityClientState::Detached => MmClientState::Detached,
+            },
+            groups: payload.groups.clone(),
+            energy_saving_mode,
+            monitoring_frame: payload.monitoring_frame,
+            monitoring_multiframe: payload.monitoring_multiframe,
+            class_of_ms: payload.class_of_ms.as_ref().map(|class| ClassOfMs {
+                freq_simplex_duplex: class.freq_simplex_duplex,
+                multislot_phase_mod: class.multislot_phase_mod,
+                concurrent_multicarrier: class.concurrent_multicarrier,
+                voice: class.voice,
+                e2e_encryption_not_supported: class.e2e_encryption_not_supported,
+                circuit_mode_data: class.circuit_mode_data,
+                tetra_packet_data: class.tetra_packet_data,
+                fast_switching: class.fast_switching,
+                dck_encryption: class.dck_encryption,
+                clch_needed: class.clch_needed,
+                concurrent_circuit_mode: class.concurrent_circuit_mode,
+                original_advanced_link: class.original_advanced_link,
+                minimum_mode: class.minimum_mode,
+                carrier_specific_signalling: class.carrier_specific_signalling,
+                authentication: class.authentication,
+                sck_encryption: class.sck_encryption,
+                air_interface_version: class.air_interface_version,
+                common_scch: class.common_scch,
+                reserved_21: class.reserved_21,
+                mac_d_blck: class.mac_d_blck,
+                extended_advanced_link: class.extended_advanced_link,
+                d8psk: class.d8psk,
+            }),
+            last_handle: payload.last_handle,
+            tei: payload.tei,
+        })
+    }
+
+    fn remove_mobility_context(&mut self, issi: u32) -> Option<MmClientMobilityContext> {
+        let context = self.client_mgr.export_mobility_context(issi)?;
+        self.client_mgr.remove_client(issi);
+        self.mobility.forget_local_identity(issi);
+        self.config.state_write().subscribers.deregister(issi);
+        self.recovery_mark_dirty();
+        Some(context)
+    }
+
+    fn announce_imported_mobility_context(
+        &self,
+        queue: &mut MessageQueue,
+        local_issi: u32,
+        context: &MmClientMobilityContext,
+    ) {
+        queue.push_back(SapMsg {
+            sap: Sap::Control,
+            src: TetraEntity::Mm,
+            dest: TetraEntity::Cmce,
+            msg: SapMsgInner::MmSubscriberUpdate(MmSubscriberUpdate {
+                issi: local_issi,
+                groups: Vec::new(),
+                action: BrewSubscriberAction::Register,
+            }),
+        });
+        if !context.groups.is_empty() {
+            queue.push_back(SapMsg {
+                sap: Sap::Control,
+                src: TetraEntity::Mm,
+                dest: TetraEntity::Cmce,
+                msg: SapMsgInner::MmSubscriberUpdate(MmSubscriberUpdate {
+                    issi: local_issi,
+                    groups: context.groups.clone(),
+                    action: BrewSubscriberAction::Affiliate,
+                }),
+            });
+        }
+        self.emit_subscriber_update(queue, local_issi, Vec::new(), BrewSubscriberAction::Register);
+        self.emit_subscriber_update(
+            queue,
+            local_issi,
+            context.groups.clone(),
+            BrewSubscriberAction::Affiliate,
+        );
+        if let Some(sink) = &self.telemetry {
+            sink.send(crate::net_telemetry::TelemetryEvent::MsRegistration { issi: local_issi });
+            sink.send(crate::net_telemetry::TelemetryEvent::MsGroupsSnapshot {
+                issi: local_issi,
+                gssis: context.groups.clone(),
+            });
+            sink.send(crate::net_telemetry::TelemetryEvent::MsEnergySaving {
+                issi: local_issi,
+                mode: context.energy_saving_mode.into_raw() as u8,
+            });
         }
     }
 
@@ -457,6 +603,7 @@ impl MmBs {
         let ssi = prim.received_address.ssi;
         let detached_client = self.client_mgr.remove_client(ssi);
         if let Some(client) = detached_client {
+            self.mobility.forget_local_identity(ssi);
             self.config.state_write().subscribers.deregister(ssi);
             if !client.groups.is_empty() {
                 let groups: Vec<u32> = client.groups.iter().copied().collect();
@@ -631,11 +778,15 @@ impl MmBs {
         let authorization_issi = migration_completion
             .as_ref()
             .map(|completion| completion.home_issi)
+            .or_else(|| self.mobility.home_issi_for_local(issi))
             .unwrap_or(issi);
         let issi_allowed = {
             let state = self.config.state_read();
             match &state.issi_whitelist_override {
-                Some(list) => list.is_empty() || list.contains(&authorization_issi),
+                Some(list) => {
+                    !state.issi_whitelist_deny_all
+                        && (list.is_empty() || list.contains(&authorization_issi))
+                }
                 None => self
                     .config
                     .config()
@@ -1435,14 +1586,17 @@ impl MmBs {
         // allocated VASSI. Access control must still be evaluated against the Home
         // ISSI, otherwise every legitimate migration would fail when a whitelist is
         // configured and the temporary VASSI is (correctly) absent from it.
-        let authorization_issi = migration_completion
-            .as_ref()
-            .map(|completion| completion.home_issi)
+        let authorization_issi = self
+            .mobility
+            .home_issi_for_local(issi)
             .unwrap_or(issi);
         let issi_allowed = {
             let state = self.config.state_read();
             match &state.issi_whitelist_override {
-                Some(list) => list.is_empty() || list.contains(&authorization_issi),
+                Some(list) => {
+                    !state.issi_whitelist_deny_all
+                        && (list.is_empty() || list.contains(&authorization_issi))
+                }
                 None => self
                     .config
                     .config()
@@ -2308,6 +2462,7 @@ impl TetraEntityTrait for MmBs {
         // immutable borrow on `self.control` is released before the handlers run — DGNA needs
         // `&mut self` (client registry, subscriber state, telemetry).
         if self.control.is_some() {
+            let responder = self.control.clone();
             let mut cmds = Vec::new();
             if let Some(cep) = &self.control {
                 while let Some(cmd) = cep.try_recv() {
@@ -2318,6 +2473,167 @@ impl TetraEntityTrait for MmBs {
                 match cmd {
                     ControlCommand::Dgna { issi, gssi, attach } => {
                         self.do_dgna(queue, issi, gssi, attach);
+                    }
+                    ControlCommand::MobilityExportContext { handle, issi } => {
+                        let context = self.export_mobility_context(issi).map(Self::mobility_context_to_payload);
+                        let found = context.is_some();
+                        if let Some(cep) = responder.as_ref() {
+                            cep.respond(ControlResponse::MobilityContextExported {
+                                handle,
+                                issi,
+                                found,
+                                context,
+                                message: if found {
+                                    "mobility context exported".to_string()
+                                } else {
+                                    "subscriber is not registered on this node".to_string()
+                                },
+                            });
+                        }
+                    }
+                    ControlCommand::MobilityImportContext {
+                        handle,
+                        local_issi,
+                        context,
+                    } => {
+                        let result = Self::mobility_payload_to_context(&context).and_then(|internal| {
+                            if self.client_mgr.client_is_known(local_issi) {
+                                return Err(format!("local ISSI {} already exists", local_issi));
+                            }
+                            self.import_mobility_context(local_issi, &internal);
+                            self.announce_imported_mobility_context(queue, local_issi, &internal);
+                            self.recovery_mark_dirty();
+                            Ok(())
+                        });
+                        if let Some(cep) = responder.as_ref() {
+                            cep.respond(ControlResponse::MobilityContextImported {
+                                handle,
+                                local_issi,
+                                success: result.is_ok(),
+                                message: result.err().unwrap_or_else(|| "mobility context imported".to_string()),
+                            });
+                        }
+                    }
+                    ControlCommand::SubscriberAccessPolicyApply {
+                        handle,
+                        revision,
+                        allow_all,
+                        mut allowed_issis,
+                        disconnect_unauthorized,
+                    } => {
+                        allowed_issis.retain(|issi| *issi > 0 && *issi <= 0xFF_FFFF);
+                        allowed_issis.sort_unstable();
+                        allowed_issis.dedup();
+                        if allow_all {
+                            allowed_issis.clear();
+                        }
+
+                        let to_disconnect: Vec<u32> = if disconnect_unauthorized && !allow_all {
+                            let registered_local_issis: Vec<u32> = {
+                                let state = self.config.state_read();
+                                state.subscribers.all_registered_issis().collect()
+                            };
+                            registered_local_issis
+                                .into_iter()
+                                .filter(|local_issi| {
+                                    let policy_issi = self
+                                        .mobility
+                                        .home_issi_for_local(*local_issi)
+                                        .unwrap_or(*local_issi);
+                                    !allowed_issis.contains(&policy_issi)
+                                })
+                                .collect()
+                        } else {
+                            Vec::new()
+                        };
+
+                        {
+                            let mut state = self.config.state_write();
+                            state.issi_whitelist_deny_all = !allow_all && allowed_issis.is_empty();
+                            state.issi_whitelist_override = Some(allowed_issis.clone());
+                        }
+
+                        for issi in &to_disconnect {
+                            queue.push_back(SapMsg {
+                                sap: Sap::Control,
+                                src: TetraEntity::Mm,
+                                dest: TetraEntity::Mm,
+                                msg: SapMsgInner::MmSubscriberUpdate(MmSubscriberUpdate {
+                                    issi: *issi,
+                                    groups: Vec::new(),
+                                    action: BrewSubscriberAction::Deregister,
+                                }),
+                            });
+                        }
+
+                        tracing::info!(
+                            revision,
+                            allow_all,
+                            allowed_count = allowed_issis.len(),
+                            disconnected_count = to_disconnect.len(),
+                            "MM: central subscriber access policy applied"
+                        );
+                        if let Some(cep) = responder.as_ref() {
+                            cep.respond(ControlResponse::SubscriberAccessPolicyApplied {
+                                handle,
+                                revision,
+                                success: true,
+                                allow_all,
+                                allowed_count: allowed_issis.len() as u32,
+                                disconnected_count: to_disconnect.len() as u32,
+                                message: "subscriber access policy applied".to_string(),
+                            });
+                        }
+                    }
+                    ControlCommand::MobilityRemoveContext {
+                        handle,
+                        issi,
+                        reason,
+                    } => {
+                        let removed = self.remove_mobility_context(issi);
+                        if let Some(context) = &removed {
+                            if !context.groups.is_empty() {
+                                self.emit_subscriber_update(
+                                    queue,
+                                    issi,
+                                    context.groups.clone(),
+                                    BrewSubscriberAction::Deaffiliate,
+                                );
+                            }
+                            self.emit_subscriber_update(
+                                queue,
+                                issi,
+                                Vec::new(),
+                                BrewSubscriberAction::Deregister,
+                            );
+                            queue.push_back(SapMsg {
+                                sap: Sap::Control,
+                                src: TetraEntity::Mm,
+                                dest: TetraEntity::Cmce,
+                                msg: SapMsgInner::MmSubscriberUpdate(MmSubscriberUpdate {
+                                    issi,
+                                    groups: Vec::new(),
+                                    action: BrewSubscriberAction::Deregister,
+                                }),
+                            });
+                            tracing::info!(
+                                "MM: removed transferred context for ISSI {} ({})",
+                                issi,
+                                reason
+                            );
+                        }
+                        if let Some(cep) = responder.as_ref() {
+                            cep.respond(ControlResponse::MobilityContextRemoved {
+                                handle,
+                                issi,
+                                success: true,
+                                message: if removed.is_some() {
+                                    "source mobility context removed".to_string()
+                                } else {
+                                    "source mobility context already absent".to_string()
+                                },
+                            });
+                        }
                     }
                     _ => {
                         tracing::warn!("MM: ignoring unsupported control command {:?}", cmd);

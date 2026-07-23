@@ -34,9 +34,16 @@ Jeder später eigenständig laufende LXC- oder VM-Dienst erhält eine eigene Web
 
 Die WebUI gehört ab der ersten Implementierung eines Dienstes zu dessen Definition of Done; sie wird nicht als spätere kosmetische Zusatzphase behandelt.
 
-Der erste `node-gateway`-LXC startet im ausdrücklich markierten `open_lab`-Modus ohne Tokens, Benutzerkonten oder TLS. Diese Zwischenstufe dient nur dem isolierten Testnetz und wird vor einem Produktivbetrieb durch die spätere Security-Phase ersetzt beziehungsweise abgesichert.
+Die ersten LXC-Dienste `node-gateway`, `mobility-core` und `subscriber-core` starten im ausdrücklich markierten `open_lab`-Modus ohne Tokens, Benutzerkonten oder TLS. Diese Zwischenstufe dient nur dem isolierten Testnetz und wird vor einem Produktivbetrieb durch die spätere Security-Phase ersetzt beziehungsweise abgesichert.
 
 ---
+
+## Aktueller LXC-Ausbaustand
+
+- `node-gateway`: umgesetzt, offene TBS-/Backend-Vermittlung mit WebUI
+- `mobility-core`: umgesetzt, Context Transfer und Teilnehmerlage mit WebUI
+- `subscriber-core`: umgesetzt, persistente Teilnehmerprofile und TBS-Zugangsrichtlinie mit WebUI
+- nächster Dienst: `group-core`
 
 # 2. Normative Grundlage
 

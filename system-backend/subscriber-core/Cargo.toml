@@ -1,0 +1,24 @@
+[package]
+name = "netcore-subscriber-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "netcore-subscriber-core"
+path = "src/main.rs"
+
+[dependencies]
+tetra-entities = { path = "../../crates/tetra-entities", default-features = false }
+clap = { workspace = true }
+chrono = { workspace = true }
+serde = { workspace = true }
+serde_json = "1.0"
+toml = { workspace = true }
+tungstenite = { workspace = true }
+uuid = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+[lints]
+workspace = true

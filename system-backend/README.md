@@ -41,8 +41,13 @@ Langfristig verwenden neue Dienste mit eigener LXC-IP einheitlich:
 https://<LXC-IP>:8443/
 ```
 
-Der erste Node Gateway ist eine ausdrücklich dokumentierte Ausnahme: Er läuft für die frühe isolierte Testumgebung unter `http://<LXC-IP>:8080/` im offenen Labormodus. Abweichungen werden im jeweiligen README und in `services.toml` festgehalten.
+Die ersten drei Dienste sind ausdrücklich dokumentierte Ausnahmen für die isolierte Testumgebung: Node Gateway auf Port 8080, Mobility Core auf Port 8090 und Subscriber Core auf Port 8100, jeweils per HTTP im offenen Labormodus. Abweichungen werden im jeweiligen README und in `services.toml` festgehalten.
 
 ## Bereits deploybarer Dienst
 
-`node-gateway/` ist der erste tatsächlich implementierte LXC-Dienst. Er enthält Rust-Runtime, TBS- und Backend-WebSockets, REST-API, WebUI, systemd-Unit und Installationsskripte. In der ersten Teststufe läuft er bewusst im deutlich markierten `open_lab`-Modus ohne Tokens oder Benutzeranmeldung.
+Bereits deploybar sind:
+
+- `node-gateway/` als zentrale TBS- und Backend-Verbindungsstelle auf Port 8080,
+- `mobility-core/` als zentrale Teilnehmerlage und MM-Context-Transfer-Steuerung auf Port 8090.
+
+Beide Dienste enthalten Rust-Runtime, REST-API, eigene WebUI, systemd-Unit und Installationsskripte. In der ersten Teststufe laufen sie bewusst im deutlich markierten `open_lab`-Modus ohne Tokens, Benutzeranmeldung oder TLS.

@@ -178,11 +178,11 @@
 | panic! | prüfen | Runtime | `crates/tetra-core/src/tx_receipt.rs` | 114 | `panic!(` |
 | panic! | prüfen | Runtime | `crates/tetra-core/src/typed_pdu_fields.rs` | 194 | `_ => panic!(), // Never happens` |
 | unimplemented! | kritisch | Runtime | `crates/tetra-core/src/typed_pdu_fields.rs` | 641 | `unimplemented!("can't generically write a type4 field");` |
-| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/cmce/cmce_bs.rs` | 201 | `unimplemented_log!("{:?}", pdu_type);` |
-| panic! | prüfen | Runtime | `crates/tetra-entities/src/cmce/cmce_bs.rs` | 329 | `panic!("Unexpected message on LcmcSap: {:?}", message.msg);` |
-| unreachable! | prüfen | Runtime | `crates/tetra-entities/src/cmce/cmce_bs.rs` | 338 | `unreachable!();` |
-| panic! | prüfen | Runtime | `crates/tetra-entities/src/cmce/cmce_bs.rs` | 347 | `panic!("Unexpected control message: {:?}", message.msg);` |
-| panic! | prüfen | Runtime | `crates/tetra-entities/src/cmce/cmce_bs.rs` | 351 | `panic!("Unexpected SAP: {:?}", message.sap);` |
+| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/cmce/cmce_bs.rs` | 207 | `unimplemented_log!("{:?}", pdu_type);` |
+| panic! | prüfen | Runtime | `crates/tetra-entities/src/cmce/cmce_bs.rs` | 335 | `panic!("Unexpected message on LcmcSap: {:?}", message.msg);` |
+| unreachable! | prüfen | Runtime | `crates/tetra-entities/src/cmce/cmce_bs.rs` | 344 | `unreachable!();` |
+| panic! | prüfen | Runtime | `crates/tetra-entities/src/cmce/cmce_bs.rs` | 353 | `panic!("Unexpected control message: {:?}", message.msg);` |
+| panic! | prüfen | Runtime | `crates/tetra-entities/src/cmce/cmce_bs.rs` | 357 | `panic!("Unexpected SAP: {:?}", message.sap);` |
 | TODO/FIXME | technische Schuld | Runtime | `crates/tetra-entities/src/cmce/components/circuit_mgr.rs` | 148 | `// TODO FIXME we may do a bit smarter allocation here` |
 | TODO/FIXME | technische Schuld | Runtime | `crates/tetra-entities/src/cmce/components/circuit_mgr.rs` | 186 | `circuit_mode: CircuitModeType::TchS, // TODO: only speech supported for now` |
 | TODO/FIXME | technische Schuld | Runtime | `crates/tetra-entities/src/cmce/components/circuit_mgr.rs` | 187 | `// endpoint_id: 0, // TODO, we don't use endpoints as of yet` |
@@ -323,30 +323,30 @@
 | TODO/FIXME | technische Schuld | Runtime | `crates/tetra-entities/src/mle/mle_ms.rs` | 566 | `req_handle: 0, // TODO FIXME` |
 | Todo-Typ | Typ-Platzhalter | Runtime | `crates/tetra-entities/src/mm/components/not_supported.rs` | 34 | `layer2service: Layer2Service::Todo,` |
 | panic! | prüfen | Runtime | `crates/tetra-entities/src/mm/components/recovery_cache.rs` | 246 | `cache.maybe_flush(\|\| panic!("snapshot must not be called when clean"));` |
-| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mm/mm_bs.rs` | 1384 | `unimplemented_log!("{:?}", pdu.status_uplink)` |
-| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mm/mm_bs.rs` | 1392 | `unimplemented_log!("Unhandled UMmStatus type {:?}", pdu.status_uplink);` |
-| TODO/FIXME | technische Schuld | Runtime | `crates/tetra-entities/src/mm/mm_bs.rs` | 1567 | `reserved: false,                 // TODO FIXME Guessed proper value of reserved field` |
-| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mm/mm_bs.rs` | 1616 | `MmPduTypeUl::UAuthentication => unimplemented_log!("UAuthentication"),` |
-| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mm/mm_bs.rs` | 1620 | `MmPduTypeUl::UCkChangeResult => unimplemented_log!("UCkChangeResult"),` |
-| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mm/mm_bs.rs` | 1621 | `MmPduTypeUl::UOtar => unimplemented_log!("UOtar"),` |
-| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mm/mm_bs.rs` | 1622 | `MmPduTypeUl::UInformationProvide => unimplemented_log!("UInformationProvide"),` |
-| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mm/mm_bs.rs` | 1626 | `MmPduTypeUl::UDisableStatus => unimplemented_log!("UDisableStatus"),` |
-| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mm/mm_bs.rs` | 1627 | `MmPduTypeUl::MmPduFunctionNotSupported => unimplemented_log!("MmPduFunctionNotSupported"),` |
-| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mm/mm_bs.rs` | 1645 | `unimplemented_log!("GroupIdentityUplink without gssi field");` |
-| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mm/mm_bs.rs` | 1649 | `unimplemented_log!("Only support GroupIdentityUplink with address_type 0");` |
-| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mm/mm_bs.rs` | 2155 | `unimplemented_log!("Unsupported address_extension present");` |
-| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mm/mm_bs.rs` | 2158 | `unimplemented_log!("Unsupported proprietary present");` |
-| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mm/mm_bs.rs` | 2193 | `unimplemented_log!("Unsupported {}", pdu.location_update_type);` |
-| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mm/mm_bs.rs` | 2197 | `unimplemented_log!("Unsupported request_to_append_la == true");` |
-| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mm/mm_bs.rs` | 2201 | `unimplemented_log!("Unsupported cipher_control == true");` |
-| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mm/mm_bs.rs` | 2205 | `unimplemented_log!("Unsupported ciphering_parameters present");` |
-| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mm/mm_bs.rs` | 2209 | `unimplemented_log!("Unsupported la_information present");` |
-| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mm/mm_bs.rs` | 2221 | `unimplemented_log!("Unsupported authentication_uplink present");` |
-| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mm/mm_bs.rs` | 2224 | `unimplemented_log!("Unsupported extended_capabilities present");` |
-| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mm/mm_bs.rs` | 2227 | `unimplemented_log!("Unsupported proprietary present");` |
-| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mm/mm_bs.rs` | 2238 | `unimplemented_log!("Unsupported group_identity_report == true");` |
-| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mm/mm_bs.rs` | 2241 | `unimplemented_log!("Missing group_identity_uplink");` |
-| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mm/mm_bs.rs` | 2248 | `unimplemented_log!("Unsupported proprietary present");` |
+| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mm/mm_bs.rs` | 1535 | `unimplemented_log!("{:?}", pdu.status_uplink)` |
+| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mm/mm_bs.rs` | 1543 | `unimplemented_log!("Unhandled UMmStatus type {:?}", pdu.status_uplink);` |
+| TODO/FIXME | technische Schuld | Runtime | `crates/tetra-entities/src/mm/mm_bs.rs` | 1721 | `reserved: false,                 // TODO FIXME Guessed proper value of reserved field` |
+| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mm/mm_bs.rs` | 1770 | `MmPduTypeUl::UAuthentication => unimplemented_log!("UAuthentication"),` |
+| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mm/mm_bs.rs` | 1774 | `MmPduTypeUl::UCkChangeResult => unimplemented_log!("UCkChangeResult"),` |
+| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mm/mm_bs.rs` | 1775 | `MmPduTypeUl::UOtar => unimplemented_log!("UOtar"),` |
+| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mm/mm_bs.rs` | 1776 | `MmPduTypeUl::UInformationProvide => unimplemented_log!("UInformationProvide"),` |
+| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mm/mm_bs.rs` | 1780 | `MmPduTypeUl::UDisableStatus => unimplemented_log!("UDisableStatus"),` |
+| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mm/mm_bs.rs` | 1781 | `MmPduTypeUl::MmPduFunctionNotSupported => unimplemented_log!("MmPduFunctionNotSupported"),` |
+| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mm/mm_bs.rs` | 1799 | `unimplemented_log!("GroupIdentityUplink without gssi field");` |
+| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mm/mm_bs.rs` | 1803 | `unimplemented_log!("Only support GroupIdentityUplink with address_type 0");` |
+| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mm/mm_bs.rs` | 2309 | `unimplemented_log!("Unsupported address_extension present");` |
+| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mm/mm_bs.rs` | 2312 | `unimplemented_log!("Unsupported proprietary present");` |
+| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mm/mm_bs.rs` | 2347 | `unimplemented_log!("Unsupported {}", pdu.location_update_type);` |
+| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mm/mm_bs.rs` | 2351 | `unimplemented_log!("Unsupported request_to_append_la == true");` |
+| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mm/mm_bs.rs` | 2355 | `unimplemented_log!("Unsupported cipher_control == true");` |
+| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mm/mm_bs.rs` | 2359 | `unimplemented_log!("Unsupported ciphering_parameters present");` |
+| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mm/mm_bs.rs` | 2363 | `unimplemented_log!("Unsupported la_information present");` |
+| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mm/mm_bs.rs` | 2375 | `unimplemented_log!("Unsupported authentication_uplink present");` |
+| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mm/mm_bs.rs` | 2378 | `unimplemented_log!("Unsupported extended_capabilities present");` |
+| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mm/mm_bs.rs` | 2381 | `unimplemented_log!("Unsupported proprietary present");` |
+| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mm/mm_bs.rs` | 2392 | `unimplemented_log!("Unsupported group_identity_report == true");` |
+| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mm/mm_bs.rs` | 2395 | `unimplemented_log!("Missing group_identity_uplink");` |
+| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mm/mm_bs.rs` | 2402 | `unimplemented_log!("Unsupported proprietary present");` |
 | unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mm/mm_ms.rs` | 36 | `MmPduTypeDl::DOtar => unimplemented_log!("DOtar"),` |
 | unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mm/mm_ms.rs` | 37 | `MmPduTypeDl::DAuthentication => unimplemented_log!("DAuthentication"),` |
 | unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/mm/mm_ms.rs` | 38 | `MmPduTypeDl::DCkChangeDemand => unimplemented_log!("DCkChangeDemand"),` |

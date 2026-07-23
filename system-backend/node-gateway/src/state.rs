@@ -81,20 +81,38 @@ pub enum BackendEvent {
     Snapshot { snapshot: GatewaySnapshot },
     Event { event: EventRecord },
     NodeMessage { node_id: String, message: NodeToControlRoomMessage },
-    ActionResult { ok: bool, message: String },
+    ActionResult {
+        request_id: Option<String>,
+        command_id: Option<String>,
+        ok: bool,
+        message: String,
+    },
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum BackendRequest {
-    Ping,
+    Ping {
+        #[serde(default)]
+        request_id: Option<String>,
+    },
     Command {
+        #[serde(default)]
+        request_id: Option<String>,
         node_id: String,
         command: ControlCommand,
         operator_id: Option<String>,
     },
-    DisconnectNode { node_id: String },
-    PingNode { node_id: String },
+    DisconnectNode {
+        #[serde(default)]
+        request_id: Option<String>,
+        node_id: String,
+    },
+    PingNode {
+        #[serde(default)]
+        request_id: Option<String>,
+        node_id: String,
+    },
 }
 
 struct NodeRuntime {
@@ -209,6 +227,13 @@ impl SharedGateway {
             Some(node_id.to_string()),
             json!({ "session_id": session_id, "protocol_version": hello.protocol_version }),
         );
+        let gateway_snapshot = snapshot_locked(&state);
+        broadcast_locked(
+            &mut state,
+            BackendEvent::Snapshot {
+                snapshot: gateway_snapshot,
+            },
+        );
         Ok(())
     }
 
@@ -292,6 +317,13 @@ impl SharedGateway {
             "node_disconnected",
             Some(node_id.to_string()),
             json!({ "session_id": session_id, "reason": reason }),
+        );
+        let gateway_snapshot = snapshot_locked(&state);
+        broadcast_locked(
+            &mut state,
+            BackendEvent::Snapshot {
+                snapshot: gateway_snapshot,
+            },
         );
     }
 
@@ -517,6 +549,7 @@ mod tests {
                 packet_data: true,
                 legacy_wap_sds: true,
                 multi_pdch: true,
+                subscriber_policy: true,
             },
             started_at: now_iso(),
         }

@@ -287,14 +287,14 @@ fn handle_backend_websocket(mut ws: WebSocket<TcpStream>, gateway: SharedGateway
         match ws.read() {
             Ok(Message::Binary(data)) => {
                 if data.len() > config.limits.max_message_bytes {
-                    let _ = send_backend_event(&mut ws, &BackendEvent::ActionResult { ok: false, message: "message too large".to_string() });
+                    let _ = send_backend_event(&mut ws, &BackendEvent::ActionResult { request_id: None, command_id: None, ok: false, message: "message too large".to_string() });
                     continue;
                 }
                 handle_backend_request(&mut ws, &gateway, serde_json::from_slice(data.as_ref()));
             }
             Ok(Message::Text(text)) => {
                 if text.len() > config.limits.max_message_bytes {
-                    let _ = send_backend_event(&mut ws, &BackendEvent::ActionResult { ok: false, message: "message too large".to_string() });
+                    let _ = send_backend_event(&mut ws, &BackendEvent::ActionResult { request_id: None, command_id: None, ok: false, message: "message too large".to_string() });
                     continue;
                 }
                 handle_backend_request(&mut ws, &gateway, serde_json::from_str(text.as_str()));
@@ -323,18 +323,51 @@ fn handle_backend_request(
     gateway: &SharedGateway,
     request: Result<BackendRequest, serde_json::Error>,
 ) {
-    let result = match request {
-        Ok(BackendRequest::Ping) => Ok("pong".to_string()),
-        Ok(BackendRequest::PingNode { node_id }) => gateway.ping_node(&node_id).map(|_| format!("ping queued for {node_id}")),
-        Ok(BackendRequest::DisconnectNode { node_id }) => gateway.disconnect_node(&node_id).map(|_| format!("disconnect queued for {node_id}")),
-        Ok(BackendRequest::Command { node_id, command, operator_id }) => gateway
-            .send_command(&node_id, command, operator_id)
-            .map(|command_id| format!("command queued: {command_id}")),
-        Err(error) => Err(format!("invalid backend request: {error}")),
+    let (request_id, result): (Option<String>, Result<(String, Option<String>), String>) = match request {
+        Ok(BackendRequest::Ping { request_id }) => {
+            (request_id, Ok(("pong".to_string(), None)))
+        }
+        Ok(BackendRequest::PingNode { request_id, node_id }) => {
+            let result = gateway
+                .ping_node(&node_id)
+                .map(|_| (format!("ping queued for {node_id}"), None));
+            (request_id, result)
+        }
+        Ok(BackendRequest::DisconnectNode { request_id, node_id }) => {
+            let result = gateway
+                .disconnect_node(&node_id)
+                .map(|_| (format!("disconnect queued for {node_id}"), None));
+            (request_id, result)
+        }
+        Ok(BackendRequest::Command {
+            request_id,
+            node_id,
+            command,
+            operator_id,
+        }) => {
+            let result = gateway
+                .send_command(&node_id, command, operator_id)
+                .map(|command_id| ("command queued".to_string(), Some(command_id)));
+            (request_id, result)
+        }
+        Err(error) => (
+            None,
+            Err(format!("invalid backend request: {error}")),
+        ),
     };
     let event = match result {
-        Ok(message) => BackendEvent::ActionResult { ok: true, message },
-        Err(message) => BackendEvent::ActionResult { ok: false, message },
+        Ok((message, command_id)) => BackendEvent::ActionResult {
+            request_id,
+            command_id,
+            ok: true,
+            message,
+        },
+        Err(message) => BackendEvent::ActionResult {
+            request_id,
+            command_id: None,
+            ok: false,
+            message,
+        },
     };
     let _ = send_backend_event(ws, &event);
 }

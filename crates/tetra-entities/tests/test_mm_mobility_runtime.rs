@@ -64,6 +64,7 @@ fn two_stage_migration_allocates_vassi_and_transfers_context() {
     assert_eq!(completion.local_issi, vassi);
     assert_eq!(completion.home_issi, 2_260_575);
     assert_eq!(completion.imported_context.unwrap().groups, vec![100, 101]);
+    assert_eq!(runtime.home_issi_for_local(vassi), Some(2_260_575));
     assert_eq!(runtime.snapshot(now.add_timeslots(2)).migrations[0].phase, MmMobilityPhase::MigrationAccepted);
 }
 
@@ -136,6 +137,13 @@ fn terminal_migration_history_is_bounded_and_vassi_can_be_reused() {
 
     runtime.tick(now.add_timeslots(1 + MM_MOBILITY_HISTORY_SLOTS));
     assert!(runtime.snapshot(now.add_timeslots(1 + MM_MOBILITY_HISTORY_SLOTS)).migrations.is_empty());
+    assert_eq!(
+        runtime.home_issi_for_local(first_vassi),
+        Some(2_260_575),
+        "the admission-policy identity mapping must outlive bounded transaction history"
+    );
+    runtime.forget_local_identity(first_vassi);
+    assert_eq!(runtime.home_issi_for_local(first_vassi), None);
 
     let (second_vassi, _) = runtime
         .begin_migration(

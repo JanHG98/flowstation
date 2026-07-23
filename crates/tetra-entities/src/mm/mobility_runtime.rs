@@ -167,6 +167,13 @@ pub enum MmMobilityError {
 pub struct MmMobilityRuntime {
     migrations_by_vassi: HashMap<u32, MigrationTransaction>,
     vassi_by_original_ssi: HashMap<u32, u32>,
+    /// Durable local-to-home identity mapping for migrated subscribers.
+    ///
+    /// Migration transactions are intentionally removed after a bounded
+    /// diagnostic history, while the subscriber can remain registered under
+    /// its VASSI for much longer. Admission policy checks therefore must not
+    /// depend on the transaction history itself.
+    home_issi_by_local_issi: HashMap<u32, u32>,
     forward_registrations: HashMap<u32, ForwardRegistrationTransaction>,
     next_vassi: u32,
     counters: MmMobilityCounters,
@@ -183,10 +190,44 @@ impl MmMobilityRuntime {
         Self {
             migrations_by_vassi: HashMap::new(),
             vassi_by_original_ssi: HashMap::new(),
+            home_issi_by_local_issi: HashMap::new(),
             forward_registrations: HashMap::new(),
             next_vassi: DEFAULT_VASSI_MIN,
             counters: MmMobilityCounters::default(),
         }
+    }
+
+    /// Resolve a local air-interface SSI to the subscriber's home ISSI.
+    ///
+    /// Migrated subscribers can be registered locally under a VASSI. Central
+    /// admission policies are expressed in home identities, so callers must
+    /// translate the local VASSI before deciding whether an existing
+    /// registration is still authorized.
+    pub fn home_issi_for_local(&self, local_issi: u32) -> Option<u32> {
+        self.home_issi_by_local_issi
+            .get(&local_issi)
+            .copied()
+            .or_else(|| {
+                self.migrations_by_vassi
+                    .get(&local_issi)
+                    .and_then(|transaction| transaction.home_issi)
+            })
+    }
+
+    /// Register a durable identity mapping for a locally imported or migrated
+    /// subscriber context.
+    pub fn register_local_identity(&mut self, local_issi: u32, home_issi: u32) {
+        if local_issi != home_issi {
+            self.home_issi_by_local_issi.insert(local_issi, home_issi);
+        } else {
+            self.home_issi_by_local_issi.remove(&local_issi);
+        }
+    }
+
+    /// Remove a durable local-to-home mapping when the local mobility context
+    /// is explicitly detached or transferred away.
+    pub fn forget_local_identity(&mut self, local_issi: u32) {
+        self.home_issi_by_local_issi.remove(&local_issi);
     }
 
     pub fn begin_migration<F>(
@@ -321,6 +362,7 @@ impl MmMobilityRuntime {
         transaction.home_issi = Some(home_issi);
         transaction.phase = MmMobilityPhase::MigrationAccepted;
         transaction.updated_at = now;
+        self.home_issi_by_local_issi.insert(vassi, home_issi);
         self.counters.migration_accepts += 1;
         let completion = MigrationCompletion {
             local_issi: vassi,

@@ -14,7 +14,7 @@ Paket A stellt die reproduzierbare Inventur bereit. Paket B ergänzt die typisie
 | TLMC-Primitive inventarisiert | 18 |
 | LTPD-Primitive inventarisiert | 27 |
 | kritische Runtime-Platzhalter | 45 |
-| gefundene State-Typen | 17 |
+| gefundene State-Typen | 18 |
 
 ## Erzeugte Artefakte
 

@@ -1,0 +1,30 @@
+name: SWMI Core Subscriber
+on:
+  push:
+    paths:
+      - 'system-backend/subscriber-core/**'
+      - 'crates/tetra-entities/src/net_control/**'
+      - 'crates/tetra-entities/src/mm/**'
+      - 'crates/tetra-config/src/bluestation/state.rs'
+      - 'tools/check_subscriber_core.py'
+  pull_request:
+    paths:
+      - 'system-backend/subscriber-core/**'
+      - 'crates/tetra-entities/src/net_control/**'
+      - 'crates/tetra-entities/src/mm/**'
+      - 'crates/tetra-config/src/bluestation/state.rs'
+      - 'tools/check_subscriber_core.py'
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - run: python3 tools/check_subscriber_core.py
+      - run: cargo fmt --all -- --check
+      - run: cargo test -p netcore-subscriber-core
+      - run: cargo test -p tetra-entities --test test_mm_bs
+      - run: cargo build --release -p netcore-subscriber-core
+      - run: cargo clippy -p netcore-subscriber-core --all-targets -- -D warnings

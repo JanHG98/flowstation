@@ -3,7 +3,7 @@
 | Dienst | Schwerpunkt der eigenen WebUI | Besonders geschützte Aktionen |
 | --- | --- | --- |
 | Node Gateway | TBS-Sessions, Heartbeats, Protokollversionen, Backend-Transport | Node trennen und Kommandos senden; im ersten Testpaket bewusst offen ohne Tokens |
-| Subscriber Core | Teilnehmer, Geräte, Profile, Berechtigungen | Sperren, Import, Gerätezuordnung |
+| Subscriber Core | Teilnehmer, Geräte, Profile, Berechtigungen, TBS-Synchronisation | Sperren, Import, Gerätezuordnung; im Testpaket bewusst offen ohne Tokens |
 | Group Core | GSSI, Mitglieder, Affiliationen, DGNA | DGNA, Gruppenrechte, Löschung |
 | Mobility Core | Registrierungen, Zellen, Migration, Recovery | Kontextfreigabe, Handover-Abbruch |
 | Call Control | Calls, Legs, Floor, Priorität, Restore | Call beenden, Floor entziehen, Pre-emption |

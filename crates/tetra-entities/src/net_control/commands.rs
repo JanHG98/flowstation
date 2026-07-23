@@ -8,6 +8,53 @@
 use bitcode::{Decode, Encode};
 use serde::{Deserialize, Serialize};
 
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Encode, Decode, Serialize, Deserialize)]
+pub enum MobilityClientState {
+    Unknown,
+    Attached,
+    Detached,
+}
+
+#[derive(Debug, Clone, Encode, Decode, Serialize, Deserialize)]
+pub struct MobilityClassOfMs {
+    pub freq_simplex_duplex: bool,
+    pub multislot_phase_mod: bool,
+    pub concurrent_multicarrier: bool,
+    pub voice: bool,
+    pub e2e_encryption_not_supported: bool,
+    pub circuit_mode_data: bool,
+    pub tetra_packet_data: bool,
+    pub fast_switching: bool,
+    pub dck_encryption: bool,
+    pub clch_needed: bool,
+    pub concurrent_circuit_mode: bool,
+    pub original_advanced_link: bool,
+    pub minimum_mode: bool,
+    pub carrier_specific_signalling: bool,
+    pub authentication: bool,
+    pub sck_encryption: bool,
+    pub air_interface_version: u8,
+    pub common_scch: bool,
+    pub reserved_21: bool,
+    pub mac_d_blck: bool,
+    pub extended_advanced_link: bool,
+    pub d8psk: bool,
+}
+
+#[derive(Debug, Clone, Encode, Decode, Serialize, Deserialize)]
+pub struct MobilityContextPayload {
+    pub home_issi: u32,
+    pub state: MobilityClientState,
+    pub groups: Vec<u32>,
+    pub energy_saving_mode: u8,
+    pub monitoring_frame: Option<u8>,
+    pub monitoring_multiframe: Option<u8>,
+    pub class_of_ms: Option<MobilityClassOfMs>,
+    pub last_handle: u32,
+    pub tei: Option<u64>,
+}
+
 /// Command received from the remote command server.
 #[derive(Debug, Clone, Encode, Decode, Serialize, Deserialize)]
 pub enum ControlCommand {
@@ -75,6 +122,37 @@ pub enum ControlCommand {
     /// clears the source session so a subsequent emergency re-send raises a fresh alarm.
     ClearEmergency { issi: u32 },
 
+    /// Export the local MM context of a registered subscriber for transfer to another TBS.
+    MobilityExportContext { handle: u32, issi: u32 },
+
+    /// Import a context that was exported by another TBS.
+    MobilityImportContext {
+        handle: u32,
+        local_issi: u32,
+        context: MobilityContextPayload,
+    },
+
+    /// Remove a transferred context from the source TBS after the target confirmed import.
+    MobilityRemoveContext {
+        handle: u32,
+        issi: u32,
+        reason: String,
+    },
+
+    /// Apply the centrally managed subscriber admission policy to this TBS.
+    ///
+    /// `allow_all = true` opens the cell regardless of `allowed_issis`.  With
+    /// `allow_all = false`, only the listed Home ISSIs may register.  An empty
+    /// list in closed mode therefore means deny-all, unlike the legacy local
+    /// dashboard whitelist where an empty list means open network.
+    SubscriberAccessPolicyApply {
+        handle: u32,
+        revision: u64,
+        allow_all: bool,
+        allowed_issis: Vec<u32>,
+        disconnect_unauthorized: bool,
+    },
+
     /// Placeholder command A.
     CommandA { handle: u32, parameter: u32 },
     /// Placeholder command B.
@@ -92,4 +170,32 @@ pub enum ControlResponse {
     CommandAResponse { handle: u32, result: u32 },
     SendSdsResponse { handle: u32, success: bool },
     KickMsResponse { issi: u32, success: bool },
+    MobilityContextExported {
+        handle: u32,
+        issi: u32,
+        found: bool,
+        context: Option<MobilityContextPayload>,
+        message: String,
+    },
+    MobilityContextImported {
+        handle: u32,
+        local_issi: u32,
+        success: bool,
+        message: String,
+    },
+    MobilityContextRemoved {
+        handle: u32,
+        issi: u32,
+        success: bool,
+        message: String,
+    },
+    SubscriberAccessPolicyApplied {
+        handle: u32,
+        revision: u64,
+        success: bool,
+        allow_all: bool,
+        allowed_count: u32,
+        disconnected_count: u32,
+        message: String,
+    },
 }

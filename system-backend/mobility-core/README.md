@@ -2,84 +2,53 @@
 
 ## Zweck
 
-Der Mobility Core verwaltet Aufenthaltsort, Erreichbarkeit und netzweite Mobilitätszustände aller Teilnehmer. Er wird später die autoritative Koordination zwischen mehreren TBS übernehmen, während die Air-Interface-State-Machines lokal in den Basisstationen bleiben.
+Der Mobility Core ist der zentrale LXC-Dienst für Teilnehmerlage, Migrationen und MM-Context-Transfers zwischen mehreren NetCore-TBS.
 
-## Kernaufgaben
+## Aktueller Funktionsumfang
 
-- Serving TBS, Serving Cell und Location Area verwalten
-- Attach, Detach und Location Updates koordinieren
-- Migration und Forward Registration zwischen TBS autorisieren
-- Teilnehmerkontexte sicher zwischen Quell- und Ziel-TBS übertragen
-- Home-/Visited-Zustände und VASSI-Zuordnungen verwalten
-- Zellwechsel-, Restore- und Recovery-Vorgänge korrelieren
-- Konflikte und doppelte Serving-Kontexte erkennen
-- Audit und Operatorentscheidungen bereitstellen
+- Verbindung zum offenen Backend-WebSocket des Node Gateway
+- automatische Erfassung verbundener TBS
+- zentrale Teilnehmerlage aus Registration-, Group-, Energy-Saving- und RSSI-Telemetrie
+- dreistufiger Context Transfer:
+  1. Export auf der Quell-TBS
+  2. Import auf der Ziel-TBS
+  3. Bereinigung auf der Quell-TBS
+- eindeutige Transfer-IDs und Command-Korrelation
+- Timeouts, Fehlerzustände und Abbruch vor abgeschlossenem Zielimport
+- eigene REST-API, Metriken und OpenAPI-Beschreibung
+- eigene Verwaltungs-WebUI
 
-## TBS-Schnittstelle
+## WebUI
 
-Die lokale TBS stellt seit SWMI Mobility 1 Paket C folgende Adapter bereit:
+```text
+http://<LXC-IP>:8090/
+```
 
-- Export eines `MmClientMobilityContext`
-- Import unter einer lokalen ISSI beziehungsweise VASSI
-- Bereitstellung eines Kontexts für eine laufende Migration
-- Abruf eines durch Forward Registration vorbereiteten Kontexts
-- read-only Snapshot laufender Migrationen und Forward Registrations
+Die Oberfläche zeigt:
 
-Das spätere Edge Protocol muss diese fachlichen Daten versioniert transportieren. Rohe interne `SapMsg`-Varianten werden nicht über das Netzwerk übertragen.
+- Verbindung zum Node Gateway
+- bekannte und aktive TBS
+- Serving Node je Teilnehmer
+- Gruppen, Energy-Saving-Mode und RSSI
+- aktive und abgeschlossene Transfers
+- Transferphasen und Fehler
+- Ereignisprotokoll
+- manuellen Transferstart und kontrollierten Abbruch
 
-## Kontextinhalt
+## Offener Testmodus
 
-- Home-ISSI und gegebenenfalls lokale VASSI
-- Teilnehmerzustand
-- Gruppenaffiliationen
-- Energy-Saving-Mode und Monitoring Window
-- Class of MS
-- TEI
-- letzter lokaler Handle als Diagnosewert
-- Quell-/Ziel-TBS, Location Area und Cell-Identifier
-- Restore- und Call-Context-Referenzen
+Diese Ausbaustufe arbeitet absichtlich ohne Tokens, Login, Passwörter, mTLS oder HTTPS.
 
-## Abgrenzung
+```toml
+[security]
+mode = "open_lab"
+allow_remote_management = true
+```
 
-Der Mobility Core übernimmt nicht:
+Der Dienst darf nur in einem isolierten Testnetz betrieben werden. Andere Security-Modi werden beim Start abgewiesen.
 
-- Air-Interface-PDU-Encoding und -Parsing
-- lokale MLE-/MM-Timer
-- Endpoint-, Link- oder Timeslot-Steuerung
-- Teilnehmerstammdaten
-- eigentliche Rufsteuerung
-- Sprachtransport
+## Architekturgrenze
 
-Diese Bereiche verbleiben bei TBS, Subscriber Core, Call Control beziehungsweise Media Switch.
+Der Mobility Core koordiniert den zentralen MM-Kontext. Die zeitkritischen Air-Interface-Verfahren, MLE-Zellwechsel und CMCE-Call-Restore-State-Machines bleiben in der jeweiligen TBS.
 
-## Fallback
-
-Bei Verlust des Core darf die TBS nur die lokal konfigurierten Fallback-Verfahren ausführen. Neue netzweite Migrationen werden nicht geraten oder mit veralteten Kontexten fortgesetzt. Lokale Calls, SDS und Emergency-Funktionen richten sich nach dem später festgelegten Fallback-Profil.
-
-## WebUI zur Verwaltung
-
-Der Mobility Core erhält eine eigene, unabhängig vom Control Room erreichbare Verwaltungsoberfläche.
-
-### Geplante Ansichten
-
-- aktive Registrierungen mit Serving TBS und Serving Cell
-- Home-, Visited- und VASSI-Zuordnungen
-- Location Areas und Registration Areas
-- laufende Migrationen und Forward Registrations
-- Context Transfer mit Quell-/Ziel-TBS und Versionsstand
-- Gruppen- und Energy-Economy-Kontext eines Transfers
-- Zellwechsel und Call-Restore-Korrelation
-- Recovery-, Reject- und Timeout-Zustände
-- Konflikte, Ghost-Kontexte und doppelte Serving-Zuordnungen
-- TBS- und Zellübersicht, optional später als Karte
-
-### Kritische Aktionen
-
-- Teilnehmerkontext kontrolliert freigeben
-- erneutes Location Update anfordern
-- Context Transfer abbrechen oder wiederholen
-- Konflikt auf eine definierte Serving TBS auflösen
-- Migration beziehungsweise Forward Registration ablehnen
-- Zelle oder TBS in Wartung setzen
-
-Alle schreibenden Aktionen benötigen RBAC, Bestätigung und Audit-Eintrag. Ein Ausfall der WebUI darf den Mobility-Dienst nicht stoppen.
+Eine spätere produktive Ausbaustufe ergänzt persistente Datenhaltung, gegenseitige Dienstauthentisierung, TLS, RBAC und Audit-Signaturen.

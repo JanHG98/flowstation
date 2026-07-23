@@ -1,0 +1,42 @@
+name: SWMI Mobility Core
+
+on:
+  push:
+    paths:
+      - "system-backend/mobility-core/**"
+      - "system-backend/node-gateway/**"
+      - "crates/tetra-entities/src/net_control/**"
+      - "crates/tetra-entities/src/net_control_room/**"
+      - "crates/tetra-entities/src/mm/**"
+      - "tools/check_mobility_core.py"
+      - ".github/workflows/swmi-mobility-core.yml"
+  pull_request:
+    paths:
+      - "system-backend/mobility-core/**"
+      - "system-backend/node-gateway/**"
+      - "crates/tetra-entities/src/net_control/**"
+      - "crates/tetra-entities/src/net_control_room/**"
+      - "crates/tetra-entities/src/mm/**"
+
+jobs:
+  mobility-core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Static package check
+        run: python3 -S tools/check_mobility_core.py
+      - name: Format
+        run: cargo fmt --all -- --check
+      - name: Protocol tests
+        run: cargo test -p tetra-entities
+      - name: Mobility Core tests
+        run: cargo test -p netcore-mobility-core
+      - name: Node Gateway tests
+        run: cargo test -p netcore-node-gateway
+      - name: Build
+        run: cargo build --release -p netcore-node-gateway -p netcore-mobility-core
+      - name: Clippy
+        run: cargo clippy -p tetra-entities -p netcore-node-gateway -p netcore-mobility-core --all-targets -- -D warnings

@@ -4430,6 +4430,7 @@ fn serve_whitelist_post(
     {
         let mut state = cfg.state_write();
         state.issi_whitelist_override = Some(list.clone());
+        state.issi_whitelist_deny_all = false;
     }
 
     // 2) Enforce immediately on terminals that are ALREADY registered. The whitelist is
