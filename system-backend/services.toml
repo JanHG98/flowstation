@@ -15,6 +15,12 @@ same_process_or_package = true
 [[services]]
 name = "node-gateway"
 webui = true
+scheme = "http"
+management_port = 8080
+security_mode = "open_lab"
+token_auth = false
+tls = false
+warning = "Isolated test network only; every reachable client has management access"
 
 [[services]]
 name = "subscriber-core"

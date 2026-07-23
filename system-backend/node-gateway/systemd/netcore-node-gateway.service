@@ -1,0 +1,21 @@
+[Unit]
+Description=NetCore-Tetra Node Gateway (OPEN LAB MODE)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=netcore
+Group=netcore
+ExecStart=/usr/local/bin/netcore-node-gateway --config /etc/netcore/node-gateway.toml
+Restart=on-failure
+RestartSec=3
+Environment=RUST_LOG=info
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/netcore-node-gateway
+
+[Install]
+WantedBy=multi-user.target

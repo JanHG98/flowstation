@@ -1,0 +1,37 @@
+name: SWMI Mobility Node Gateway
+
+on:
+  push:
+    paths:
+      - "system-backend/node-gateway/**"
+      - "system-backend/services.toml"
+      - "tools/check_node_gateway.py"
+      - "Docs/SWMI_MOBILITY_1_PACKAGE_D*"
+      - "Cargo.toml"
+      - ".github/workflows/swmi-mobility-node-gateway.yml"
+  pull_request:
+    paths:
+      - "system-backend/node-gateway/**"
+      - "system-backend/services.toml"
+      - "tools/check_node_gateway.py"
+      - "Docs/SWMI_MOBILITY_1_PACKAGE_D*"
+      - "Cargo.toml"
+
+jobs:
+  node-gateway:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Static package checks
+        run: python3 -S tools/check_node_gateway.py
+      - name: Format
+        run: cargo fmt --all -- --check
+      - name: Unit tests
+        run: cargo test -p netcore-node-gateway
+      - name: Build lean LXC binary
+        run: cargo build --release -p netcore-node-gateway
+      - name: Clippy
+        run: cargo clippy -p netcore-node-gateway --all-targets -- -D warnings

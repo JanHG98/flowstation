@@ -2,7 +2,7 @@
 
 | Dienst | Schwerpunkt der eigenen WebUI | Besonders geschützte Aktionen |
 | --- | --- | --- |
-| Node Gateway | TBS-Sessions, Heartbeats, Zertifikate, Protokollversionen | Node sperren, Zertifikat widerrufen |
+| Node Gateway | TBS-Sessions, Heartbeats, Protokollversionen, Backend-Transport | Node trennen und Kommandos senden; im ersten Testpaket bewusst offen ohne Tokens |
 | Subscriber Core | Teilnehmer, Geräte, Profile, Berechtigungen | Sperren, Import, Gerätezuordnung |
 | Group Core | GSSI, Mitglieder, Affiliationen, DGNA | DGNA, Gruppenrechte, Löschung |
 | Mobility Core | Registrierungen, Zellen, Migration, Recovery | Kontextfreigabe, Handover-Abbruch |

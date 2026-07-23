@@ -34,6 +34,8 @@ Jeder später eigenständig laufende LXC- oder VM-Dienst erhält eine eigene Web
 
 Die WebUI gehört ab der ersten Implementierung eines Dienstes zu dessen Definition of Done; sie wird nicht als spätere kosmetische Zusatzphase behandelt.
 
+Der erste `node-gateway`-LXC startet im ausdrücklich markierten `open_lab`-Modus ohne Tokens, Benutzerkonten oder TLS. Diese Zwischenstufe dient nur dem isolierten Testnetz und wird vor einem Produktivbetrieb durch die spätere Security-Phase ersetzt beziehungsweise abgesichert.
+
 ---
 
 # 2. Normative Grundlage
@@ -1194,7 +1196,7 @@ Ergebnisse:
 
 Hinweis: Paket A ist eine statische und reproduzierbare Bestandsaufnahme. Es behauptet noch keine ETSI-Konformität und ersetzt weder Golden Vectors noch On-Air-Tests.
 
-### Paket B – Typen
+### Paket B – Typen ✅ abgeschlossen
 
 * TLMC-Enums und Strukturen,
 * TLPD-Primitiven,
@@ -1204,7 +1206,7 @@ Hinweis: Paket A ist eine statische und reproduzierbare Bestandsaufnahme. Es beh
 * Measurement Report,
 * Restore Context.
 
-### Paket C – TLMC Runtime
+### Paket C – TLMC Runtime ✅ abgeschlossen
 
 * Configure,
 * Scan,
@@ -1213,7 +1215,7 @@ Hinweis: Paket A ist eine statische und reproduzierbare Bestandsaufnahme. Es beh
 * Cell Read,
 * Select.
 
-### Paket D – TLPD Runtime
+### Paket D – TLPD Runtime ✅ abgeschlossen
 
 * vollständiger Uplink,
 * vollständiger Downlink,
@@ -1222,7 +1224,7 @@ Hinweis: Paket A ist eine statische und reproduzierbare Bestandsaufnahme. Es beh
 * Reconnect,
 * Context Routing.
 
-### Paket E – Tests
+### Paket E – Tests und Robustheit ✅ abgeschlossen
 
 * Unit Tests,
 * Golden Vectors,
@@ -1253,12 +1255,23 @@ Für jede Phase, in der ein neuer Containerdienst entsteht, gelten zusätzlich:
 - eigene WebUI im jeweiligen `system-backend/<dienst>/`-Paket;
 - Übersicht, Fachverwaltung, Health, Abhängigkeiten, Audit, Konfiguration und Wartung;
 - versionierte Verwaltungs-API;
-- RBAC für alle schreibenden Aktionen;
+- RBAC für alle schreibenden Aktionen im späteren gesicherten Betrieb;
+- bei einer ausdrücklich markierten `open_lab`-Stufe: deutliche Warnung und Netzisolation statt vorgetäuschter Authentisierung;
 - unabhängige Erreichbarkeit bei ausgefallenem Control Room;
 - UI- und API-Tests;
-- dokumentierter HTTPS-Zugriff im Managementnetz.
+- dokumentierter HTTPS-Zugriff im Managementnetz beziehungsweise dokumentierter HTTP-Laborausnahme.
 
 
 ## Funkstack-Voraussetzung: SWMI Foundation 1 – Paket D
 
 Die lokale TLPD-Runtime ist abgeschlossen. Sie bleibt auf der TBS und stellt Diagnose-Snapshots für die spätere TBS-WebUI und den Node Gateway bereit. Es entsteht kein eigener Backend-Container.
+
+## Aktueller Stand: SWMI Mobility 1
+
+- Paket A – MLE-Zellwechselbasis: abgeschlossen
+- Paket B – vollständige lokale CMCE-Call-Restore-State-Machine: abgeschlossen
+- Paket C – MM-Migration, VASSI und Forward Registration: abgeschlossen
+- Paket D – erster LXC-Dienst `node-gateway`: abgeschlossen
+
+Der Node Gateway läuft in dieser ersten Teststufe bewusst als `open_lab` unter HTTP-Port 8080 und verwendet keine Tokens. Der nächste zentrale Dienst kann den Gateway über `/ws/backend` abonnieren.
+

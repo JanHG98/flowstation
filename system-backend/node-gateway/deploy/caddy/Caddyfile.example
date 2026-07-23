@@ -1,0 +1,7 @@
+# Replace the hostname with the DNS name or IP used for this LXC.
+# For an internal CA, use `tls internal` and install Caddy's root CA on clients.
+node-gateway.example.internal:8443 {
+    tls internal
+    encode zstd gzip
+    reverse_proxy 127.0.0.1:8080
+}

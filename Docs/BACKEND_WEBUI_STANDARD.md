@@ -26,13 +26,25 @@ Es wird **kein zusätzlicher Frontend-LXC pro Dienst** benötigt.
 
 ## 3. Einheitlicher Zugriff
 
-Neue LXC-Dienste verwenden im Testumfeld standardmäßig:
+Neue LXC-Dienste verwenden langfristig standardmäßig:
 
 ```text
 https://<LXC-IP>:8443/
 ```
 
 Da jeder Container eine eigene IP besitzt, kann derselbe Port mehrfach verwendet werden. Bereits vorhandene Dienste dürfen ihren bisherigen Port behalten.
+
+### Vorübergehender Open-Lab-Modus
+
+Während des frühen Testaufbaus darf ein Dienst ausdrücklich als `open_lab` markiert werden. Dann gelten abweichend:
+
+- HTTP statt HTTPS ist zulässig,
+- es gibt keine Tokens, Benutzerkonten oder Client-Zertifikate,
+- der offene Zustand muss in WebUI, API, Logs und Dokumentation deutlich sichtbar sein,
+- der Dienst darf ausschließlich in einem isolierten Test-/Managementnetz erreichbar sein,
+- ein nicht implementierter Sicherheitsmodus darf nicht als produktionsfähig ausgegeben werden.
+
+Der erste Node Gateway verwendet daher zunächst `http://<LXC-IP>:8080/`. Diese Ausnahme ist absichtlich und keine Lockerung der späteren Produktivanforderungen.
 
 Empfohlene Endpunkte:
 
@@ -117,7 +129,7 @@ Ein Backend-Dienst gilt erst als vollständig, wenn:
 - seine fachliche Runtime funktioniert,
 - seine WebUI die Pflichtbereiche bereitstellt,
 - Readiness und Liveness vorhanden sind,
-- alle Schreibaktionen RBAC und Audit verwenden,
+- alle Schreibaktionen RBAC und Audit verwenden oder während einer ausdrücklich dokumentierten `open_lab`-Phase eindeutig als ungeschützt gekennzeichnet sind,
 - Konfigurationsänderungen validiert werden,
 - die UI bei ausgeschaltetem Control Room erreichbar bleibt,
 - API- und UI-Tests vorhanden sind,

@@ -1,0 +1,19 @@
+[server]
+# Open lab listener. Put this LXC only into an isolated management/test VLAN.
+bind = "0.0.0.0:8080"
+node_path = "/ws/node"
+backend_path = "/ws/backend"
+history_limit = 1000
+stale_after_secs = 20
+hello_timeout_secs = 10
+application_ping_secs = 15
+
+[security]
+# This package deliberately supports only open_lab.
+# No token fields exist and no user/password login is performed.
+mode = "open_lab"
+allow_remote_management = true
+
+[limits]
+max_message_bytes = 1048576
+max_http_body_bytes = 1048576

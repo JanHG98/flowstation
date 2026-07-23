@@ -33,12 +33,16 @@ Gemeinsame UI-Bausteine werden zukünftig unter folgendem Pfad entwickelt:
 system-backend/shared/web-ui/
 ```
 
-## Standardzugriff im Testumfeld
+## Standardzugriff
 
-Da jeder LXC eine eigene IP erhält, kann für neue Dienste einheitlich derselbe Management-Port verwendet werden:
+Langfristig verwenden neue Dienste mit eigener LXC-IP einheitlich:
 
 ```text
 https://<LXC-IP>:8443/
 ```
 
-Abweichungen für bereits bestehende Dienste sind zulässig und werden im jeweiligen README dokumentiert.
+Der erste Node Gateway ist eine ausdrücklich dokumentierte Ausnahme: Er läuft für die frühe isolierte Testumgebung unter `http://<LXC-IP>:8080/` im offenen Labormodus. Abweichungen werden im jeweiligen README und in `services.toml` festgehalten.
+
+## Bereits deploybarer Dienst
+
+`node-gateway/` ist der erste tatsächlich implementierte LXC-Dienst. Er enthält Rust-Runtime, TBS- und Backend-WebSockets, REST-API, WebUI, systemd-Unit und Installationsskripte. In der ersten Teststufe läuft er bewusst im deutlich markierten `open_lab`-Modus ohne Tokens oder Benutzeranmeldung.
