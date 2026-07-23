@@ -2466,7 +2466,7 @@
     },
     {
       "category": "Todo-Typ",
-      "line": 201,
+      "line": 304,
       "path": "crates/tetra-entities/src/umac/umac_bs.rs",
       "scope": "Runtime",
       "severity": "Typ-Platzhalter",
@@ -2474,7 +2474,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 246,
+      "line": 349,
       "path": "crates/tetra-entities/src/umac/umac_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -2482,7 +2482,7 @@
     },
     {
       "category": "panic!",
-      "line": 277,
+      "line": 380,
       "path": "crates/tetra-entities/src/umac/umac_bs.rs",
       "scope": "Runtime",
       "severity": "prüfen",
@@ -2490,7 +2490,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 367,
+      "line": 470,
       "path": "crates/tetra-entities/src/umac/umac_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -2498,7 +2498,7 @@
     },
     {
       "category": "Todo-Typ",
-      "line": 424,
+      "line": 527,
       "path": "crates/tetra-entities/src/umac/umac_bs.rs",
       "scope": "Runtime",
       "severity": "Typ-Platzhalter",
@@ -2506,7 +2506,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 629,
+      "line": 732,
       "path": "crates/tetra-entities/src/umac/umac_bs.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -2514,7 +2514,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 707,
+      "line": 810,
       "path": "crates/tetra-entities/src/umac/umac_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -2522,7 +2522,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 714,
+      "line": 817,
       "path": "crates/tetra-entities/src/umac/umac_bs.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -2530,7 +2530,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 744,
+      "line": 847,
       "path": "crates/tetra-entities/src/umac/umac_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -2538,7 +2538,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 762,
+      "line": 865,
       "path": "crates/tetra-entities/src/umac/umac_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -2546,7 +2546,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 763,
+      "line": 866,
       "path": "crates/tetra-entities/src/umac/umac_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -2554,7 +2554,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 764,
+      "line": 867,
       "path": "crates/tetra-entities/src/umac/umac_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -2562,7 +2562,7 @@
     },
     {
       "category": "Todo-Typ",
-      "line": 765,
+      "line": 868,
       "path": "crates/tetra-entities/src/umac/umac_bs.rs",
       "scope": "Runtime",
       "severity": "Typ-Platzhalter",
@@ -2570,7 +2570,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 902,
+      "line": 1005,
       "path": "crates/tetra-entities/src/umac/umac_bs.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -2578,7 +2578,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 936,
+      "line": 1039,
       "path": "crates/tetra-entities/src/umac/umac_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -2586,7 +2586,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 952,
+      "line": 1055,
       "path": "crates/tetra-entities/src/umac/umac_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -2594,7 +2594,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 953,
+      "line": 1056,
       "path": "crates/tetra-entities/src/umac/umac_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -2602,7 +2602,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 954,
+      "line": 1057,
       "path": "crates/tetra-entities/src/umac/umac_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -2610,7 +2610,7 @@
     },
     {
       "category": "Todo-Typ",
-      "line": 955,
+      "line": 1058,
       "path": "crates/tetra-entities/src/umac/umac_bs.rs",
       "scope": "Runtime",
       "severity": "Typ-Platzhalter",
@@ -2618,7 +2618,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 1027,
+      "line": 1130,
       "path": "crates/tetra-entities/src/umac/umac_bs.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -2626,7 +2626,7 @@
     },
     {
       "category": "unimplemented!",
-      "line": 1103,
+      "line": 1206,
       "path": "crates/tetra-entities/src/umac/umac_bs.rs",
       "scope": "Runtime",
       "severity": "kritisch",
@@ -2634,7 +2634,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 1138,
+      "line": 1241,
       "path": "crates/tetra-entities/src/umac/umac_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -2642,7 +2642,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 1139,
+      "line": 1242,
       "path": "crates/tetra-entities/src/umac/umac_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -2650,7 +2650,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 1140,
+      "line": 1243,
       "path": "crates/tetra-entities/src/umac/umac_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -2658,7 +2658,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 1141,
+      "line": 1244,
       "path": "crates/tetra-entities/src/umac/umac_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -2666,7 +2666,7 @@
     },
     {
       "category": "unimplemented!",
-      "line": 1232,
+      "line": 1335,
       "path": "crates/tetra-entities/src/umac/umac_bs.rs",
       "scope": "Runtime",
       "severity": "kritisch",
@@ -2674,7 +2674,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 1267,
+      "line": 1370,
       "path": "crates/tetra-entities/src/umac/umac_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -2682,7 +2682,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 1268,
+      "line": 1371,
       "path": "crates/tetra-entities/src/umac/umac_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -2690,7 +2690,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 1269,
+      "line": 1372,
       "path": "crates/tetra-entities/src/umac/umac_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -2698,7 +2698,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 1270,
+      "line": 1373,
       "path": "crates/tetra-entities/src/umac/umac_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -2706,7 +2706,7 @@
     },
     {
       "category": "TODO/FIXME",
-      "line": 1376,
+      "line": 1479,
       "path": "crates/tetra-entities/src/umac/umac_bs.rs",
       "scope": "Runtime",
       "severity": "technische Schuld",
@@ -2714,7 +2714,7 @@
     },
     {
       "category": "unimplemented!",
-      "line": 1377,
+      "line": 1480,
       "path": "crates/tetra-entities/src/umac/umac_bs.rs",
       "scope": "Runtime",
       "severity": "kritisch",
@@ -2722,7 +2722,7 @@
     },
     {
       "category": "Todo-Typ",
-      "line": 1848,
+      "line": 1955,
       "path": "crates/tetra-entities/src/umac/umac_bs.rs",
       "scope": "Runtime",
       "severity": "Typ-Platzhalter",
@@ -5698,7 +5698,7 @@
     },
     {
       "category": "panic!",
-      "line": 276,
+      "line": 303,
       "path": "bins/bluestation-bs/src/main.rs",
       "scope": "Runtime",
       "severity": "prüfen",
@@ -5706,7 +5706,7 @@
     },
     {
       "category": "panic!",
-      "line": 465,
+      "line": 495,
       "path": "bins/bluestation-bs/src/main.rs",
       "scope": "Runtime",
       "severity": "prüfen",
@@ -5735,6 +5735,22 @@
       "scope": "Runtime",
       "severity": "prüfen",
       "text": "panic!(\"expected group policy command\");"
+    },
+    {
+      "category": "unreachable!",
+      "line": 407,
+      "path": "system-backend/node-gateway/src/ws.rs",
+      "scope": "Runtime",
+      "severity": "prüfen",
+      "text": "BackendRequest::Subscribe { .. } => unreachable!(\"subscription handled above\"),"
+    },
+    {
+      "category": "unreachable!",
+      "line": 408,
+      "path": "system-backend/node-gateway/src/ws.rs",
+      "scope": "Runtime",
+      "severity": "prüfen",
+      "text": "BackendRequest::MediaFrame { .. } => unreachable!(\"media frame handled above\"),"
     }
   ],
   "note": "Static source inventory; not a claim of ETSI certification.",
@@ -8556,7 +8572,7 @@
     }
   ],
   "summary": {
-    "gap_count": 717,
+    "gap_count": 719,
     "pdu_count": 77,
     "sap_primitive_count": 130,
     "state_type_count": 18

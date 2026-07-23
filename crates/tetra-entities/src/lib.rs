@@ -7,6 +7,7 @@ pub mod health;
 pub mod legacy_wap;
 pub mod net_control;
 pub mod net_control_room;
+pub mod net_media;
 pub mod net_telemetry;
 
 // Full base-station/entity runtime.  Kept behind `runtime` so the Control Room

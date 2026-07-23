@@ -1148,6 +1148,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "netcore-media-switch"
+version = "1.3.0"
+dependencies = [
+ "chrono",
+ "clap",
+ "serde",
+ "serde_json",
+ "tetra-entities",
+ "toml",
+ "tracing",
+ "tracing-subscriber",
+ "tungstenite",
+]
+
+[[package]]
 name = "netcore-subscriber-core"
 version = "1.3.0"
 dependencies = [

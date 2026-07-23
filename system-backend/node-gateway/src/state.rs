@@ -4,6 +4,7 @@ use std::sync::{Arc, Mutex, mpsc};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use tetra_entities::net_control::ControlCommand;
+use tetra_entities::net_media::MediaDownlinkFrame;
 use tetra_entities::net_control_room::{
     CONTROL_ROOM_PROTOCOL_VERSION, ControlCommandEnvelope, ControlRoomNodeCapabilities,
     ControlRoomNodeIdentity, ControlRoomNodeHello,
@@ -34,6 +35,7 @@ pub struct NodeSnapshot {
     pub telemetry_count: u64,
     pub control_ack_count: u64,
     pub control_response_count: u64,
+    pub media_frame_count: u64,
     pub error_count: u64,
     pub last_message_kind: String,
     pub last_telemetry: Option<Value>,
@@ -57,6 +59,7 @@ pub struct GatewayStatus {
     pub total_node_sessions: u64,
     pub total_node_messages: u64,
     pub total_commands: u64,
+    pub total_media_frames: u64,
     pub total_disconnects: u64,
 }
 
@@ -113,6 +116,20 @@ pub enum BackendRequest {
         request_id: Option<String>,
         node_id: String,
     },
+    /// Select high-rate backend topics. Media frames are opt-in so normal
+    /// management services are not flooded with speech traffic.
+    Subscribe {
+        #[serde(default)]
+        request_id: Option<String>,
+        #[serde(default)]
+        topics: Vec<String>,
+    },
+    /// High-rate packed media frame. Success is intentionally not acknowledged
+    /// per frame; errors are returned as ActionResult events.
+    MediaFrame {
+        node_id: String,
+        frame: MediaDownlinkFrame,
+    },
 }
 
 struct NodeRuntime {
@@ -120,16 +137,22 @@ struct NodeRuntime {
     sender: Option<mpsc::Sender<NodeOutbound>>,
 }
 
+struct BackendRuntime {
+    sender: mpsc::Sender<BackendEvent>,
+    media_frames: bool,
+}
+
 struct GatewayState {
     config: NodeGatewayConfig,
     started_at: String,
     nodes: HashMap<String, NodeRuntime>,
-    backend_clients: HashMap<String, mpsc::Sender<BackendEvent>>,
+    backend_clients: HashMap<String, BackendRuntime>,
     events: VecDeque<EventRecord>,
     next_event_seq: u64,
     total_node_sessions: u64,
     total_node_messages: u64,
     total_commands: u64,
+    total_media_frames: u64,
     total_disconnects: u64,
 }
 
@@ -148,6 +171,7 @@ impl SharedGateway {
             total_node_sessions: 0,
             total_node_messages: 0,
             total_commands: 0,
+            total_media_frames: 0,
             total_disconnects: 0,
         })))
     }
@@ -212,6 +236,7 @@ impl SharedGateway {
             telemetry_count: 0,
             control_ack_count: 0,
             control_response_count: 0,
+            media_frame_count: 0,
             error_count: 0,
             last_message_kind: "hello".to_string(),
             last_telemetry: None,
@@ -239,7 +264,7 @@ impl SharedGateway {
 
     pub fn handle_node_message(&self, node_id: &str, session_id: &str, message: NodeToControlRoomMessage) {
         let mut state = self.0.lock().expect("gateway state poisoned");
-        let kind = {
+        let (kind, is_media) = {
             let Some(runtime) = state.nodes.get_mut(node_id) else {
                 return;
             };
@@ -271,22 +296,31 @@ impl SharedGateway {
                     runtime.snapshot.control_response_count = runtime.snapshot.control_response_count.wrapping_add(1);
                     "control_response"
                 }
+                NodeToControlRoomMessage::MediaFrame { .. } => {
+                    runtime.snapshot.media_frame_count = runtime.snapshot.media_frame_count.wrapping_add(1);
+                    "media_frame"
+                }
                 NodeToControlRoomMessage::Error { .. } => {
                     runtime.snapshot.error_count = runtime.snapshot.error_count.wrapping_add(1);
                     "error"
                 }
             };
             runtime.snapshot.last_message_kind = kind.to_string();
-            kind
+            (kind, matches!(&message, NodeToControlRoomMessage::MediaFrame { .. }))
         };
         state.total_node_messages = state.total_node_messages.wrapping_add(1);
-
-        push_event_locked(
-            &mut state,
-            "node_message",
-            Some(node_id.to_string()),
-            json!({ "message_kind": kind }),
-        );
+        if is_media {
+            state.total_media_frames = state.total_media_frames.wrapping_add(1);
+        } else {
+            push_event_locked(
+                &mut state,
+                "node_message",
+                Some(node_id.to_string()),
+                json!({ "message_kind": kind }),
+            );
+        }
+        // Media frames are broadcast directly but deliberately omitted from the
+        // persistent event history to avoid 18 events/s per active speech leg.
         broadcast_locked(
             &mut state,
             BackendEvent::NodeMessage {
@@ -366,6 +400,31 @@ impl SharedGateway {
         Ok(())
     }
 
+    pub fn send_media_frame(
+        &self,
+        node_id: &str,
+        frame: MediaDownlinkFrame,
+    ) -> Result<(), String> {
+        let mut state = self.0.lock().expect("gateway state poisoned");
+        let sender = state
+            .nodes
+            .get(node_id)
+            .and_then(|node| node.sender.clone())
+            .ok_or_else(|| format!("node {node_id} is not connected"))?;
+        if !state
+            .nodes
+            .get(node_id)
+            .is_some_and(|node| node.snapshot.capabilities.media_bridge)
+        {
+            return Err(format!("node {node_id} does not advertise media_bridge"));
+        }
+        sender
+            .send(NodeOutbound::Protocol(ControlRoomToNodeMessage::MediaFrame { frame }))
+            .map_err(|_| format!("node {node_id} send queue is closed"))?;
+        state.total_media_frames = state.total_media_frames.wrapping_add(1);
+        Ok(())
+    }
+
     pub fn send_command(&self, node_id: &str, command: ControlCommand, operator_id: Option<String>) -> Result<String, String> {
         let mut state = self.0.lock().expect("gateway state poisoned");
         if !state.config.security.allow_remote_management {
@@ -402,9 +461,34 @@ impl SharedGateway {
         let id = uuid::Uuid::new_v4().to_string();
         let mut state = self.0.lock().expect("gateway state poisoned");
         let _ = tx.send(BackendEvent::Snapshot { snapshot: snapshot_locked(&state) });
-        state.backend_clients.insert(id.clone(), tx);
+        state.backend_clients.insert(id.clone(), BackendRuntime { sender: tx, media_frames: false });
         push_event_locked(&mut state, "backend_connected", None, json!({ "backend_id": id.clone() }));
         (id, rx)
+    }
+
+    pub fn set_backend_topics(
+        &self,
+        backend_id: &str,
+        topics: &[String],
+    ) -> Result<Vec<String>, String> {
+        let mut state = self.0.lock().expect("gateway state poisoned");
+        let backend = state
+            .backend_clients
+            .get_mut(backend_id)
+            .ok_or_else(|| "backend session is no longer registered".to_string())?;
+        backend.media_frames = topics.iter().any(|topic| topic == "media_frames");
+        let accepted = if backend.media_frames {
+            vec!["media_frames".to_string()]
+        } else {
+            Vec::new()
+        };
+        push_event_locked(
+            &mut state,
+            "backend_subscription_changed",
+            None,
+            json!({"backend_id": backend_id, "topics": &accepted}),
+        );
+        Ok(accepted)
     }
 
     pub fn unregister_backend(&self, backend_id: &str) {
@@ -431,7 +515,9 @@ impl SharedGateway {
                 "# TYPE netcore_node_gateway_node_messages_total counter\n",
                 "netcore_node_gateway_node_messages_total {}\n",
                 "# TYPE netcore_node_gateway_commands_total counter\n",
-                "netcore_node_gateway_commands_total {}\n"
+                "netcore_node_gateway_commands_total {}\n",
+                "# TYPE netcore_node_gateway_media_frames_total counter\n",
+                "netcore_node_gateway_media_frames_total {}\n"
             ),
             status.known_nodes,
             status.connected_nodes,
@@ -439,6 +525,7 @@ impl SharedGateway {
             status.backend_clients,
             status.total_node_messages,
             status.total_commands,
+            status.total_media_frames,
         )
     }
 }
@@ -474,6 +561,7 @@ fn status_locked(state: &GatewayState) -> GatewayStatus {
         total_node_sessions: state.total_node_sessions,
         total_node_messages: state.total_node_messages,
         total_commands: state.total_commands,
+        total_media_frames: state.total_media_frames,
         total_disconnects: state.total_disconnects,
     }
 }
@@ -501,7 +589,20 @@ fn push_event_locked(state: &mut GatewayState, kind: &str, node_id: Option<Strin
 }
 
 fn broadcast_locked(state: &mut GatewayState, event: BackendEvent) {
-    state.backend_clients.retain(|_, sender| sender.send(event.clone()).is_ok());
+    let is_media = matches!(
+        &event,
+        BackendEvent::NodeMessage {
+            message: NodeToControlRoomMessage::MediaFrame { .. },
+            ..
+        }
+    );
+    state.backend_clients.retain(|_, backend| {
+        if is_media && !backend.media_frames {
+            true
+        } else {
+            backend.sender.send(event.clone()).is_ok()
+        }
+    });
 }
 
 fn seconds_since(timestamp: &str) -> Option<u64> {
@@ -553,6 +654,7 @@ mod tests {
                 group_policy: true,
                 call_control: true,
                 call_restore_context: true,
+                media_bridge: true,
             },
             started_at: now_iso(),
         }
@@ -566,6 +668,51 @@ mod tests {
         assert_eq!(gateway.status().connected_nodes, 1);
         gateway.mark_disconnected("tbs-a", "s1", "test");
         assert_eq!(gateway.status().connected_nodes, 0);
+    }
+
+    #[test]
+    fn media_frames_are_delivered_only_to_subscribed_backends() {
+        let gateway = SharedGateway::new(NodeGatewayConfig::default());
+        let (node_tx, _node_rx) = mpsc::channel();
+        gateway
+            .register_node(
+                &hello("tbs-a"),
+                "s1".to_string(),
+                "127.0.0.1".to_string(),
+                node_tx,
+            )
+            .unwrap();
+        let (plain_id, plain_rx) = gateway.register_backend();
+        let (media_id, media_rx) = gateway.register_backend();
+        let _ = plain_rx.try_recv();
+        let _ = media_rx.try_recv();
+        gateway
+            .set_backend_topics(&media_id, &["media_frames".to_string()])
+            .unwrap();
+        while plain_rx.try_recv().is_ok() {}
+        while media_rx.try_recv().is_ok() {}
+
+        gateway.handle_node_message(
+            "tbs-a",
+            "s1",
+            NodeToControlRoomMessage::MediaFrame {
+                frame: tetra_entities::net_media::MediaUplinkFrame {
+                    node_id: "tbs-a".to_string(),
+                    sequence: 1,
+                    timestamp: now_iso(),
+                    carrier_num: 720,
+                    logical_ts: 2,
+                    codec: tetra_entities::net_media::MediaCodec::TetraAcelp0,
+                    payload: vec![0; tetra_entities::net_media::TETRA_ACELP_FRAME_BYTES],
+                },
+            },
+        );
+        assert!(plain_rx.try_recv().is_err());
+        assert!(matches!(
+            media_rx.try_recv().unwrap(),
+            BackendEvent::NodeMessage { .. }
+        ));
+        gateway.unregister_backend(&plain_id);
     }
 
     #[test]

@@ -18,11 +18,12 @@ use crate::{
         ControlRoomCodecJson, ControlRoomNodeCapabilities, ControlRoomNodeHeartbeat, ControlRoomNodeHello, ControlRoomNodeIdentity,
         ControlRoomToNodeMessage, NodeTelemetryEnvelope, NodeToControlRoomMessage,
     },
+    net_media::{MediaDownlinkSink, MediaTryRecvError, MediaUplinkFrame, MediaUplinkSource},
     net_telemetry::{TelemetryEvent, TelemetrySource, channel::RecvEvent},
     network::transports::NetworkTransport,
 };
 
-const POLL_TIMEOUT: Duration = Duration::from_millis(250);
+const POLL_TIMEOUT: Duration = Duration::from_millis(10);
 const RECONNECT_DELAY: Duration = Duration::from_secs(10);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -47,6 +48,8 @@ pub struct ControlRoomWorker<T: NetworkTransport> {
     identity: ControlRoomNodeIdentity,
     capabilities: ControlRoomNodeCapabilities,
     telemetry_source: TelemetrySource,
+    media_uplink_source: Option<MediaUplinkSource>,
+    media_downlink_sink: Option<MediaDownlinkSink>,
     dispatchers: HashMap<TetraEntity, CommandDispatcher>,
     transport: T,
     connected: bool,
@@ -62,6 +65,8 @@ impl<T: NetworkTransport> ControlRoomWorker<T> {
         identity: ControlRoomNodeIdentity,
         capabilities: ControlRoomNodeCapabilities,
         telemetry_source: TelemetrySource,
+        media_uplink_source: Option<MediaUplinkSource>,
+        media_downlink_sink: Option<MediaDownlinkSink>,
         dispatchers: HashMap<TetraEntity, CommandDispatcher>,
         transport: T,
     ) -> Self {
@@ -70,6 +75,8 @@ impl<T: NetworkTransport> ControlRoomWorker<T> {
             identity,
             capabilities,
             telemetry_source,
+            media_uplink_source,
+            media_downlink_sink,
             dispatchers,
             transport,
             connected: false,
@@ -96,6 +103,7 @@ impl<T: NetworkTransport> ControlRoomWorker<T> {
             }
 
             if self.connected {
+                self.drain_media_uplink();
                 self.poll_downlink();
                 self.collect_responses();
                 self.send_periodic_heartbeat();
@@ -184,6 +192,37 @@ impl<T: NetworkTransport> ControlRoomWorker<T> {
         self.send_uplink(&NodeToControlRoomMessage::Telemetry { envelope });
     }
 
+    fn drain_media_uplink(&mut self) {
+        let mut frames = Vec::new();
+        if let Some(source) = self.media_uplink_source.as_ref() {
+            for _ in 0..64 {
+                match source.try_recv() {
+                    Ok(frame) => frames.push(frame),
+                    Err(MediaTryRecvError::Empty) => break,
+                    Err(MediaTryRecvError::Disconnected) => {
+                        tracing::warn!("ControlRoom media uplink queue disconnected");
+                        break;
+                    }
+                }
+            }
+        }
+
+        for frame in frames {
+            let frame = MediaUplinkFrame {
+                node_id: self.identity.node_id.clone(),
+                sequence: frame.sequence,
+                timestamp: now_iso(),
+                carrier_num: frame.carrier_num,
+                logical_ts: frame.logical_ts,
+                codec: frame.codec,
+                payload: frame.payload,
+            };
+            if !self.send_uplink(&NodeToControlRoomMessage::MediaFrame { frame }) {
+                break;
+            }
+        }
+    }
+
     fn poll_downlink(&mut self) {
         for msg in self.transport.receive_reliable() {
             let codec = ControlRoomCodecJson;
@@ -203,6 +242,19 @@ impl<T: NetworkTransport> ControlRoomWorker<T> {
                     self.send_periodic_heartbeat();
                 }
                 Ok(ControlRoomToNodeMessage::Command { envelope }) => self.handle_command(envelope),
+                Ok(ControlRoomToNodeMessage::MediaFrame { frame }) => {
+                    let Some(sink) = self.media_downlink_sink.as_ref() else {
+                        tracing::warn!(
+                            session_id = %frame.session_id,
+                            logical_ts = frame.logical_ts,
+                            "received Media Switch frame but no local media bridge is installed"
+                        );
+                        continue;
+                    };
+                    if let Err(error) = sink.try_send(frame) {
+                        tracing::warn!("dropping Media Switch downlink frame: {:?}", error);
+                    }
+                }
                 Err(e) => {
                     tracing::warn!("ControlRoom: failed to decode downlink message ({} bytes): {}", msg.payload.len(), e);
                     self.send_error(format!("failed to decode downlink message: {}", e));

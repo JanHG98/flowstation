@@ -290,14 +290,14 @@ fn handle_backend_websocket(mut ws: WebSocket<TcpStream>, gateway: SharedGateway
                     let _ = send_backend_event(&mut ws, &BackendEvent::ActionResult { request_id: None, command_id: None, ok: false, message: "message too large".to_string() });
                     continue;
                 }
-                handle_backend_request(&mut ws, &gateway, serde_json::from_slice(data.as_ref()));
+                handle_backend_request(&mut ws, &gateway, &backend_id, serde_json::from_slice(data.as_ref()));
             }
             Ok(Message::Text(text)) => {
                 if text.len() > config.limits.max_message_bytes {
                     let _ = send_backend_event(&mut ws, &BackendEvent::ActionResult { request_id: None, command_id: None, ok: false, message: "message too large".to_string() });
                     continue;
                 }
-                handle_backend_request(&mut ws, &gateway, serde_json::from_str(text.as_str()));
+                handle_backend_request(&mut ws, &gateway, &backend_id, serde_json::from_str(text.as_str()));
             }
             Ok(Message::Ping(payload)) => {
                 let _ = ws.send(Message::Pong(payload));
@@ -321,39 +321,91 @@ fn handle_backend_websocket(mut ws: WebSocket<TcpStream>, gateway: SharedGateway
 fn handle_backend_request(
     ws: &mut WebSocket<TcpStream>,
     gateway: &SharedGateway,
+    backend_id: &str,
     request: Result<BackendRequest, serde_json::Error>,
 ) {
+    let request = match request {
+        Ok(request) => request,
+        Err(error) => {
+            let _ = send_backend_event(
+                ws,
+                &BackendEvent::ActionResult {
+                    request_id: None,
+                    command_id: None,
+                    ok: false,
+                    message: format!("invalid backend request: {error}"),
+                },
+            );
+            return;
+        }
+    };
+
+    let request = match request {
+        BackendRequest::Subscribe { request_id, topics } => {
+            let result = gateway.set_backend_topics(backend_id, &topics);
+            let event = match result {
+                Ok(accepted) => BackendEvent::ActionResult {
+                    request_id,
+                    command_id: None,
+                    ok: true,
+                    message: format!("subscribed topics: {}", accepted.join(",")),
+                },
+                Err(message) => BackendEvent::ActionResult {
+                    request_id,
+                    command_id: None,
+                    ok: false,
+                    message,
+                },
+            };
+            let _ = send_backend_event(ws, &event);
+            return;
+        }
+        BackendRequest::MediaFrame { node_id, frame } => {
+            if let Err(message) = gateway.send_media_frame(&node_id, frame) {
+                let _ = send_backend_event(
+                    ws,
+                    &BackendEvent::ActionResult {
+                        request_id: None,
+                        command_id: None,
+                        ok: false,
+                        message,
+                    },
+                );
+            }
+            return;
+        }
+        other => other,
+    };
+
     let (request_id, result): (Option<String>, Result<(String, Option<String>), String>) = match request {
-        Ok(BackendRequest::Ping { request_id }) => {
+        BackendRequest::Ping { request_id } => {
             (request_id, Ok(("pong".to_string(), None)))
         }
-        Ok(BackendRequest::PingNode { request_id, node_id }) => {
+        BackendRequest::PingNode { request_id, node_id } => {
             let result = gateway
                 .ping_node(&node_id)
                 .map(|_| (format!("ping queued for {node_id}"), None));
             (request_id, result)
         }
-        Ok(BackendRequest::DisconnectNode { request_id, node_id }) => {
+        BackendRequest::DisconnectNode { request_id, node_id } => {
             let result = gateway
                 .disconnect_node(&node_id)
                 .map(|_| (format!("disconnect queued for {node_id}"), None));
             (request_id, result)
         }
-        Ok(BackendRequest::Command {
+        BackendRequest::Command {
             request_id,
             node_id,
             command,
             operator_id,
-        }) => {
+        } => {
             let result = gateway
                 .send_command(&node_id, command, operator_id)
                 .map(|command_id| ("command queued".to_string(), Some(command_id)));
             (request_id, result)
         }
-        Err(error) => (
-            None,
-            Err(format!("invalid backend request: {error}")),
-        ),
+        BackendRequest::Subscribe { .. } => unreachable!("subscription handled above"),
+        BackendRequest::MediaFrame { .. } => unreachable!("media frame handled above"),
     };
     let event = match result {
         Ok((message, command_id)) => BackendEvent::ActionResult {

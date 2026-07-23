@@ -18,6 +18,7 @@ members = [
     "system-backend/subscriber-core",
     "system-backend/group-core",
     "system-backend/call-control",
+    "system-backend/media-switch",
     #"bins/bluestation-telemetry",
     #"bins/bluestation-control",
     #"bins/pdu-tool",

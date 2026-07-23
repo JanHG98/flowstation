@@ -1601,6 +1601,13 @@ impl ControlRoomState {
                 self.record_control_response(envelope);
                 Some(node_id)
             }
+            NodeToControlRoomMessage::MediaFrame { frame } => {
+                let node_id = frame.node_id.clone();
+                if let Some(node) = self.nodes.get_mut(&node_id) {
+                    node.last_seen = Some(frame.timestamp.clone());
+                }
+                Some(node_id)
+            }
             NodeToControlRoomMessage::Error { node_id, message, timestamp } => {
                 self.node_mut(node_id).push_error(format!("{}: {}", timestamp, message));
                 self.push_event(EventLogEntry {

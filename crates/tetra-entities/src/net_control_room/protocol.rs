@@ -5,6 +5,7 @@ use tetra_core::tetra_entities::TetraEntity;
 
 use crate::{
     net_control::{ControlCommand, ControlResponse},
+    net_media::{MediaDownlinkFrame, MediaUplinkFrame},
     net_telemetry::TelemetryEvent,
 };
 
@@ -95,6 +96,9 @@ pub struct ControlRoomNodeCapabilities {
     /// Node can export and install CMCE call-restore contexts.
     #[serde(default)]
     pub call_restore_context: bool,
+    /// Node can stream packed TETRA speech frames through the Node Gateway.
+    #[serde(default)]
+    pub media_bridge: bool,
 }
 
 impl ControlRoomNodeCapabilities {
@@ -118,6 +122,7 @@ impl ControlRoomNodeCapabilities {
             group_policy: true,
             call_control: true,
             call_restore_context: true,
+            media_bridge: cfg.control_room.as_ref().is_some_and(|control| control.enabled),
         }
     }
 }
@@ -185,6 +190,8 @@ pub enum NodeToControlRoomMessage {
     Telemetry { envelope: NodeTelemetryEnvelope },
     ControlAck { ack: ControlCommandAck },
     ControlResponse { envelope: ControlResponseEnvelope },
+    /// Packed UL speech frame for the central Media Switch.
+    MediaFrame { frame: MediaUplinkFrame },
     Error { node_id: String, message: String, timestamp: String },
 }
 
@@ -195,4 +202,6 @@ pub enum ControlRoomToNodeMessage {
     HelloAck { accepted: bool, message: Option<String> },
     Ping { seq: u64, timestamp: String },
     Command { envelope: ControlCommandEnvelope },
+    /// Packed speech frame routed by the Media Switch to one local TBS leg.
+    MediaFrame { frame: MediaDownlinkFrame },
 }

@@ -1348,7 +1348,8 @@ impl CallState {
                 Vec::new()
             }
             NodeToControlRoomMessage::Hello { .. }
-            | NodeToControlRoomMessage::Heartbeat { .. } => Vec::new(),
+            | NodeToControlRoomMessage::Heartbeat { .. }
+            | NodeToControlRoomMessage::MediaFrame { .. } => Vec::new(),
         }
     }
 

@@ -909,6 +909,7 @@ mod tests {
                 group_policy: true,
                 call_control: true,
                 call_restore_context: true,
+                media_bridge: true,
             },
         }
     }

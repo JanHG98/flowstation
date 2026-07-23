@@ -1,0 +1,37 @@
+# NetCore Media Switch – offener Testbetrieb.
+# Keine Tokens, keine Passwörter und kein TLS. Nur in einem isolierten Labornetz verwenden.
+
+[server]
+bind = "0.0.0.0:8130"
+history_limit = 2000
+
+[node_gateway]
+url = "ws://10.0.1.20:8080/ws/backend"
+reconnect_secs = 2
+
+[call_control]
+url = "http://10.0.1.24:8120/api/v1/calls"
+reconcile_secs = 2
+request_timeout_secs = 2
+
+[media]
+# Ein gepackter TETRA-TCH/S-Sprachframe pro 60-ms-Rahmen.
+frame_duration_ms = 60
+# Fester Startpuffer. 3 Frames entsprechen standardmäßig 180 ms.
+jitter_buffer_frames = 3
+# Harte Obergrenze pro Zielstream.
+max_jitter_buffer_frames = 12
+session_idle_secs = 30
+max_frames_per_tick = 256
+allow_same_leg_loopback = false
+tap_history_frames = 256
+
+[security]
+mode = "open_lab"
+allow_remote_management = true
+
+[limits]
+max_body_bytes = 1048576
+max_sessions = 10000
+max_streams = 50000
+max_pending_frames = 100000

@@ -12,6 +12,9 @@ use tetra_entities::net_control_room::{
     CONTROL_ROOM_HEARTBEAT_INTERVAL, CONTROL_ROOM_HEARTBEAT_TIMEOUT, CONTROL_ROOM_PROTOCOL_VERSION, ControlRoomNodeCapabilities,
     ControlRoomNodeIdentity, ControlRoomWorker,
 };
+use tetra_entities::net_media::{
+    MediaDownlinkSink, MediaUplinkSource, media_bridge_channel,
+};
 
 use tetra_config::bluestation::{PhyBackend, SharedConfig, StackConfig, parsing};
 use tetra_core::{TdmaTime, debug};
@@ -38,6 +41,7 @@ type OptionalRecorderHandle = ();
 type OptionalAudioPlayerHandle = Option<AudioPlayerHandle>;
 #[cfg(not(feature = "audio-player"))]
 type OptionalAudioPlayerHandle = ();
+type OptionalControlRoomMedia = Option<(MediaUplinkSource, MediaDownlinkSink)>;
 use tetra_entities::net_echolink::{EcholinkEntity, echolink_channel};
 use tetra_entities::net_geoalarm::{GeoAlarmSink, spawn_geoalarm_worker};
 use tetra_entities::net_meshcom::spawn_meshcom_worker;
@@ -176,14 +180,15 @@ fn start_control_worker(cfg: SharedConfig, command_dispatchers: HashMap<TetraEnt
 fn start_control_room_worker(
     cfg: SharedConfig,
     telemetry_source: TelemetrySource,
+    media: OptionalControlRoomMedia,
     command_dispatchers: HashMap<TetraEntity, CommandDispatcher>,
 ) -> thread::JoinHandle<()> {
     let config = cfg.config();
     let rcfg = config.control_room.as_ref().unwrap();
 
     if rcfg.credentials.is_none() {
-        tracing::warn!(
-            "Control Room node connection has no credentials configured; it will only connect when Control Room auth is disabled. Set [control_room] token when auth is enabled"
+        tracing::info!(
+            "Control Room node connection has no credentials configured (expected for Node Gateway open_lab mode)"
         );
     }
 
@@ -221,7 +226,18 @@ fn start_control_room_worker(
         .name("control-room-node".into())
         .spawn(move || {
             let transport = WebSocketTransport::new(ws_config);
-            let mut worker = ControlRoomWorker::new(identity, capabilities, telemetry_source, command_dispatchers, transport);
+            let (media_uplink_source, media_downlink_sink) = media
+                .map(|(uplink, downlink)| (Some(uplink), Some(downlink)))
+                .unwrap_or((None, None));
+            let mut worker = ControlRoomWorker::new(
+                identity,
+                capabilities,
+                telemetry_source,
+                media_uplink_source,
+                media_downlink_sink,
+                command_dispatchers,
+                transport,
+            );
             worker.run();
         })
         .expect("failed to spawn control-room-node thread")
@@ -239,6 +255,7 @@ fn build_bs_stack(
     Option<TelemetrySink>,
     OptionalRecorderHandle,
     OptionalAudioPlayerHandle,
+    OptionalControlRoomMedia,
 ) {
     let mut router = MessageRouter::new(cfg.clone());
     #[cfg(feature = "recording")]
@@ -252,6 +269,16 @@ fn build_bs_stack(
 
     // Build telemetry sink/source — always create if either telemetry or dashboard is enabled
     let has_control_room = cfg.config().control_room.as_ref().is_some_and(|c| c.enabled);
+    let (media_for_umac, media_for_worker) = if has_control_room {
+        let (uplink_sink, uplink_source, downlink_sink, downlink_source) =
+            media_bridge_channel(1_024);
+        (
+            Some((uplink_sink, downlink_source)),
+            Some((uplink_source, downlink_sink)),
+        )
+    } else {
+        (None, None)
+    };
     let needs_telemetry = cfg.config().telemetry.is_some()
         || has_control_room
         || cfg.config().dashboard.is_some()
@@ -317,7 +344,10 @@ fn build_bs_stack(
 
     // Add remaining components
     let lmac = LmacBs::new(cfg.clone());
-    let umac = UmacBs::new(cfg.clone());
+    let mut umac = UmacBs::new(cfg.clone());
+    if let Some((uplink_sink, downlink_source)) = media_for_umac {
+        umac.set_media_bridge(uplink_sink, downlink_source);
+    }
     let llc = Llc::new(cfg.clone());
     let mle = MleBs::new(cfg.clone());
     let mut mm = MmBs::new(cfg.clone(), tsink.clone(), c_e.remove(&TetraEntity::Mm));
@@ -479,7 +509,15 @@ fn build_bs_stack(
     // Init network time
     router.set_dl_time(TdmaTime::default());
 
-    (router, tsource, c_d, tsink, recorder_handle, audio_player_handle)
+    (
+        router,
+        tsource,
+        c_d,
+        tsink,
+        recorder_handle,
+        audio_player_handle,
+        media_for_worker,
+    )
 }
 
 #[derive(Parser, Debug)]
@@ -551,8 +589,15 @@ fn main() {
     }
 
     let (echolink_cmd_tx, echolink_cmd_rx) = echolink_channel();
-    let (mut router, tsource, cdispatchers, dapnet_telemetry_sink, recorder_handle, audio_player_handle) =
-        build_bs_stack(&mut cfg, &args.config, echolink_cmd_rx);
+    let (
+        mut router,
+        tsource,
+        cdispatchers,
+        dapnet_telemetry_sink,
+        recorder_handle,
+        audio_player_handle,
+        control_room_media,
+    ) = build_bs_stack(&mut cfg, &args.config, echolink_cmd_rx);
     #[cfg(feature = "audio-player")]
     let tts_handle = if cfg.config().tts.enabled {
         match (audio_player_handle.clone(), recorder_handle.clone()) {
@@ -832,7 +877,12 @@ fn main() {
             start_telemetry_worker(cfg.clone(), tee_source);
         }
         if let Some(control_room_source) = control_room_source {
-            start_control_room_worker(cfg.clone(), control_room_source, cdispatchers.clone());
+            start_control_room_worker(
+                cfg.clone(),
+                control_room_source,
+                control_room_media,
+                cdispatchers.clone(),
+            );
             eprintln!(" -> NetCore Control-Room node enabled");
         }
     };

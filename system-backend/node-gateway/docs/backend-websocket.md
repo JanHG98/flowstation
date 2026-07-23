@@ -103,3 +103,36 @@ Jede Anfrage erhält ein `action_result`. Bei Kommandos enthält die Antwort zus
 ## Sicherheit
 
 In diesem Paket ist der Backend-WebSocket bewusst offen. Es gibt keine Tokens und keine Herkunftsprüfung. Er darf nur aus dem isolierten Backend-/Managementnetz erreichbar sein.
+
+## Hochratiger Media-Topic
+
+Sprachframes werden nicht an jeden Backend-Client verteilt. Ein Media Switch meldet das Topic nach der Verbindung explizit an:
+
+```json
+{
+  "kind": "subscribe",
+  "request_id": "media-switch-subscribe",
+  "topics": ["media_frames"]
+}
+```
+
+Nur diese Backend-Session erhält danach `node_message`-Ereignisse mit `message.kind = "media_frame"`. Mobility Core, Subscriber Core, Group Core und Call Control werden dadurch nicht mit Sprachtraffic belastet.
+
+Downlink-Media wird ohne Erfolgsbestätigung pro Frame gesendet:
+
+```json
+{
+  "kind": "media_frame",
+  "node_id": "tbs-ziel",
+  "frame": {
+    "session_id": "logical-call-id",
+    "source_node_id": "tbs-quelle",
+    "sequence": 42,
+    "logical_ts": 3,
+    "codec": "tetra_acelp0",
+    "payload": [0, 1, 2]
+  }
+}
+```
+
+Fehler – beispielsweise ein offline befindlicher oder nicht mediafähiger Node – werden weiterhin als `action_result` gemeldet. Erfolgreiche Einzel-Frames erhalten bewusst kein ACK, damit der Gateway-Datenpfad nicht die doppelte Nachrichtenrate erzeugt.

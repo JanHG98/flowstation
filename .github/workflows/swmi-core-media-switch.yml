@@ -1,0 +1,37 @@
+name: SWMI Core Media Switch
+
+on:
+  push:
+    paths:
+      - 'system-backend/media-switch/**'
+      - 'system-backend/node-gateway/**'
+      - 'crates/tetra-entities/src/net_media/**'
+      - 'crates/tetra-entities/src/net_control_room/**'
+      - 'crates/tetra-entities/src/umac/umac_bs.rs'
+      - 'bins/bluestation-bs/src/main.rs'
+      - 'tools/check_media_switch.py'
+      - '.github/workflows/swmi-core-media-switch.yml'
+  pull_request:
+
+jobs:
+  media-switch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Static package checks
+        run: python3 tools/check_media_switch.py
+      - name: Protocol inventory
+        run: python3 tools/protocol_inventory.py --check
+      - name: Format
+        run: cargo fmt --all -- --check
+      - name: Media bridge tests
+        run: cargo test -p tetra-entities --test test_media_bridge
+      - name: Media Switch tests
+        run: cargo test -p netcore-media-switch
+      - name: Release build
+        run: cargo build --release -p netcore-media-switch
+      - name: Clippy
+        run: cargo clippy -p netcore-media-switch --all-targets -- -D warnings

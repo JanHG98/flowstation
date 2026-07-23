@@ -7,7 +7,7 @@
 | Group Core | GSSI, Mitglieder, Affiliationen, DGNA | DGNA, Gruppenrechte, Löschung; im Testpaket bewusst offen ohne Tokens |
 | Mobility Core | Registrierungen, Zellen, Migration, Recovery | Kontextfreigabe, Handover-Abbruch |
 | Call Control | Calls, Legs, Floor, Priorität, Restore | Call beenden, Floor entziehen, Pre-emption; im Testpaket bewusst offen ohne Tokens |
-| Media Switch | Streams, Jitter, Routing, Gateways | Stream trennen, Route ändern |
+| Media Switch | Streams, Jitter, Routing, TBS-Legs, Recorder-Taps | Stream stummschalten, Puffer leeren, Testframe einspeisen; im Testpaket bewusst offen ohne Tokens |
 | SDS Router | Nachrichten, Queues, Zustelltrace | Nachricht senden, Retry, Queue löschen |
 | Packet Core | PDP Contexts, NSAPI, Durchsatz | Context trennen, Zugriff sperren |
 | IP Gateway | Routing, NAT, Firewall, Capture | Firewall ändern, Capture starten |
