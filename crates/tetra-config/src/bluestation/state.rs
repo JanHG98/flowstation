@@ -618,6 +618,107 @@ impl Default for GeoalarmRuntimeStatus {
     }
 }
 
+
+/// One centrally managed group definition distributed by the Group Core.
+#[derive(Debug, Clone)]
+pub struct CentralGroupDefinition {
+    pub gssi: u32,
+    pub enabled: bool,
+    pub attach_allowed: bool,
+    pub dgna_allowed: bool,
+    pub call_allowed: bool,
+    pub sds_allowed: bool,
+    pub emergency_allowed: bool,
+    pub call_priority: u8,
+    pub class_of_usage: u8,
+}
+
+/// Runtime group policy installed by the central Group Core.
+#[derive(Debug, Clone)]
+pub struct CentralGroupPolicy {
+    pub revision: u64,
+    pub allow_unlisted_groups: bool,
+    pub enforce_memberships: bool,
+    pub groups: HashMap<u32, CentralGroupDefinition>,
+    pub memberships: HashMap<u32, HashSet<u32>>,
+    pub automatic_memberships: HashMap<u32, HashSet<u32>>,
+}
+
+impl CentralGroupPolicy {
+    pub fn allows_affiliation(&self, issi: u32, gssi: u32) -> bool {
+        let definition_allowed = self
+            .groups
+            .get(&gssi)
+            .map(|group| group.enabled && group.attach_allowed)
+            .unwrap_or(self.allow_unlisted_groups);
+        if !definition_allowed {
+            return false;
+        }
+        !self.enforce_memberships
+            || self
+                .memberships
+                .get(&issi)
+                .is_some_and(|groups| groups.contains(&gssi))
+    }
+
+    pub fn allows_dgna(&self, issi: u32, gssi: u32) -> bool {
+        let definition_allowed = self
+            .groups
+            .get(&gssi)
+            .map(|group| group.enabled && group.dgna_allowed)
+            .unwrap_or(self.allow_unlisted_groups);
+        if !definition_allowed {
+            return false;
+        }
+        !self.enforce_memberships
+            || self
+                .memberships
+                .get(&issi)
+                .is_some_and(|groups| groups.contains(&gssi))
+    }
+
+    pub fn allows_group_call(&self, gssi: u32) -> bool {
+        self.groups
+            .get(&gssi)
+            .map(|group| group.enabled && group.call_allowed)
+            .unwrap_or(self.allow_unlisted_groups)
+    }
+
+    pub fn allows_emergency_call(&self, gssi: u32) -> bool {
+        self.groups
+            .get(&gssi)
+            .map(|group| group.enabled && group.call_allowed && group.emergency_allowed)
+            .unwrap_or(self.allow_unlisted_groups)
+    }
+
+    pub fn class_of_usage(&self, gssi: u32, fallback: u8) -> u8 {
+        self.groups
+            .get(&gssi)
+            .map(|group| group.class_of_usage.min(15))
+            .unwrap_or(fallback.min(15))
+    }
+
+    pub fn call_priority(&self, gssi: u32, requested: u8) -> u8 {
+        self.groups
+            .get(&gssi)
+            .map(|group| requested.max(group.call_priority).min(15))
+            .unwrap_or(requested.min(15))
+    }
+
+    pub fn automatic_groups_for(&self, issi: u32) -> Vec<u32> {
+        let mut groups: Vec<u32> = self
+            .automatic_memberships
+            .get(&issi)
+            .into_iter()
+            .flatten()
+            .copied()
+            .filter(|gssi| self.allows_affiliation(issi, *gssi))
+            .collect();
+        groups.sort_unstable();
+        groups
+    }
+}
+
 /// Mutable, stack-editable state (mutex-protected).
 #[derive(Debug, Clone)]
 pub struct StackState {
@@ -644,6 +745,9 @@ pub struct StackState {
     /// separate from the historical dashboard semantics where an empty list
     /// means open network.  Dashboard edits always reset this flag to false.
     pub issi_whitelist_deny_all: bool,
+    /// Runtime group policy supplied by the central Group Core. `None` keeps the
+    /// historical open group-affiliation behaviour.
+    pub group_policy_override: Option<CentralGroupPolicy>,
     /// Runtime override for the WX/METAR service (dashboard toggle). See WxRuntimeOverride.
     pub wx_override: Option<WxRuntimeOverride>,
     /// Runtime override for Telegram alerts (dashboard editing). See TelegramRuntimeOverride.
@@ -693,6 +797,77 @@ pub struct StackState {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn sample_group_policy() -> CentralGroupPolicy {
+        let mut groups = HashMap::new();
+        groups.insert(15501, CentralGroupDefinition {
+            gssi: 15501,
+            enabled: true,
+            attach_allowed: true,
+            dgna_allowed: true,
+            call_allowed: false,
+            sds_allowed: true,
+            emergency_allowed: false,
+            call_priority: 7,
+            class_of_usage: 4,
+        });
+        groups.insert(15502, CentralGroupDefinition {
+            gssi: 15502,
+            enabled: false,
+            attach_allowed: true,
+            dgna_allowed: true,
+            call_allowed: true,
+            sds_allowed: true,
+            emergency_allowed: false,
+            call_priority: 2,
+            class_of_usage: 4,
+        });
+        let mut memberships = HashMap::new();
+        memberships.insert(1001, HashSet::from([15501]));
+        let mut automatic_memberships = HashMap::new();
+        automatic_memberships.insert(1001, HashSet::from([15501, 15502]));
+        CentralGroupPolicy {
+            revision: 12,
+            allow_unlisted_groups: false,
+            enforce_memberships: true,
+            groups,
+            memberships,
+            automatic_memberships,
+        }
+    }
+
+    #[test]
+    fn central_group_policy_enforces_definition_and_membership() {
+        let policy = sample_group_policy();
+        assert!(policy.allows_affiliation(1001, 15501));
+        assert!(policy.allows_dgna(1001, 15501));
+        assert!(!policy.allows_affiliation(1002, 15501));
+        assert!(!policy.allows_affiliation(1001, 15502));
+        assert!(!policy.allows_affiliation(1001, 19999));
+    }
+
+    #[test]
+    fn central_group_policy_controls_calls_priority_and_auto_attach() {
+        let policy = sample_group_policy();
+        assert!(!policy.allows_group_call(15501));
+        assert!(!policy.allows_emergency_call(15501));
+        assert_eq!(policy.call_priority(15501, 3), 7);
+        assert_eq!(policy.call_priority(15501, 10), 10);
+        assert_eq!(policy.class_of_usage(15501, 1), 4);
+        assert_eq!(policy.automatic_groups_for(1001), vec![15501]);
+    }
+
+    #[test]
+    fn central_group_policy_can_allow_unlisted_groups_without_membership_enforcement() {
+        let mut policy = sample_group_policy();
+        policy.allow_unlisted_groups = true;
+        policy.enforce_memberships = false;
+        assert!(policy.allows_affiliation(5000, 19999));
+        assert!(policy.allows_dgna(5000, 19999));
+        assert!(policy.allows_group_call(19999));
+        assert!(policy.allows_emergency_call(19999));
+        assert_eq!(policy.class_of_usage(19999, 6), 6);
+    }
 
     #[test]
     fn test_register_deregister() {
@@ -803,6 +978,7 @@ impl Default for StackState {
             next_live_sds_id: 1,
             issi_whitelist_override: None,
             issi_whitelist_deny_all: false,
+            group_policy_override: None,
             wx_override: None,
             telegram_override: None,
             dapnet_override: None,

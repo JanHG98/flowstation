@@ -91,7 +91,9 @@ impl CmceBs {
             ControlCommand::MobilityExportContext { .. }
             | ControlCommand::MobilityImportContext { .. }
             | ControlCommand::MobilityRemoveContext { .. }
-            | ControlCommand::SubscriberAccessPolicyApply { .. } => {
+            | ControlCommand::SubscriberAccessPolicyApply { .. }
+            | ControlCommand::GroupAccessPolicyApply { .. }
+            | ControlCommand::GroupDgnaApply { .. } => {
                 tracing::warn!("CMCE: MM command reached CMCE instead of MM; ignoring");
             }
             ControlCommand::Dgna { issi, gssi, attach } => {

@@ -86,6 +86,9 @@ pub struct ControlRoomNodeCapabilities {
     /// Node accepts centrally managed subscriber admission policies.
     #[serde(default)]
     pub subscriber_policy: bool,
+    /// Node accepts centrally managed group definitions, memberships and DGNA commands.
+    #[serde(default)]
+    pub group_policy: bool,
 }
 
 impl ControlRoomNodeCapabilities {
@@ -106,6 +109,7 @@ impl ControlRoomNodeCapabilities {
             legacy_wap_sds: true,
             multi_pdch: cfg.cell.wap_ip_sndcp_profile_enabled(),
             subscriber_policy: true,
+            group_policy: true,
         }
     }
 }

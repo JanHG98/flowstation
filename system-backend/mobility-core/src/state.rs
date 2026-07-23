@@ -906,6 +906,7 @@ mod tests {
                 legacy_wap_sds: false,
                 multi_pdch: false,
                 subscriber_policy: true,
+                group_policy: true,
             },
         }
     }

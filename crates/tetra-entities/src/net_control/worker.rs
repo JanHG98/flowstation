@@ -122,7 +122,9 @@ impl<T: NetworkTransport> ControlWorker<T> {
             | ControlCommand::MobilityExportContext { .. }
             | ControlCommand::MobilityImportContext { .. }
             | ControlCommand::MobilityRemoveContext { .. }
-        | ControlCommand::SubscriberAccessPolicyApply { .. } => TetraEntity::Mm,
+            | ControlCommand::SubscriberAccessPolicyApply { .. }
+            | ControlCommand::GroupAccessPolicyApply { .. }
+            | ControlCommand::GroupDgnaApply { .. } => TetraEntity::Mm,
             ControlCommand::RestartService => TetraEntity::Cmce,
             ControlCommand::ShutdownService => TetraEntity::Cmce,
             ControlCommand::AddLiveSds { .. } => TetraEntity::Cmce,

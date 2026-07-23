@@ -4,12 +4,12 @@ use std::path::PathBuf;
 use crate::mm::components::recovery_cache::{RecoveryCache, TerminalRecord};
 use crate::mm::mobility_runtime::{MmMobilityRuntime, MmMobilityRuntimeSnapshot, MmMobilityTimeout};
 use crate::net_control::{
-    ControlCommand, ControlEndpoint, ControlResponse, MobilityClassOfMs,
-    MobilityClientState, MobilityContextPayload,
+    ControlCommand, ControlEndpoint, ControlResponse, GroupMembershipPolicy,
+    GroupPolicyDefinition, MobilityClassOfMs, MobilityClientState, MobilityContextPayload,
 };
 use crate::net_telemetry::channel::TelemetrySink;
 use crate::{MessageQueue, TetraEntityTrait, net_brew};
-use tetra_config::bluestation::SharedConfig;
+use tetra_config::bluestation::{CentralGroupDefinition, CentralGroupPolicy, SharedConfig};
 use tetra_core::tetra_entities::TetraEntity;
 use tetra_core::{BitBuffer, Layer2Service, Sap, TdmaTime, TetraAddress, unimplemented_log};
 use tetra_saps::control::brew::{BrewSubscriberAction, MmSubscriberUpdate};
@@ -1782,6 +1782,141 @@ impl MmBs {
         };
     }
 
+
+    fn group_policy_allows_attach(&self, local_issi: u32, gssi: u32) -> bool {
+        let policy_issi = self.mobility.home_issi_for_local(local_issi).unwrap_or(local_issi);
+        let state = self.config.state_read();
+        state
+            .group_policy_override
+            .as_ref()
+            .map(|policy| policy.allows_affiliation(policy_issi, gssi))
+            .unwrap_or(true)
+    }
+
+    fn group_policy_allows_dgna(&self, local_issi: u32, gssi: u32) -> bool {
+        let policy_issi = self.mobility.home_issi_for_local(local_issi).unwrap_or(local_issi);
+        let state = self.config.state_read();
+        state
+            .group_policy_override
+            .as_ref()
+            .map(|policy| policy.allows_dgna(policy_issi, gssi))
+            .unwrap_or(true)
+    }
+
+    fn group_policy_class_of_usage(&self, gssi: u32) -> u8 {
+        let state = self.config.state_read();
+        state
+            .group_policy_override
+            .as_ref()
+            .map(|policy| policy.class_of_usage(gssi, Self::DGNA_CLASS_OF_USAGE))
+            .unwrap_or(Self::DGNA_CLASS_OF_USAGE)
+    }
+
+    fn apply_group_policy(
+        &mut self,
+        queue: &mut MessageQueue,
+        revision: u64,
+        allow_unlisted_groups: bool,
+        enforce_memberships: bool,
+        reconcile_registered: bool,
+        groups: Vec<GroupPolicyDefinition>,
+        memberships: Vec<GroupMembershipPolicy>,
+    ) -> Result<(u32, u32, u32, u32), String> {
+        if self
+            .config
+            .state_read()
+            .group_policy_override
+            .as_ref()
+            .is_some_and(|current| revision < current.revision)
+        {
+            return Err(format!(
+                "stale group policy revision {revision}; a newer revision is already active"
+            ));
+        }
+
+        let mut definitions = HashMap::new();
+        for group in groups {
+            if group.gssi == 0 || group.gssi > 0xFF_FFFF {
+                return Err(format!("invalid GSSI {}", group.gssi));
+            }
+            definitions.insert(
+                group.gssi,
+                CentralGroupDefinition {
+                    gssi: group.gssi,
+                    enabled: group.enabled,
+                    attach_allowed: group.attach_allowed,
+                    dgna_allowed: group.dgna_allowed,
+                    call_allowed: group.call_allowed,
+                    sds_allowed: group.sds_allowed,
+                    emergency_allowed: group.emergency_allowed,
+                    call_priority: group.call_priority.min(15),
+                    class_of_usage: group.class_of_usage.min(15),
+                },
+            );
+        }
+
+        let mut allowed = HashMap::<u32, std::collections::HashSet<u32>>::new();
+        let mut automatic = HashMap::<u32, std::collections::HashSet<u32>>::new();
+        let mut membership_count = 0u32;
+        for membership in memberships {
+            if membership.issi == 0 || membership.issi > 0xFF_FFFF {
+                return Err(format!("invalid membership ISSI {}", membership.issi));
+            }
+            if membership.gssi == 0 || membership.gssi > 0xFF_FFFF {
+                return Err(format!("invalid membership GSSI {}", membership.gssi));
+            }
+            if membership.allowed {
+                allowed.entry(membership.issi).or_default().insert(membership.gssi);
+                if membership.auto_attach {
+                    automatic.entry(membership.issi).or_default().insert(membership.gssi);
+                }
+                membership_count += 1;
+            }
+        }
+
+        let policy = CentralGroupPolicy {
+            revision,
+            allow_unlisted_groups,
+            enforce_memberships,
+            groups: definitions,
+            memberships: allowed,
+            automatic_memberships: automatic,
+        };
+        let group_count = policy.groups.len() as u32;
+        self.config.state_write().group_policy_override = Some(policy.clone());
+
+        let mut attached_count = 0u32;
+        let mut detached_count = 0u32;
+        if reconcile_registered {
+            let local_issis = self.client_mgr.all_known_issis();
+            for local_issi in local_issis {
+                let policy_issi = self.mobility.home_issi_for_local(local_issi).unwrap_or(local_issi);
+                let current: Vec<u32> = self
+                    .client_mgr
+                    .get_client_by_issi(local_issi)
+                    .map(|client| client.groups.iter().copied().collect())
+                    .unwrap_or_default();
+                for gssi in current {
+                    if !policy.allows_affiliation(policy_issi, gssi)
+                        && self.do_dgna(queue, local_issi, gssi, false, true)
+                    {
+                        detached_count += 1;
+                    }
+                }
+                for gssi in policy.automatic_groups_for(policy_issi) {
+                    let already_attached = self
+                        .client_mgr
+                        .get_client_by_issi(local_issi)
+                        .is_some_and(|client| client.groups.contains(&gssi));
+                    if !already_attached && self.do_dgna(queue, local_issi, gssi, true, true) {
+                        attached_count += 1;
+                    }
+                }
+            }
+        }
+        Ok((group_count, membership_count, attached_count, detached_count))
+    }
+
     fn try_attach_detach_groups(
         &mut self,
         queue: &mut MessageQueue,
@@ -1830,6 +1965,14 @@ impl MmBs {
                     }
                 }
             } else {
+                if !self.group_policy_allows_attach(issi, gssi) {
+                    tracing::warn!(
+                        "MM: central group policy rejected affiliation ISSI {} -> GSSI {}",
+                        issi,
+                        gssi
+                    );
+                    continue;
+                }
                 match self.client_mgr.client_group_attach(issi, gssi, true) {
                     Ok(changed) => {
                         if changed {
@@ -2000,7 +2143,7 @@ impl MmBs {
     /// removes the group in its own list. Brew is intentionally not involved.
     ///
     /// Returns `true` if the command was accepted and a PDU was sent to the terminal.
-    fn do_dgna(&mut self, queue: &mut MessageQueue, issi: u32, gssi: u32, attach: bool) -> bool {
+    fn do_dgna(&mut self, queue: &mut MessageQueue, issi: u32, gssi: u32, attach: bool, force: bool) -> bool {
         let verb = if attach { "assign" } else { "deassign" };
 
         // The terminal must be registered on the cell — we cannot regroup a radio that is not here.
@@ -2009,6 +2152,15 @@ impl MmBs {
                 "DGNA: ISSI {} is not registered on this cell — ignoring {} of GSSI {}",
                 issi,
                 verb,
+                gssi
+            );
+            return false;
+        }
+
+        if attach && !force && !self.group_policy_allows_dgna(issi, gssi) {
+            tracing::warn!(
+                "DGNA: central group policy rejected assignment ISSI {} -> GSSI {}",
+                issi,
                 gssi
             );
             return false;
@@ -2036,7 +2188,10 @@ impl MmBs {
         }
 
         // Push the unsolicited D-ATTACH/DETACH GROUP IDENTITY to the terminal.
-        self.send_d_attach_detach_group_identity(queue, issi, gssi, attach);
+        // When a central policy is active, use its class-of-usage value; otherwise retain
+        // the historic local default.
+        let class_of_usage = self.group_policy_class_of_usage(gssi);
+        self.send_d_attach_detach_group_identity(queue, issi, gssi, attach, class_of_usage);
 
         // Persist for restart recovery (debounced) and refresh the dashboard with the full group set.
         self.recovery_mark_dirty();
@@ -2062,14 +2217,21 @@ impl MmBs {
     /// Build and queue an unsolicited D-ATTACH/DETACH GROUP IDENTITY for a single GSSI, addressed to
     /// `issi`, requesting an acknowledgement. `attach == true` carries a (persistent) group identity
     /// attachment; `false` carries a detachment. Used by [`Self::do_dgna`].
-    fn send_d_attach_detach_group_identity(&self, queue: &mut MessageQueue, issi: u32, gssi: u32, attach: bool) {
+    fn send_d_attach_detach_group_identity(
+        &self,
+        queue: &mut MessageQueue,
+        issi: u32,
+        gssi: u32,
+        attach: bool,
+        class_of_usage: u8,
+    ) {
         let gid = GroupIdentityDownlink {
             group_identity_attachment: attach.then_some(GroupIdentityAttachment {
                 // 0 = "attachment not needed" → persistent on the MS until an explicit detach.
                 // Matches the affiliation-ACK path; see try_attach_detach_groups for why lifetime=0
                 // (not 1) is correct for scan-list-heavy Motorola radios (FH-BUG-022).
                 group_identity_attachment_lifetime: 0,
-                class_of_usage: Self::DGNA_CLASS_OF_USAGE,
+                class_of_usage: class_of_usage.min(15),
             }),
             // 2-bit group identity detachment field; 0 = unknown/default. The attach/detach type
             // identifier plus the GSSI are what make the MS drop the group.
@@ -2472,7 +2634,54 @@ impl TetraEntityTrait for MmBs {
             for cmd in cmds {
                 match cmd {
                     ControlCommand::Dgna { issi, gssi, attach } => {
-                        self.do_dgna(queue, issi, gssi, attach);
+                        self.do_dgna(queue, issi, gssi, attach, false);
+                    }
+                    ControlCommand::GroupAccessPolicyApply {
+                        handle,
+                        revision,
+                        allow_unlisted_groups,
+                        enforce_memberships,
+                        reconcile_registered,
+                        groups,
+                        memberships,
+                    } => {
+                        let result = self.apply_group_policy(
+                            queue,
+                            revision,
+                            allow_unlisted_groups,
+                            enforce_memberships,
+                            reconcile_registered,
+                            groups,
+                            memberships,
+                        );
+                        if let Some(cep) = responder.as_ref() {
+                            match result {
+                                Ok((group_count, membership_count, attached_count, detached_count)) => {
+                                    cep.respond(ControlResponse::GroupAccessPolicyApplied {
+                                        handle, revision, success: true, group_count, membership_count,
+                                        attached_count, detached_count,
+                                        message: "group access policy applied".to_string(),
+                                    });
+                                }
+                                Err(message) => cep.respond(ControlResponse::GroupAccessPolicyApplied {
+                                    handle, revision, success: false, group_count: 0, membership_count: 0,
+                                    attached_count: 0, detached_count: 0, message,
+                                }),
+                            }
+                        }
+                    }
+                    ControlCommand::GroupDgnaApply { handle, issi, gssi, attach, force } => {
+                        let success = self.do_dgna(queue, issi, gssi, attach, force);
+                        if let Some(cep) = responder.as_ref() {
+                            cep.respond(ControlResponse::GroupDgnaApplied {
+                                handle, issi, gssi, attach, success,
+                                message: if success {
+                                    "DGNA command applied".to_string()
+                                } else {
+                                    "DGNA command rejected or subscriber unavailable".to_string()
+                                },
+                            });
+                        }
                     }
                     ControlCommand::MobilityExportContext { handle, issi } => {
                         let context = self.export_mobility_context(issi).map(Self::mobility_context_to_payload);
@@ -2884,7 +3093,7 @@ impl TetraEntityTrait for MmBs {
                     SapMsgInner::MmDgnaRequest { issi, gssi, attach } => {
                         // Dashboard-originated DGNA, forwarded by CMCE (the dashboard control channel
                         // terminates there). The group machinery lives here in MM.
-                        self.do_dgna(queue, issi, gssi, attach);
+                        self.do_dgna(queue, issi, gssi, attach, false);
                     }
                     _ => {
                         tracing::warn!("mm_bs: unexpected Control message from {:?}", message.src);

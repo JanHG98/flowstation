@@ -294,6 +294,73 @@ impl CcBsSubentity {
         let dest_gssi = dest_gssi as u32;
         let dest_addr = TetraAddress::new(dest_gssi, SsiType::Gssi);
 
+        let group_policy_decision = {
+            let state = self.config.state_read();
+            state.group_policy_override.as_ref().map(|policy| {
+                let caller_affiliated = state
+                    .subscribers
+                    .attached_groups_of(calling_party.ssi)
+                    .contains(&dest_gssi);
+                (
+                    policy.allows_group_call(dest_gssi),
+                    policy.call_priority(dest_gssi, pdu.call_priority),
+                    policy.allows_emergency_call(dest_gssi),
+                    !policy.enforce_memberships || caller_affiliated,
+                )
+            })
+        };
+        if group_policy_decision.is_some_and(|(allowed, _, _, _)| !allowed) {
+            tracing::warn!(
+                "CMCE: central group policy rejected call from ISSI {} to GSSI {}",
+                calling_party.ssi,
+                dest_gssi
+            );
+            self.reject_setup_request(
+                queue,
+                message,
+                calling_party,
+                DisconnectCause::RequestedServiceNotAvailable,
+                "group call disabled by central policy",
+            );
+            return;
+        }
+        if group_policy_decision.is_some_and(|(_, _, _, caller_authorized)| !caller_authorized) {
+            tracing::warn!(
+                "CMCE: central group policy rejected non-member ISSI {} for GSSI {}",
+                calling_party.ssi,
+                dest_gssi
+            );
+            self.reject_setup_request(
+                queue,
+                message,
+                calling_party,
+                DisconnectCause::RequestedServiceNotAvailable,
+                "calling subscriber is not affiliated to the centrally managed group",
+            );
+            return;
+        }
+        let effective_priority = group_policy_decision
+            .map(|(_, priority, _, _)| priority)
+            .unwrap_or_else(|| pdu.call_priority.min(15));
+        if is_emergency_priority(effective_priority)
+            && group_policy_decision
+                .is_some_and(|(_, _, emergency_allowed, _)| !emergency_allowed)
+        {
+            tracing::warn!(
+                "CMCE: central group policy rejected emergency call from ISSI {} to GSSI {}",
+                calling_party.ssi,
+                dest_gssi
+            );
+            self.reject_setup_request(
+                queue,
+                message,
+                calling_party,
+                DisconnectCause::RequestedServiceNotAvailable,
+                "emergency group call disabled by central policy",
+            );
+            return;
+        }
+
         if !self.has_listener(dest_gssi) {
             tracing::info!(
                 "CMCE: rejecting U-SETUP from issi={} to gssi={} (no listeners)",
@@ -303,19 +370,19 @@ impl CcBsSubentity {
             return;
         }
 
-        if is_emergency_priority(pdu.call_priority) {
+        if is_emergency_priority(effective_priority) {
             tracing::info!(
                 "CMCE: EMERGENCY group call set-up from ISSI {} to GSSI {} (priority {})",
                 calling_party.ssi,
                 dest_gssi,
-                pdu.call_priority
+                effective_priority
             );
         }
 
         // Emergency / pre-emptive priority: if the cell is full, free one traffic channel by
         // releasing a lower-priority call before allocating (ETSI EN 300 392-2 clause 14.8).
         // No-op for ordinary priority.
-        self.preempt_for_priority(queue, 1, pdu.call_priority);
+        self.preempt_for_priority(queue, 1, effective_priority);
 
         // Allocate circuit (DL+UL for group call)
         let traffic_slot_capacity = self.traffic_slot_capacity();
@@ -447,7 +514,7 @@ impl CcBsSubentity {
             basic_service_information: pdu.basic_service_information.clone(),
             transmission_grant: TransmissionGrant::GrantedToOtherUser,
             transmission_request_permission: false,
-            call_priority: pdu.call_priority,
+            call_priority: effective_priority,
             notification_indicator: None,
             temporary_address: None,
             calling_party_address_ssi: Some(calling_party.ssi),
@@ -484,7 +551,7 @@ impl CcBsSubentity {
                 circuit.usage,
                 self.dltime,
                 group_call_timeout,
-                pdu.call_priority,
+                effective_priority,
             ),
         );
 
@@ -495,7 +562,7 @@ impl CcBsSubentity {
             caller_issi: calling_party.ssi,
             ts: circuit.ts,
             carrier_num: self.carrier_num_for_logical_ts(circuit.ts),
-            priority: pdu.call_priority,
+            priority: effective_priority,
             source: "local".to_string(),
         });
 

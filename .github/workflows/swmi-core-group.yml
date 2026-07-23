@@ -1,0 +1,29 @@
+name: SWMI Core Group
+
+on:
+  push:
+    paths:
+      - 'system-backend/group-core/**'
+      - 'crates/tetra-config/src/bluestation/state.rs'
+      - 'crates/tetra-entities/src/net_control/**'
+      - 'crates/tetra-entities/src/net_control_room/**'
+      - 'crates/tetra-entities/src/mm/**'
+      - 'crates/tetra-entities/src/cmce/**'
+      - 'tools/check_group_core.py'
+  pull_request:
+
+jobs:
+  group-core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - run: python3 -S tools/check_group_core.py
+      - run: cargo fmt --all -- --check
+      - run: cargo test -p tetra-config
+      - run: cargo test -p tetra-entities
+      - run: cargo test -p netcore-group-core
+      - run: cargo build --release -p netcore-group-core
+      - run: cargo clippy -p tetra-config -p tetra-entities -p netcore-group-core --all-targets -- -D warnings

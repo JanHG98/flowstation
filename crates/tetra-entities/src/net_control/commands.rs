@@ -55,6 +55,29 @@ pub struct MobilityContextPayload {
     pub tei: Option<u64>,
 }
 
+
+#[derive(Debug, Clone, Encode, Decode, Serialize, Deserialize)]
+pub struct GroupPolicyDefinition {
+    pub gssi: u32,
+    pub enabled: bool,
+    pub attach_allowed: bool,
+    pub dgna_allowed: bool,
+    pub call_allowed: bool,
+    pub sds_allowed: bool,
+    pub emergency_allowed: bool,
+    pub call_priority: u8,
+    pub class_of_usage: u8,
+}
+
+#[derive(Debug, Clone, Encode, Decode, Serialize, Deserialize)]
+pub struct GroupMembershipPolicy {
+    pub issi: u32,
+    pub gssi: u32,
+    pub allowed: bool,
+    pub auto_attach: bool,
+    pub locked: bool,
+}
+
 /// Command received from the remote command server.
 #[derive(Debug, Clone, Encode, Decode, Serialize, Deserialize)]
 pub enum ControlCommand {
@@ -153,6 +176,27 @@ pub enum ControlCommand {
         disconnect_unauthorized: bool,
     },
 
+
+    /// Apply centrally managed group definitions and membership policy.
+    GroupAccessPolicyApply {
+        handle: u32,
+        revision: u64,
+        allow_unlisted_groups: bool,
+        enforce_memberships: bool,
+        reconcile_registered: bool,
+        groups: Vec<GroupPolicyDefinition>,
+        memberships: Vec<GroupMembershipPolicy>,
+    },
+
+    /// Execute one centrally coordinated DGNA operation and return an explicit result.
+    GroupDgnaApply {
+        handle: u32,
+        issi: u32,
+        gssi: u32,
+        attach: bool,
+        force: bool,
+    },
+
     /// Placeholder command A.
     CommandA { handle: u32, parameter: u32 },
     /// Placeholder command B.
@@ -186,6 +230,25 @@ pub enum ControlResponse {
     MobilityContextRemoved {
         handle: u32,
         issi: u32,
+        success: bool,
+        message: String,
+    },
+
+    GroupAccessPolicyApplied {
+        handle: u32,
+        revision: u64,
+        success: bool,
+        group_count: u32,
+        membership_count: u32,
+        attached_count: u32,
+        detached_count: u32,
+        message: String,
+    },
+    GroupDgnaApplied {
+        handle: u32,
+        issi: u32,
+        gssi: u32,
+        attach: bool,
         success: bool,
         message: String,
     },

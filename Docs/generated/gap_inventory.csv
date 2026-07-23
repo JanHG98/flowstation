@@ -20,11 +20,11 @@ Todo-Typ,Typ-Platzhalter,Runtime,crates/tetra-core/src/tetra_common.rs,2,pub typ
 panic!,prüfen,Runtime,crates/tetra-core/src/tx_receipt.rs,114,panic!(
 panic!,prüfen,Runtime,crates/tetra-core/src/typed_pdu_fields.rs,194,"_ => panic!(), // Never happens"
 unimplemented!,kritisch,Runtime,crates/tetra-core/src/typed_pdu_fields.rs,641,"unimplemented!(""can't generically write a type4 field"");"
-unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/cmce/cmce_bs.rs,207,"unimplemented_log!(""{:?}"", pdu_type);"
-panic!,prüfen,Runtime,crates/tetra-entities/src/cmce/cmce_bs.rs,335,"panic!(""Unexpected message on LcmcSap: {:?}"", message.msg);"
-unreachable!,prüfen,Runtime,crates/tetra-entities/src/cmce/cmce_bs.rs,344,unreachable!();
-panic!,prüfen,Runtime,crates/tetra-entities/src/cmce/cmce_bs.rs,353,"panic!(""Unexpected control message: {:?}"", message.msg);"
-panic!,prüfen,Runtime,crates/tetra-entities/src/cmce/cmce_bs.rs,357,"panic!(""Unexpected SAP: {:?}"", message.sap);"
+unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/cmce/cmce_bs.rs,209,"unimplemented_log!(""{:?}"", pdu_type);"
+panic!,prüfen,Runtime,crates/tetra-entities/src/cmce/cmce_bs.rs,337,"panic!(""Unexpected message on LcmcSap: {:?}"", message.msg);"
+unreachable!,prüfen,Runtime,crates/tetra-entities/src/cmce/cmce_bs.rs,346,unreachable!();
+panic!,prüfen,Runtime,crates/tetra-entities/src/cmce/cmce_bs.rs,355,"panic!(""Unexpected control message: {:?}"", message.msg);"
+panic!,prüfen,Runtime,crates/tetra-entities/src/cmce/cmce_bs.rs,359,"panic!(""Unexpected SAP: {:?}"", message.sap);"
 TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/cmce/components/circuit_mgr.rs,148,// TODO FIXME we may do a bit smarter allocation here
 TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/cmce/components/circuit_mgr.rs,186,"circuit_mode: CircuitModeType::TchS, // TODO: only speech supported for now"
 TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/cmce/components/circuit_mgr.rs,187,"// endpoint_id: 0, // TODO, we don't use endpoints as of yet"
@@ -48,9 +48,9 @@ unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/cmce/s
 unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/cmce/subentities/cc_bs/pdu.rs,1038,"unimplemented_log!(""facility not supported: {:?}"", v);"
 unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/cmce/subentities/cc_bs/pdu.rs,1041,"unimplemented_log!(""dm_ms_address not supported: {:?}"", v);"
 unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/cmce/subentities/cc_bs/pdu.rs,1044,"unimplemented_log!(""proprietary not supported: {:?}"", v);"
-panic!,prüfen,Runtime,crates/tetra-entities/src/cmce/subentities/cc_bs/procedures/setup.rs,368,panic!()
-panic!,prüfen,Runtime,crates/tetra-entities/src/cmce/subentities/cc_bs/procedures/setup.rs,528,panic!()
-panic!,prüfen,Runtime,crates/tetra-entities/src/cmce/subentities/cc_bs/procedures/setup.rs,844,panic!()
+panic!,prüfen,Runtime,crates/tetra-entities/src/cmce/subentities/cc_bs/procedures/setup.rs,435,panic!()
+panic!,prüfen,Runtime,crates/tetra-entities/src/cmce/subentities/cc_bs/procedures/setup.rs,595,panic!()
+panic!,prüfen,Runtime,crates/tetra-entities/src/cmce/subentities/cc_bs/procedures/setup.rs,911,panic!()
 panic!,prüfen,Runtime,crates/tetra-entities/src/cmce/subentities/cc_bs/procedures/uplink.rs,432,panic!()
 unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/cmce/subentities/cc_bs/procedures/uplink.rs,749,unimplemented_log!(
 unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/cmce/subentities/cc_bs/procedures/uplink.rs,865,unimplemented_log!(
@@ -174,21 +174,21 @@ unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/mm/mm_
 unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/mm/mm_bs.rs,1776,"MmPduTypeUl::UInformationProvide => unimplemented_log!(""UInformationProvide""),"
 unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/mm/mm_bs.rs,1780,"MmPduTypeUl::UDisableStatus => unimplemented_log!(""UDisableStatus""),"
 unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/mm/mm_bs.rs,1781,"MmPduTypeUl::MmPduFunctionNotSupported => unimplemented_log!(""MmPduFunctionNotSupported""),"
-unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/mm/mm_bs.rs,1799,"unimplemented_log!(""GroupIdentityUplink without gssi field"");"
-unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/mm/mm_bs.rs,1803,"unimplemented_log!(""Only support GroupIdentityUplink with address_type 0"");"
-unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/mm/mm_bs.rs,2309,"unimplemented_log!(""Unsupported address_extension present"");"
-unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/mm/mm_bs.rs,2312,"unimplemented_log!(""Unsupported proprietary present"");"
-unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/mm/mm_bs.rs,2347,"unimplemented_log!(""Unsupported {}"", pdu.location_update_type);"
-unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/mm/mm_bs.rs,2351,"unimplemented_log!(""Unsupported request_to_append_la == true"");"
-unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/mm/mm_bs.rs,2355,"unimplemented_log!(""Unsupported cipher_control == true"");"
-unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/mm/mm_bs.rs,2359,"unimplemented_log!(""Unsupported ciphering_parameters present"");"
-unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/mm/mm_bs.rs,2363,"unimplemented_log!(""Unsupported la_information present"");"
-unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/mm/mm_bs.rs,2375,"unimplemented_log!(""Unsupported authentication_uplink present"");"
-unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/mm/mm_bs.rs,2378,"unimplemented_log!(""Unsupported extended_capabilities present"");"
-unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/mm/mm_bs.rs,2381,"unimplemented_log!(""Unsupported proprietary present"");"
-unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/mm/mm_bs.rs,2392,"unimplemented_log!(""Unsupported group_identity_report == true"");"
-unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/mm/mm_bs.rs,2395,"unimplemented_log!(""Missing group_identity_uplink"");"
-unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/mm/mm_bs.rs,2402,"unimplemented_log!(""Unsupported proprietary present"");"
+unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/mm/mm_bs.rs,1934,"unimplemented_log!(""GroupIdentityUplink without gssi field"");"
+unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/mm/mm_bs.rs,1938,"unimplemented_log!(""Only support GroupIdentityUplink with address_type 0"");"
+unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/mm/mm_bs.rs,2471,"unimplemented_log!(""Unsupported address_extension present"");"
+unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/mm/mm_bs.rs,2474,"unimplemented_log!(""Unsupported proprietary present"");"
+unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/mm/mm_bs.rs,2509,"unimplemented_log!(""Unsupported {}"", pdu.location_update_type);"
+unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/mm/mm_bs.rs,2513,"unimplemented_log!(""Unsupported request_to_append_la == true"");"
+unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/mm/mm_bs.rs,2517,"unimplemented_log!(""Unsupported cipher_control == true"");"
+unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/mm/mm_bs.rs,2521,"unimplemented_log!(""Unsupported ciphering_parameters present"");"
+unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/mm/mm_bs.rs,2525,"unimplemented_log!(""Unsupported la_information present"");"
+unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/mm/mm_bs.rs,2537,"unimplemented_log!(""Unsupported authentication_uplink present"");"
+unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/mm/mm_bs.rs,2540,"unimplemented_log!(""Unsupported extended_capabilities present"");"
+unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/mm/mm_bs.rs,2543,"unimplemented_log!(""Unsupported proprietary present"");"
+unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/mm/mm_bs.rs,2554,"unimplemented_log!(""Unsupported group_identity_report == true"");"
+unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/mm/mm_bs.rs,2557,"unimplemented_log!(""Missing group_identity_uplink"");"
+unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/mm/mm_bs.rs,2564,"unimplemented_log!(""Unsupported proprietary present"");"
 unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/mm/mm_ms.rs,36,"MmPduTypeDl::DOtar => unimplemented_log!(""DOtar""),"
 unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/mm/mm_ms.rs,37,"MmPduTypeDl::DAuthentication => unimplemented_log!(""DAuthentication""),"
 unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/mm/mm_ms.rs,38,"MmPduTypeDl::DCkChangeDemand => unimplemented_log!(""DCkChangeDemand""),"
@@ -712,3 +712,5 @@ Todo-Typ,Typ-Platzhalter,Runtime,crates/tetra-saps/src/tmv/mod.rs,86,"pub channe
 panic!,prüfen,Runtime,bins/bluestation-bs/src/main.rs,276,"panic!(""Unsupported PhyIo type: {:?}"", cfg.config().phy_io.backend);"
 panic!,prüfen,Runtime,bins/bluestation-bs/src/main.rs,465,"panic!(""Failed to start Asterisk SIP integration: {}"", err);"
 unreachable!,prüfen,Runtime,bins/pdu-tool/src/entities/umac.rs,113,"_ => unreachable!(),"
+panic!,prüfen,Runtime,system-backend/group-core/src/state.rs,1021,"panic!(""expected command request"");"
+panic!,prüfen,Runtime,system-backend/group-core/src/state.rs,1029,"panic!(""expected group policy command"");"

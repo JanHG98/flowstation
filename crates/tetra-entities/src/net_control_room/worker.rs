@@ -32,6 +32,8 @@ enum CommandCorrelationKey {
     Dgna { issi: u32, gssi: u32, attach: bool },
     Mobility(u32),
     SubscriberPolicy(u32),
+    GroupPolicy(u32),
+    GroupDgna(u32),
     RestartService,
     ShutdownService,
     LiveSdsAdd { source_issi: u32, protocol_id: u8, text: String },
@@ -330,7 +332,9 @@ pub fn route_control_command(command: &ControlCommand) -> TetraEntity {
         | ControlCommand::MobilityExportContext { .. }
         | ControlCommand::MobilityImportContext { .. }
         | ControlCommand::MobilityRemoveContext { .. }
-        | ControlCommand::SubscriberAccessPolicyApply { .. } => TetraEntity::Mm,
+        | ControlCommand::SubscriberAccessPolicyApply { .. }
+        | ControlCommand::GroupAccessPolicyApply { .. }
+        | ControlCommand::GroupDgnaApply { .. } => TetraEntity::Mm,
         ControlCommand::RestartService => TetraEntity::Cmce,
         ControlCommand::ShutdownService => TetraEntity::Cmce,
         ControlCommand::AddLiveSds { .. } => TetraEntity::Cmce,
@@ -356,6 +360,12 @@ fn correlation_key_for_command(command: &ControlCommand) -> Option<CommandCorrel
         }
         ControlCommand::SubscriberAccessPolicyApply { handle, .. } => {
             Some(CommandCorrelationKey::SubscriberPolicy(*handle))
+        }
+        ControlCommand::GroupAccessPolicyApply { handle, .. } => {
+            Some(CommandCorrelationKey::GroupPolicy(*handle))
+        }
+        ControlCommand::GroupDgnaApply { handle, .. } => {
+            Some(CommandCorrelationKey::GroupDgna(*handle))
         }
         ControlCommand::Dgna { issi, gssi, attach } => Some(CommandCorrelationKey::Dgna {
             issi: *issi,
@@ -394,6 +404,12 @@ fn correlation_key_for_response(response: &ControlResponse) -> Option<CommandCor
         ControlResponse::SubscriberAccessPolicyApplied { handle, .. } => {
             Some(CommandCorrelationKey::SubscriberPolicy(*handle))
         }
+        ControlResponse::GroupAccessPolicyApplied { handle, .. } => {
+            Some(CommandCorrelationKey::GroupPolicy(*handle))
+        }
+        ControlResponse::GroupDgnaApplied { handle, .. } => {
+            Some(CommandCorrelationKey::GroupDgna(*handle))
+        }
     }
 }
 
@@ -414,6 +430,79 @@ mod tests {
                 attach: true,
             }),
             TetraEntity::Mm
+        );
+    }
+
+    #[test]
+    fn routes_central_group_commands_to_mm() {
+        assert_eq!(
+            route_control_command(&ControlCommand::GroupAccessPolicyApply {
+                handle: 7,
+                revision: 1,
+                allow_unlisted_groups: false,
+                enforce_memberships: true,
+                reconcile_registered: true,
+                groups: Vec::new(),
+                memberships: Vec::new(),
+            }),
+            TetraEntity::Mm
+        );
+        assert_eq!(
+            route_control_command(&ControlCommand::GroupDgnaApply {
+                handle: 8,
+                issi: 1001,
+                gssi: 15501,
+                attach: true,
+                force: false,
+            }),
+            TetraEntity::Mm
+        );
+    }
+
+    #[test]
+    fn correlates_group_policy_and_dgna_responses() {
+        let policy_command = ControlCommand::GroupAccessPolicyApply {
+            handle: 77,
+            revision: 2,
+            allow_unlisted_groups: false,
+            enforce_memberships: true,
+            reconcile_registered: true,
+            groups: Vec::new(),
+            memberships: Vec::new(),
+        };
+        let policy_response = ControlResponse::GroupAccessPolicyApplied {
+            handle: 77,
+            revision: 2,
+            success: true,
+            group_count: 0,
+            membership_count: 0,
+            attached_count: 0,
+            detached_count: 0,
+            message: String::new(),
+        };
+        assert_eq!(
+            correlation_key_for_command(&policy_command),
+            correlation_key_for_response(&policy_response)
+        );
+
+        let dgna_command = ControlCommand::GroupDgnaApply {
+            handle: 78,
+            issi: 1001,
+            gssi: 15501,
+            attach: true,
+            force: false,
+        };
+        let dgna_response = ControlResponse::GroupDgnaApplied {
+            handle: 78,
+            issi: 1001,
+            gssi: 15501,
+            attach: true,
+            success: true,
+            message: String::new(),
+        };
+        assert_eq!(
+            correlation_key_for_command(&dgna_command),
+            correlation_key_for_response(&dgna_response)
         );
     }
 

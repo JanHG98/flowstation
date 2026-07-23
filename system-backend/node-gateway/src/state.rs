@@ -550,6 +550,7 @@ mod tests {
                 legacy_wap_sds: true,
                 multi_pdch: true,
                 subscriber_policy: true,
+                group_policy: true,
             },
             started_at: now_iso(),
         }

@@ -1,0 +1,28 @@
+[server]
+bind = "0.0.0.0:8110"
+history_limit = 2000
+
+[node_gateway]
+url = "ws://10.0.1.XX:8080/ws/backend"
+reconnect_secs = 5
+
+[storage]
+database_path = "/var/lib/netcore-group-core/groups.json"
+backup_path = "/var/lib/netcore-group-core/groups.json.bak"
+
+[policy]
+allow_unlisted_groups = false
+enforce_memberships = true
+reconcile_registered = true
+auto_sync = true
+sync_timeout_secs = 30
+dgna_timeout_secs = 30
+
+[security]
+mode = "open_lab"
+allow_remote_management = true
+
+[limits]
+max_body_bytes = 2097152
+max_groups = 65536
+max_memberships = 1000000
