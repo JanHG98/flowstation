@@ -34,7 +34,7 @@ Jeder später eigenständig laufende LXC- oder VM-Dienst erhält eine eigene Web
 
 Die WebUI gehört ab der ersten Implementierung eines Dienstes zu dessen Definition of Done; sie wird nicht als spätere kosmetische Zusatzphase behandelt.
 
-Die ersten LXC-Dienste `node-gateway`, `mobility-core`, `subscriber-core` und `group-core` starten im ausdrücklich markierten `open_lab`-Modus ohne Tokens, Benutzerkonten oder TLS. Diese Zwischenstufe dient nur dem isolierten Testnetz und wird vor einem Produktivbetrieb durch die spätere Security-Phase ersetzt beziehungsweise abgesichert.
+Die bisher umgesetzten LXC-Dienste starten im ausdrücklich markierten `open_lab`-Modus ohne Tokens, Benutzerkonten oder TLS. Diese Zwischenstufe dient nur dem isolierten Testnetz und wird vor einem Produktivbetrieb durch die spätere Security-Phase ersetzt beziehungsweise abgesichert.
 
 ---
 
@@ -44,7 +44,11 @@ Die ersten LXC-Dienste `node-gateway`, `mobility-core`, `subscriber-core` und `g
 - `mobility-core`: umgesetzt, Context Transfer und Teilnehmerlage mit WebUI
 - `subscriber-core`: umgesetzt, persistente Teilnehmerprofile und TBS-Zugangsrichtlinie mit WebUI
 - `group-core`: umgesetzt, GSSI, Mitgliedschaften, TBS-Gruppenpolicy und DGNA mit WebUI
-- nächster Dienst: `call-control`
+- `call-control`: umgesetzt, logische Gruppen-/Einzelrufe, Floor Control und Call Restore mit WebUI
+- `media-switch`: umgesetzt, netzweites Routing gepackter TETRA-Sprachframes mit WebUI
+- `recorder`: umgesetzt, passiver Vollframe-Tap, Archiv, Integrität, Retention und WebUI
+- nächster Core-Dienst: `sds-router`
+- nächster Media-Baustein: `media-library` / Audio Player auf Basis des stabilen Recorder-Formats
 
 # 2. Normative Grundlage
 

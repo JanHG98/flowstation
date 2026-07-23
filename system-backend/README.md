@@ -41,13 +41,18 @@ Langfristig verwenden neue Dienste mit eigener LXC-IP einheitlich:
 https://<LXC-IP>:8443/
 ```
 
-Die ersten drei Dienste sind ausdrücklich dokumentierte Ausnahmen für die isolierte Testumgebung: Node Gateway auf Port 8080, Mobility Core auf Port 8090 und Subscriber Core auf Port 8100, jeweils per HTTP im offenen Labormodus. Abweichungen werden im jeweiligen README und in `services.toml` festgehalten.
+Die bisher umgesetzten Dienste sind ausdrücklich dokumentierte Ausnahmen für die isolierte Testumgebung und verwenden je Dienst einen eigenen HTTP-Port im offenen Labormodus. Die verbindliche Zuordnung steht in `services.toml`; der Recorder verwendet Port 8140.
 
-## Bereits deploybarer Dienst
+## Bereits deploybare Dienste
 
 Bereits deploybar sind:
 
-- `node-gateway/` als zentrale TBS- und Backend-Verbindungsstelle auf Port 8080,
-- `mobility-core/` als zentrale Teilnehmerlage und MM-Context-Transfer-Steuerung auf Port 8090.
+- `node-gateway/` – TBS- und Backend-Vermittlung, Port 8080
+- `mobility-core/` – Teilnehmerlage und MM-Context-Transfer, Port 8090
+- `subscriber-core/` – Teilnehmerprofile und Admission, Port 8100
+- `group-core/` – Gruppen, Mitgliedschaften und DGNA, Port 8110
+- `call-control/` – logische Calls, Floor Control und Restore, Port 8120
+- `media-switch/` – Routing gepackter TETRA-Sprachframes, Port 8130
+- `recorder/` – passive Aufnahme, Integrität, Retention und Export, Port 8140
 
-Beide Dienste enthalten Rust-Runtime, REST-API, eigene WebUI, systemd-Unit und Installationsskripte. In der ersten Teststufe laufen sie bewusst im deutlich markierten `open_lab`-Modus ohne Tokens, Benutzeranmeldung oder TLS.
+Alle enthalten Rust-Runtime, REST-API, eigene WebUI, systemd-Unit und Installationsskripte. In der aktuellen Teststufe laufen sie bewusst im deutlich markierten `open_lab`-Modus ohne Tokens, Benutzeranmeldung oder TLS.

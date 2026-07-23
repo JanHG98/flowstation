@@ -91,7 +91,7 @@ checks = {
     'duplicate and mute protection': all(term in state for term in (
         'duplicate_frames', 'unknown_stream_frames', 'muted_frames', 'mute_stream',
     )),
-    'recorder and player preparation': 'push_tap_locked' in state and 'pub fn inject' in state and '/api/v1/taps' in http and '/inject' in http,
+    'recorder and player preparation': all(term in state for term in ('push_tap_locked', 'RecorderTapRecord', 'recorder_taps', 'payload: payload.to_vec()', 'recorder_tap_history_frames')) and '/api/v1/recorder/taps' in http and 'pub fn inject' in state and '/inject' in http,
     'call-control reconciliation': 'GET {} HTTP/1.1' in call_control and 'reconcile_calls' in call_control,
     'gateway media loop': 'drain_due_frames' in gateway and 'Duration::from_millis(10)' in gateway and 'media_frames' in gateway,
     'WebUI and REST API': 'const INDEX_HTML' in http and '/api/v1/sessions' in http and '/api/v1/buffers' in http,

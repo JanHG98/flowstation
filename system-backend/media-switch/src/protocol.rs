@@ -115,6 +115,14 @@ pub struct CallControlCall {
     pub logical_call_id: String,
     pub kind: String,
     pub phase: String,
+    #[serde(default)]
+    pub source_issi: Option<u32>,
+    #[serde(default)]
+    pub gssi: Option<u32>,
+    #[serde(default)]
+    pub calling_issi: Option<u32>,
+    #[serde(default)]
+    pub called_issi: Option<u32>,
     pub floor_holder: Option<u32>,
     #[serde(default)]
     pub priority: u8,

@@ -1,0 +1,21 @@
+[Unit]
+Description=NetCore Recorder (OPEN LAB)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=netcore
+Group=netcore
+ExecStart=/usr/local/bin/netcore-recorder --config /etc/netcore/recorder.toml
+Restart=on-failure
+RestartSec=2
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/netcore-recorder
+Environment=RUST_LOG=netcore_recorder=info
+
+[Install]
+WantedBy=multi-user.target

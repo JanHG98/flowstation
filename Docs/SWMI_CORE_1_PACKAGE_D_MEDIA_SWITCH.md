@@ -58,7 +58,9 @@ Die offenen Labormodus-Aktionen sind Stream-Mute, Session-Flush und Testframe-In
 
 ## Recorder und Audio-Player
 
-Der Media-Tap liefert bereits Session-/Quell-/Sequenzmetadaten. Die Injection-API akzeptiert exakt 35 gepackte Bytes. Damit sind die stabilen Anschlussstellen für die kommenden LXC-Dienste Recorder und Media Library/Audio Player vorhanden, ohne diese Dienste in den zeitkritischen Routingpfad einzubauen.
+Neben dem kompakten Diagnose-Tap stellt der Media Switch jetzt den replay-fähigen Vollframe-Endpunkt `/api/v1/recorder/taps` bereit. Er liefert Cursor-/Ringinformationen, Call- und Sprecher-Metadaten sowie die unveränderte 35-Byte-Payload. Der Recorder pollt diesen Ring asynchron; der Media Switch wartet niemals auf ihn.
+
+Die Injection-API akzeptiert weiterhin exakt 35 gepackte Bytes. Damit besitzen Recorder und Media Library/Audio Player stabile, voneinander getrennte Anschlussstellen außerhalb des zeitkritischen Routingpfads.
 
 ## Sicherheitsmodus
 

@@ -82,6 +82,8 @@ impl MediaSwitchConfig {
         self.media.session_idle_secs = self.media.session_idle_secs.max(5);
         self.media.max_frames_per_tick = self.media.max_frames_per_tick.max(1);
         self.media.tap_history_frames = self.media.tap_history_frames.max(16);
+        self.media.recorder_tap_history_frames =
+            self.media.recorder_tap_history_frames.max(256);
         self.limits.max_body_bytes = self.limits.max_body_bytes.max(1_024);
         self.limits.max_sessions = self.limits.max_sessions.max(1);
         self.limits.max_streams = self.limits.max_streams.max(2);
@@ -150,6 +152,7 @@ pub struct MediaConfig {
     pub max_frames_per_tick: usize,
     pub allow_same_leg_loopback: bool,
     pub tap_history_frames: usize,
+    pub recorder_tap_history_frames: usize,
 }
 
 impl Default for MediaConfig {
@@ -162,6 +165,7 @@ impl Default for MediaConfig {
             max_frames_per_tick: 256,
             allow_same_leg_loopback: false,
             tap_history_frames: 256,
+            recorder_tap_history_frames: 20_000,
         }
     }
 }

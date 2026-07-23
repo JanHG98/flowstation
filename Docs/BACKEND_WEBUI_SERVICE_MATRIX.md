@@ -17,7 +17,7 @@
 | Control Room | Operatoren, Arbeitsplätze, Backend-Verknüpfung | Rollen, Tokens, Leitstellenkonfiguration |
 | Application Gateway | Connectoren, Queues, Webhooks | Connector aktivieren, Secrets ersetzen |
 | Media Library | Audio, TTS, Vorlagen, Storage | Upload, Löschen, Freigabe |
-| Recorder | Aufnahmen, Suche, Retention, Integrität | Export, Retention, Löschung |
+| Recorder | Aufnahmen, Suche, Retention, Integrität | Export, Retention, Hold und Löschung; im Testpaket bewusst offen ohne Tokens |
 | Observability | Metriken, Logs, Traces, Alarme | Alarmregeln, Retention, Stummschaltung |
 | Shared | kein Container; gemeinsames UI-Kit | nicht zutreffend |
 

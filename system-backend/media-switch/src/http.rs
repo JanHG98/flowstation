@@ -97,6 +97,15 @@ fn route(
             let limit = query_limit(&request, 100);
             json_response(200, &media.taps(limit))
         }
+        ("GET", "/api/v1/recorder/taps") => {
+            let limit = query_limit(&request, 500);
+            let after = request
+                .query
+                .get("after")
+                .and_then(|value| value.parse::<u64>().ok())
+                .unwrap_or(0);
+            json_response(200, &media.recorder_taps(after, limit))
+        }
         ("GET", "/api/v1/events") => {
             let limit = query_limit(&request, 100);
             json_response(200, &media.events(limit))
@@ -190,6 +199,7 @@ fn openapi() -> serde_json::Value {
             "/api/v1/streams":{"get":{}},
             "/api/v1/buffers":{"get":{}},
             "/api/v1/taps":{"get":{}},
+            "/api/v1/recorder/taps":{"get":{}},
             "/api/v1/events":{"get":{}},
             "/api/v1/config":{"get":{}},
             "/api/v1/gateway/ping":{"post":{}},

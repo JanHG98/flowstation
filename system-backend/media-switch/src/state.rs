@@ -42,6 +42,9 @@ pub struct MediaSwitchStatus {
     pub muted_frames: u64,
     pub buffer_overflows: u64,
     pub send_failures: u64,
+    pub recorder_taps_buffered: usize,
+    pub recorder_oldest_seq: Option<u64>,
+    pub recorder_newest_seq: Option<u64>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -83,6 +86,10 @@ pub struct MediaSession {
     pub logical_call_id: String,
     pub kind: String,
     pub phase: String,
+    pub source_issi: Option<u32>,
+    pub gssi: Option<u32>,
+    pub calling_issi: Option<u32>,
+    pub called_issi: Option<u32>,
     pub priority: u8,
     pub emergency: bool,
     pub floor_holder: Option<u32>,
@@ -135,6 +142,38 @@ pub struct TapRecord {
 }
 
 #[derive(Debug, Clone, Serialize)]
+pub struct RecorderTapRecord {
+    pub seq: u64,
+    pub timestamp: String,
+    pub session_id: String,
+    pub call_kind: String,
+    pub call_phase: String,
+    pub source_issi: Option<u32>,
+    pub gssi: Option<u32>,
+    pub calling_issi: Option<u32>,
+    pub called_issi: Option<u32>,
+    pub priority: u8,
+    pub emergency: bool,
+    pub speaker_issi: Option<u32>,
+    pub source_node_id: String,
+    pub source_logical_ts: u8,
+    pub source_sequence: u64,
+    pub target_count: usize,
+    pub codec: String,
+    pub payload: Vec<u8>,
+    pub injected: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct RecorderTapBatch {
+    pub requested_after: u64,
+    pub oldest_available_seq: Option<u64>,
+    pub newest_available_seq: Option<u64>,
+    pub dropped_before: u64,
+    pub records: Vec<RecorderTapRecord>,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct EventRecord {
     pub seq: u64,
     pub timestamp: String,
@@ -184,6 +223,7 @@ struct MediaState {
     buffers: HashMap<StreamKey, VecDeque<BufferedFrame>>,
     pending_frames: usize,
     taps: VecDeque<TapRecord>,
+    recorder_taps: VecDeque<RecorderTapRecord>,
     events: VecDeque<EventRecord>,
     next_event_seq: u64,
     next_tap_seq: u64,
@@ -218,6 +258,7 @@ impl SharedMedia {
             buffers: HashMap::new(),
             pending_frames: 0,
             taps: VecDeque::new(),
+            recorder_taps: VecDeque::new(),
             events: VecDeque::new(),
             next_event_seq: 1,
             next_tap_seq: 1,
@@ -299,6 +340,30 @@ impl SharedMedia {
             .take(limit.min(state.taps.len()))
             .cloned()
             .collect()
+    }
+
+    pub fn recorder_taps(&self, after: u64, limit: usize) -> RecorderTapBatch {
+        let state = self.0.lock().expect("media state poisoned");
+        let oldest = state.recorder_taps.front().map(|record| record.seq);
+        let newest = state.recorder_taps.back().map(|record| record.seq);
+        let dropped_before = oldest
+            .filter(|oldest| after.saturating_add(1) < *oldest)
+            .map(|oldest| oldest.saturating_sub(after.saturating_add(1)))
+            .unwrap_or(0);
+        let records = state
+            .recorder_taps
+            .iter()
+            .filter(|record| record.seq > after)
+            .take(limit.clamp(1, 5_000))
+            .cloned()
+            .collect();
+        RecorderTapBatch {
+            requested_after: after,
+            oldest_available_seq: oldest,
+            newest_available_seq: newest,
+            dropped_before,
+            records,
+        }
     }
 
     pub fn events(&self, limit: usize) -> Vec<EventRecord> {
@@ -479,6 +544,10 @@ impl SharedMedia {
                     logical_call_id: call.logical_call_id,
                     kind: call.kind,
                     phase: call.phase,
+                    source_issi: call.source_issi,
+                    gssi: call.gssi,
+                    calling_issi: call.calling_issi,
+                    called_issi: call.called_issi,
                     priority: call.priority,
                     emergency: call.emergency,
                     floor_holder: call.floor_holder,
@@ -692,7 +761,7 @@ impl SharedMedia {
             0,
             sequence,
             queued,
-            input.payload.len(),
+            &input.payload,
             true,
         );
         push_event_locked(
@@ -935,7 +1004,7 @@ impl SharedMedia {
             frame.logical_ts,
             frame.sequence,
             routed,
-            frame.payload.len(),
+            &frame.payload,
             false,
         );
     }
@@ -975,6 +1044,9 @@ fn status_locked(state: &MediaState) -> MediaSwitchStatus {
         muted_frames: state.muted_frames,
         buffer_overflows: state.buffer_overflows,
         send_failures: state.send_failures,
+        recorder_taps_buffered: state.recorder_taps.len(),
+        recorder_oldest_seq: state.recorder_taps.front().map(|record| record.seq),
+        recorder_newest_seq: state.recorder_taps.back().map(|record| record.seq),
     }
 }
 
@@ -1118,24 +1190,50 @@ fn push_tap_locked(
     source_logical_ts: u8,
     source_sequence: u64,
     target_count: usize,
-    payload_bytes: usize,
+    payload: &[u8],
     injected: bool,
 ) {
-    let record = TapRecord {
+    let session = state.sessions.get(session_id);
+    let full_record = RecorderTapRecord {
         seq: state.next_tap_seq,
         timestamp: now_iso(),
+        session_id: session_id.to_string(),
+        call_kind: session.map_or_else(|| "unknown".to_string(), |value| value.kind.clone()),
+        call_phase: session.map_or_else(|| "unknown".to_string(), |value| value.phase.clone()),
+        source_issi: session.and_then(|value| value.source_issi),
+        gssi: session.and_then(|value| value.gssi),
+        calling_issi: session.and_then(|value| value.calling_issi),
+        called_issi: session.and_then(|value| value.called_issi),
+        priority: session.map_or(0, |value| value.priority),
+        emergency: session.is_some_and(|value| value.emergency),
+        speaker_issi: session.and_then(|value| value.floor_holder),
+        source_node_id: source_node_id.to_string(),
+        source_logical_ts,
+        source_sequence,
+        target_count,
+        codec: "tetra_acelp0".to_string(),
+        payload: payload.to_vec(),
+        injected,
+    };
+    let record = TapRecord {
+        seq: full_record.seq,
+        timestamp: full_record.timestamp.clone(),
         session_id: session_id.to_string(),
         source_node_id: source_node_id.to_string(),
         source_logical_ts,
         source_sequence,
         target_count,
-        payload_bytes,
+        payload_bytes: payload.len(),
         injected,
     };
     state.next_tap_seq = state.next_tap_seq.wrapping_add(1);
     state.taps.push_back(record);
+    state.recorder_taps.push_back(full_record);
     while state.taps.len() > state.config.media.tap_history_frames {
         state.taps.pop_front();
+    }
+    while state.recorder_taps.len() > state.config.media.recorder_tap_history_frames {
+        state.recorder_taps.pop_front();
     }
 }
 
@@ -1207,6 +1305,10 @@ mod tests {
             logical_call_id: "call-1".to_string(),
             kind: "group".to_string(),
             phase: "active".to_string(),
+            source_issi: Some(1001),
+            gssi: Some(2000),
+            calling_issi: None,
+            called_issi: None,
             floor_holder: Some(1001),
             priority: 5,
             emergency: false,
@@ -1334,5 +1436,48 @@ mod tests {
             },
         );
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn recorder_tap_contains_payload_and_call_metadata() {
+        let mut config = MediaSwitchConfig::default();
+        config.media.jitter_buffer_frames = 0;
+        let media = SharedMedia::new(config);
+        {
+            let mut state = media.0.lock().expect("media state");
+            state.nodes.insert(
+                "tbs-a".to_string(),
+                NodeRecord {
+                    node_id: "tbs-a".to_string(),
+                    station_name: "TBS A".to_string(),
+                    gateway_session_id: "session-a".to_string(),
+                    site: None,
+                    connected: true,
+                    stale: false,
+                    last_seen: now_iso(),
+                    media_bridge: true,
+                    media_frame_count: 0,
+                    mcc: 262,
+                    mnc: 42,
+                    location_area: 1,
+                    colour_code: 1,
+                },
+            );
+        }
+        media.reconcile_calls(vec![sample_call()]);
+        media.route_uplink(MediaUplinkFrame {
+            node_id: "tbs-a".to_string(),
+            sequence: 7,
+            timestamp: now_iso(),
+            carrier_num: 720,
+            logical_ts: 2,
+            codec: MediaCodec::TetraAcelp0,
+            payload: vec![0x5a; TETRA_ACELP_FRAME_BYTES],
+        });
+        let batch = media.recorder_taps(0, 10);
+        assert_eq!(batch.records.len(), 1);
+        assert_eq!(batch.records[0].gssi, Some(2000));
+        assert_eq!(batch.records[0].speaker_issi, Some(1001));
+        assert_eq!(batch.records[0].payload, vec![0x5a; TETRA_ACELP_FRAME_BYTES]);
     }
 }

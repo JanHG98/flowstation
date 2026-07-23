@@ -5,6 +5,7 @@ curl http://127.0.0.1:8130/api/v1/status
 curl http://127.0.0.1:8130/api/v1/sessions
 curl http://127.0.0.1:8130/api/v1/streams
 curl http://127.0.0.1:8130/api/v1/buffers
+curl 'http://127.0.0.1:8130/api/v1/recorder/taps?after=0&limit=10'
 ```
 
 Stream stummschalten:

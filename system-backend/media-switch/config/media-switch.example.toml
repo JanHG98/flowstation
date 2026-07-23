@@ -25,6 +25,9 @@ session_idle_secs = 30
 max_frames_per_tick = 256
 allow_same_leg_loopback = false
 tap_history_frames = 256
+# Replay-fähiger Vollframe-Tap für den Recorder. 20.000 Frames entsprechen
+# bei einem einzelnen aktiven Sprecher ungefähr 20 Minuten Roh-Audio.
+recorder_tap_history_frames = 20000
 
 [security]
 mode = "open_lab"

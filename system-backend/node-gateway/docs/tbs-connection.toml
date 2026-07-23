@@ -7,7 +7,6 @@ host = "10.0.1.30"       # IP des Node-Gateway-LXC
 port = 9011
 use_tls = false           # zunächst internes Testnetz; WSS folgt als eigener Ausbau
 endpoint_path = "/node"
-auth_token = "same-value-as-NETCORE_NODE_GATEWAY_NODE_TOKEN"
 node_id = "tbs-hannover-01"
 station_name = "NetCore TBS Hannover 01"
 site = "Rack 01"

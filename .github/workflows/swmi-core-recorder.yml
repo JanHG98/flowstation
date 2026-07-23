@@ -1,0 +1,39 @@
+name: SWMI Core Recorder
+
+on:
+  push:
+    paths:
+      - 'system-backend/recorder/**'
+      - 'system-backend/media-switch/**'
+      - 'system-backend/services.toml'
+      - 'tools/check_recorder.py'
+      - 'tools/check_media_switch.py'
+      - 'Docs/SWMI_CORE_1_PACKAGE_E_RECORDER.md'
+      - 'Docs/SWMI_CORE_1_PACKAGE_E_APPLY.md'
+      - '.github/workflows/swmi-core-recorder.yml'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+  pull_request:
+
+jobs:
+  recorder:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Static Recorder checks
+        run: python3 tools/check_recorder.py
+      - name: Static Media Switch checks
+        run: python3 tools/check_media_switch.py
+      - name: Format
+        run: cargo fmt --all -- --check
+      - name: Media Switch tests
+        run: cargo test -p netcore-media-switch
+      - name: Recorder tests
+        run: cargo test -p netcore-recorder
+      - name: Release build
+        run: cargo build --release -p netcore-recorder
+      - name: Clippy
+        run: cargo clippy -p netcore-recorder --all-targets -- -D warnings
