@@ -1,38 +1,92 @@
-# SDS Router
+# NetCore SDS Router
 
-## Zweck
+Der SDS Router ist der zentrale SwMI-Dienst für **SDS und pre-coded Status**. Er nimmt verlustfrei normalisierte SDS-Edge-Ereignisse der TBS entgegen, entscheidet über Individual-, Gruppen- und Anwendungsziele und beauftragt die zuständigen TBS über den Node Gateway mit der Air-Interface-Zustellung.
 
-Der SDS Router übernimmt die netzweite Zustellung und Speicherung von SDS- und Statusnachrichten.
+## Aktueller Umfang
 
-## Kernaufgaben
+- Individual- und Gruppen-SDS, Typ 1 bis 4
+- pre-coded Status
+- exakte Erhaltung von SDS-Typ, Bitlänge und Payload
+- Teilnehmer- und Gruppenpräsenz aus TBS-Telemetrie
+- Store-and-forward bei nicht erreichbaren Teilnehmern oder TBS
+- TTL, Priorität, Retry mit Backoff und maximale Versuchszahl
+- Offline-, In-flight-, Partial-, Failed- und Dead-Letter-Zustände
+- Duplikaterkennung mit konfigurierbarem Zeitfenster
+- Protokoll-ID-Routen an externe Anwendungen
+- optionale feste Individual-/Gruppenrouten zu einer TBS
+- Application-Outbox mit explizitem ACK/NACK
+- persistente JSON-Datenbank mit Backup
+- REST-API, OpenAPI, Prometheus-Metriken, Health und eigene WebUI
+- systemd-Unit sowie Install-, Update- und Uninstall-Skripte
 
-- Individual- und Gruppen-SDS routen
-- Store-and-forward, TTL und Prioritäten verwalten
-- Zustellberichte, Wiederholungen und Offline-Queues behandeln
-- Protokoll-ID-basiert an Anwendungen weiterleiten
+## Bewusste Edge/Core-Grenze
 
-## Abgrenzung
+Die TBS behält weiterhin:
 
-MCCH/FACCH-Zustellung und Air-Interface-PDUs bleiben auf der TBS.
+- U-/D-SDS-PDU-Encoding und -Decoding,
+- MCCH/FACCH-Ressourcenwahl,
+- Energy-Economy- und Wake-up-Fenster,
+- lokale sicherheitskritische Notrufbehandlung,
+- lokale WX-/Command-ISSI-Sonderfunktionen,
+- eine kurze Air-Interface-nahe Zustellqueue.
 
-## WebUI zur Verwaltung
+Der zentrale Router arbeitet oberhalb dieser Grenze mit einem verlustfreien SDS-Datensatz. Die TBS-Konfiguration aktiviert die Übergabe mit:
 
-Der SDS Router erhält eine eigene Verwaltungsoberfläche für Nachrichten, Queues und Zustellpfade.
+```toml
+[control_room]
+central_sds_routing = true
+```
 
-### Geplante Ansichten
+Solange der Wert `false` bleibt, arbeitet die bestehende lokale SDS-Logik weiter. Dadurch ist das Update rückwärtskompatibel und die Zentralisierung kann TBS für TBS eingeschaltet werden.
 
-- eingehende und ausgehende SDS
-- Zustellstatus, Wiederholungen und TTL
-- Online-, Offline- und Dead-Letter-Queues
-- Individual-, Gruppen- und Protokoll-ID-Routen
-- zuständige TBS und Anwendungsgateways
-- Nachrichtentrace und Audit
+## Open-Lab-Betrieb
 
-### Kritische Aktionen
+Der aktuelle Dienst läuft absichtlich ohne Benutzerkonten, Token und TLS. Jeder Client mit Netzzugriff kann Nachrichten und Nutzdaten lesen, Nachrichten senden, Zustellungen wiederholen und Routen verändern. Nur in einem isolierten Testnetz einsetzen.
 
-- SDS manuell senden
-- Zustellung wiederholen oder abbrechen
-- Dead-Letter-Nachricht erneut einreihen
-- Route oder Protokollzuordnung ändern
+Standardzugriff:
 
-Nutzdaten werden abhängig von Rolle und Datenschutzrichtlinie maskiert.
+```text
+http://<LXC-IP>:8150/
+```
+
+## Schnellstart im Repo
+
+```bash
+cargo run -p netcore-sds-router -- --no-config --bind 0.0.0.0:8150
+```
+
+Mit Konfiguration:
+
+```bash
+cp system-backend/sds-router/config/sds-router.example.toml /etc/netcore/sds-router.toml
+cargo run -p netcore-sds-router -- --config /etc/netcore/sds-router.toml
+```
+
+## API-Auswahl
+
+```text
+GET    /api/v1/status
+GET    /api/v1/messages
+POST   /api/v1/messages
+GET    /api/v1/messages/{id}
+POST   /api/v1/messages/{id}/retry
+POST   /api/v1/messages/{id}/requeue
+POST   /api/v1/messages/{id}/cancel
+DELETE /api/v1/messages/{id}
+GET    /api/v1/routes
+POST   /api/v1/routes
+PUT    /api/v1/routes/{id}
+DELETE /api/v1/routes/{id}
+GET    /api/v1/application-outbox
+POST   /api/v1/application-outbox/{application}/{id}/ack
+GET    /api/v1/nodes
+GET    /api/v1/subscribers
+GET    /api/v1/groups
+GET    /api/v1/events
+GET    /metrics
+GET    /health/live
+GET    /health/ready
+GET    /openapi.json
+```
+
+Weitere Details stehen unter `docs/`.

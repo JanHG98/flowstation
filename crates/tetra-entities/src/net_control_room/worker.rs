@@ -379,7 +379,9 @@ impl<T: NetworkTransport> ControlRoomWorker<T> {
 pub fn route_control_command(command: &ControlCommand) -> TetraEntity {
     match command {
         ControlCommand::SendSds { .. } => TetraEntity::Cmce,
-        ControlCommand::SendRawSdsType4 { .. } => TetraEntity::Cmce,
+        ControlCommand::SendRawSdsType4 { .. }
+        | ControlCommand::DeliverSds { .. }
+        | ControlCommand::SendStatus { .. } => TetraEntity::Cmce,
         ControlCommand::KickMs { .. } => TetraEntity::Cmce,
         ControlCommand::Dgna { .. }
         | ControlCommand::MobilityExportContext { .. }
@@ -411,6 +413,8 @@ fn correlation_key_for_command(command: &ControlCommand) -> Option<CommandCorrel
     match command {
         ControlCommand::SendSds { handle, .. }
         | ControlCommand::SendRawSdsType4 { handle, .. }
+        | ControlCommand::DeliverSds { handle, .. }
+        | ControlCommand::SendStatus { handle, .. }
         | ControlCommand::CommandA { handle, .. }
         | ControlCommand::TestCmdB { handle, .. } => Some(CommandCorrelationKey::Handle(*handle)),
         ControlCommand::KickMs { issi } => Some(CommandCorrelationKey::KickMs(*issi)),
@@ -463,7 +467,9 @@ fn correlation_key_for_command(command: &ControlCommand) -> Option<CommandCorrel
 
 fn correlation_key_for_response(response: &ControlResponse) -> Option<CommandCorrelationKey> {
     match response {
-        ControlResponse::CommandAResponse { handle, .. } | ControlResponse::SendSdsResponse { handle, .. } => {
+        ControlResponse::CommandAResponse { handle, .. }
+        | ControlResponse::SendSdsResponse { handle, .. }
+        | ControlResponse::SdsDeliveryResponse { handle, .. } => {
             Some(CommandCorrelationKey::Handle(*handle))
         }
         ControlResponse::KickMsResponse { issi, .. } => Some(CommandCorrelationKey::KickMs(*issi)),

@@ -509,6 +509,60 @@ impl SdsBsSubentity {
         });
     }
 
+    fn central_sds_routing_enabled(&self) -> bool {
+        self.config
+            .config()
+            .control_room
+            .as_ref()
+            .is_some_and(|cfg| cfg.enabled && cfg.central_sds_routing)
+    }
+
+    fn emit_sds_edge_data(
+        &self,
+        ingress: &str,
+        source_issi: u32,
+        dest_issi: u32,
+        is_group: bool,
+        data: &SdsUserData,
+        priority: u8,
+    ) {
+        let payload = data.to_arr();
+        self.emit(TelemetryEvent::SdsEdgeIngress {
+            message_id: uuid::Uuid::new_v4().to_string(),
+            ingress: ingress.to_string(),
+            source_issi,
+            dest_issi,
+            is_group,
+            sds_type: data.type_identifier().saturating_add(1),
+            protocol_id: payload.first().copied().unwrap_or(0),
+            len_bits: data.length_bits(),
+            payload,
+            priority: priority.min(15),
+        });
+    }
+
+    fn emit_sds_edge_status(
+        &self,
+        ingress: &str,
+        source_issi: u32,
+        dest_issi: u32,
+        status: PreCodedStatus,
+    ) {
+        let raw = status.into_raw();
+        self.emit(TelemetryEvent::SdsEdgeIngress {
+            message_id: uuid::Uuid::new_v4().to_string(),
+            ingress: ingress.to_string(),
+            source_issi,
+            dest_issi,
+            is_group: false,
+            sds_type: 0,
+            protocol_id: 0,
+            len_bits: 16,
+            payload: raw.to_be_bytes().to_vec(),
+            priority: if matches!(status, PreCodedStatus::Emergency) { 15 } else { 0 },
+        });
+    }
+
     /// True if `dest_ssi` (an individual ISSI) is currently on one of our traffic timeslots —
     /// either directly (active talker / individual-call party) or as an affiliated member of an
     /// active group call. Such an MS follows the FACCH on its traffic slot, not the MCCH.
@@ -711,6 +765,29 @@ impl SdsBsSubentity {
             return;
         }
 
+        // In central SDS mode the TBS remains the Air-Interface edge only. The lossless
+        // payload is handed to the SDS Router through the existing Control-Room telemetry
+        // channel; the router will resolve the destination and send a first-class delivery
+        // command back to the serving TBS. Local safety services above remain local.
+        if self.central_sds_routing_enabled() {
+            tracing::info!(
+                "SDS: central handoff {} -> {} (group={}, type={})",
+                source_ssi,
+                dest_ssi,
+                rx_is_group,
+                pdu.user_defined_data.type_identifier().saturating_add(1)
+            );
+            self.emit_sds_edge_data(
+                "air",
+                source_ssi,
+                dest_ssi,
+                rx_is_group,
+                &pdu.user_defined_data,
+                0,
+            );
+            return;
+        }
+
         // Route: local delivery (ISSI or GSSI), Brew forward, or drop
         let is_local_issi = self.config.state_read().subscribers.is_registered(dest_ssi);
         let is_local_group = !is_local_issi && self.config.state_read().subscribers.has_group_members(dest_ssi);
@@ -777,6 +854,18 @@ impl SdsBsSubentity {
         // Log the network-originated SDS in the dashboard SDS Log before it is delivered.
         self.log_sds("net", sds.source_issi, sds.dest_issi, is_local_group, &sds.user_defined_data);
 
+        if self.central_sds_routing_enabled() {
+            self.emit_sds_edge_data(
+                source,
+                sds.source_issi,
+                sds.dest_issi,
+                is_local_group,
+                &sds.user_defined_data,
+                0,
+            );
+            return;
+        }
+
         if is_local_issi {
             // Send D-SDS-DATA downlink to the local MS on the MCCH.
             tracing::info!("SDS: local delivery from Brew: {} -> {}", sds.source_issi, sds.dest_issi);
@@ -804,7 +893,7 @@ impl SdsBsSubentity {
 
     /// Handle incoming SDS data from Control entity (network-originated SDS)
     pub fn rx_sds_from_control(&mut self, queue: &mut MessageQueue, message: ControlCommand) -> bool {
-        let (handle, source_ssi, dest_ssi, dest_is_group, len_bits, payload, raw_type4) = match message {
+        let (handle, source_ssi, dest_ssi, dest_is_group, len_bits, payload, raw_type4, preserved_type) = match message {
             ControlCommand::SendRawSdsType4 {
                 handle,
                 source_ssi,
@@ -812,7 +901,7 @@ impl SdsBsSubentity {
                 dest_is_group,
                 len_bits,
                 payload,
-            } => (handle, source_ssi, dest_ssi, dest_is_group, len_bits, payload, true),
+            } => (handle, source_ssi, dest_ssi, dest_is_group, len_bits, payload, true, None),
             ControlCommand::SendSds {
                 handle,
                 source_ssi,
@@ -820,7 +909,16 @@ impl SdsBsSubentity {
                 dest_is_group,
                 len_bits,
                 payload,
-            } => (handle, source_ssi, dest_ssi, dest_is_group, len_bits, payload, false),
+            } => (handle, source_ssi, dest_ssi, dest_is_group, len_bits, payload, false, None),
+            ControlCommand::DeliverSds {
+                handle,
+                source_ssi,
+                dest_ssi,
+                dest_is_group,
+                sds_type,
+                len_bits,
+                payload,
+            } => (handle, source_ssi, dest_ssi, dest_is_group, len_bits, payload, false, Some(sds_type)),
             other => {
                 tracing::error!(
                     "SDS: rx_sds_from_control expected SDS command, got unexpected command type {:?}",
@@ -829,6 +927,43 @@ impl SdsBsSubentity {
                 return false;
             }
         };
+
+        if let Some(sds_type) = preserved_type {
+            let sds_data = match sds_type {
+                1 if len_bits == 16 && payload.len() == 2 => {
+                    SdsUserData::Type1(u16::from_be_bytes([payload[0], payload[1]]))
+                }
+                2 if len_bits == 32 && payload.len() == 4 => SdsUserData::Type2(
+                    u32::from_be_bytes([payload[0], payload[1], payload[2], payload[3]]),
+                ),
+                3 if len_bits == 64 && payload.len() == 8 => SdsUserData::Type3(u64::from_be_bytes([
+                    payload[0], payload[1], payload[2], payload[3],
+                    payload[4], payload[5], payload[6], payload[7],
+                ])),
+                4 if len_bits > 0 && (len_bits as usize) <= payload.len().saturating_mul(8) => {
+                    SdsUserData::Type4(len_bits, payload)
+                }
+                _ => {
+                    tracing::warn!(
+                        "SDS: central delivery rejected: invalid type={} len_bits={} payload_bytes={}",
+                        sds_type,
+                        len_bits,
+                        payload.len()
+                    );
+                    return false;
+                }
+            };
+
+            self.log_sds("net", source_ssi, dest_ssi, dest_is_group, &sds_data);
+            self.send_d_sds_data(
+                queue,
+                source_ssi,
+                dest_ssi,
+                if dest_is_group { SsiType::Gssi } else { SsiType::Issi },
+                sds_data,
+            );
+            return true;
+        }
 
         if raw_type4 {
             tracing::info!(
@@ -1018,6 +1153,22 @@ impl SdsBsSubentity {
             return;
         }
 
+        if self.central_sds_routing_enabled() {
+            tracing::info!(
+                "SDS-STATUS: central handoff {} -> {} status={}",
+                source_ssi,
+                dest_ssi,
+                pdu.pre_coded_status
+            );
+            self.emit_sds_edge_status(
+                "air",
+                source_ssi,
+                dest_ssi,
+                pdu.pre_coded_status,
+            );
+            return;
+        }
+
         // Emergency status is LOCAL-only by design — never forwarded to Brew unless the operator
         // opts in via [emergency] forward_to_brew. Non-emergency statuses keep their normal routing.
         let is_emergency = matches!(pdu.pre_coded_status, PreCodedStatus::Emergency)
@@ -1161,6 +1312,31 @@ impl SdsBsSubentity {
             }),
         };
         queue.push_back(msg);
+    }
+
+    /// Deliver one central pre-coded status to a local subscriber.
+    pub fn send_status_from_control(
+        &mut self,
+        queue: &mut MessageQueue,
+        source_ssi: u32,
+        dest_ssi: u32,
+        pre_coded_status: u16,
+    ) -> bool {
+        if source_ssi == 0 || source_ssi > 0xFF_FFFF || dest_ssi == 0 || dest_ssi > 0xFF_FFFF {
+            tracing::warn!(
+                "SDS-STATUS: central delivery rejected for invalid source/destination {}/{}",
+                source_ssi,
+                dest_ssi
+            );
+            return false;
+        }
+        self.send_d_status(
+            queue,
+            source_ssi,
+            dest_ssi,
+            PreCodedStatus::from(pre_coded_status),
+        );
+        true
     }
 
     // ── Built-in WX/METAR service ──────────────────────────────────────────

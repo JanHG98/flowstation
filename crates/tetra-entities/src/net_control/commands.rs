@@ -324,6 +324,27 @@ pub enum ControlCommand {
         is_group: bool,
         payload: Vec<u8>,
     },
+
+    /// Deliver an already decoded SDS data field from the central SDS Router.
+    /// `sds_type` uses the ETSI short-data type numbering 1..=4 and preserves
+    /// the exact bit length and payload seen on the ingress TBS.
+    DeliverSds {
+        handle: u32,
+        source_ssi: u32,
+        dest_ssi: u32,
+        dest_is_group: bool,
+        sds_type: u8,
+        len_bits: u16,
+        payload: Vec<u8>,
+    },
+
+    /// Deliver one pre-coded status through the local Air Interface.
+    SendStatus {
+        handle: u32,
+        source_ssi: u32,
+        dest_ssi: u32,
+        pre_coded_status: u16,
+    },
 }
 
 /// Response sent back after processing a [`ControlCommand`].
@@ -420,6 +441,12 @@ pub enum ControlResponse {
     CallControlRestoreContextRemoved {
         handle: u32,
         call_id: u16,
+        success: bool,
+        message: String,
+    },
+    /// Result of a first-class central SDS or status delivery command.
+    SdsDeliveryResponse {
+        handle: u32,
         success: bool,
         message: String,
     },

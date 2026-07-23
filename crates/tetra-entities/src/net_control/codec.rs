@@ -129,6 +129,67 @@ mod tests {
     }
 
     #[test]
+    fn test_roundtrip_central_sds_commands() {
+        for command in [
+            ControlCommand::DeliverSds {
+                handle: 77,
+                source_ssi: 4_010_001,
+                dest_ssi: 4_010_002,
+                dest_is_group: false,
+                sds_type: 4,
+                len_bits: 40,
+                payload: vec![0x82, 0x04, 0x01, 0x01, b'A'],
+            },
+            ControlCommand::SendStatus {
+                handle: 78,
+                source_ssi: 4_010_001,
+                dest_ssi: 4_010_002,
+                pre_coded_status: 32_780,
+            },
+        ] {
+            let json = ControlCodecJson;
+            let decoded = json.decode_command(&json.encode_command(&command)).unwrap();
+            assert_eq!(
+                serde_json::to_value(decoded).unwrap(),
+                serde_json::to_value(command.clone()).unwrap()
+            );
+
+            let bitcode = ControlCodecBitcode;
+            let decoded = bitcode
+                .decode_command(&bitcode.encode_command(&command))
+                .unwrap();
+            assert_eq!(
+                serde_json::to_value(decoded).unwrap(),
+                serde_json::to_value(command).unwrap()
+            );
+        }
+    }
+
+    #[test]
+    fn test_roundtrip_central_sds_response() {
+        let response = ControlResponse::SdsDeliveryResponse {
+            handle: 77,
+            success: true,
+            message: "accepted by TBS".to_string(),
+        };
+        let codec = ControlCodecJson;
+        let decoded = codec
+            .decode_response(&codec.encode_response(&response))
+            .unwrap();
+        let ControlResponse::SdsDeliveryResponse {
+            handle,
+            success,
+            message,
+        } = decoded
+        else {
+            panic!("expected SdsDeliveryResponse");
+        };
+        assert_eq!(handle, 77);
+        assert!(success);
+        assert_eq!(message, "accepted by TBS");
+    }
+
+    #[test]
     fn test_decode_invalid_bytes() {
         let codec = ControlCodecBitcode;
         // Use truncated bytes that cannot form a valid Command

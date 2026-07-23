@@ -250,6 +250,21 @@ pub enum TelemetryEvent {
         contexts: Vec<PacketDataContextTelemetry>,
         bearers: Vec<PdchBearerTelemetry>,
     },
+    /// Lossless SDS/STATUS ingress handed from the local Air-Interface edge to
+    /// the central SDS Router. Appended last for bitcode wire stability.
+    SdsEdgeIngress {
+        message_id: String,
+        ingress: String,
+        source_issi: u32,
+        dest_issi: u32,
+        is_group: bool,
+        /// 0 = pre-coded status, 1..=4 = SDS data type.
+        sds_type: u8,
+        protocol_id: u8,
+        len_bits: u16,
+        payload: Vec<u8>,
+        priority: u8,
+    },
 }
 
 #[derive(Debug, Clone, Encode, Decode, Serialize, Deserialize)]

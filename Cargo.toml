@@ -20,6 +20,7 @@ members = [
     "system-backend/call-control",
     "system-backend/media-switch",
     "system-backend/recorder",
+    "system-backend/sds-router",
     #"bins/bluestation-telemetry",
     #"bins/bluestation-control",
     #"bins/pdu-tool",

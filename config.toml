@@ -756,6 +756,10 @@ node_id = "SRV-M_TBS-01"
 station_name = "SRV-M_TBS-01"
 site = "Main"
 
+# Route normal SDS and status traffic through the central SDS Router.
+# Keep disabled for a fully local standalone TBS.
+central_sds_routing = false
+
 # REQUIRED when the Control Room runs with [auth] enabled:
 # Use exactly the same node token as NETCORE_CONTROL_ROOM_NODE_TOKEN on the
 # Control Room host. The token is sent as Basic auth user "node".

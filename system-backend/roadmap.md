@@ -47,7 +47,8 @@ Die bisher umgesetzten LXC-Dienste starten im ausdrücklich markierten `open_lab
 - `call-control`: umgesetzt, logische Gruppen-/Einzelrufe, Floor Control und Call Restore mit WebUI
 - `media-switch`: umgesetzt, netzweites Routing gepackter TETRA-Sprachframes mit WebUI
 - `recorder`: umgesetzt, passiver Vollframe-Tap, Archiv, Integrität, Retention und WebUI
-- nächster Core-Dienst: `sds-router`
+- `sds-router`: umgesetzt, zentrale SDS-/Statusvermittlung, Store-and-forward, TTL, Retry, Dead Letter, Protokoll-ID-Routing und WebUI
+- nächster Core-Dienst: `packet-core`
 - nächster Media-Baustein: `media-library` / Audio Player auf Basis des stabilen Recorder-Formats
 
 # 2. Normative Grundlage
@@ -1278,12 +1279,11 @@ Für jede Phase, in der ein neuer Containerdienst entsteht, gelten zusätzlich:
 
 Die lokale TLPD-Runtime ist abgeschlossen. Sie bleibt auf der TBS und stellt Diagnose-Snapshots für die spätere TBS-WebUI und den Node Gateway bereit. Es entsteht kein eigener Backend-Container.
 
-## Aktueller Stand: SWMI Mobility 1
+## Aktueller Stand: SWMI Mobility 1 und Core 1
 
-- Paket A – MLE-Zellwechselbasis: abgeschlossen
-- Paket B – vollständige lokale CMCE-Call-Restore-State-Machine: abgeschlossen
-- Paket C – MM-Migration, VASSI und Forward Registration: abgeschlossen
-- Paket D – erster LXC-Dienst `node-gateway`: abgeschlossen
+Die lokale Funkstack- und Mobility-Grundlage ist abgeschlossen. Darauf aufbauend sind die zentralen Open-Lab-Dienste `node-gateway`, `mobility-core`, `subscriber-core`, `group-core`, `call-control`, `media-switch`, `recorder` und `sds-router` jeweils mit eigener WebUI umgesetzt.
 
-Der Node Gateway läuft in dieser ersten Teststufe bewusst als `open_lab` unter HTTP-Port 8080 und verwendet keine Tokens. Der nächste zentrale Dienst kann den Gateway über `/ws/backend` abonnieren.
+Der SDS Router nutzt den offenen Backend-WebSocket des Node Gateway, übernimmt netzweites Individual-, Gruppen-, Status- und Protocol-ID-Routing und lässt die Air-Interface-nahe Zustellung bewusst in der TBS. Der nächste zentrale Dienst ist `packet-core`; anschließend folgt die Kopplung an `ip-gateway`.
+
+Bis zur späteren Security-Phase bleiben alle genannten LXC-Dienste ausdrücklich `open_lab`: keine Tokens, keine Benutzerkonten und kein TLS. Das ist nur für das isolierte Testnetz vorgesehen.
 

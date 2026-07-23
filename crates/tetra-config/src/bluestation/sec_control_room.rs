@@ -30,6 +30,10 @@ pub struct CfgControlRoom {
     pub station_name: Option<String>,
     /// Optional site/location label, e.g. "Hannover Rack" or "xGEAR Event".
     pub site: Option<String>,
+    /// Route ordinary SDS/STATUS ingress through the central SDS Router instead of
+    /// deciding the destination locally. Safety-critical local emergency handling,
+    /// the configured WX responder and the local command ISSI remain local.
+    pub central_sds_routing: bool,
 }
 
 #[derive(Default, Deserialize)]
@@ -51,6 +55,8 @@ pub struct CfgControlRoomDto {
     pub node_id: Option<String>,
     pub station_name: Option<String>,
     pub site: Option<String>,
+    #[serde(default)]
+    pub central_sds_routing: bool,
 
     #[serde(flatten)]
     pub extra: HashMap<String, Value>,
@@ -112,5 +118,39 @@ pub fn apply_control_room_patch(src: CfgControlRoomDto) -> Result<CfgControlRoom
         node_id: src.node_id,
         station_name: src.station_name,
         site: src.site,
+        central_sds_routing: src.central_sds_routing,
     })
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn central_sds_routing_defaults_to_disabled() {
+        let dto: CfgControlRoomDto = toml::from_str(
+            r#"
+                enabled = false
+            "#,
+        )
+        .unwrap();
+        let config = apply_control_room_patch(dto).unwrap();
+        assert!(!config.central_sds_routing);
+    }
+
+    #[test]
+    fn central_sds_routing_can_be_enabled() {
+        let dto: CfgControlRoomDto = toml::from_str(
+            r#"
+                enabled = true
+                host = "127.0.0.1"
+                port = 9010
+                central_sds_routing = true
+            "#,
+        )
+        .unwrap();
+        let config = apply_control_room_patch(dto).unwrap();
+        assert!(config.central_sds_routing);
+    }
 }

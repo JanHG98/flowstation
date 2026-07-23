@@ -81,6 +81,39 @@ impl CmceBs {
                     cep.respond(ControlResponse::SendSdsResponse { handle, success });
                 }
             }
+            ControlCommand::DeliverSds { handle, .. } => {
+                let success = sds.rx_sds_from_control(queue, cmd);
+                if let Some(cep) = responder {
+                    cep.respond(ControlResponse::SdsDeliveryResponse {
+                        handle,
+                        success,
+                        message: if success {
+                            "SDS accepted by local edge".to_string()
+                        } else {
+                            "SDS rejected by local edge".to_string()
+                        },
+                    });
+                }
+            }
+            ControlCommand::SendStatus { handle, source_ssi, dest_ssi, pre_coded_status } => {
+                let success = sds.send_status_from_control(
+                    queue,
+                    source_ssi,
+                    dest_ssi,
+                    pre_coded_status,
+                );
+                if let Some(cep) = responder {
+                    cep.respond(ControlResponse::SdsDeliveryResponse {
+                        handle,
+                        success,
+                        message: if success {
+                            "status accepted by local edge".to_string()
+                        } else {
+                            "status rejected by local edge".to_string()
+                        },
+                    });
+                }
+            }
             ControlCommand::KickMs { issi } => {
                 tracing::info!("CMCE: KickMs issi={} requested", issi);
                 let success = cc.kick_ms(queue, issi);

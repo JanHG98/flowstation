@@ -1,0 +1,38 @@
+name: SWMI Core SDS Router
+
+on:
+  push:
+    paths:
+      - 'system-backend/sds-router/**'
+      - 'crates/tetra-config/src/bluestation/sec_control_room.rs'
+      - 'crates/tetra-entities/src/net_control/**'
+      - 'crates/tetra-entities/src/net_control_room/**'
+      - 'crates/tetra-entities/src/net_telemetry/**'
+      - 'crates/tetra-entities/src/cmce/**'
+      - 'system-backend/services.toml'
+      - 'tools/check_sds_router.py'
+      - 'Docs/SWMI_CORE_1_PACKAGE_F_SDS_ROUTER.md'
+      - 'Docs/SWMI_CORE_1_PACKAGE_F_APPLY.md'
+      - '.github/workflows/swmi-core-sds-router.yml'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+  pull_request:
+
+jobs:
+  sds-router:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Static SDS Router checks
+        run: python3 tools/check_sds_router.py
+      - name: Format
+        run: cargo fmt --all -- --check
+      - name: Protocol and SDS Router tests
+        run: cargo test -p tetra-config -p tetra-entities -p netcore-sds-router
+      - name: Release build
+        run: cargo build --release -p netcore-sds-router
+      - name: Clippy
+        run: cargo clippy -p netcore-sds-router --all-targets -- -D warnings

@@ -1,0 +1,37 @@
+# NetCore SDS Router – offener Testbetrieb.
+# Keine Benutzerkonten, keine Tokens und kein TLS. Nur im isolierten Labornetz verwenden.
+
+[server]
+bind = "0.0.0.0:8150"
+history_limit = 4000
+
+[node_gateway]
+url = "ws://10.0.1.20:8080/ws/backend"
+reconnect_secs = 5
+
+[storage]
+database_path = "/var/lib/netcore-sds-router/messages.json"
+backup_path = "/var/lib/netcore-sds-router/messages.json.bak"
+
+[routing]
+default_ttl_secs = 300
+max_ttl_secs = 86400
+max_attempts = 5
+initial_retry_secs = 2
+max_retry_secs = 60
+dedupe_window_secs = 30
+presence_timeout_secs = 90
+# true: ordinary SDS/STATUS ingress is decided centrally.
+# Safety-critical local handlers in the TBS stay local.
+authoritative_ingress = true
+
+[security]
+mode = "open_lab"
+allow_remote_management = true
+mask_payload_in_list = false
+
+[limits]
+max_body_bytes = 2097152
+max_payload_bytes = 2048
+max_messages = 100000
+max_routes = 4096
