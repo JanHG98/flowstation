@@ -34,6 +34,7 @@ enum CommandCorrelationKey {
     SubscriberPolicy(u32),
     GroupPolicy(u32),
     GroupDgna(u32),
+    CallControl(u32),
     RestartService,
     ShutdownService,
     LiveSdsAdd { source_issi: u32, protocol_id: u8, text: String },
@@ -335,6 +336,14 @@ pub fn route_control_command(command: &ControlCommand) -> TetraEntity {
         | ControlCommand::SubscriberAccessPolicyApply { .. }
         | ControlCommand::GroupAccessPolicyApply { .. }
         | ControlCommand::GroupDgnaApply { .. } => TetraEntity::Mm,
+        ControlCommand::CallControlGroupStart { .. }
+        | ControlCommand::CallControlIndividualStart { .. }
+        | ControlCommand::CallControlRelease { .. }
+        | ControlCommand::CallControlFloorRequest { .. }
+        | ControlCommand::CallControlFloorRelease { .. }
+        | ControlCommand::CallControlExportRestoreContext { .. }
+        | ControlCommand::CallControlImportRestoreContext { .. }
+        | ControlCommand::CallControlRemoveRestoreContext { .. } => TetraEntity::Cmce,
         ControlCommand::RestartService => TetraEntity::Cmce,
         ControlCommand::ShutdownService => TetraEntity::Cmce,
         ControlCommand::AddLiveSds { .. } => TetraEntity::Cmce,
@@ -366,6 +375,16 @@ fn correlation_key_for_command(command: &ControlCommand) -> Option<CommandCorrel
         }
         ControlCommand::GroupDgnaApply { handle, .. } => {
             Some(CommandCorrelationKey::GroupDgna(*handle))
+        }
+        ControlCommand::CallControlGroupStart { handle, .. }
+        | ControlCommand::CallControlIndividualStart { handle, .. }
+        | ControlCommand::CallControlRelease { handle, .. }
+        | ControlCommand::CallControlFloorRequest { handle, .. }
+        | ControlCommand::CallControlFloorRelease { handle, .. }
+        | ControlCommand::CallControlExportRestoreContext { handle, .. }
+        | ControlCommand::CallControlImportRestoreContext { handle, .. }
+        | ControlCommand::CallControlRemoveRestoreContext { handle, .. } => {
+            Some(CommandCorrelationKey::CallControl(*handle))
         }
         ControlCommand::Dgna { issi, gssi, attach } => Some(CommandCorrelationKey::Dgna {
             issi: *issi,
@@ -409,6 +428,14 @@ fn correlation_key_for_response(response: &ControlResponse) -> Option<CommandCor
         }
         ControlResponse::GroupDgnaApplied { handle, .. } => {
             Some(CommandCorrelationKey::GroupDgna(*handle))
+        }
+        ControlResponse::CallControlLegStarted { handle, .. }
+        | ControlResponse::CallControlLegReleased { handle, .. }
+        | ControlResponse::CallControlFloorChanged { handle, .. }
+        | ControlResponse::CallControlRestoreContextExported { handle, .. }
+        | ControlResponse::CallControlRestoreContextImported { handle, .. }
+        | ControlResponse::CallControlRestoreContextRemoved { handle, .. } => {
+            Some(CommandCorrelationKey::CallControl(*handle))
         }
     }
 }

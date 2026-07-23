@@ -7,7 +7,7 @@
 | --- | --- |
 | TODO/FIXME | 206 |
 | Todo-Typ | 240 |
-| panic! | 86 |
+| panic! | 88 |
 | unimplemented! | 45 |
 | unimplemented_log! | 107 |
 | unreachable! | 31 |
@@ -178,11 +178,11 @@
 | panic! | prüfen | Runtime | `crates/tetra-core/src/tx_receipt.rs` | 114 | `panic!(` |
 | panic! | prüfen | Runtime | `crates/tetra-core/src/typed_pdu_fields.rs` | 194 | `_ => panic!(), // Never happens` |
 | unimplemented! | kritisch | Runtime | `crates/tetra-core/src/typed_pdu_fields.rs` | 641 | `unimplemented!("can't generically write a type4 field");` |
-| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/cmce/cmce_bs.rs` | 209 | `unimplemented_log!("{:?}", pdu_type);` |
-| panic! | prüfen | Runtime | `crates/tetra-entities/src/cmce/cmce_bs.rs` | 337 | `panic!("Unexpected message on LcmcSap: {:?}", message.msg);` |
-| unreachable! | prüfen | Runtime | `crates/tetra-entities/src/cmce/cmce_bs.rs` | 346 | `unreachable!();` |
-| panic! | prüfen | Runtime | `crates/tetra-entities/src/cmce/cmce_bs.rs` | 355 | `panic!("Unexpected control message: {:?}", message.msg);` |
-| panic! | prüfen | Runtime | `crates/tetra-entities/src/cmce/cmce_bs.rs` | 359 | `panic!("Unexpected SAP: {:?}", message.sap);` |
+| unimplemented_log! | offener Runtime-Pfad | Runtime | `crates/tetra-entities/src/cmce/cmce_bs.rs` | 363 | `unimplemented_log!("{:?}", pdu_type);` |
+| panic! | prüfen | Runtime | `crates/tetra-entities/src/cmce/cmce_bs.rs` | 491 | `panic!("Unexpected message on LcmcSap: {:?}", message.msg);` |
+| unreachable! | prüfen | Runtime | `crates/tetra-entities/src/cmce/cmce_bs.rs` | 500 | `unreachable!();` |
+| panic! | prüfen | Runtime | `crates/tetra-entities/src/cmce/cmce_bs.rs` | 509 | `panic!("Unexpected control message: {:?}", message.msg);` |
+| panic! | prüfen | Runtime | `crates/tetra-entities/src/cmce/cmce_bs.rs` | 513 | `panic!("Unexpected SAP: {:?}", message.sap);` |
 | TODO/FIXME | technische Schuld | Runtime | `crates/tetra-entities/src/cmce/components/circuit_mgr.rs` | 148 | `// TODO FIXME we may do a bit smarter allocation here` |
 | TODO/FIXME | technische Schuld | Runtime | `crates/tetra-entities/src/cmce/components/circuit_mgr.rs` | 186 | `circuit_mode: CircuitModeType::TchS, // TODO: only speech supported for now` |
 | TODO/FIXME | technische Schuld | Runtime | `crates/tetra-entities/src/cmce/components/circuit_mgr.rs` | 187 | `// endpoint_id: 0, // TODO, we don't use endpoints as of yet` |
@@ -535,6 +535,8 @@
 | TODO/FIXME | technische Schuld | Test | `crates/tetra-entities/tests/test_llc_bs.rs` | 19 | `// FIXME make proper vec here that can be passed onwards` |
 | panic! | Test-Assertion | Test | `crates/tetra-entities/tests/test_llc_bs.rs` | 114 | `panic!("expected TlaTlDataIndBl with piggyback payload");` |
 | panic! | Test-Assertion | Test | `crates/tetra-entities/tests/test_llc_bs.rs` | 163 | `panic!("expected TMA-UNITDATA request");` |
+| panic! | Test-Assertion | Test | `crates/tetra-entities/tests/test_managed_call_control_protocol.rs` | 31 | `other => panic!("unexpected command: {other:?}"),` |
+| panic! | Test-Assertion | Test | `crates/tetra-entities/tests/test_managed_call_control_protocol.rs` | 79 | `other => panic!("unexpected response: {other:?}"),` |
 | panic! | Test-Assertion | Test | `crates/tetra-entities/tests/test_mm_bs.rs` | 119 | `.unwrap_or_else(\|\| panic!("expected a D-LOCATION-UPDATE-COMMAND for the unknown ISSI, got {} msgs", msgs.len()));` |
 | panic! | Test-Assertion | Test | `crates/tetra-entities/tests/test_mm_bs.rs` | 208 | `panic!(` |
 | panic! | Test-Assertion | Test | `crates/tetra-entities/tests/test_mm_bs.rs` | 275 | `panic!(` |

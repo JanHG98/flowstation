@@ -170,7 +170,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 209,
+      "line": 363,
       "path": "crates/tetra-entities/src/cmce/cmce_bs.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -178,7 +178,7 @@
     },
     {
       "category": "panic!",
-      "line": 337,
+      "line": 491,
       "path": "crates/tetra-entities/src/cmce/cmce_bs.rs",
       "scope": "Runtime",
       "severity": "prüfen",
@@ -186,7 +186,7 @@
     },
     {
       "category": "unreachable!",
-      "line": 346,
+      "line": 500,
       "path": "crates/tetra-entities/src/cmce/cmce_bs.rs",
       "scope": "Runtime",
       "severity": "prüfen",
@@ -194,7 +194,7 @@
     },
     {
       "category": "panic!",
-      "line": 355,
+      "line": 509,
       "path": "crates/tetra-entities/src/cmce/cmce_bs.rs",
       "scope": "Runtime",
       "severity": "prüfen",
@@ -202,7 +202,7 @@
     },
     {
       "category": "panic!",
-      "line": 359,
+      "line": 513,
       "path": "crates/tetra-entities/src/cmce/cmce_bs.rs",
       "scope": "Runtime",
       "severity": "prüfen",
@@ -3023,6 +3023,22 @@
       "scope": "Test",
       "severity": "Test-Assertion",
       "text": "panic!(\"expected TMA-UNITDATA request\");"
+    },
+    {
+      "category": "panic!",
+      "line": 31,
+      "path": "crates/tetra-entities/tests/test_managed_call_control_protocol.rs",
+      "scope": "Test",
+      "severity": "Test-Assertion",
+      "text": "other => panic!(\"unexpected command: {other:?}\"),"
+    },
+    {
+      "category": "panic!",
+      "line": 79,
+      "path": "crates/tetra-entities/tests/test_managed_call_control_protocol.rs",
+      "scope": "Test",
+      "severity": "Test-Assertion",
+      "text": "other => panic!(\"unexpected response: {other:?}\"),"
     },
     {
       "category": "panic!",
@@ -6269,7 +6285,7 @@
       "phase": "Phase 5/13 – Call Control/SS",
       "relevance": "Calls, Single-/Multi-Site",
       "runtime": "offene Hinweise",
-      "runtime_references": 14,
+      "runtime_references": 16,
       "test_references": 3,
       "tests": "vorhanden"
     },
@@ -6288,7 +6304,7 @@
       "phase": "Phase 5/13 – Call Control/SS",
       "relevance": "Calls, Single-/Multi-Site",
       "runtime": "offene Hinweise",
-      "runtime_references": 13,
+      "runtime_references": 14,
       "test_references": 3,
       "tests": "vorhanden"
     },
@@ -8540,7 +8556,7 @@
     }
   ],
   "summary": {
-    "gap_count": 715,
+    "gap_count": 717,
     "pdu_count": 77,
     "sap_primitive_count": 130,
     "state_type_count": 18

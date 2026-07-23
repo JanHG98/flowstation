@@ -27,8 +27,8 @@ CMCE,URelease,Uplink,crates/tetra-pdus/src/cmce/pdus/u_release.rs,vorhanden,vorh
 CMCE,USdsData,Uplink,crates/tetra-pdus/src/cmce/pdus/u_sds_data.rs,teilweise,vorhanden,blockiert,vorhanden,vorhanden,11,2,unreachable!,SDS/Status,Phase 5/13 – Call Control/SS
 CMCE,USetup,Uplink,crates/tetra-pdus/src/cmce/pdus/u_setup.rs,vorhanden,vorhanden,offene Hinweise,vorhanden,vorhanden,31,12,FIXME;TODO,"Calls, Single-/Multi-Site",Phase 5/13 – Call Control/SS
 CMCE,UStatus,Uplink,crates/tetra-pdus/src/cmce/pdus/u_status.rs,vorhanden,vorhanden,offene Hinweise,vorhanden,vorhanden,15,5,FIXME;TODO,SDS/Status,Phase 5/13 – Call Control/SS
-CMCE,UTxCeased,Uplink,crates/tetra-pdus/src/cmce/pdus/u_tx_ceased.rs,vorhanden,vorhanden,offene Hinweise,vorhanden,vorhanden,14,3,FIXME;TODO,"Calls, Single-/Multi-Site",Phase 5/13 – Call Control/SS
-CMCE,UTxDemand,Uplink,crates/tetra-pdus/src/cmce/pdus/u_tx_demand.rs,vorhanden,vorhanden,offene Hinweise,vorhanden,vorhanden,13,3,FIXME;TODO,"Calls, Single-/Multi-Site",Phase 5/13 – Call Control/SS
+CMCE,UTxCeased,Uplink,crates/tetra-pdus/src/cmce/pdus/u_tx_ceased.rs,vorhanden,vorhanden,offene Hinweise,vorhanden,vorhanden,16,3,FIXME;TODO,"Calls, Single-/Multi-Site",Phase 5/13 – Call Control/SS
+CMCE,UTxDemand,Uplink,crates/tetra-pdus/src/cmce/pdus/u_tx_demand.rs,vorhanden,vorhanden,offene Hinweise,vorhanden,vorhanden,14,3,FIXME;TODO,"Calls, Single-/Multi-Site",Phase 5/13 – Call Control/SS
 LLC,BlAck,bidirektional,crates/tetra-pdus/src/llc/pdus/bl_ack.rs,vorhanden,vorhanden,ohne offensichtlichen Blocker,vorhanden,vorhanden,15,2,,"Single-Site, Funkzugang",Phase 0 – Protokollfundament
 LLC,BlAdata,bidirektional,crates/tetra-pdus/src/llc/pdus/bl_adata.rs,vorhanden,vorhanden,ohne offensichtlichen Blocker,fehlt,nicht nachgewiesen,11,0,,"Single-Site, Funkzugang",Phase 0 – Protokollfundament
 LLC,BlData,bidirektional,crates/tetra-pdus/src/llc/pdus/bl_data.rs,vorhanden,vorhanden,ohne offensichtlichen Blocker,fehlt,nicht nachgewiesen,13,0,,"Single-Site, Funkzugang",Phase 0 – Protokollfundament

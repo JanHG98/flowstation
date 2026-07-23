@@ -6,7 +6,7 @@
 | Subscriber Core | Teilnehmer, Geräte, Profile, Berechtigungen, TBS-Synchronisation | Sperren, Import, Gerätezuordnung; im Testpaket bewusst offen ohne Tokens |
 | Group Core | GSSI, Mitglieder, Affiliationen, DGNA | DGNA, Gruppenrechte, Löschung; im Testpaket bewusst offen ohne Tokens |
 | Mobility Core | Registrierungen, Zellen, Migration, Recovery | Kontextfreigabe, Handover-Abbruch |
-| Call Control | Calls, Legs, Floor, Priorität, Restore | Call beenden, Floor entziehen, Pre-emption |
+| Call Control | Calls, Legs, Floor, Priorität, Restore | Call beenden, Floor entziehen, Pre-emption; im Testpaket bewusst offen ohne Tokens |
 | Media Switch | Streams, Jitter, Routing, Gateways | Stream trennen, Route ändern |
 | SDS Router | Nachrichten, Queues, Zustelltrace | Nachricht senden, Retry, Queue löschen |
 | Packet Core | PDP Contexts, NSAPI, Durchsatz | Context trennen, Zugriff sperren |

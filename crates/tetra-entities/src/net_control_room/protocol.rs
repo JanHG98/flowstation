@@ -89,6 +89,12 @@ pub struct ControlRoomNodeCapabilities {
     /// Node accepts centrally managed group definitions, memberships and DGNA commands.
     #[serde(default)]
     pub group_policy: bool,
+    /// Node accepts central call-leg, release and floor-control commands.
+    #[serde(default)]
+    pub call_control: bool,
+    /// Node can export and install CMCE call-restore contexts.
+    #[serde(default)]
+    pub call_restore_context: bool,
 }
 
 impl ControlRoomNodeCapabilities {
@@ -110,6 +116,8 @@ impl ControlRoomNodeCapabilities {
             multi_pdch: cfg.cell.wap_ip_sndcp_profile_enabled(),
             subscriber_policy: true,
             group_policy: true,
+            call_control: true,
+            call_restore_context: true,
         }
     }
 }

@@ -125,6 +125,14 @@ impl<T: NetworkTransport> ControlWorker<T> {
             | ControlCommand::SubscriberAccessPolicyApply { .. }
             | ControlCommand::GroupAccessPolicyApply { .. }
             | ControlCommand::GroupDgnaApply { .. } => TetraEntity::Mm,
+            ControlCommand::CallControlGroupStart { .. }
+            | ControlCommand::CallControlIndividualStart { .. }
+            | ControlCommand::CallControlRelease { .. }
+            | ControlCommand::CallControlFloorRequest { .. }
+            | ControlCommand::CallControlFloorRelease { .. }
+            | ControlCommand::CallControlExportRestoreContext { .. }
+            | ControlCommand::CallControlImportRestoreContext { .. }
+            | ControlCommand::CallControlRemoveRestoreContext { .. } => TetraEntity::Cmce,
             ControlCommand::RestartService => TetraEntity::Cmce,
             ControlCommand::ShutdownService => TetraEntity::Cmce,
             ControlCommand::AddLiveSds { .. } => TetraEntity::Cmce,

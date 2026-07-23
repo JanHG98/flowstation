@@ -7,7 +7,7 @@
 
 use bitcode::{Decode, Encode};
 use serde::{Deserialize, Serialize};
-
+use tetra_core::{TdmaTime, tetra_entities::TetraEntity};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Encode, Decode, Serialize, Deserialize)]
 pub enum MobilityClientState {
@@ -55,6 +55,72 @@ pub struct MobilityContextPayload {
     pub tei: Option<u64>,
 }
 
+
+
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Encode, Decode, Serialize, Deserialize)]
+pub enum ManagedCallKind {
+    Group,
+    Individual,
+}
+
+#[derive(Debug, Clone, Encode, Decode, Serialize, Deserialize)]
+pub struct ManagedNetworkCircuitCallPayload {
+    pub source_issi: u32,
+    pub destination: u32,
+    pub number: String,
+    pub priority: u8,
+    pub service: u8,
+    pub mode: u8,
+    pub duplex: u8,
+    pub method: u8,
+    pub communication: u8,
+    pub grant: u8,
+    pub permission: u8,
+    pub timeout: u8,
+    pub ownership: u8,
+    pub queued: u8,
+}
+
+#[derive(Debug, Clone, Encode, Decode, Serialize, Deserialize)]
+pub enum ManagedCallRestoreContextPayload {
+    Group {
+        call_id: u16,
+        dest_gssi: u32,
+        source_issi: u32,
+        floor_holder: Option<u32>,
+        priority: u8,
+        call_timeout: u8,
+        created_at: TdmaTime,
+        tx_active: bool,
+        communication_type: u8,
+        circuit_mode_type: u8,
+        speech_service: Option<u8>,
+        etee_encrypted: bool,
+        origin_local_caller: Option<u32>,
+        network_entity: Option<TetraEntity>,
+        network_uuid: Option<String>,
+    },
+    Individual {
+        call_id: u16,
+        calling_issi: u32,
+        called_issi: u32,
+        simplex_duplex: bool,
+        priority: u8,
+        call_timeout: u8,
+        active_timer_started: Option<TdmaTime>,
+        floor_holder: Option<u32>,
+        called_over_network: bool,
+        calling_over_network: bool,
+        network_uuid: Option<String>,
+        network_entity: Option<TetraEntity>,
+        network_call: Option<ManagedNetworkCircuitCallPayload>,
+        communication_type: u8,
+        circuit_mode_type: u8,
+        speech_service: Option<u8>,
+        etee_encrypted: bool,
+    },
+}
 
 #[derive(Debug, Clone, Encode, Decode, Serialize, Deserialize)]
 pub struct GroupPolicyDefinition {
@@ -197,6 +263,58 @@ pub enum ControlCommand {
         force: bool,
     },
 
+    /// Start or join a centrally coordinated network group-call leg on this TBS.
+    CallControlGroupStart {
+        handle: u32,
+        operation_id: String,
+        source_issi: u32,
+        gssi: u32,
+        priority: u8,
+    },
+
+    /// Start an incoming individual-call leg towards a subscriber registered on this TBS.
+    CallControlIndividualStart {
+        handle: u32,
+        operation_id: String,
+        calling_issi: u32,
+        called_issi: u32,
+        simplex: bool,
+        priority: u8,
+    },
+
+    /// Release one local CMCE call leg.
+    CallControlRelease {
+        handle: u32,
+        call_id: u16,
+        cause: u8,
+    },
+
+    /// Request or forcibly hand over the floor on a local group/simplex leg.
+    CallControlFloorRequest {
+        handle: u32,
+        call_id: u16,
+        source_issi: u32,
+        force: bool,
+    },
+
+    /// Release the current floor on a local group/simplex leg.
+    CallControlFloorRelease {
+        handle: u32,
+        call_id: u16,
+    },
+
+    /// Export the active local call as a transferable restore context.
+    CallControlExportRestoreContext { handle: u32, call_id: u16 },
+
+    /// Install a restore context before the subscriber arrives on the target TBS.
+    CallControlImportRestoreContext {
+        handle: u32,
+        context: ManagedCallRestoreContextPayload,
+    },
+
+    /// Remove a previously installed restore context.
+    CallControlRemoveRestoreContext { handle: u32, call_id: u16 },
+
     /// Placeholder command A.
     CommandA { handle: u32, parameter: u32 },
     /// Placeholder command B.
@@ -259,6 +377,50 @@ pub enum ControlResponse {
         allow_all: bool,
         allowed_count: u32,
         disconnected_count: u32,
+        message: String,
+    },
+    CallControlLegStarted {
+        handle: u32,
+        operation_id: String,
+        kind: ManagedCallKind,
+        success: bool,
+        call_id: Option<u16>,
+        timeslot: Option<u8>,
+        usage: Option<u8>,
+        floor_holder: Option<u32>,
+        message: String,
+    },
+    CallControlLegReleased {
+        handle: u32,
+        call_id: u16,
+        success: bool,
+        message: String,
+    },
+    CallControlFloorChanged {
+        handle: u32,
+        call_id: u16,
+        success: bool,
+        floor_holder: Option<u32>,
+        queued_issi: Option<u32>,
+        message: String,
+    },
+    CallControlRestoreContextExported {
+        handle: u32,
+        call_id: u16,
+        found: bool,
+        context: Option<ManagedCallRestoreContextPayload>,
+        message: String,
+    },
+    CallControlRestoreContextImported {
+        handle: u32,
+        call_id: u16,
+        success: bool,
+        message: String,
+    },
+    CallControlRestoreContextRemoved {
+        handle: u32,
+        call_id: u16,
+        success: bool,
         message: String,
     },
 }

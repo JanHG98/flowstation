@@ -1,0 +1,28 @@
+name: SWMI Core Call Control
+
+on:
+  push:
+    paths:
+      - 'system-backend/call-control/**'
+      - 'crates/tetra-entities/src/net_control/**'
+      - 'crates/tetra-entities/src/net_control_room/**'
+      - 'crates/tetra-entities/src/cmce/**'
+      - 'crates/tetra-entities/tests/test_managed_call_control_protocol.rs'
+      - 'tools/check_call_control.py'
+  pull_request:
+
+jobs:
+  call-control:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - run: python3 -S tools/check_call_control.py
+      - run: cargo fmt --all -- --check
+      - run: cargo test -p tetra-entities --test test_managed_call_control_protocol
+      - run: cargo test -p tetra-entities
+      - run: cargo test -p netcore-call-control
+      - run: cargo build --release -p netcore-call-control
+      - run: cargo clippy -p tetra-entities -p netcore-call-control --all-targets -- -D warnings

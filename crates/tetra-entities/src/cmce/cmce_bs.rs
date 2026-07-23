@@ -113,6 +113,160 @@ impl CmceBs {
                     msg: SapMsgInner::MmDgnaRequest { issi, gssi, attach },
                 });
             }
+            ControlCommand::CallControlGroupStart {
+                handle,
+                operation_id,
+                source_issi,
+                gssi,
+                priority,
+            } => {
+                let result = cc.control_start_group_call(
+                    queue,
+                    &operation_id,
+                    source_issi,
+                    gssi,
+                    priority,
+                );
+                if let Some(cep) = responder {
+                    cep.respond(ControlResponse::CallControlLegStarted {
+                        handle,
+                        operation_id,
+                        kind: result.kind,
+                        success: result.success,
+                        call_id: result.call_id,
+                        timeslot: result.timeslot,
+                        usage: result.usage,
+                        floor_holder: result.floor_holder,
+                        message: result.message,
+                    });
+                }
+            }
+            ControlCommand::CallControlIndividualStart {
+                handle,
+                operation_id,
+                calling_issi,
+                called_issi,
+                simplex,
+                priority,
+            } => {
+                let result = cc.control_start_individual_call(
+                    queue,
+                    &operation_id,
+                    calling_issi,
+                    called_issi,
+                    simplex,
+                    priority,
+                );
+                if let Some(cep) = responder {
+                    cep.respond(ControlResponse::CallControlLegStarted {
+                        handle,
+                        operation_id,
+                        kind: result.kind,
+                        success: result.success,
+                        call_id: result.call_id,
+                        timeslot: result.timeslot,
+                        usage: result.usage,
+                        floor_holder: result.floor_holder,
+                        message: result.message,
+                    });
+                }
+            }
+            ControlCommand::CallControlRelease { handle, call_id, cause } => {
+                let result = cc.control_release_call(queue, call_id, cause);
+                if let Some(cep) = responder {
+                    cep.respond(ControlResponse::CallControlLegReleased {
+                        handle,
+                        call_id,
+                        success: result.success,
+                        message: result.message,
+                    });
+                }
+            }
+            ControlCommand::CallControlFloorRequest {
+                handle,
+                call_id,
+                source_issi,
+                force,
+            } => {
+                let result = cc.control_request_floor(
+                    queue,
+                    call_id,
+                    source_issi,
+                    force,
+                );
+                if let Some(cep) = responder {
+                    cep.respond(ControlResponse::CallControlFloorChanged {
+                        handle,
+                        call_id,
+                        success: result.success,
+                        floor_holder: result.floor_holder,
+                        queued_issi: result.queued_issi,
+                        message: result.message,
+                    });
+                }
+            }
+            ControlCommand::CallControlFloorRelease { handle, call_id } => {
+                let result = cc.control_release_floor(queue, call_id);
+                if let Some(cep) = responder {
+                    cep.respond(ControlResponse::CallControlFloorChanged {
+                        handle,
+                        call_id,
+                        success: result.success,
+                        floor_holder: result.floor_holder,
+                        queued_issi: result.queued_issi,
+                        message: result.message,
+                    });
+                }
+            }
+            ControlCommand::CallControlExportRestoreContext { handle, call_id } => {
+                let context = cc.control_export_restore_context(call_id);
+                let found = context.is_some();
+                if let Some(cep) = responder {
+                    cep.respond(ControlResponse::CallControlRestoreContextExported {
+                        handle,
+                        call_id,
+                        found,
+                        context,
+                        message: if found {
+                            "restore context exported".to_string()
+                        } else {
+                            "call or restore context not found".to_string()
+                        },
+                    });
+                }
+            }
+            ControlCommand::CallControlImportRestoreContext { handle, context } => {
+                let call_id = match &context {
+                    crate::net_control::ManagedCallRestoreContextPayload::Group { call_id, .. }
+                    | crate::net_control::ManagedCallRestoreContextPayload::Individual { call_id, .. } => *call_id,
+                };
+                let result = cc.control_import_restore_context(context);
+                if let Some(cep) = responder {
+                    cep.respond(ControlResponse::CallControlRestoreContextImported {
+                        handle,
+                        call_id,
+                        success: result.is_ok(),
+                        message: result
+                            .map(|_| "restore context installed".to_string())
+                            .unwrap_or_else(|error| error),
+                    });
+                }
+            }
+            ControlCommand::CallControlRemoveRestoreContext { handle, call_id } => {
+                let removed = cc.control_remove_restore_context(call_id);
+                if let Some(cep) = responder {
+                    cep.respond(ControlResponse::CallControlRestoreContextRemoved {
+                        handle,
+                        call_id,
+                        success: removed,
+                        message: if removed {
+                            "restore context removed".to_string()
+                        } else {
+                            "restore context not found".to_string()
+                        },
+                    });
+                }
+            }
             ControlCommand::RestartService => {
                 tracing::info!("CMCE: RestartService requested");
                 crate::service_control::schedule_service_action(

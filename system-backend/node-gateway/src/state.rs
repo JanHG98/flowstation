@@ -551,6 +551,8 @@ mod tests {
                 multi_pdch: true,
                 subscriber_policy: true,
                 group_policy: true,
+                call_control: true,
+                call_restore_context: true,
             },
             started_at: now_iso(),
         }

@@ -1,0 +1,29 @@
+[server]
+bind = "0.0.0.0:8120"
+history_limit = 2000
+
+[node_gateway]
+url = "ws://10.0.1.XX:8080/ws/backend"
+reconnect_secs = 5
+
+[storage]
+database_path = "/var/lib/netcore-call-control/calls.json"
+backup_path = "/var/lib/netcore-call-control/calls.json.bak"
+
+[calls]
+command_timeout_secs = 30
+restore_timeout_secs = 45
+reconcile_interval_secs = 2
+auto_target_affiliated_nodes = true
+release_partial_start_on_failure = false
+allow_operator_force_floor = true
+
+[security]
+mode = "open_lab"
+allow_remote_management = true
+
+[limits]
+max_body_bytes = 2097152
+max_calls = 100000
+max_legs_per_call = 1024
+max_pending_commands = 20000

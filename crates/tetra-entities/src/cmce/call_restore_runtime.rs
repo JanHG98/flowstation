@@ -13,6 +13,10 @@ use tetra_saps::control::{
     enums::{circuit_mode_type::CircuitModeType, communication_type::CommunicationType},
 };
 
+use crate::net_control::{
+    ManagedCallRestoreContextPayload, ManagedNetworkCircuitCallPayload,
+};
+
 /// Bounded lifetime of an unanswered CMCE restore transaction (~6.1 seconds).
 pub const CALL_RESTORE_TRANSACTION_TIMEOUT_SLOTS: i32 = 432;
 /// Keep terminal results briefly so retransmitted U-RESTORE requests are idempotent.
@@ -140,6 +144,161 @@ impl CallRestoreContext {
                 is_party && other_party_ssi.map_or(true, |ssi| ssi == peer)
             }
         }
+    }
+
+    /// Convert the local runtime context into the protocol-only payload transported
+    /// through Node Gateway and Call Control. No media frames or secrets are included.
+    pub fn to_managed_payload(&self) -> ManagedCallRestoreContextPayload {
+        match self {
+            Self::Group(context) => {
+                let (origin_local_caller, network_entity, network_uuid) = match &context.origin {
+                    GroupRestoreOrigin::Local { caller } => (Some(caller.ssi), None, None),
+                    GroupRestoreOrigin::Network { network_entity, brew_uuid } => {
+                        (None, Some(*network_entity), Some(brew_uuid.to_string()))
+                    }
+                };
+                ManagedCallRestoreContextPayload::Group {
+                    call_id: context.call_id,
+                    dest_gssi: context.dest_gssi,
+                    source_issi: context.source_issi,
+                    floor_holder: context.floor_holder,
+                    priority: context.priority,
+                    call_timeout: context.call_timeout.into_raw() as u8,
+                    created_at: context.created_at,
+                    tx_active: context.tx_active,
+                    communication_type: context.communication_type.into_raw() as u8,
+                    circuit_mode_type: context.circuit_mode_type.into_raw() as u8,
+                    speech_service: context.speech_service,
+                    etee_encrypted: context.etee_encrypted,
+                    origin_local_caller,
+                    network_entity,
+                    network_uuid,
+                }
+            }
+            Self::Individual(context) => ManagedCallRestoreContextPayload::Individual {
+                call_id: context.call_id,
+                calling_issi: context.calling_addr.ssi,
+                called_issi: context.called_addr.ssi,
+                simplex_duplex: context.simplex_duplex,
+                priority: context.priority,
+                call_timeout: context.call_timeout.into_raw() as u8,
+                active_timer_started: context.active_timer_started,
+                floor_holder: context.floor_holder,
+                called_over_network: context.called_over_brew,
+                calling_over_network: context.calling_over_brew,
+                network_uuid: context.brew_uuid.map(|value| value.to_string()),
+                network_entity: context.network_entity,
+                network_call: context.network_call.as_ref().map(network_call_to_payload),
+                communication_type: context.communication_type.into_raw() as u8,
+                circuit_mode_type: context.circuit_mode_type.into_raw() as u8,
+                speech_service: context.speech_service,
+                etee_encrypted: context.etee_encrypted,
+            },
+        }
+    }
+
+    /// Rebuild a local restore context from the central protocol payload. Invalid
+    /// enum values or UUIDs are rejected instead of silently selecting a service.
+    pub fn from_managed_payload(payload: ManagedCallRestoreContextPayload) -> Result<Self, String> {
+        match payload {
+            ManagedCallRestoreContextPayload::Group {
+                call_id, dest_gssi, source_issi, floor_holder, priority, call_timeout,
+                created_at, tx_active, communication_type, circuit_mode_type,
+                speech_service, etee_encrypted, origin_local_caller, network_entity,
+                network_uuid,
+            } => {
+                let call_timeout = CallTimeout::try_from(call_timeout as u64)
+                    .map_err(|_| format!("invalid call timeout {call_timeout}"))?;
+                let communication_type = CommunicationType::try_from(communication_type as u64)
+                    .map_err(|_| format!("invalid communication type {communication_type}"))?;
+                let circuit_mode_type = CircuitModeType::try_from(circuit_mode_type as u64)
+                    .map_err(|_| format!("invalid circuit mode {circuit_mode_type}"))?;
+                let origin = if let Some(caller) = origin_local_caller {
+                    GroupRestoreOrigin::Local {
+                        caller: TetraAddress::new(caller, SsiType::Issi),
+                    }
+                } else {
+                    let network_entity = network_entity.unwrap_or(TetraEntity::AudioPlayer);
+                    let brew_uuid = match network_uuid {
+                        Some(value) => uuid::Uuid::parse_str(&value)
+                            .map_err(|error| format!("invalid network UUID: {error}"))?,
+                        None => uuid::Uuid::new_v4(),
+                    };
+                    GroupRestoreOrigin::Network { network_entity, brew_uuid }
+                };
+                Ok(Self::Group(GroupCallRestoreContext {
+                    call_id, dest_gssi, source_issi, floor_holder, priority, call_timeout,
+                    created_at, tx_active, origin, communication_type, circuit_mode_type,
+                    speech_service, etee_encrypted,
+                }))
+            }
+            ManagedCallRestoreContextPayload::Individual {
+                call_id, calling_issi, called_issi, simplex_duplex, priority,
+                call_timeout, active_timer_started, floor_holder, called_over_network,
+                calling_over_network, network_uuid, network_entity, network_call,
+                communication_type, circuit_mode_type, speech_service, etee_encrypted,
+            } => {
+                let call_timeout = CallTimeout::try_from(call_timeout as u64)
+                    .map_err(|_| format!("invalid call timeout {call_timeout}"))?;
+                let communication_type = CommunicationType::try_from(communication_type as u64)
+                    .map_err(|_| format!("invalid communication type {communication_type}"))?;
+                let circuit_mode_type = CircuitModeType::try_from(circuit_mode_type as u64)
+                    .map_err(|_| format!("invalid circuit mode {circuit_mode_type}"))?;
+                let brew_uuid = match network_uuid {
+                    Some(value) => Some(uuid::Uuid::parse_str(&value)
+                        .map_err(|error| format!("invalid network UUID: {error}"))?),
+                    None => None,
+                };
+                Ok(Self::Individual(IndividualCallRestoreContext {
+                    call_id,
+                    calling_addr: TetraAddress::new(calling_issi, SsiType::Issi),
+                    called_addr: TetraAddress::new(called_issi, SsiType::Issi),
+                    simplex_duplex, priority, call_timeout, active_timer_started,
+                    floor_holder, called_over_brew: called_over_network,
+                    calling_over_brew: calling_over_network, brew_uuid, network_entity,
+                    network_call: network_call.map(network_call_from_payload),
+                    communication_type, circuit_mode_type, speech_service, etee_encrypted,
+                }))
+            }
+        }
+    }
+}
+
+fn network_call_to_payload(call: &NetworkCircuitCall) -> ManagedNetworkCircuitCallPayload {
+    ManagedNetworkCircuitCallPayload {
+        source_issi: call.source_issi,
+        destination: call.destination,
+        number: call.number.clone(),
+        priority: call.priority,
+        service: call.service,
+        mode: call.mode,
+        duplex: call.duplex,
+        method: call.method,
+        communication: call.communication,
+        grant: call.grant,
+        permission: call.permission,
+        timeout: call.timeout,
+        ownership: call.ownership,
+        queued: call.queued,
+    }
+}
+
+fn network_call_from_payload(call: ManagedNetworkCircuitCallPayload) -> NetworkCircuitCall {
+    NetworkCircuitCall {
+        source_issi: call.source_issi,
+        destination: call.destination,
+        number: call.number,
+        priority: call.priority,
+        service: call.service,
+        mode: call.mode,
+        duplex: call.duplex,
+        method: call.method,
+        communication: call.communication,
+        grant: call.grant,
+        permission: call.permission,
+        timeout: call.timeout,
+        ownership: call.ownership,
+        queued: call.queued,
     }
 }
 
