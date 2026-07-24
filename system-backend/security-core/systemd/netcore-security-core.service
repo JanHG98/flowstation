@@ -1,0 +1,27 @@
+[Unit]
+Description=NetCore Security Core (OPEN LAB)
+After=network-online.target netcore-node-gateway.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=netcore-security
+Group=netcore-security
+ExecStart=/usr/local/bin/netcore-security-core --config /etc/netcore/security-core.toml
+Restart=on-failure
+RestartSec=2
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+ReadWritePaths=/var/lib/netcore-security-core
+UMask=0077
+Environment=RUST_LOG=netcore_security_core=info
+
+[Install]
+WantedBy=multi-user.target

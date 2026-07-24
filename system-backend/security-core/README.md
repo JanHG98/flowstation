@@ -1,37 +1,54 @@
-# Security Core
+# NetCore-Tetra Security Core
 
-## Zweck
+Zentraler SwMI-Dienst für Authentisierung, Security-Class-Policy, kurzlebige DCK-Kontexte, Teilnehmer-/Gerätesperren, Alarme und Audit.
 
-Der Security Core verwaltet Authentisierung, Sicherheitsrichtlinien und Sicherheitszustände.
+> **OPEN LAB:** Port 8180 besitzt aktuell keine Benutzerkonten, Tokens oder TLS. Nur im isolierten Testnetz betreiben.
 
-## Kernaufgaben
+## Funktionsumfang
 
-- Teilnehmer- und Infrastrukturauthentisierung
-- Security-Class-Verhandlung und Sicherheitsprofile
-- Geräte- und Teilnehmersperren
-- Kryptografische Kontexte, Alarme und Audit
+- persistente Sicherheitsprofile je ISSI
+- globale und teilnehmerspezifische Security-Class-Policy
+- Aushandlung von Class 1, 2 und 3; Class 3 erzwingt immer Authentisierung und DCK-Workflow
+- Challenge/Response-State-Machine mit TTL, Retry und Lockout
+- DCK-Erzeugung und Edge-Installationsworkflow für Class 3
+- Disable/Enable für Teilnehmer und Equipment, inklusive optionaler automatischer Sperre nach Fehlversuchen
+- Kontext- und DCK-Widerruf
+- Security-Alarme und append-orientiertes Audit
+- Node-Gateway-Abhängigkeitsstatus
+- eigene WebUI, REST API, OpenAPI, Metrics, Liveness und Readiness
+- Crash-Recovery ohne Persistieren von Rohgeheimnissen
 
-## Abgrenzung
+## Bewusste Sicherheitsgrenze
 
-Langfristige Netz- und Gruppenschlüssel liegen in der KMF.
+Der enthaltene Provider `lab_hmac_sha256` ist ein **Testprovider** für End-to-End-Integration. Er implementiert nicht die proprietären beziehungsweise normativen TETRA-Authentisierungsalgorithmen und ersetzt keine KMF. Das folgende KMF-Paket liefert die echten Provider-Hooks und langfristige Schlüsselverwaltung.
 
-## WebUI zur Verwaltung
+Normale Managementantworten enthalten niemals Seed, Challenge, erwartete Antwort oder DCK. Der getrennte Edge-Claim-Pfad darf dieses Material nur kurzlebig an den TBS-Adapter ausgeben.
 
-Der Security Core erhält eine besonders restriktiv geschützte Verwaltungsoberfläche.
+## Start
 
-### Geplante Ansichten
+```bash
+cargo run -p netcore-security-core -- \
+  --config system-backend/security-core/config/security-core.example.toml
+```
 
-- Authentisierungsereignisse und Fehler
-- Security Classes und Teilnehmerprofile
-- gesperrte beziehungsweise deaktivierte Geräte
-- Richtlinien, Crypto-Context-Metadaten und Audit
-- Abhängigkeit zur KMF
+WebUI: `http://127.0.0.1:8180/`
 
-### Kritische Aktionen
+```bash
+curl http://127.0.0.1:8180/health/live
+curl http://127.0.0.1:8180/health/ready
+curl http://127.0.0.1:8180/api/v1/status
+```
 
-- Gerät oder Teilnehmer sperren und freigeben
-- Security Policy ändern
-- Authentisierungskontext widerrufen
-- Sicherheitsalarm quittieren
+## Betriebsmodi
 
-Die WebUI zeigt niemals Rohschlüssel oder geheime Challenge-Materialien an. Erhöhte Rechte, erneute Anmeldung und optional MFA sind für schreibende Aktionen vorgesehen.
+- `shadow`: State Machines, Policy und Audit laufen, Entscheidungen sind beobachtend.
+- `authoritative`: Edge-Aktionen für Challenge, DCK, Sperre und Widerruf werden verbindlich bereitgestellt.
+
+## Dokumentation
+
+- [Architektur](docs/architecture.md)
+- [Authentisierungs-State-Machine](docs/auth-state-machine.md)
+- [Edge-Protokoll](docs/edge-protocol.md)
+- [Lab-Provider und Geheimnisse](docs/lab-provider-secret-handling.md)
+- [Open Lab](docs/open-lab-mode.md)
+- [LXC-Deployment](docs/lxc-deployment.md)

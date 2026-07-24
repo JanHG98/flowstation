@@ -1,0 +1,35 @@
+name: SwMI Core Security Core
+
+on:
+  push:
+    paths:
+      - 'system-backend/security-core/**'
+      - 'tools/check_security_core.py'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.github/workflows/swmi-core-security-core.yml'
+  pull_request:
+    paths:
+      - 'system-backend/security-core/**'
+      - 'tools/check_security_core.py'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: python3 tools/check_security_core.py
+      - run: cargo fmt --all -- --check
+      - run: cargo test -p netcore-security-core
+      - run: cargo clippy -p netcore-security-core --all-targets -- -D warnings

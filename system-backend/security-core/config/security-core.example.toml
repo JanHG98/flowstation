@@ -1,0 +1,57 @@
+[server]
+bind = "0.0.0.0:8180"
+history_limit = 5000
+
+[node_gateway]
+url = "ws://127.0.0.1:8080/ws/backend"
+reconnect_secs = 5
+observe_nodes = true
+
+[storage]
+database_path = "/var/lib/netcore-security-core/state.json"
+backup_path = "/var/lib/netcore-security-core/state.json.bak"
+lab_seed_path = "/var/lib/netcore-security-core/lab-auth.seed"
+
+[policy]
+# shadow: policy decisions and edge actions are visible but not authoritative.
+# authoritative: the Security Core may issue challenge/install/revoke/disable actions.
+operating_mode = "shadow"
+default_security_class = 1
+minimum_security_class = 1
+authentication_required = true
+allow_class1_fallback = true
+reject_unknown_subscribers = false
+disable_after_failures = false
+
+[authentication]
+# Integration-test provider only. The following KMF package replaces this with
+# real TETRA authentication/key-provider hooks.
+provider = "lab_hmac_sha256"
+challenge_bytes = 16
+response_bytes = 16
+challenge_ttl_secs = 30
+max_attempts = 3
+lockout_secs = 300
+issue_dck_on_success = true
+
+[dck]
+key_bytes = 16
+ttl_secs = 3600
+rotate_before_secs = 300
+max_active_per_subscriber = 2
+
+[security]
+# OPEN LAB: management API/WebUI intentionally have no users, tokens or TLS.
+mode = "open_lab"
+allow_remote_management = true
+# This endpoint is only for the TBS edge adapter. It is deliberately separate
+# from normal management views and must stay inside the isolated lab network.
+expose_ephemeral_edge_material = true
+
+[limits]
+max_body_bytes = 1048576
+max_profiles = 100000
+max_contexts = 20000
+max_actions = 20000
+max_alarms = 20000
+max_audit = 100000

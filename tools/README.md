@@ -41,3 +41,5 @@ python3 tools/check_packet_core.py
 ```
 
 Der Check prüft Paketstruktur, Workspace-Einbindung, TBS-Control-Routing, SNDCP-Endpunkt, WebUI/API und Open-Lab-Konfiguration des Packet-Core-LXC.
+
+- `check_security_core.py`: prüft Security-Core-Paket, Open-Lab-Konfiguration, Secret-Redaction, WebUI-JavaScript und Installationsskripte.

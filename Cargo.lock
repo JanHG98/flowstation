@@ -1210,6 +1210,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "netcore-security-core"
+version = "1.3.0"
+dependencies = [
+ "chrono",
+ "clap",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tetra-entities",
+ "toml",
+ "tracing",
+ "tracing-subscriber",
+ "tungstenite",
+ "uuid",
+]
+
+[[package]]
 name = "netcore-sds-router"
 version = "1.3.0"
 dependencies = [

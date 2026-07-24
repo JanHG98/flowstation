@@ -108,7 +108,15 @@ warning = "OPEN LAB: no authentication, no tokens and no TLS; every reachable cl
 [[services]]
 name = "security-core"
 webui = true
+scheme = "http"
+management_port = 8180
+security_mode = "open_lab"
+token_auth = false
+tls = false
 restricted_management_network = true
+raw_secret_display = false
+depends_on = ["node-gateway"]
+warning = "OPEN LAB: no authentication, no tokens and no TLS; every reachable client may alter security policy, disable subscribers and claim ephemeral edge material"
 
 [[services]]
 name = "kmf"

@@ -47,8 +47,11 @@ Die bisher umgesetzten LXC-Dienste starten im ausdrücklich markierten `open_lab
 - `call-control`: umgesetzt, logische Gruppen-/Einzelrufe, Floor Control und Call Restore mit WebUI
 - `media-switch`: umgesetzt, netzweites Routing gepackter TETRA-Sprachframes mit WebUI
 - `recorder`: umgesetzt, passiver Vollframe-Tap, Archiv, Integrität, Retention und WebUI
-- `sds-router`: umgesetzt, zentrale SDS-/Statusvermittlung, Store-and-forward, TTL, Retry, Dead Letter, Protokoll-ID-Routing und WebUI
-- nächster Core-Dienst: `packet-core`
+- `sds-router`: umgesetzt, zentrale SDS-/Statusvermittlung, Store-and-forward, Routing und WebUI
+- `packet-core`: umgesetzt, PDP-/NSAPI-Kontexte, Fragmentierung, Mobility Anchor und WebUI
+- `ip-gateway`: umgesetzt, TUN, Routing, Firewall/NAT, DNS/WAP-Test und WebUI
+- `security-core`: umgesetzt, Security-Class-Policy, Challenge/Response, DCK-Kontexte, Sperren, Alarm/Audit und WebUI
+- nächster Security-Baustein: `kmf`
 - nächster Media-Baustein: `media-library` / Audio Player auf Basis des stabilen Recorder-Formats
 
 # 2. Normative Grundlage
@@ -1315,3 +1318,12 @@ Der Packet Core bleibt Eigentümer der SNDCP-State-Machine, Fragmentierung, Reas
 ## Sicherheitsstatus
 
 Der Dienst läuft in der aktuellen Teststufe als `open_lab`: keine Anmeldung, keine Token und kein TLS. Im Authoritative-Modus besitzt er bewusst `CAP_NET_ADMIN`, `CAP_NET_RAW` und `CAP_NET_BIND_SERVICE`; deshalb ausschließlich im isolierten Labor betreiben.
+
+
+---
+
+## Package I – Security Core
+
+Der Security Core ist als eigenständiger LXC-Dienst auf Port 8180 umgesetzt. Er verwaltet Sicherheitsprofile, Security-Class-Aushandlung, Challenge/Response-Kontexte, kurzlebige DCK-Installationsaufträge, Teilnehmer-/Gerätesperren, Alarme und Audit. Das Management bleibt in der aktuellen Testphase `open_lab`; Rohgeheimnisse sind aus normalen Managementpfaden ausgeschlossen.
+
+Der mitgelieferte HMAC-Lab-Provider ist nur für Integrationstests vorgesehen. Langzeitschlüssel, normative Authentisierungsprovider, CCK/GCK/SCK und OTAR folgen getrennt im nächsten Baustein `kmf`.
