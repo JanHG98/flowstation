@@ -1,0 +1,11 @@
+global:
+  resolve_timeout: 5m
+route:
+  receiver: open-lab-log
+  group_by: [alertname, service, instance]
+  group_wait: 10s
+  group_interval: 1m
+  repeat_interval: 4h
+receivers:
+  - name: open-lab-log
+# No mail, webhook, pager or secret-bearing receiver is configured in open-lab.

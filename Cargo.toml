@@ -26,6 +26,7 @@ members = [
     "system-backend/security-core",
     "system-backend/kmf",
     "system-backend/transit",
+    "system-backend/observability",
     #"bins/bluestation-telemetry",
     #"bins/bluestation-control",
     #"bins/pdu-tool",
@@ -132,5 +133,5 @@ bitcode = "0.6.9"
 tungstenite = { version = "0.24", features = ["rustls-tls-native-roots"] }
 uuid = { version = "1", features = ["v4"] }
 ctrlc = "3"
-chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+chrono = { version = "0.4", default-features = false, features = ["clock", "std", "serde"] }
 chrono-tz = "0.10"

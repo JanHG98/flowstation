@@ -1,0 +1,38 @@
+[Unit]
+Description=NetCore-Tetra Observability and NMS management plane
+Documentation=file:/opt/netcore-observability/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=netcore-observability
+Group=netcore-observability
+ExecStart=/opt/netcore-observability/bin/netcore-observability --config /etc/netcore/observability.toml
+Restart=on-failure
+RestartSec=2
+TimeoutStopSec=20
+WorkingDirectory=/var/lib/netcore-observability
+StateDirectory=netcore-observability
+RuntimeDirectory=netcore-observability
+ConfigurationDirectory=netcore
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+ReadWritePaths=/var/lib/netcore-observability
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+[Install]
+WantedBy=multi-user.target

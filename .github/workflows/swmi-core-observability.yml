@@ -1,0 +1,38 @@
+name: SWMI Core Observability
+
+on:
+  push:
+    paths:
+      - "system-backend/observability/**"
+      - "tools/check_observability.py"
+      - "Docs/SWMI_CORE_1_PACKAGE_M_OBSERVABILITY.md"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/swmi-core-observability.yml"
+  pull_request:
+    paths:
+      - "system-backend/observability/**"
+      - "tools/check_observability.py"
+      - "Docs/SWMI_CORE_1_PACKAGE_M_OBSERVABILITY.md"
+      - "Cargo.toml"
+      - "Cargo.lock"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Static package check
+        run: python3 tools/check_observability.py
+      - name: Format
+        run: cargo fmt --all -- --check
+      - name: Build
+        run: cargo build --locked --package netcore-observability
+      - name: Test
+        run: cargo test --locked --package netcore-observability
+      - name: Clippy
+        run: cargo clippy --locked --package netcore-observability --all-targets -- -D warnings

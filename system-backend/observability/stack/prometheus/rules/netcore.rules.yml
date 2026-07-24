@@ -1,0 +1,20 @@
+groups:
+  - name: netcore-service-health
+    rules:
+      - alert: NetCoreTargetDown
+        expr: up{job=~"netcore-.*"} == 0
+        for: 30s
+        labels:
+          severity: critical
+          system: netcore-tetra
+        annotations:
+          summary: "NetCore target {{ $labels.instance }} is down"
+          description: "Prometheus cannot scrape {{ $labels.job }} / {{ $labels.instance }}."
+      - alert: NetCoreObservabilityHasUnacknowledgedAlerts
+        expr: netcore_observability_alerts_unacknowledged > 0
+        for: 1m
+        labels:
+          severity: warning
+          system: netcore-tetra
+        annotations:
+          summary: "The NetCore NMS has unacknowledged alarms"

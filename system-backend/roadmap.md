@@ -54,7 +54,7 @@ Die bisher umgesetzten LXC-Dienste starten im ausdrücklich markierten `open_lab
 - `kmf`: umgesetzt, CCK/GCK/SCK-Lifecycle, Key-Versionen, Crypto Periods, Rotation, versiegelte OTAR-Aktionen, Backup und WebUI
 - `transit`: umgesetzt, NetCore-native Regionen-/Peervermittlung, Routing, Failover und WebUI
 - `control-room`: umgesetzt, zentrale Bedien-/Lageebene mit Service-Federation, Incident-Journal, Schichtbuch und Browser-WebUI
-- nächster Betriebsbaustein: `observability` / NMS
+- Observability/NMS als eigener LXC-Dienst umgesetzt; nächster Baustein: `application-gateway`
 - nächster Media-Baustein: `media-library` / Audio Player auf Basis des stabilen Recorder-Formats
 
 # 2. Normative Grundlage
@@ -1291,7 +1291,7 @@ Die lokale TLPD-Runtime ist abgeschlossen. Sie bleibt auf der TBS und stellt Dia
 
 Die lokale Funkstack- und Mobility-Grundlage ist abgeschlossen. Darauf aufbauend sind die zentralen Open-Lab-Dienste `node-gateway`, `mobility-core`, `subscriber-core`, `group-core`, `call-control`, `media-switch`, `recorder`, `sds-router`, `packet-core`, `ip-gateway`, `security-core` und `kmf` jeweils mit eigener WebUI umgesetzt.
 
-Der Packet Core hält PDP-/NSAPI-Zustand, Reassembly und Downlink-Queue. Der IP Gateway koppelt dessen vollständige IPv4-N-PDUs über Linux-TUN an Routing, nftables, NAT, DNS sowie lokale WAP-/Testdienste und erzeugt direkt PCAP-Dateien. Security Core und KMF ergänzen Security-Class-Policy, Authentisierungs-/DCK-Orchestrierung sowie CCK/GCK/SCK-Lifecycle, Crypto Periods, Rotation, nodegebundene OTAR-Envelopes und sichere Vault-Backups. Transit und Control Room sind als zentrale LXC-Dienste umgesetzt. Als nächster Betriebsbaustein folgt `observability` / NMS.
+Der Packet Core hält PDP-/NSAPI-Zustand, Reassembly und Downlink-Queue. Der IP Gateway koppelt dessen vollständige IPv4-N-PDUs über Linux-TUN an Routing, nftables, NAT, DNS sowie lokale WAP-/Testdienste und erzeugt direkt PCAP-Dateien. Security Core und KMF ergänzen Security-Class-Policy, Authentisierungs-/DCK-Orchestrierung sowie CCK/GCK/SCK-Lifecycle, Crypto Periods, Rotation, nodegebundene OTAR-Envelopes und sichere Vault-Backups. Transit und Control Room sind als zentrale LXC-Dienste umgesetzt. Observability/NMS ist als eigener LXC-Dienst mit Prometheus-, Grafana-, Loki- und Alertmanager-Konfiguration umgesetzt. Als nächster Baustein folgt `application-gateway`.
 
 Bis zur späteren Security-Phase bleiben alle genannten LXC-Dienste ausdrücklich `open_lab`: keine Tokens, keine Benutzerkonten und kein TLS. Das ist nur für das isolierte Testnetz vorgesehen.
 
@@ -1359,4 +1359,4 @@ Der bestehende Control Room ist als eigenständiger LXC-Dienst mit Browser-WebUI
 
 Der Control Room bleibt Presentation und Operator Plane. Er ist keine zweite Teilnehmer-, Gruppen-, Mobility-, Call-, SDS-, Packet- oder Schlüssel-Datenbank und enthält keinen beliebigen Schreibproxy zu Fachsystemen.
 
-Die aktuelle Stufe bleibt `open_lab`: keine Anmeldung, keine Tokens, kein Node-Token und kein TLS. Nächster Baustein ist `observability` / NMS.
+Die aktuelle Stufe bleibt `open_lab`: keine Anmeldung, keine Tokens, kein Node-Token und kein TLS. Observability/NMS ist umgesetzt. Nächster Baustein ist `application-gateway`.

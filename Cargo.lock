@@ -1193,6 +1193,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "netcore-observability"
+version = "1.3.0"
+dependencies = [
+ "chrono",
+ "clap",
+ "serde",
+ "serde_json",
+ "toml",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
 name = "netcore-packet-core"
 version = "1.3.0"
 dependencies = [

@@ -1,0 +1,18 @@
+[Unit]
+Description=Forward local journald entries to NetCore Observability (open lab)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+Environment=NETCORE_OBSERVABILITY_LOG_ENDPOINT=http://127.0.0.1:8210/api/v1/logs/ingest
+Environment=NETCORE_SERVICE_NAME=replace-me
+ExecStart=/usr/local/lib/netcore-observability/journal_forwarder.py
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

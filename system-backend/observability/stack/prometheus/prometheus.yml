@@ -1,0 +1,35 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    system: netcore-tetra
+    environment: open-lab
+rule_files:
+  - /etc/prometheus/rules/*.yml
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["127.0.0.1:9093"]
+scrape_configs:
+  - job_name: netcore-observability
+    static_configs:
+      - targets: ["127.0.0.1:8210"]
+  # Replace localhost addresses with the management IPs/DNS names of the LXC services.
+  - job_name: netcore-services
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - "127.0.0.1:8080"
+          - "127.0.0.1:8090"
+          - "127.0.0.1:8100"
+          - "127.0.0.1:8110"
+          - "127.0.0.1:8120"
+          - "127.0.0.1:8130"
+          - "127.0.0.1:8140"
+          - "127.0.0.1:8150"
+          - "127.0.0.1:8160"
+          - "127.0.0.1:8170"
+          - "127.0.0.1:8180"
+          - "127.0.0.1:8190"
+          - "127.0.0.1:8200"
+          - "127.0.0.1:9010"
