@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:netcore:schema:problem-details:v1",
+  "title": "NetCore Problem Details",
+  "type": "object",
+  "required": ["type", "title", "status"],
+  "properties": {
+    "type": {"type": "string"},
+    "title": {"type": "string", "minLength": 1},
+    "status": {"type": "integer", "minimum": 400, "maximum": 599},
+    "detail": {"type": "string"},
+    "instance": {"type": "string"},
+    "code": {"type": "string", "pattern": "^[a-z0-9_.-]+$"},
+    "correlation_id": {"type": "string"}
+  },
+  "additionalProperties": true
+}

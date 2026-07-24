@@ -1,0 +1,151 @@
+# NetCore Control Room LXC – Open Lab
+
+[server]
+bind = "0.0.0.0:9010"
+node_path = "/node"
+ui_path = "/ui"
+history_limit = 2000
+
+[persistence]
+enabled = true
+database_path = "/var/lib/netcore-control-room/control-room.sqlite3"
+persist_events = true
+persist_noisy_events = false
+load_recent_limit = 2000
+
+[auth]
+# Current laboratory phase: deliberately no login, no node token and no TLS.
+enabled = false
+allow_health_unauthenticated = true
+node_token_env = ""
+bootstrap_username_env = ""
+bootstrap_password_env = ""
+bootstrap_role = "admin"
+
+[federation]
+enabled = true
+poll_interval_secs = 5
+request_timeout_ms = 1200
+failure_threshold = 3
+fetch_summaries = true
+
+[operations]
+state_path = "/var/lib/netcore-control-room/operations.json"
+backup_path = "/var/lib/netcore-control-room/operations.json.bak"
+auto_service_incidents = true
+incident_limit = 5000
+shift_log_limit = 10000
+
+# Replace 10.0.20.x with the addresses of the respective LXCs.
+[[services]]
+name = "node-gateway"
+display_name = "Node Gateway"
+kind = "edge"
+base_url = "http://10.0.20.10:8080"
+health_live = "/health/live"
+health_ready = "/health/ready"
+summary_path = "/api/v1/status"
+webui_path = "/"
+critical = true
+enabled = true
+
+[[services]]
+name = "mobility-core"
+display_name = "Mobility Core"
+kind = "core"
+base_url = "http://10.0.20.11:8090"
+critical = true
+
+[[services]]
+name = "subscriber-core"
+display_name = "Subscriber Core"
+kind = "core"
+base_url = "http://10.0.20.12:8100"
+critical = true
+
+[[services]]
+name = "group-core"
+display_name = "Group Core"
+kind = "core"
+base_url = "http://10.0.20.13:8110"
+critical = true
+
+[[services]]
+name = "call-control"
+display_name = "Call Control"
+kind = "core"
+base_url = "http://10.0.20.14:8120"
+critical = true
+
+[[services]]
+name = "media-switch"
+display_name = "Media Switch"
+kind = "media"
+base_url = "http://10.0.20.15:8130"
+critical = true
+
+[[services]]
+name = "recorder"
+display_name = "Recorder"
+kind = "media"
+base_url = "http://10.0.20.16:8140"
+critical = false
+
+[[services]]
+name = "sds-router"
+display_name = "SDS Router"
+kind = "data"
+base_url = "http://10.0.20.17:8150"
+critical = false
+
+[[services]]
+name = "packet-core"
+display_name = "Packet Core"
+kind = "data"
+base_url = "http://10.0.20.18:8160"
+critical = false
+
+[[services]]
+name = "ip-gateway"
+display_name = "IP Gateway"
+kind = "data"
+base_url = "http://10.0.20.19:8170"
+critical = false
+
+[[services]]
+name = "security-core"
+display_name = "Security Core"
+kind = "security"
+base_url = "http://10.0.20.20:8180"
+critical = true
+
+[[services]]
+name = "kmf"
+display_name = "KMF"
+kind = "security"
+base_url = "http://10.0.20.21:8190"
+critical = false
+
+[[services]]
+name = "transit"
+display_name = "Transit"
+kind = "interworking"
+base_url = "http://10.0.20.22:8200"
+critical = false
+
+[[services]]
+name = "application-gateway"
+display_name = "Application Gateway"
+kind = "application"
+base_url = "http://10.0.20.23:8220"
+critical = false
+
+[[services]]
+name = "media-library"
+display_name = "Media Library"
+kind = "media"
+base_url = "http://10.0.20.24:8230"
+critical = false
+
+[directory]
+hide_infrastructure = true

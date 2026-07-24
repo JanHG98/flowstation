@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>NetCore Shared WebUI Demo</title>
+  <link rel="stylesheet" href="../assets/netcore.css">
+</head>
+<body>
+  <div class="nc-shell">
+    <header class="nc-header">
+      <div class="nc-brand">NetCore-Tetra <small>Shared WebUI Demo</small></div>
+      <span class="nc-open-lab">OPEN LAB</span>
+    </header>
+    <main class="nc-main">
+      <div class="nc-toolbar"><button class="nc-button" id="confirm">Gefährliche Aktion</button></div>
+      <section class="nc-grid">
+        <article class="nc-card"><h2>Node Gateway</h2><div id="up"></div><p class="nc-muted">Gemeinsame Status- und Kartenbausteine ohne Frontend-Buildserver.</p></article>
+        <article class="nc-card"><h2>Packet Core</h2><div id="degraded"></div><p class="nc-muted">Die Assets können direkt eingebettet oder installiert werden.</p></article>
+      </section>
+    </main>
+  </div>
+  <script type="module">
+    import { confirmAction, statusBadge, toast } from "../assets/netcore.js";
+    document.querySelector("#up").append(statusBadge("up", "Betriebsbereit"));
+    document.querySelector("#degraded").append(statusBadge("degraded", "Eingeschränkt"));
+    document.querySelector("#confirm").addEventListener("click", async () => {
+      if (await confirmAction({ title: "Wirklich ausführen?", message: "Dies ist nur die gemeinsame Dialog-Komponente.", dangerous: true })) toast("Bestätigt", "warning");
+    });
+  </script>
+</body>
+</html>

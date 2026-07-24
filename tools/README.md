@@ -53,3 +53,11 @@ Der Check prüft Paketstruktur, Workspace-Einbindung, TBS-Control-Routing, SNDCP
 - `check_observability.py`: prüft Observability/NMS, Targets, Alarmregeln, Stack-Konfigurationen, WebUI und LXC-Skripte.
 
 - `check_application_gateway.py`: prüft Application-Gateway-Paket, Connectorinventar, Routing/Vorlagen, Secret-Redaction, TTS-WAV-Grenze, WebUI und LXC-Skripte.
+
+## Shared Platform
+
+```bash
+python3 tools/check_shared_platform.py
+```
+
+Prüft die gemeinsamen Rust-Crates, JSON-Schemas, build-freien WebUI-Assets, Open-Lab-Service-Registry, Deployment-Inventar, gerenderte Konfigurationen und den Offline-Vertragstest.

@@ -1,0 +1,7 @@
+[Unit]
+Description=NetCore-Tetra packet and media data-plane target
+Wants=netcore-media-switch.service netcore-recorder.service netcore-packet-core.service netcore-ip-gateway.service netcore-media-library.service
+After=network-online.target
+
+[Install]
+WantedBy=multi-user.target

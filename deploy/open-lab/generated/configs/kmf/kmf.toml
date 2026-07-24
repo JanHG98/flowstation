@@ -1,0 +1,51 @@
+[server]
+bind = "0.0.0.0:8190"
+history_limit = 5000
+
+[storage]
+database_path = "/var/lib/netcore-kmf/state.json"
+vault_path = "/var/lib/netcore-kmf/vault.json"
+master_key_path = "/var/lib/netcore-kmf/master.key"
+backup_dir = "/var/lib/netcore-kmf/backups"
+bootstrap_dir = "/var/lib/netcore-kmf/bootstrap"
+
+[policy]
+# shadow: Workflows and OTAR actions are prepared but never released to an Edge.
+# authoritative: approved and queued OTAR actions can be claimed by matching TBS nodes.
+operating_mode = "shadow"
+default_key_bytes = 16
+default_crypto_period_secs = 86400
+rotation_lead_secs = 3600
+require_dual_approval = true
+allow_overlapping_crypto_periods = true
+auto_retire_predecessor = true
+
+[vault]
+# Integration provider only. It keeps encrypted blobs separate from metadata.
+# It is not a production HSM and the lab envelope is not a certified cipher.
+provider = "lab_file_vault"
+master_key_bytes = 32
+fsync = true
+# hsm_library = "/usr/lib/x86_64-linux-gnu/pkcs11/vendor.so"
+# hsm_slot = 0
+
+[otar]
+action_ttl_secs = 600
+max_attempts = 5
+retry_backoff_secs = 15
+max_claim_batch = 100
+
+[security]
+# Current isolated test-lab stage: deliberately no login, token or TLS.
+mode = "open_lab"
+allow_remote_management = true
+# Hard invariant in this package. Setting true is rejected by design later if introduced.
+expose_raw_keys = false
+
+[limits]
+max_body_bytes = 1048576
+max_keys = 100000
+max_nodes = 10000
+max_jobs = 100000
+max_actions = 500000
+max_audit = 100000

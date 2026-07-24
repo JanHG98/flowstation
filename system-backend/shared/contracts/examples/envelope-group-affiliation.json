@@ -1,0 +1,22 @@
+{
+  "meta": {
+    "message_id": "b958f339-4f4f-4fd9-8d2d-71447ef1f302",
+    "api_version": "netcore.v1",
+    "kind": "event",
+    "source": "group-core",
+    "destination": "call-control",
+    "created_at": "2026-07-24T04:00:00Z",
+    "correlation_id": "914ee405-6e9c-4ef9-9f20-e64f2ca2a50c",
+    "trace": {"trace_id": "fcbcd2e8575945398df09c23e34d41f1", "span_id": "37b7a9dde7bf44b8"},
+    "delivery": "idempotent_at_least_once",
+    "idempotency_key": "affiliation:4010001:2000:42"
+  },
+  "payload_type": "group.affiliation.changed.v1",
+  "payload": {
+    "issi": 4010001,
+    "gssi": 2000,
+    "affiliated": true,
+    "node_id": "tbs-04010001",
+    "revision": 42
+  }
+}

@@ -1,0 +1,60 @@
+[server]
+bind = "0.0.0.0:8230"
+public_base_url = "http://10.0.20.24:8230"
+max_body_bytes = 100663296
+
+[security]
+mode = "open_lab"
+token_auth = false
+tls = false
+allow_remote_management = true
+allow_delete = true
+allow_url_import = true
+# Required for imports from the local Application Gateway and Recorder in the lab.
+allow_private_import_urls = true
+
+[storage]
+root = "/var/lib/netcore-media-library/assets"
+state_file = "/var/lib/netcore-media-library/state.json"
+temp_root = "/var/lib/netcore-media-library/tmp"
+backup_root = "/var/lib/netcore-media-library/backups"
+# Mount the NFS share before using Archive in the WebUI. The service never treats
+# the archive as the live playout source.
+archive_root = "/mnt/nfs-share/Media-Library"
+max_asset_bytes = 67108864
+max_total_bytes = 21474836480
+fsync_imports = true
+
+[runtime]
+# shadow prepares jobs but suppresses Media Switch injection.
+# authoritative injects validated 35-byte frames into an existing media session.
+operating_mode = "shadow"
+worker_interval_ms = 500
+probe_interval_secs = 15
+import_timeout_secs = 20
+max_assets = 10000
+max_jobs = 2000
+max_events = 5000
+max_audit_records = 10000
+max_attempts = 3
+frame_interval_ms = 60
+auto_approve_tts = false
+
+[codec]
+frame_bytes = 35
+# The command is executed directly without a shell. {input} and {output} are
+# replaced with paths owned by the service.
+ffmpeg_command = [
+  "/usr/bin/ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+  "-i", "{input}", "-ac", "1", "-ar", "8000", "-c:a", "pcm_s16le", "{output}"
+]
+# Optional native helper commands. They must produce/consume packed 35-byte
+# TETRA speech service 0 frames. Empty means WAV/MP3 assets remain preview-only,
+# while imported .tacelp assets remain directly playable.
+encoder_command = []
+decoder_command = []
+
+[dependencies]
+media_switch_base_url = "http://10.0.20.15:8130"
+recorder_base_url = "http://10.0.20.16:8140"
+application_gateway_base_url = "http://10.0.20.23:8220"

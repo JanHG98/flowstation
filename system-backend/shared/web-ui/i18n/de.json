@@ -1,0 +1,15 @@
+{
+  "common.overview": "Übersicht",
+  "common.health": "Zustand & Abhängigkeiten",
+  "common.audit": "Ereignisse & Audit",
+  "common.configuration": "Konfiguration",
+  "common.maintenance": "Wartung",
+  "common.api": "API",
+  "common.about": "Über",
+  "common.open_lab": "OPEN LAB – keine Anmeldung, Tokens oder TLS",
+  "status.up": "Betriebsbereit",
+  "status.degraded": "Eingeschränkt",
+  "status.down": "Nicht erreichbar",
+  "action.cancel": "Abbrechen",
+  "action.confirm": "Bestätigen"
+}

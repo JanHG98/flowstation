@@ -27,10 +27,15 @@ Die dienstspezifischen Verwaltungsbereiche stehen in:
 Docs/BACKEND_WEBUI_SERVICE_MATRIX.md
 ```
 
-Gemeinsame UI-Bausteine werden zukünftig unter folgendem Pfad entwickelt:
+Gemeinsame UI-Bausteine und Service-Verträge liegen unter:
 
 ```text
-system-backend/shared/web-ui/
+system-backend/shared/
+├── contracts/
+├── service-common/
+├── database-common/
+├── telemetry-common/
+└── web-ui/
 ```
 
 ## Standardzugriff
@@ -66,3 +71,8 @@ Bereits deploybar sind:
 - `control-room/` – zentrale Bedien-, Lage-, Incident- und Schichtbuchebene, Port 9010
 
 Alle enthalten Rust-Runtime, REST-API, eigene WebUI, systemd-Unit und Installationsskripte. In der aktuellen Teststufe laufen sie bewusst im deutlich markierten `open_lab`-Modus ohne Tokens, Benutzeranmeldung oder TLS.
+
+
+## Gemeinsame Plattform und Deployment
+
+Die gemeinsame Vertragsversion ist `netcore.v1`. Die inventory-gesteuerte Open-Lab-LXC-Integration liegt unter `deploy/open-lab/` und erzeugt Servicekatalog, gerenderte Konfigurationen, Portliste, Hosts-Datei und Abhängigkeitsgraph. `shared/` bleibt eine Library und ist kein zusätzlicher Container.

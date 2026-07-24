@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:netcore:schema:health:v1",
+  "title": "NetCore Health Document",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["status", "service", "instance", "observed_at", "dependencies"],
+  "properties": {
+    "status": {"enum": ["up", "degraded", "down", "unknown"]},
+    "service": {"type": "string", "minLength": 1},
+    "instance": {"type": "string", "minLength": 1},
+    "observed_at": {"type": "string", "format": "date-time"},
+    "dependencies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "status"],
+        "properties": {
+          "name": {"type": "string"},
+          "status": {"enum": ["up", "degraded", "down", "unknown"]},
+          "latency_ms": {"type": "integer", "minimum": 0},
+          "detail": {"type": "string"},
+          "checked_at": {"type": "string", "format": "date-time"}
+        }
+      }
+    },
+    "build": {"$ref": "service-descriptor.schema.json#/$defs/buildInfo"}
+  }
+}

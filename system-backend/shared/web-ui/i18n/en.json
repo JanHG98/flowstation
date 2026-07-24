@@ -1,0 +1,15 @@
+{
+  "common.overview": "Overview",
+  "common.health": "Health & dependencies",
+  "common.audit": "Events & audit",
+  "common.configuration": "Configuration",
+  "common.maintenance": "Maintenance",
+  "common.api": "API",
+  "common.about": "About",
+  "common.open_lab": "OPEN LAB – no login, tokens or TLS",
+  "status.up": "Ready",
+  "status.degraded": "Degraded",
+  "status.down": "Unavailable",
+  "action.cancel": "Cancel",
+  "action.confirm": "Confirm"
+}

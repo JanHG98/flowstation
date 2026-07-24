@@ -1,0 +1,8 @@
+[Unit]
+Description=NetCore-Tetra complete backend target (co-located lab only)
+Documentation=file:/opt/netcore-tetra-src/Docs/OPEN_LAB_LXC_DEPLOYMENT.md
+Wants=netcore-node-gateway.service netcore-subscriber-core.service netcore-group-core.service netcore-mobility-core.service netcore-call-control.service netcore-media-switch.service netcore-recorder.service netcore-sds-router.service netcore-packet-core.service netcore-ip-gateway.service netcore-security-core.service netcore-kmf.service netcore-transit.service netcore-application-gateway.service netcore-media-library.service netcore-control-room.service netcore-observability.service
+After=network-online.target
+
+[Install]
+WantedBy=multi-user.target

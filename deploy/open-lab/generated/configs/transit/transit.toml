@@ -1,0 +1,57 @@
+[server]
+bind = "0.0.0.0:8200"
+history_limit = 5000
+
+[storage]
+database_path = "/var/lib/netcore-transit/state.json"
+backup_path = "/var/lib/netcore-transit/state.json.bak"
+
+[region]
+region_id = "region-a"
+swmi_id = "netcore-swmi-a"
+display_name = "NetCore Region A"
+advertised_endpoint = "http://10.0.20.22:8200"
+protocol_version = "netcore-transit-v1"
+operating_mode = "shadow"
+capabilities = [
+  "mobility",
+  "individual_call",
+  "group_call",
+  "sds",
+  "media",
+  "supplementary_service",
+]
+
+[routing]
+max_hops = 8
+dedupe_ttl_secs = 900
+session_idle_ttl_secs = 3600
+route_stale_secs = 120
+prefer_direct_region_peer = true
+allow_transitive_routing = true
+allow_dynamic_peers = false
+fail_closed_on_loop = true
+
+[transport]
+connect_timeout_ms = 2000
+io_timeout_ms = 5000
+heartbeat_interval_secs = 5
+peer_timeout_secs = 20
+retry_backoff_secs = 3
+max_attempts = 5
+max_batch = 100
+
+[security]
+mode = "open_lab"
+allow_remote_management = true
+tls = false
+token_auth = false
+
+[limits]
+max_body_bytes = 4194304
+max_peers = 1000
+max_routes = 100000
+max_sessions = 100000
+max_envelopes = 500000
+max_local_deliveries = 500000
+max_events = 100000

@@ -56,7 +56,10 @@ Die bisher umgesetzten LXC-Dienste starten im ausdrücklich markierten `open_lab
 - `control-room`: umgesetzt, zentrale Bedien-/Lageebene mit Service-Federation, Incident-Journal, Schichtbuch und Browser-WebUI
 - `observability`: umgesetzt, zentrale Metrik-, Log-, Trace-, Alarm- und Diagnoseebene mit WebUI
 - `application-gateway`: umgesetzt, Connector Registry, Webhooks, Routing, Vorlagen, Retry/Dead Letter, Secret-Redaction und TTS-Orchestrierung mit WebUI
-- nächster Baustein: `media-library` / Audio Player auf Basis des stabilen Recorder- und TTS-Formats
+- `media-library`: umgesetzt, Audio-Assets, Vorschau, Freigabe, TETRA-Cache, Archiv und kontrolliertes Playout mit WebUI
+- `shared`: umgesetzt, gemeinsame `netcore.v1`-Verträge, Service-/Persistenz-/Telemetrie-Bausteine und build-freies WebUI-Kit
+- `deploy/open-lab`: umgesetzt, inventory-gesteuerte LXC-Integration, URL-Rendering, Dependency-Plan, PDF-freies Bundle und SSH-Deployment
+- nächste Gesamtphase: reale LXC-Integrationstests, End-to-End-Vertragstests, On-Air-Validierung und anschließend produktive Management-Absicherung
 
 # 2. Normative Grundlage
 

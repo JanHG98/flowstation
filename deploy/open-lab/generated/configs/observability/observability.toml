@@ -1,0 +1,265 @@
+[server]
+bind = "0.0.0.0:8210"
+history_limit = 5000
+max_body_bytes = 4194304
+
+[storage]
+state_path = "/var/lib/netcore-observability/state.json"
+backup_path = "/var/lib/netcore-observability/state.json.bak"
+diagnostic_dir = "/var/lib/netcore-observability/diagnostics"
+
+[security]
+mode = "open_lab"
+token_auth = false
+tls = false
+allow_remote_management = true
+warning_banner = "OPEN LAB: no login, no tokens and no TLS. Isolated management network only."
+
+[collection]
+scrape_interval_secs = 15
+request_timeout_ms = 2000
+max_response_bytes = 2097152
+scrape_on_start = true
+ingest_logs = true
+ingest_traces = true
+
+[retention]
+metric_retention_secs = 86400
+log_retention_secs = 604800
+trace_retention_secs = 86400
+audit_retention_secs = 2592000
+max_series = 10000
+max_samples_per_series = 5760
+max_logs = 100000
+max_spans = 50000
+max_alerts = 10000
+max_audit_records = 50000
+
+[stack]
+prometheus_url = "http://127.0.0.1:9090"
+grafana_url = "http://127.0.0.1:3000"
+loki_url = "http://127.0.0.1:3100"
+alertmanager_url = "http://127.0.0.1:9093"
+prometheus_ready_path = "/-/ready"
+grafana_ready_path = "/api/health"
+loki_ready_path = "/ready"
+alertmanager_ready_path = "/-/ready"
+
+# In a distributed LXC setup, replace 127.0.0.1 with the management IP or DNS
+# name of each service container. All endpoints are deliberately HTTP-only in
+# this open-lab package.
+
+[[targets]]
+target_id = "node-gateway"
+display_name = "Node Gateway"
+service = "node-gateway"
+base_url = "http://10.0.20.10:8080"
+metrics_path = "/metrics"
+live_path = "/health/live"
+ready_path = "/health/ready"
+enabled = true
+labels = { environment = "open-lab", component = "node-gateway" }
+
+[[targets]]
+target_id = "mobility-core"
+display_name = "Mobility Core"
+service = "mobility-core"
+base_url = "http://10.0.20.11:8090"
+metrics_path = "/metrics"
+live_path = "/health/live"
+ready_path = "/health/ready"
+enabled = true
+labels = { environment = "open-lab", component = "mobility-core" }
+
+[[targets]]
+target_id = "subscriber-core"
+display_name = "Subscriber Core"
+service = "subscriber-core"
+base_url = "http://10.0.20.12:8100"
+metrics_path = "/metrics"
+live_path = "/health/live"
+ready_path = "/health/ready"
+enabled = true
+labels = { environment = "open-lab", component = "subscriber-core" }
+
+[[targets]]
+target_id = "group-core"
+display_name = "Group Core"
+service = "group-core"
+base_url = "http://10.0.20.13:8110"
+metrics_path = "/metrics"
+live_path = "/health/live"
+ready_path = "/health/ready"
+enabled = true
+labels = { environment = "open-lab", component = "group-core" }
+
+[[targets]]
+target_id = "call-control"
+display_name = "Call Control"
+service = "call-control"
+base_url = "http://10.0.20.14:8120"
+metrics_path = "/metrics"
+live_path = "/health/live"
+ready_path = "/health/ready"
+enabled = true
+labels = { environment = "open-lab", component = "call-control" }
+
+[[targets]]
+target_id = "media-switch"
+display_name = "Media Switch"
+service = "media-switch"
+base_url = "http://10.0.20.15:8130"
+metrics_path = "/metrics"
+live_path = "/health/live"
+ready_path = "/health/ready"
+enabled = true
+labels = { environment = "open-lab", component = "media-switch" }
+
+[[targets]]
+target_id = "recorder"
+display_name = "Recorder"
+service = "recorder"
+base_url = "http://10.0.20.16:8140"
+metrics_path = "/metrics"
+live_path = "/health/live"
+ready_path = "/health/ready"
+enabled = true
+labels = { environment = "open-lab", component = "recorder" }
+
+[[targets]]
+target_id = "sds-router"
+display_name = "SDS Router"
+service = "sds-router"
+base_url = "http://10.0.20.17:8150"
+metrics_path = "/metrics"
+live_path = "/health/live"
+ready_path = "/health/ready"
+enabled = true
+labels = { environment = "open-lab", component = "sds-router" }
+
+[[targets]]
+target_id = "packet-core"
+display_name = "Packet Core"
+service = "packet-core"
+base_url = "http://10.0.20.18:8160"
+metrics_path = "/metrics"
+live_path = "/health/live"
+ready_path = "/health/ready"
+enabled = true
+labels = { environment = "open-lab", component = "packet-core" }
+
+[[targets]]
+target_id = "ip-gateway"
+display_name = "IP Gateway"
+service = "ip-gateway"
+base_url = "http://10.0.20.19:8170"
+metrics_path = "/metrics"
+live_path = "/health/live"
+ready_path = "/health/ready"
+enabled = true
+labels = { environment = "open-lab", component = "ip-gateway" }
+
+[[targets]]
+target_id = "security-core"
+display_name = "Security Core"
+service = "security-core"
+base_url = "http://10.0.20.20:8180"
+metrics_path = "/metrics"
+live_path = "/health/live"
+ready_path = "/health/ready"
+enabled = true
+labels = { environment = "open-lab", component = "security-core" }
+
+[[targets]]
+target_id = "kmf"
+display_name = "KMF"
+service = "kmf"
+base_url = "http://10.0.20.21:8190"
+metrics_path = "/metrics"
+live_path = "/health/live"
+ready_path = "/health/ready"
+enabled = true
+labels = { environment = "open-lab", component = "kmf" }
+
+[[targets]]
+target_id = "transit"
+display_name = "Transit"
+service = "transit"
+base_url = "http://10.0.20.22:8200"
+metrics_path = "/metrics"
+live_path = "/health/live"
+ready_path = "/health/ready"
+enabled = true
+labels = { environment = "open-lab", component = "transit" }
+
+[[targets]]
+target_id = "application-gateway"
+display_name = "Application Gateway"
+service = "application-gateway"
+base_url = "http://10.0.20.23:8220"
+metrics_path = "/metrics"
+live_path = "/health/live"
+ready_path = "/health/ready"
+enabled = true
+labels = { environment = "open-lab", component = "application-gateway" }
+
+[[targets]]
+target_id = "media-library"
+display_name = "Media Library"
+service = "media-library"
+base_url = "http://10.0.20.24:8230"
+metrics_path = "/metrics"
+live_path = "/health/live"
+ready_path = "/health/ready"
+enabled = true
+labels = { environment = "open-lab", component = "media-library" }
+
+[[targets]]
+target_id = "control-room"
+display_name = "Control Room"
+service = "control-room"
+base_url = "http://10.0.20.25:9010"
+metrics_path = "/metrics"
+live_path = "/health/live"
+ready_path = "/health/ready"
+enabled = true
+labels = { environment = "open-lab", component = "control-room" }
+
+[[alert_rules]]
+rule_id = "target-down"
+name = "Target down"
+description = "A monitored target does not answer its liveness endpoint"
+metric = "netcore_observability_target_up"
+comparator = "<"
+threshold = 1.0
+for_secs = 30
+severity = "critical"
+enabled = true
+labels = { source = "netcore-observability" }
+annotations = { runbook = "Check service process, network path and /health/live" }
+
+[[alert_rules]]
+rule_id = "target-not-ready"
+name = "Target not ready"
+description = "A service is alive but reports not ready"
+metric = "netcore_observability_target_ready"
+comparator = "<"
+threshold = 1.0
+for_secs = 60
+severity = "warning"
+enabled = true
+labels = { source = "netcore-observability" }
+annotations = { runbook = "Check dependencies and /health/ready" }
+
+[[alert_rules]]
+rule_id = "repeated-scrape-errors"
+name = "Repeated scrape errors"
+description = "The NMS cannot collect metrics from a target repeatedly"
+metric = "netcore_observability_target_consecutive_failures"
+comparator = ">="
+threshold = 3.0
+for_secs = 0
+severity = "warning"
+enabled = true
+labels = { source = "netcore-observability" }
+annotations = { runbook = "Check the target /metrics endpoint and NMS routing" }

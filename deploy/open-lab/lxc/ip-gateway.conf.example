@@ -1,0 +1,5 @@
+# Additional raw LXC lines for the IP Gateway container.
+# The container needs /dev/net/tun plus NET_ADMIN in its own network namespace.
+lxc.cgroup2.devices.allow: c 10:200 rwm
+lxc.mount.entry: /dev/net/tun dev/net/tun none bind,create=file
+# Do not expose this LXC directly to untrusted networks while management is open_lab.

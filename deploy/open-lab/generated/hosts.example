@@ -1,0 +1,17 @@
+10.0.20.10	netcore-node-gateway
+10.0.20.11	netcore-mobility-core
+10.0.20.12	netcore-subscriber-core
+10.0.20.13	netcore-group-core
+10.0.20.14	netcore-call-control
+10.0.20.15	netcore-media-switch
+10.0.20.16	netcore-recorder
+10.0.20.17	netcore-sds-router
+10.0.20.18	netcore-packet-core
+10.0.20.19	netcore-ip-gateway
+10.0.20.20	netcore-security-core
+10.0.20.21	netcore-kmf
+10.0.20.22	netcore-transit
+10.0.20.23	netcore-application-gateway
+10.0.20.24	netcore-media-library
+10.0.20.25	netcore-control-room
+10.0.20.26	netcore-observability

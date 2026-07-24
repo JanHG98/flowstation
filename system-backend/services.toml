@@ -1,4 +1,6 @@
 version = 1
+contract_version = "netcore.v1"
+deployment_inventory = "deploy/open-lab/inventory.example.toml"
 
 [webui_defaults]
 required = true
@@ -201,4 +203,7 @@ warning = "OPEN LAB: no authentication, no tokens and no TLS; every reachable cl
 [[services]]
 name = "shared"
 webui = false
+runtime = false
+contract_version = "netcore.v1"
+modules = ["contracts", "service-common", "database-common", "telemetry-common", "web-ui"]
 reason = "Library directory, not a deployable container"

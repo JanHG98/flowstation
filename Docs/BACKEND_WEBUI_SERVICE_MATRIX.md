@@ -19,7 +19,7 @@
 | Media Library | Audio-Assets, TTS-/Recorder-Import, Vorschau, Freigabe, TETRA-Cache, Archiv und Playout-Jobs | Upload/Import, Metadaten, Freigabe/Sperre, Vorschau, Archivkopie sowie kontrollierte Einspeisung in bestehende Media-Switch-Sessions |
 | Recorder | Aufnahmen, Suche, Retention, Integrität | Export, Retention, Hold und Löschung; im Testpaket bewusst offen ohne Tokens |
 | Observability | Metriken, Logs, Traces, Alarme und Diagnose | Alarmregeln, Retention, Stummschaltung und Diagnoseexport; im Testpaket bewusst offen ohne Tokens |
-| Shared | kein Container; gemeinsames UI-Kit | nicht zutreffend |
+| Shared | kein Container; gemeinsames UI-Kit, API-Verträge und Service-Grundbausteine | nicht zutreffend |
 
 ## Gemeinsame Seiten
 

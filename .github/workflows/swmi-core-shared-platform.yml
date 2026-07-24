@@ -1,0 +1,41 @@
+name: SWMI Core Shared Platform
+
+on:
+  push:
+    paths:
+      - "system-backend/shared/**"
+      - "deploy/open-lab/**"
+      - "tests/integration/open_lab_contract_test.py"
+      - "tools/check_shared_platform.py"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/swmi-core-shared-platform.yml"
+  pull_request:
+    paths:
+      - "system-backend/shared/**"
+      - "deploy/open-lab/**"
+      - "tests/integration/open_lab_contract_test.py"
+      - "tools/check_shared_platform.py"
+      - "Cargo.toml"
+      - "Cargo.lock"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Static shared-platform validation
+        run: python3 tools/check_shared_platform.py
+      - name: Shared crate tests
+        run: cargo test --locked --package netcore-contracts --package netcore-service-common --package netcore-database-common --package netcore-telemetry-common
+      - name: Formatting
+        run: cargo fmt --all --check
+      - name: Clippy
+        run: cargo clippy --locked --package netcore-contracts --package netcore-service-common --package netcore-database-common --package netcore-telemetry-common --all-targets -- -D warnings

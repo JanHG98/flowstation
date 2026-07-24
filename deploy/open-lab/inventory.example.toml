@@ -1,0 +1,197 @@
+version = 1
+contract_version = "netcore.v1"
+mode = "open_lab"
+ssh_user = "root"
+ssh_options = ["-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=accept-new", "-o", "ConnectTimeout=8"]
+remote_source_root = "/opt/netcore-tetra-src"
+health_timeout_secs = 8
+
+# One service per LXC is the intended layout. Addresses are examples and must be
+# changed to the isolated management network before apply is used.
+
+[[services]]
+name = "node-gateway"
+host = "10.0.20.10"
+port = 8080
+unit = "netcore-node-gateway.service"
+user = "netcore"
+install = "system-backend/node-gateway/install/install.sh"
+config_template = "system-backend/node-gateway/config/node-gateway.example.toml"
+config_target = "/etc/netcore/node-gateway.toml"
+depends_on = []
+
+[[services]]
+name = "mobility-core"
+host = "10.0.20.11"
+port = 8090
+unit = "netcore-mobility-core.service"
+user = "netcore"
+install = "system-backend/mobility-core/install/install.sh"
+config_template = "system-backend/mobility-core/config/mobility-core.example.toml"
+config_target = "/etc/netcore/mobility-core.toml"
+depends_on = ["node-gateway"]
+
+[[services]]
+name = "subscriber-core"
+host = "10.0.20.12"
+port = 8100
+unit = "netcore-subscriber-core.service"
+user = "netcore"
+install = "system-backend/subscriber-core/install/install.sh"
+config_template = "system-backend/subscriber-core/config/subscriber-core.example.toml"
+config_target = "/etc/netcore/subscriber-core.toml"
+depends_on = ["node-gateway"]
+
+[[services]]
+name = "group-core"
+host = "10.0.20.13"
+port = 8110
+unit = "netcore-group-core.service"
+user = "netcore"
+install = "system-backend/group-core/install/install.sh"
+config_template = "system-backend/group-core/config/group-core.example.toml"
+config_target = "/etc/netcore/group-core.toml"
+depends_on = ["node-gateway", "subscriber-core"]
+
+[[services]]
+name = "call-control"
+host = "10.0.20.14"
+port = 8120
+unit = "netcore-call-control.service"
+user = "netcore"
+install = "system-backend/call-control/install/install.sh"
+config_template = "system-backend/call-control/config/call-control.example.toml"
+config_target = "/etc/netcore/call-control.toml"
+depends_on = ["node-gateway", "subscriber-core", "group-core", "mobility-core"]
+
+[[services]]
+name = "media-switch"
+host = "10.0.20.15"
+port = 8130
+unit = "netcore-media-switch.service"
+user = "netcore"
+install = "system-backend/media-switch/install/install.sh"
+config_template = "system-backend/media-switch/config/media-switch.example.toml"
+config_target = "/etc/netcore/media-switch.toml"
+depends_on = ["node-gateway", "call-control"]
+
+[[services]]
+name = "recorder"
+host = "10.0.20.16"
+port = 8140
+unit = "netcore-recorder.service"
+user = "netcore"
+install = "system-backend/recorder/install/install.sh"
+config_template = "system-backend/recorder/config/recorder.example.toml"
+config_target = "/etc/netcore/recorder.toml"
+depends_on = ["media-switch"]
+
+[[services]]
+name = "sds-router"
+host = "10.0.20.17"
+port = 8150
+unit = "netcore-sds-router.service"
+user = "netcore"
+install = "system-backend/sds-router/install/install.sh"
+config_template = "system-backend/sds-router/config/sds-router.example.toml"
+config_target = "/etc/netcore/sds-router.toml"
+depends_on = ["node-gateway", "subscriber-core", "group-core", "mobility-core"]
+
+[[services]]
+name = "packet-core"
+host = "10.0.20.18"
+port = 8160
+unit = "netcore-packet-core.service"
+user = "netcore"
+install = "system-backend/packet-core/install/install.sh"
+config_template = "system-backend/packet-core/config/packet-core.example.toml"
+config_target = "/etc/netcore/packet-core.toml"
+depends_on = ["node-gateway", "subscriber-core", "mobility-core"]
+
+[[services]]
+name = "ip-gateway"
+host = "10.0.20.19"
+port = 8170
+unit = "netcore-ip-gateway.service"
+user = "netcore"
+install = "system-backend/ip-gateway/install/install.sh"
+config_template = "system-backend/ip-gateway/config/ip-gateway.example.toml"
+config_target = "/etc/netcore/ip-gateway.toml"
+depends_on = ["packet-core"]
+
+[[services]]
+name = "security-core"
+host = "10.0.20.20"
+port = 8180
+unit = "netcore-security-core.service"
+user = "netcore-security"
+install = "system-backend/security-core/install/install.sh"
+config_template = "system-backend/security-core/config/security-core.example.toml"
+config_target = "/etc/netcore/security-core.toml"
+depends_on = ["node-gateway", "subscriber-core"]
+
+[[services]]
+name = "kmf"
+host = "10.0.20.21"
+port = 8190
+unit = "netcore-kmf.service"
+user = "netcore-kmf"
+install = "system-backend/kmf/install/install.sh"
+config_template = "system-backend/kmf/config/kmf.example.toml"
+config_target = "/etc/netcore/kmf.toml"
+depends_on = ["security-core"]
+
+[[services]]
+name = "transit"
+host = "10.0.20.22"
+port = 8200
+unit = "netcore-transit.service"
+user = "netcore-transit"
+install = "system-backend/transit/install/install.sh"
+config_template = "system-backend/transit/config/transit.example.toml"
+config_target = "/etc/netcore/transit.toml"
+depends_on = ["mobility-core", "call-control", "media-switch", "sds-router"]
+
+[[services]]
+name = "application-gateway"
+host = "10.0.20.23"
+port = 8220
+unit = "netcore-application-gateway.service"
+user = "netcore-app-gateway"
+install = "system-backend/application-gateway/install/install.sh"
+config_template = "system-backend/application-gateway/config/application-gateway.example.toml"
+config_target = "/etc/netcore/application-gateway.toml"
+depends_on = ["sds-router"]
+
+[[services]]
+name = "media-library"
+host = "10.0.20.24"
+port = 8230
+unit = "netcore-media-library.service"
+user = "netcore-media-library"
+install = "system-backend/media-library/install/install.sh"
+config_template = "system-backend/media-library/config/media-library.example.toml"
+config_target = "/etc/netcore/media-library.toml"
+depends_on = ["media-switch", "recorder", "application-gateway"]
+
+[[services]]
+name = "control-room"
+host = "10.0.20.25"
+port = 9010
+unit = "netcore-control-room.service"
+user = "netcore"
+install = "system-backend/control-room/install/install.sh"
+config_template = "system-backend/control-room/config/control-room.example.toml"
+config_target = "/etc/netcore/control-room.toml"
+depends_on = ["node-gateway", "subscriber-core", "group-core", "mobility-core", "call-control", "media-switch", "recorder", "sds-router", "packet-core", "ip-gateway", "security-core", "kmf", "transit", "application-gateway", "media-library"]
+
+[[services]]
+name = "observability"
+host = "10.0.20.26"
+port = 8210
+unit = "netcore-observability.service"
+user = "netcore-observability"
+install = "system-backend/observability/install/install.sh"
+config_template = "system-backend/observability/config/observability.example.toml"
+config_target = "/etc/netcore/observability.toml"
+depends_on = ["node-gateway", "subscriber-core", "group-core", "mobility-core", "call-control", "media-switch", "recorder", "sds-router", "packet-core", "ip-gateway", "security-core", "kmf", "transit", "application-gateway", "media-library", "control-room"]

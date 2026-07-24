@@ -134,3 +134,9 @@ Ein Backend-Dienst gilt erst als vollständig, wenn:
 - die UI bei ausgeschaltetem Control Room erreichbar bleibt,
 - API- und UI-Tests vorhanden sind,
 - Installations- und Updateanleitung die WebUI berücksichtigt.
+
+## Gemeinsame build-freie Assets
+
+Die Referenzimplementierung liegt unter `system-backend/shared/web-ui/`. Sie enthält Design-Tokens, responsive Grundkomponenten, Statusanzeige, JSON-API-Client, Bestätigungsdialoge, Toasts und i18n-Basistexte. Ein Dienst darf die Assets einbetten oder bei der Installation kopieren; ein separater Frontend-Container oder Node.js-Produktionsserver bleibt unzulässig.
+
+Die Migration bestehender WebUIs erfolgt schrittweise. Fachfunktionen, Notfallbedienung und dienstspezifische Diagnose dürfen nicht zugunsten optischer Vereinheitlichung entfernt werden.

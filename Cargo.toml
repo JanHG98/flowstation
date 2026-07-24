@@ -29,6 +29,10 @@ members = [
     "system-backend/observability",
     "system-backend/application-gateway",
     "system-backend/media-library",
+    "system-backend/shared/contracts",
+    "system-backend/shared/service-common",
+    "system-backend/shared/database-common",
+    "system-backend/shared/telemetry-common",
     #"bins/bluestation-telemetry",
     #"bins/bluestation-control",
     #"bins/pdu-tool",
@@ -116,6 +120,10 @@ tetra-config = { path = "crates/tetra-config" }
 tetra-saps = { path = "crates/tetra-saps" }
 tetra-pdus = { path = "crates/tetra-pdus" }
 tetra-entities = { path = "crates/tetra-entities" }
+netcore-contracts = { path = "system-backend/shared/contracts" }
+netcore-service-common = { path = "system-backend/shared/service-common" }
+netcore-database-common = { path = "system-backend/shared/database-common" }
+netcore-telemetry-common = { path = "system-backend/shared/telemetry-common" }
 
 # External dependencies
 as-any = "0.3.2"

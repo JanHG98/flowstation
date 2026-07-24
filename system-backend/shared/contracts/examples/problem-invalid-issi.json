@@ -1,0 +1,9 @@
+{
+  "type": "urn:netcore:problem:invalid_issi",
+  "title": "Invalid ISSI",
+  "status": 422,
+  "detail": "ISSI 16777216 exceeds the 24-bit SSI range",
+  "instance": "/api/v1/subscribers",
+  "code": "invalid_issi",
+  "correlation_id": "f807ca0d-ef22-409b-b955-df8fd2900d06"
+}

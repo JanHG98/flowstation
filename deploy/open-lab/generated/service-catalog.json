@@ -1,0 +1,289 @@
+{
+  "version": 1,
+  "contract_version": "netcore.v1",
+  "mode": "open_lab",
+  "generated_at_epoch": 0,
+  "services": [
+    {
+      "name": "node-gateway",
+      "host": "10.0.20.10",
+      "port": 8080,
+      "base_url": "http://10.0.20.10:8080",
+      "webui": "http://10.0.20.10:8080/",
+      "health_live": "http://10.0.20.10:8080/health/live",
+      "health_ready": "http://10.0.20.10:8080/health/ready",
+      "metrics": "http://10.0.20.10:8080/metrics",
+      "unit": "netcore-node-gateway.service",
+      "depends_on": []
+    },
+    {
+      "name": "mobility-core",
+      "host": "10.0.20.11",
+      "port": 8090,
+      "base_url": "http://10.0.20.11:8090",
+      "webui": "http://10.0.20.11:8090/",
+      "health_live": "http://10.0.20.11:8090/health/live",
+      "health_ready": "http://10.0.20.11:8090/health/ready",
+      "metrics": "http://10.0.20.11:8090/metrics",
+      "unit": "netcore-mobility-core.service",
+      "depends_on": [
+        "node-gateway"
+      ]
+    },
+    {
+      "name": "subscriber-core",
+      "host": "10.0.20.12",
+      "port": 8100,
+      "base_url": "http://10.0.20.12:8100",
+      "webui": "http://10.0.20.12:8100/",
+      "health_live": "http://10.0.20.12:8100/health/live",
+      "health_ready": "http://10.0.20.12:8100/health/ready",
+      "metrics": "http://10.0.20.12:8100/metrics",
+      "unit": "netcore-subscriber-core.service",
+      "depends_on": [
+        "node-gateway"
+      ]
+    },
+    {
+      "name": "group-core",
+      "host": "10.0.20.13",
+      "port": 8110,
+      "base_url": "http://10.0.20.13:8110",
+      "webui": "http://10.0.20.13:8110/",
+      "health_live": "http://10.0.20.13:8110/health/live",
+      "health_ready": "http://10.0.20.13:8110/health/ready",
+      "metrics": "http://10.0.20.13:8110/metrics",
+      "unit": "netcore-group-core.service",
+      "depends_on": [
+        "node-gateway",
+        "subscriber-core"
+      ]
+    },
+    {
+      "name": "call-control",
+      "host": "10.0.20.14",
+      "port": 8120,
+      "base_url": "http://10.0.20.14:8120",
+      "webui": "http://10.0.20.14:8120/",
+      "health_live": "http://10.0.20.14:8120/health/live",
+      "health_ready": "http://10.0.20.14:8120/health/ready",
+      "metrics": "http://10.0.20.14:8120/metrics",
+      "unit": "netcore-call-control.service",
+      "depends_on": [
+        "node-gateway",
+        "subscriber-core",
+        "group-core",
+        "mobility-core"
+      ]
+    },
+    {
+      "name": "media-switch",
+      "host": "10.0.20.15",
+      "port": 8130,
+      "base_url": "http://10.0.20.15:8130",
+      "webui": "http://10.0.20.15:8130/",
+      "health_live": "http://10.0.20.15:8130/health/live",
+      "health_ready": "http://10.0.20.15:8130/health/ready",
+      "metrics": "http://10.0.20.15:8130/metrics",
+      "unit": "netcore-media-switch.service",
+      "depends_on": [
+        "node-gateway",
+        "call-control"
+      ]
+    },
+    {
+      "name": "recorder",
+      "host": "10.0.20.16",
+      "port": 8140,
+      "base_url": "http://10.0.20.16:8140",
+      "webui": "http://10.0.20.16:8140/",
+      "health_live": "http://10.0.20.16:8140/health/live",
+      "health_ready": "http://10.0.20.16:8140/health/ready",
+      "metrics": "http://10.0.20.16:8140/metrics",
+      "unit": "netcore-recorder.service",
+      "depends_on": [
+        "media-switch"
+      ]
+    },
+    {
+      "name": "sds-router",
+      "host": "10.0.20.17",
+      "port": 8150,
+      "base_url": "http://10.0.20.17:8150",
+      "webui": "http://10.0.20.17:8150/",
+      "health_live": "http://10.0.20.17:8150/health/live",
+      "health_ready": "http://10.0.20.17:8150/health/ready",
+      "metrics": "http://10.0.20.17:8150/metrics",
+      "unit": "netcore-sds-router.service",
+      "depends_on": [
+        "node-gateway",
+        "subscriber-core",
+        "group-core",
+        "mobility-core"
+      ]
+    },
+    {
+      "name": "packet-core",
+      "host": "10.0.20.18",
+      "port": 8160,
+      "base_url": "http://10.0.20.18:8160",
+      "webui": "http://10.0.20.18:8160/",
+      "health_live": "http://10.0.20.18:8160/health/live",
+      "health_ready": "http://10.0.20.18:8160/health/ready",
+      "metrics": "http://10.0.20.18:8160/metrics",
+      "unit": "netcore-packet-core.service",
+      "depends_on": [
+        "node-gateway",
+        "subscriber-core",
+        "mobility-core"
+      ]
+    },
+    {
+      "name": "ip-gateway",
+      "host": "10.0.20.19",
+      "port": 8170,
+      "base_url": "http://10.0.20.19:8170",
+      "webui": "http://10.0.20.19:8170/",
+      "health_live": "http://10.0.20.19:8170/health/live",
+      "health_ready": "http://10.0.20.19:8170/health/ready",
+      "metrics": "http://10.0.20.19:8170/metrics",
+      "unit": "netcore-ip-gateway.service",
+      "depends_on": [
+        "packet-core"
+      ]
+    },
+    {
+      "name": "security-core",
+      "host": "10.0.20.20",
+      "port": 8180,
+      "base_url": "http://10.0.20.20:8180",
+      "webui": "http://10.0.20.20:8180/",
+      "health_live": "http://10.0.20.20:8180/health/live",
+      "health_ready": "http://10.0.20.20:8180/health/ready",
+      "metrics": "http://10.0.20.20:8180/metrics",
+      "unit": "netcore-security-core.service",
+      "depends_on": [
+        "node-gateway",
+        "subscriber-core"
+      ]
+    },
+    {
+      "name": "kmf",
+      "host": "10.0.20.21",
+      "port": 8190,
+      "base_url": "http://10.0.20.21:8190",
+      "webui": "http://10.0.20.21:8190/",
+      "health_live": "http://10.0.20.21:8190/health/live",
+      "health_ready": "http://10.0.20.21:8190/health/ready",
+      "metrics": "http://10.0.20.21:8190/metrics",
+      "unit": "netcore-kmf.service",
+      "depends_on": [
+        "security-core"
+      ]
+    },
+    {
+      "name": "transit",
+      "host": "10.0.20.22",
+      "port": 8200,
+      "base_url": "http://10.0.20.22:8200",
+      "webui": "http://10.0.20.22:8200/",
+      "health_live": "http://10.0.20.22:8200/health/live",
+      "health_ready": "http://10.0.20.22:8200/health/ready",
+      "metrics": "http://10.0.20.22:8200/metrics",
+      "unit": "netcore-transit.service",
+      "depends_on": [
+        "mobility-core",
+        "call-control",
+        "media-switch",
+        "sds-router"
+      ]
+    },
+    {
+      "name": "application-gateway",
+      "host": "10.0.20.23",
+      "port": 8220,
+      "base_url": "http://10.0.20.23:8220",
+      "webui": "http://10.0.20.23:8220/",
+      "health_live": "http://10.0.20.23:8220/health/live",
+      "health_ready": "http://10.0.20.23:8220/health/ready",
+      "metrics": "http://10.0.20.23:8220/metrics",
+      "unit": "netcore-application-gateway.service",
+      "depends_on": [
+        "sds-router"
+      ]
+    },
+    {
+      "name": "media-library",
+      "host": "10.0.20.24",
+      "port": 8230,
+      "base_url": "http://10.0.20.24:8230",
+      "webui": "http://10.0.20.24:8230/",
+      "health_live": "http://10.0.20.24:8230/health/live",
+      "health_ready": "http://10.0.20.24:8230/health/ready",
+      "metrics": "http://10.0.20.24:8230/metrics",
+      "unit": "netcore-media-library.service",
+      "depends_on": [
+        "media-switch",
+        "recorder",
+        "application-gateway"
+      ]
+    },
+    {
+      "name": "control-room",
+      "host": "10.0.20.25",
+      "port": 9010,
+      "base_url": "http://10.0.20.25:9010",
+      "webui": "http://10.0.20.25:9010/",
+      "health_live": "http://10.0.20.25:9010/health/live",
+      "health_ready": "http://10.0.20.25:9010/health/ready",
+      "metrics": "http://10.0.20.25:9010/metrics",
+      "unit": "netcore-control-room.service",
+      "depends_on": [
+        "node-gateway",
+        "subscriber-core",
+        "group-core",
+        "mobility-core",
+        "call-control",
+        "media-switch",
+        "recorder",
+        "sds-router",
+        "packet-core",
+        "ip-gateway",
+        "security-core",
+        "kmf",
+        "transit",
+        "application-gateway",
+        "media-library"
+      ]
+    },
+    {
+      "name": "observability",
+      "host": "10.0.20.26",
+      "port": 8210,
+      "base_url": "http://10.0.20.26:8210",
+      "webui": "http://10.0.20.26:8210/",
+      "health_live": "http://10.0.20.26:8210/health/live",
+      "health_ready": "http://10.0.20.26:8210/health/ready",
+      "metrics": "http://10.0.20.26:8210/metrics",
+      "unit": "netcore-observability.service",
+      "depends_on": [
+        "node-gateway",
+        "subscriber-core",
+        "group-core",
+        "mobility-core",
+        "call-control",
+        "media-switch",
+        "recorder",
+        "sds-router",
+        "packet-core",
+        "ip-gateway",
+        "security-core",
+        "kmf",
+        "transit",
+        "application-gateway",
+        "media-library",
+        "control-room"
+      ]
+    }
+  ]
+}

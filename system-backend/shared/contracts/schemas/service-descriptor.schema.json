@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:netcore:schema:service-descriptor:v1",
+  "title": "NetCore Service Descriptor",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "instance", "service_version", "contract_version", "security_mode", "operating_mode", "api_base", "health_live", "health_ready", "metrics", "capabilities"],
+  "properties": {
+    "name": {"type": "string", "pattern": "^[a-z0-9-]+$"},
+    "instance": {"type": "string", "minLength": 1},
+    "service_version": {"type": "string"},
+    "contract_version": {"type": "string", "pattern": "^netcore\\.v[0-9]+(?:\\.[0-9]+)?$"},
+    "security_mode": {"enum": ["open_lab", "authenticated", "mutual_tls"]},
+    "operating_mode": {"enum": ["shadow", "authoritative", "disabled"]},
+    "api_base": {"type": "string", "pattern": "^/"},
+    "health_live": {"type": "string", "pattern": "^/"},
+    "health_ready": {"type": "string", "pattern": "^/"},
+    "metrics": {"type": "string", "pattern": "^/"},
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "version", "optional"],
+        "properties": {
+          "name": {"type": "string", "pattern": "^[a-z0-9_.-]+$"},
+          "version": {"type": "string"},
+          "optional": {"type": "boolean"}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "buildInfo": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["service", "version", "contract_version"],
+      "properties": {
+        "service": {"type": "string"},
+        "version": {"type": "string"},
+        "git_commit": {"type": "string"},
+        "build_timestamp": {"type": "string"},
+        "contract_version": {"type": "string"}
+      }
+    }
+  }
+}

@@ -1,38 +1,25 @@
 # NetCore Shared WebUI
 
-Dieser Ordner ist für die gemeinsamen Verwaltungsoberflächen-Bausteine aller System-Backend-Dienste vorgesehen.
+Build-freie CSS- und ES-Modul-Bausteine für die Verwaltungsoberflächen der Backend-Dienste.
+Die Assets benötigen weder Node.js noch einen zusätzlichen Frontend-Container in Produktion.
 
-## Ziel
+## Enthalten
 
-Jeder LXC beziehungsweise jede VM besitzt eine eigene WebUI, ohne dass 18 völlig unterschiedliche Oberflächen entstehen. Gemeinsame Komponenten sorgen für ein einheitliches Bedienkonzept, während jeder Dienst seine fachlichen Seiten selbst bereitstellt.
+- gemeinsames Layout, Karten, Tabellen, Formfelder und responsive Regeln,
+- sichtbarer Open-Lab-Hinweis,
+- Status-Badges,
+- typisierter JSON-API-Client mit Timeout und Problem-Details-Fehlern,
+- Bestätigungsdialoge und Toasts,
+- deutsche und englische Basistexte,
+- statische Demo unter `demo/index.html`.
 
-## Geplante Module
+## Einbindung
 
-```text
-web-ui/
-├── shell/          # Layout, Navigation, Kopfzeile und Service-Menü
-├── auth/           # Login, Rollen, Session und Break-Glass-Anmeldung
-├── api-client/     # typisierter Zugriff auf /api/v1
-├── components/     # Tabellen, Formulare, Dialoge und Statuskarten
-├── health/         # Liveness, Readiness und Dependency-Ansichten
-├── audit/          # Änderungsprotokoll und Bedienerinformationen
-├── i18n/           # Deutsch und Englisch
-└── assets/         # gemeinsame statische Ressourcen
+```html
+<link rel="stylesheet" href="/assets/netcore.css">
+<script type="module">
+  import { NetCoreApiClient, statusBadge } from "/assets/netcore.js";
+</script>
 ```
 
-## Produktionsprinzip
-
-Die fertigen UI-Assets werden in den jeweiligen Dienst eingebettet oder gemeinsam mit ihm installiert. In Produktion ist kein Node.js-Entwicklungsserver und kein separater Frontend-Container erforderlich.
-
-## Pflichtseiten jedes Dienstes
-
-- Übersicht
-- Fachliche Verwaltung
-- Zustand und Abhängigkeiten
-- Ereignisse beziehungsweise Audit
-- Konfiguration
-- Wartung
-- API-Dokumentation
-- Version und Buildinformationen
-
-Weitere verbindliche Anforderungen stehen in `Docs/BACKEND_WEBUI_STANDARD.md`.
+Die bestehenden Dienst-WebUIs bleiben eigenständig. Migration auf diese Bausteine erfolgt schrittweise und darf keine fachliche API oder Bedienfunktion entfernen.

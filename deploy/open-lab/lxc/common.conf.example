@@ -1,0 +1,10 @@
+# Proxmox LXC baseline for ordinary NetCore backend services.
+# Use an unprivileged Debian 13 container, a static address in the isolated
+# management VLAN and no public port forwarding.
+unprivileged: 1
+features: nesting=1
+memory: 2048
+swap: 512
+cores: 2
+onboot: 1
+startup: order=20,up=20,down=30

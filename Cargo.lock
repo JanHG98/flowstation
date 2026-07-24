@@ -1069,6 +1069,37 @@ dependencies = [
 ]
 
 [[package]]
+name = "netcore-contracts"
+version = "1.3.0"
+dependencies = [
+ "chrono",
+ "serde",
+ "serde_json",
+ "uuid",
+]
+
+[[package]]
+name = "netcore-database-common"
+version = "1.3.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "netcore-service-common"
+version = "1.3.0"
+dependencies = [
+ "netcore-contracts",
+ "serde",
+ "uuid",
+]
+
+[[package]]
+name = "netcore-telemetry-common"
+version = "1.3.0"
+
+[[package]]
 name = "netcore-application-gateway"
 version = "1.3.0"
 dependencies = [

@@ -1,0 +1,55 @@
+:root {
+  color-scheme: dark;
+  --nc-bg: #0d1117;
+  --nc-panel: #161b22;
+  --nc-panel-2: #21262d;
+  --nc-border: #30363d;
+  --nc-text: #e6edf3;
+  --nc-muted: #8b949e;
+  --nc-accent: #2f81f7;
+  --nc-ok: #3fb950;
+  --nc-warn: #d29922;
+  --nc-error: #f85149;
+  --nc-radius: 10px;
+  --nc-shadow: 0 12px 32px rgba(0, 0, 0, .28);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--nc-bg); color: var(--nc-text); }
+a { color: #79c0ff; }
+button, input, select, textarea { font: inherit; }
+
+.nc-shell { min-height: 100vh; display: grid; grid-template-rows: auto 1fr; }
+.nc-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .8rem 1rem; border-bottom: 1px solid var(--nc-border); background: rgba(22, 27, 34, .96); position: sticky; top: 0; z-index: 20; }
+.nc-brand { display: flex; align-items: baseline; gap: .65rem; font-weight: 700; }
+.nc-brand small { color: var(--nc-muted); font-weight: 500; }
+.nc-open-lab { padding: .35rem .6rem; border: 1px solid var(--nc-warn); border-radius: 999px; color: #ffd78a; font-size: .82rem; }
+.nc-main { width: min(1500px, 100%); margin: 0 auto; padding: 1rem; }
+.nc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; }
+.nc-card { background: var(--nc-panel); border: 1px solid var(--nc-border); border-radius: var(--nc-radius); padding: 1rem; box-shadow: var(--nc-shadow); }
+.nc-card h2, .nc-card h3 { margin-top: 0; }
+.nc-muted { color: var(--nc-muted); }
+.nc-toolbar { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; margin-bottom: 1rem; }
+.nc-button { border: 1px solid var(--nc-border); border-radius: 7px; background: var(--nc-panel-2); color: var(--nc-text); padding: .5rem .75rem; cursor: pointer; }
+.nc-button:hover { border-color: var(--nc-accent); }
+.nc-button[data-variant="danger"] { border-color: var(--nc-error); }
+.nc-table-wrap { overflow: auto; border: 1px solid var(--nc-border); border-radius: var(--nc-radius); }
+.nc-table { width: 100%; border-collapse: collapse; min-width: 680px; }
+.nc-table th, .nc-table td { padding: .65rem .75rem; text-align: left; border-bottom: 1px solid var(--nc-border); }
+.nc-table th { color: var(--nc-muted); font-size: .82rem; text-transform: uppercase; letter-spacing: .04em; }
+.nc-status { display: inline-flex; align-items: center; gap: .4rem; border-radius: 999px; padding: .25rem .55rem; background: var(--nc-panel-2); font-size: .82rem; }
+.nc-status::before { content: ""; width: .58rem; height: .58rem; border-radius: 50%; background: var(--nc-muted); }
+.nc-status[data-status="up"]::before, .nc-status[data-status="ready"]::before, .nc-status[data-status="active"]::before { background: var(--nc-ok); }
+.nc-status[data-status="degraded"]::before, .nc-status[data-status="warning"]::before, .nc-status[data-status="pending"]::before { background: var(--nc-warn); }
+.nc-status[data-status="down"]::before, .nc-status[data-status="error"]::before, .nc-status[data-status="failed"]::before { background: var(--nc-error); }
+.nc-field { display: grid; gap: .35rem; }
+.nc-field input, .nc-field select, .nc-field textarea { width: 100%; padding: .55rem .65rem; color: var(--nc-text); background: var(--nc-bg); border: 1px solid var(--nc-border); border-radius: 7px; }
+.nc-dialog { border: 1px solid var(--nc-border); border-radius: var(--nc-radius); background: var(--nc-panel); color: var(--nc-text); max-width: 560px; width: calc(100% - 2rem); box-shadow: var(--nc-shadow); }
+.nc-dialog::backdrop { background: rgba(0, 0, 0, .7); }
+.nc-dialog-actions { display: flex; justify-content: flex-end; gap: .6rem; margin-top: 1rem; }
+.nc-toast-host { position: fixed; right: 1rem; bottom: 1rem; display: grid; gap: .5rem; z-index: 100; }
+.nc-toast { min-width: 260px; max-width: 480px; padding: .75rem .9rem; border: 1px solid var(--nc-border); border-radius: 8px; background: var(--nc-panel); box-shadow: var(--nc-shadow); }
+.nc-toast[data-level="error"] { border-color: var(--nc-error); }
+.nc-toast[data-level="warning"] { border-color: var(--nc-warn); }
+@media (max-width: 720px) { .nc-header { align-items: flex-start; } .nc-brand small { display: none; } .nc-main { padding: .7rem; } }

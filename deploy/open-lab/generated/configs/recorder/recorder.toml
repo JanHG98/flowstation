@@ -1,0 +1,40 @@
+# NetCore Recorder – offener Testbetrieb.
+# Keine Benutzerkonten, keine Tokens und kein TLS. Nur in einem isolierten Labornetz verwenden.
+
+[server]
+bind = "0.0.0.0:8140"
+history_limit = 2000
+
+[media_switch]
+# Replay-fähiger Vollframe-Tap des Media Switch.
+tap_url = "http://10.0.20.15:8130/api/v1/recorder/taps"
+sessions_url = "http://10.0.20.15:8130/api/v1/sessions"
+poll_interval_ms = 100
+session_reconcile_ms = 1000
+request_timeout_secs = 3
+batch_limit = 500
+
+[storage]
+root = "/var/lib/netcore-recorder/recordings"
+export_root = "/var/lib/netcore-recorder/exports"
+# Ein gepackter TETRA Speech Service 0 Frame umfasst 35 Bytes und 60 ms.
+frame_duration_ms = 60
+# Erst nach dieser Zeit ohne Media-Switch-Session wird eine Aufnahme finalisiert.
+session_absent_grace_secs = 3
+# Sicherheitsnetz für Calls, die nie sauber beendet gemeldet werden.
+maximum_idle_secs = 600
+default_retention_days = 30
+retention_scan_secs = 60
+# Daten, Index und aktives Manifest werden spätestens alle n Frames synchronisiert.
+fsync_every_frames = 50
+minimum_free_space_mb = 512
+
+[security]
+mode = "open_lab"
+allow_remote_management = true
+allow_delete = true
+
+[limits]
+max_body_bytes = 1048576
+max_active_recordings = 1000
+max_recordings = 100000
