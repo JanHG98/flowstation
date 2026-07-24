@@ -41,7 +41,7 @@ Langfristig verwenden neue Dienste mit eigener LXC-IP einheitlich:
 https://<LXC-IP>:8443/
 ```
 
-Die bisher umgesetzten Dienste sind ausdrücklich dokumentierte Ausnahmen für die isolierte Testumgebung und verwenden je Dienst einen eigenen HTTP-Port im offenen Labormodus. Die verbindliche Zuordnung steht in `services.toml`; der Recorder verwendet Port 8140, der SDS Router Port 8150, der Packet Core Port 8160, der IP Gateway Port 8170, der Security Core Port 8180 und die KMF Port 8190.
+Die bisher umgesetzten Dienste sind ausdrücklich dokumentierte Ausnahmen für die isolierte Testumgebung und verwenden je Dienst einen eigenen HTTP-Port im offenen Labormodus. Die verbindliche Zuordnung steht in `services.toml`; die fortlaufende Dienstreihe reicht aktuell vom Recorder auf Port 8140 bis zum Application Gateway auf Port 8220. Der Control Room bleibt auf Port 9010.
 
 ## Bereits deploybare Dienste
 
@@ -59,5 +59,9 @@ Bereits deploybar sind:
 - `ip-gateway/` – TUN, Routing, NAT, Firewall, DNS, WAP/Testdienste und PCAP, Port 8170
 - `security-core/` – Security-Class-Policy, Authentisierung, DCK-Kontexte, Sperren und Audit, Port 8180
 - `kmf/` – CCK/GCK/SCK, Crypto Periods, Rotation, versiegelte OTAR-Aktionen und Backups, Port 8190
+- `transit/` – regionale Peer-/Route-/Sessionvermittlung und Failover, Port 8200
+- `observability/` – Metriken, Logs, Traces, Alarmierung und Diagnose, Port 8210
+- `application-gateway/` – externe Connectoren, Webhooks, Routing, Vorlagen und TTS-Orchestrierung, Port 8220
+- `control-room/` – zentrale Bedien-, Lage-, Incident- und Schichtbuchebene, Port 9010
 
 Alle enthalten Rust-Runtime, REST-API, eigene WebUI, systemd-Unit und Installationsskripte. In der aktuellen Teststufe laufen sie bewusst im deutlich markierten `open_lab`-Modus ohne Tokens, Benutzeranmeldung oder TLS.

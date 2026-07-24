@@ -49,3 +49,7 @@ Der Check prüft Paketstruktur, Workspace-Einbindung, TBS-Control-Routing, SNDCP
 - `check_transit.py`: prüft Transit-Paket, Regionen-/Peer- und Routing-Grundlagen, Path-Vector/Loop-Prevention, Failover, Open-Lab-Konfiguration, WebUI-JavaScript und Installationsskripte.
 
 - `check_control_room.py`: prüft Control-Room-Federation, Open-Lab-Konfiguration, Architekturgrenze, Incident-/Schichtbuch-Paket, Browser-WebUI und LXC-Skripte.
+
+- `check_observability.py`: prüft Observability/NMS, Targets, Alarmregeln, Stack-Konfigurationen, WebUI und LXC-Skripte.
+
+- `check_application_gateway.py`: prüft Application-Gateway-Paket, Connectorinventar, Routing/Vorlagen, Secret-Redaction, TTS-WAV-Grenze, WebUI und LXC-Skripte.

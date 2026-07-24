@@ -27,6 +27,6 @@ Der Control Room ist Presentation und Operator Plane. Die jeweiligen Fachkerne b
 
 Diese Phase bleibt `open_lab`: keine Anmeldung, keine Tokens, kein Node-Token und kein TLS. Die bereits vorhandene RBAC-Basis bleibt im Code für den späteren gesicherten Betrieb, ist im Beispiel und im systemd-Service aber ausdrücklich deaktiviert.
 
-## Nächster Baustein
+## Nachgelagerte Bausteine
 
-`observability` / NMS mit Prometheus, Grafana, Loki und Alertmanager.
+Observability/NMS und Application Gateway sind inzwischen als eigene LXCs ergänzt. Der Control Room nimmt beide über dieselbe Service-Federation auf, ohne deren fachliche Zustände zu übernehmen.

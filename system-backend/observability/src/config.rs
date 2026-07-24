@@ -348,6 +348,7 @@ fn default_targets() -> Vec<TargetConfig> {
         target("security-core", "Security Core", "security-core", 8180),
         target("kmf", "KMF", "kmf", 8190),
         target("transit", "Transit", "transit", 8200),
+        target("application-gateway", "Application Gateway", "application-gateway", 8220),
         target("control-room", "Control Room", "control-room", 9010),
     ]
 }

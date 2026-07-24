@@ -157,6 +157,13 @@ warning = "OPEN LAB: no authentication, no tokens and no TLS; every reachable cl
 [[services]]
 name = "application-gateway"
 webui = true
+scheme = "http"
+management_port = 8220
+security_mode = "open_lab"
+token_auth = false
+tls = false
+depends_on = ["sds-router"]
+warning = "OPEN LAB: no authentication, no management tokens and no TLS; every reachable client may alter connectors, secrets, routing, templates, webhooks and external dispatches"
 
 [[services]]
 name = "media-library"
@@ -181,7 +188,7 @@ management_port = 8210
 security_mode = "open_lab"
 token_auth = false
 tls = false
-depends_on = ["node-gateway", "subscriber-core", "group-core", "mobility-core", "call-control", "media-switch", "recorder", "sds-router", "packet-core", "ip-gateway", "security-core", "kmf", "transit", "control-room"]
+depends_on = ["node-gateway", "subscriber-core", "group-core", "mobility-core", "call-control", "media-switch", "recorder", "sds-router", "packet-core", "ip-gateway", "security-core", "kmf", "transit", "control-room", "application-gateway"]
 warning = "OPEN LAB: no authentication, no tokens and no TLS; every reachable client may ingest telemetry, alter targets/rules/silences and download diagnostics"
 
 [[services]]

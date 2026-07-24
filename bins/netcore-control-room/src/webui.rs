@@ -155,6 +155,8 @@ function renderKpis(data) {{
     ['SDS wartend', pick('sds_queued')],
     ['PDP bereit', pick('packet_contexts_ready')],
     ['Security-Alarme', pick('security_alarms')],
+    ['App-Zustellungen', pick('application_deliveries_pending')],
+    ['App-Dead-Letter', pick('application_dead_letters')],
     ['Aktive Notfälle', l.emergencies_active||0],
   ];
   $('kpis').innerHTML = rows.map(([label,value]) => `<div class="card kpi"><div class="value">${{esc(value)}}</div><div class="label">${{esc(label)}}</div></div>`).join('');
@@ -170,7 +172,8 @@ const domainLabels = {{
   'node-gateway':'Node Gateway','subscriber-core':'Teilnehmer','group-core':'Gruppen',
   'mobility-core':'Mobility','call-control':'Call Control','media-switch':'Media',
   'recorder':'Recorder','sds-router':'SDS','packet-core':'Packet Core',
-  'ip-gateway':'IP Gateway','security-core':'Security','kmf':'KMF','transit':'Transit'
+  'ip-gateway':'IP Gateway','security-core':'Security','kmf':'KMF','transit':'Transit',
+  'application-gateway':'Applications'
 }};
 function metricLabel(value) {{ return String(value).replaceAll('_',' '); }}
 function renderDomains(federated) {{

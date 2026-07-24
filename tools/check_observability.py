@@ -102,7 +102,7 @@ def main():
         c=tomllib.loads((ROOT/'system-backend/observability/config/observability.example.toml').read_text())
         if c['security']['token_auth'] or c['security']['tls'] or c['security']['mode']!='open_lab':errors.append('example must remain open_lab without token/TLS')
         if c['server']['bind'].split(':')[-1]!='8210':errors.append('management port must be 8210')
-        if len(c.get('targets',[]))<14:errors.append('example must contain all implemented service targets')
+        if len(c.get('targets',[]))<15:errors.append('example must contain all implemented service targets')
         if len(c.get('alert_rules',[]))<3:errors.append('example must contain baseline alert rules')
     except Exception:pass
     for rel in ["system-backend/observability/src/main.rs","system-backend/observability/src/config.rs","system-backend/observability/src/collector.rs","system-backend/observability/src/protocol.rs","system-backend/observability/src/state.rs","system-backend/observability/src/http.rs"]:

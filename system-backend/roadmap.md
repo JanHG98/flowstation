@@ -54,8 +54,9 @@ Die bisher umgesetzten LXC-Dienste starten im ausdrücklich markierten `open_lab
 - `kmf`: umgesetzt, CCK/GCK/SCK-Lifecycle, Key-Versionen, Crypto Periods, Rotation, versiegelte OTAR-Aktionen, Backup und WebUI
 - `transit`: umgesetzt, NetCore-native Regionen-/Peervermittlung, Routing, Failover und WebUI
 - `control-room`: umgesetzt, zentrale Bedien-/Lageebene mit Service-Federation, Incident-Journal, Schichtbuch und Browser-WebUI
-- Observability/NMS als eigener LXC-Dienst umgesetzt; nächster Baustein: `application-gateway`
-- nächster Media-Baustein: `media-library` / Audio Player auf Basis des stabilen Recorder-Formats
+- `observability`: umgesetzt, zentrale Metrik-, Log-, Trace-, Alarm- und Diagnoseebene mit WebUI
+- `application-gateway`: umgesetzt, Connector Registry, Webhooks, Routing, Vorlagen, Retry/Dead Letter, Secret-Redaction und TTS-Orchestrierung mit WebUI
+- nächster Baustein: `media-library` / Audio Player auf Basis des stabilen Recorder- und TTS-Formats
 
 # 2. Normative Grundlage
 
@@ -1289,9 +1290,9 @@ Die lokale TLPD-Runtime ist abgeschlossen. Sie bleibt auf der TBS und stellt Dia
 
 ## Aktueller Stand: SWMI Mobility 1 und Core 1
 
-Die lokale Funkstack- und Mobility-Grundlage ist abgeschlossen. Darauf aufbauend sind die zentralen Open-Lab-Dienste `node-gateway`, `mobility-core`, `subscriber-core`, `group-core`, `call-control`, `media-switch`, `recorder`, `sds-router`, `packet-core`, `ip-gateway`, `security-core` und `kmf` jeweils mit eigener WebUI umgesetzt.
+Die lokale Funkstack- und Mobility-Grundlage ist abgeschlossen. Darauf aufbauend sind die zentralen Open-Lab-Dienste `node-gateway`, `mobility-core`, `subscriber-core`, `group-core`, `call-control`, `media-switch`, `recorder`, `sds-router`, `packet-core`, `ip-gateway`, `security-core`, `kmf`, `transit`, `control-room`, `observability` und `application-gateway` jeweils mit eigener WebUI umgesetzt.
 
-Der Packet Core hält PDP-/NSAPI-Zustand, Reassembly und Downlink-Queue. Der IP Gateway koppelt dessen vollständige IPv4-N-PDUs über Linux-TUN an Routing, nftables, NAT, DNS sowie lokale WAP-/Testdienste und erzeugt direkt PCAP-Dateien. Security Core und KMF ergänzen Security-Class-Policy, Authentisierungs-/DCK-Orchestrierung sowie CCK/GCK/SCK-Lifecycle, Crypto Periods, Rotation, nodegebundene OTAR-Envelopes und sichere Vault-Backups. Transit und Control Room sind als zentrale LXC-Dienste umgesetzt. Observability/NMS ist als eigener LXC-Dienst mit Prometheus-, Grafana-, Loki- und Alertmanager-Konfiguration umgesetzt. Als nächster Baustein folgt `application-gateway`.
+Der Packet Core hält PDP-/NSAPI-Zustand, Reassembly und Downlink-Queue. Der IP Gateway koppelt dessen vollständige IPv4-N-PDUs über Linux-TUN an Routing, nftables, NAT, DNS sowie lokale WAP-/Testdienste und erzeugt direkt PCAP-Dateien. Security Core und KMF ergänzen Security-Class-Policy, Authentisierungs-/DCK-Orchestrierung sowie CCK/GCK/SCK-Lifecycle, Crypto Periods, Rotation, nodegebundene OTAR-Envelopes und sichere Vault-Backups. Transit und Control Room bilden regionale Vermittlung und Operator Plane. Observability/NMS liefert Prometheus-, Grafana-, Loki- und Alertmanager-Integration. Der Application Gateway kapselt externe Connectoren, Webhooks, Vorlagen, Zustellungsqueues und TTS-Orchestrierung. Als nächster Baustein folgt `media-library`.
 
 Bis zur späteren Security-Phase bleiben alle genannten LXC-Dienste ausdrücklich `open_lab`: keine Tokens, keine Benutzerkonten und kein TLS. Das ist nur für das isolierte Testnetz vorgesehen.
 
@@ -1359,4 +1360,18 @@ Der bestehende Control Room ist als eigenständiger LXC-Dienst mit Browser-WebUI
 
 Der Control Room bleibt Presentation und Operator Plane. Er ist keine zweite Teilnehmer-, Gruppen-, Mobility-, Call-, SDS-, Packet- oder Schlüssel-Datenbank und enthält keinen beliebigen Schreibproxy zu Fachsystemen.
 
-Die aktuelle Stufe bleibt `open_lab`: keine Anmeldung, keine Tokens, kein Node-Token und kein TLS. Observability/NMS ist umgesetzt. Nächster Baustein ist `application-gateway`.
+Die aktuelle Stufe bleibt `open_lab`: keine Anmeldung, keine Tokens, kein Node-Token und kein TLS. Observability/NMS und Application Gateway sind umgesetzt. Nächster Baustein ist `media-library`.
+
+---
+
+## Package M – Observability / NMS
+
+Observability ist als eigenständiger LXC-Dienst auf Port 8210 umgesetzt. Der Dienst sammelt Metriken, Logs und NetCore-Trace-Spans, bewertet Alarmregeln, verwaltet Silences und erstellt Diagnosepakete. Prometheus, Grafana, Loki, Promtail und Alertmanager sind als optionaler klassischer Monitoring-Stack vorkonfiguriert.
+
+---
+
+## Package N – Application Gateway
+
+Der Application Gateway ist als eigenständiger LXC-Dienst auf Port 8220 umgesetzt. Er verwaltet externe und interne Connectoren, Inbound-Webhooks, Routingregeln, Text-/JSON-/TTS-Vorlagen sowie persistente Delivery-Queues mit Retry, TTL, Deduplizierung, Rate Limit, Circuit Breaker und Dead Letter.
+
+Connector-Secrets liegen getrennt und werden in WebUI, Management-GETs, Exporten und normalen Backups redaktiert. Piper-TTS erzeugt validierte WAV-Artefakte; die kontrollierte Ablage und Funkwiedergabe bleibt Aufgabe der folgenden Media Library.

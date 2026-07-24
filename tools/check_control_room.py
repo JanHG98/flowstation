@@ -104,7 +104,7 @@ def main() -> int:
         errors.append("Control Room example must remain no-auth in this phase")
     if config["server"]["bind"].split(":")[-1] != "9010":
         errors.append("Control Room port must be 9010")
-    if len(config.get("services", [])) < 13:
+    if len(config.get("services", [])) < 14:
         errors.append("Control Room example must list all implemented backend services")
 
     for relative in [

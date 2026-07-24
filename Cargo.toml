@@ -27,6 +27,7 @@ members = [
     "system-backend/kmf",
     "system-backend/transit",
     "system-backend/observability",
+    "system-backend/application-gateway",
     #"bins/bluestation-telemetry",
     #"bins/bluestation-control",
     #"bins/pdu-tool",

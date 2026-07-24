@@ -9,7 +9,7 @@ Der Control Room ist die zentrale Leitstellen-, Bedien- und Lageebene für eine 
 - Browser-WebUI auf Port `9010`
 - bestehende TBS- und Operator-WebSockets `/node` und `/ui`
 - Lageübersicht für TBS, Teilnehmer, Gruppen, aktive Rufe und Notfälle
-- Health-/Readiness-Polling aller Core-, Edge-, Media-, Data-, Security- und Transit-Dienste
+- Health-/Readiness-Polling aller Core-, Edge-, Media-, Data-, Security-, Transit-, Observability- und Application-Dienste
 - Abruf der jeweiligen `/api/v1/status`-Zusammenfassung
 - kuratiertes federiertes Kernlagebild mit bevorzugten Kennzahlen aus den autoritativen Fachkernen
 - direkte Links zu den eigenständigen Service-WebUIs
@@ -84,6 +84,6 @@ Die bisherigen `/api/*`- und WebSocket-Endpunkte bleiben kompatibel.
 - keine produktive Authentisierung oder RBAC-Aktivierung in dieser Phase,
 - kein beliebiger HTTP-Schreibproxy zu Fachdiensten,
 - keine Audio-Konsole im Browser; der bestehende native Operator-Client bleibt erhalten,
-- keine Prometheus-/Grafana-/Loki-Installation; das folgt im Observability-LXC,
+- keine lokale Prometheus-/Grafana-/Loki-Installation; diese bleibt im separaten Observability-LXC,
 - kein HA-Cluster oder gemeinsamer Operator-Session-State,
 - kein zertifiziertes Leitstellenprodukt.

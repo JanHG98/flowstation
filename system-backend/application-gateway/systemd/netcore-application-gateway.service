@@ -1,0 +1,38 @@
+[Unit]
+Description=NetCore-Tetra Application Gateway
+Documentation=file:/opt/netcore-application-gateway/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=netcore-app-gateway
+Group=netcore-app-gateway
+ExecStart=/opt/netcore-application-gateway/bin/netcore-application-gateway --config /etc/netcore/application-gateway.toml
+Restart=on-failure
+RestartSec=2
+TimeoutStopSec=30
+WorkingDirectory=/var/lib/netcore-application-gateway
+StateDirectory=netcore-application-gateway
+RuntimeDirectory=netcore-application-gateway
+ConfigurationDirectory=netcore
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+ReadWritePaths=/var/lib/netcore-application-gateway
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,267 @@
+# NetCore-Tetra Application Gateway – Open Lab
+
+[server]
+bind = "0.0.0.0:8220"
+public_base_url = "http://127.0.0.1:8220"
+max_body_bytes = 4194304
+history_limit = 5000
+
+[storage]
+state_path = "/var/lib/netcore-application-gateway/state.json"
+state_backup_path = "/var/lib/netcore-application-gateway/state.json.bak"
+secrets_path = "/var/lib/netcore-application-gateway/secrets.json"
+spool_dir = "/var/lib/netcore-application-gateway/spool"
+backup_dir = "/var/lib/netcore-application-gateway/backups"
+
+[security]
+mode = "open_lab"
+management_token_auth = false
+management_tls = false
+allow_remote_management = true
+connector_secrets_allowed = true
+warning_banner = "OPEN LAB: no login, no management tokens and no TLS. Isolated management network only."
+
+[runtime]
+# shadow calculates and records routes without calling external systems.
+# Change to authoritative only after connector endpoints were verified.
+operating_mode = "shadow"
+worker_interval_ms = 1000
+probe_interval_secs = 30
+default_ttl_secs = 300
+max_attempts = 6
+base_backoff_secs = 2
+max_backoff_secs = 120
+dedupe_window_secs = 600
+max_response_bytes = 65536
+max_artifact_bytes = 33554432
+max_events = 20000
+max_deliveries = 50000
+max_tts_jobs = 5000
+max_audit_records = 50000
+event_retention_secs = 604800
+delivery_retention_secs = 1209600
+audit_retention_secs = 2592000
+
+[[connectors]]
+connector_id = "sds-router"
+display_name = "SDS Router"
+kind = "sds_router"
+direction = "outbound"
+endpoint = "http://127.0.0.1:8150/api/v1/messages"
+health_endpoint = "http://127.0.0.1:8150/health/ready"
+enabled = true
+timeout_ms = 5000
+rate_limit_per_minute = 600
+circuit_failure_threshold = 5
+circuit_open_secs = 60
+required_secrets = []
+settings = { source_issi = "9999", sds_type = "4", protocol_id = "0", priority = "3" }
+
+[[connectors]]
+connector_id = "piper-tts"
+display_name = "Piper TTS"
+kind = "piper_tts"
+direction = "outbound"
+endpoint = "http://127.0.0.1:5005/synthesize"
+health_endpoint = "http://127.0.0.1:5005/voices"
+enabled = true
+timeout_ms = 30000
+rate_limit_per_minute = 30
+circuit_failure_threshold = 3
+circuit_open_secs = 60
+required_secrets = []
+settings = {}
+
+[[connectors]]
+connector_id = "media-library"
+display_name = "Media Library"
+kind = "media_library"
+direction = "outbound"
+endpoint = "http://127.0.0.1:8230/api/v1/assets/import-url"
+health_endpoint = "http://127.0.0.1:8230/health/ready"
+enabled = false
+timeout_ms = 10000
+rate_limit_per_minute = 120
+circuit_failure_threshold = 5
+circuit_open_secs = 60
+required_secrets = []
+settings = { method = "POST" }
+
+[[connectors]]
+connector_id = "telegram"
+display_name = "Telegram Bot"
+kind = "telegram_bot"
+direction = "bidirectional"
+endpoint = "https://api.telegram.org/bot{bot_token}/sendMessage"
+enabled = false
+timeout_ms = 10000
+rate_limit_per_minute = 30
+circuit_failure_threshold = 5
+circuit_open_secs = 120
+required_secrets = ["bot_token"]
+settings = { chat_id = "", parse_mode = "" }
+
+[[connectors]]
+connector_id = "dapnet"
+display_name = "DAPNET Relay"
+kind = "dapnet_http"
+direction = "bidirectional"
+endpoint = "http://127.0.0.1:8225/api/v1/messages"
+enabled = false
+timeout_ms = 10000
+rate_limit_per_minute = 60
+circuit_failure_threshold = 5
+circuit_open_secs = 120
+required_secrets = ["auth_key"]
+settings = { callsign = "" }
+
+[[connectors]]
+connector_id = "meshcom"
+display_name = "MeshCom"
+kind = "meshcom_http"
+direction = "bidirectional"
+endpoint = "http://127.0.0.1:1799/api/message"
+enabled = false
+timeout_ms = 10000
+rate_limit_per_minute = 120
+circuit_failure_threshold = 5
+circuit_open_secs = 60
+required_secrets = ["api_key"]
+settings = {}
+
+[[connectors]]
+connector_id = "snom"
+display_name = "Snom Notify"
+kind = "snom_notify"
+direction = "outbound"
+endpoint = "http://127.0.0.1:8089/notify"
+enabled = false
+timeout_ms = 5000
+rate_limit_per_minute = 120
+circuit_failure_threshold = 5
+circuit_open_secs = 60
+required_secrets = []
+settings = {}
+
+[[connectors]]
+connector_id = "geoalarm"
+display_name = "GeoAlarm"
+kind = "geoalarm_http"
+direction = "bidirectional"
+endpoint = "http://127.0.0.1:8099/api/alarms"
+enabled = false
+timeout_ms = 10000
+rate_limit_per_minute = 60
+circuit_failure_threshold = 5
+circuit_open_secs = 120
+required_secrets = ["api_key"]
+settings = {}
+
+[[connectors]]
+connector_id = "weather"
+display_name = "WX / METAR"
+kind = "weather_http"
+direction = "bidirectional"
+endpoint = "https://aviationweather.gov/api/data/metar"
+enabled = false
+timeout_ms = 10000
+rate_limit_per_minute = 60
+circuit_failure_threshold = 5
+circuit_open_secs = 120
+required_secrets = []
+settings = { station = "EDDV" }
+
+[[connectors]]
+connector_id = "tpg2200"
+display_name = "TPG2200 Bridge"
+kind = "tpg2200_bridge"
+direction = "outbound"
+endpoint = "http://127.0.0.1:8150/api/v1/messages"
+health_endpoint = "http://127.0.0.1:8150/health/ready"
+enabled = false
+timeout_ms = 5000
+rate_limit_per_minute = 120
+circuit_failure_threshold = 5
+circuit_open_secs = 60
+required_secrets = []
+settings = { source_issi = "9999", protocol_id = "130", priority = "3" }
+
+[[connectors]]
+connector_id = "directory"
+display_name = "Status Directory"
+kind = "directory_http"
+direction = "bidirectional"
+endpoint = "http://127.0.0.1:8060/api/v1/events"
+enabled = false
+timeout_ms = 5000
+rate_limit_per_minute = 120
+circuit_failure_threshold = 5
+circuit_open_secs = 60
+required_secrets = []
+settings = { method = "POST" }
+
+[[connectors]]
+connector_id = "generic-webhook"
+display_name = "Generic Webhook"
+kind = "generic_webhook"
+direction = "bidirectional"
+endpoint = "http://127.0.0.1:9000/webhook"
+enabled = false
+timeout_ms = 5000
+rate_limit_per_minute = 60
+circuit_failure_threshold = 5
+circuit_open_secs = 60
+required_secrets = []
+settings = { method = "POST" }
+
+[[rules]]
+rule_id = "manual-to-sds"
+name = "Manual messages to SDS Router"
+enabled = true
+priority = 100
+source_connector = "manual"
+event_type = "sds.message"
+target_connector = "sds-router"
+template_id = "sds-standard"
+stop_processing = false
+
+[[rules]]
+rule_id = "manual-webhook"
+name = "Manual webhook dispatch"
+enabled = false
+priority = 50
+source_connector = "manual"
+event_type = "webhook.message"
+target_connector = "generic-webhook"
+template_id = "generic-event-json"
+stop_processing = false
+
+[[templates]]
+template_id = "sds-standard"
+name = "SDS Standard"
+kind = "text"
+body = "{{text}}"
+content_type = "text/plain; charset=utf-8"
+enabled = true
+target_connector = "sds-router"
+description = "Plain SDS text with destination supplied by the event"
+
+[[templates]]
+template_id = "generic-event-json"
+name = "Generic event JSON"
+kind = "json"
+body = '''{"source":"{{source}}","event_type":"{{event_type}}","destination":"{{destination}}","text":"{{text}}"}'''
+content_type = "application/json"
+enabled = true
+target_connector = "generic-webhook"
+description = "Small interoperable webhook envelope"
+
+[[templates]]
+template_id = "tts-announcement"
+name = "TTS Announcement"
+kind = "tts"
+body = "Achtung. {{text}}"
+content_type = "text/plain; charset=utf-8"
+enabled = true
+target_connector = "piper-tts"
+description = "Reusable TTS announcement prefix"

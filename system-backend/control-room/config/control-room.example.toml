@@ -133,5 +133,12 @@ kind = "interworking"
 base_url = "http://10.0.20.22:8200"
 critical = false
 
+[[services]]
+name = "application-gateway"
+display_name = "Application Gateway"
+kind = "application"
+base_url = "http://10.0.20.23:8220"
+critical = false
+
 [directory]
 hide_infrastructure = true

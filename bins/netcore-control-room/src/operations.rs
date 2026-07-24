@@ -728,6 +728,13 @@ impl SharedOperations {
             "transit_peers_up": first_metric(&state.services, &[
                 ("transit", "peers_up"),
             ]),
+            "application_deliveries_pending": sum_metrics(&state.services, &[
+                ("application-gateway", "deliveries_queued"),
+                ("application-gateway", "deliveries_retry"),
+            ]),
+            "application_dead_letters": first_metric(&state.services, &[
+                ("application-gateway", "deliveries_dead_letter"),
+            ]),
         });
 
         json!({
@@ -1194,6 +1201,13 @@ fn curated_metrics(service_name: &str, summary: Option<&Value>) -> BTreeMap<Stri
             "peers_total", "peers_up", "peers_degraded", "routes_total", "sessions_active",
             "outbound_pending", "local_deliveries_pending", "loop_rejections",
             "duplicate_rejections",
+        ],
+        "application-gateway" => &[
+            "connectors_total", "connectors_enabled", "connectors_healthy", "connectors_degraded",
+            "circuits_open", "events_total", "events_unrouted", "deliveries_queued",
+            "deliveries_retry", "deliveries_delivered", "deliveries_shadowed",
+            "deliveries_dead_letter", "tts_jobs_total", "tts_jobs_ready",
+            "missing_required_secrets",
         ],
         _ => &[],
     };

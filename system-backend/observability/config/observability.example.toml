@@ -193,6 +193,17 @@ enabled = true
 labels = { environment = "open-lab", component = "transit" }
 
 [[targets]]
+target_id = "application-gateway"
+display_name = "Application Gateway"
+service = "application-gateway"
+base_url = "http://127.0.0.1:8220"
+metrics_path = "/metrics"
+live_path = "/health/live"
+ready_path = "/health/ready"
+enabled = true
+labels = { environment = "open-lab", component = "application-gateway" }
+
+[[targets]]
 target_id = "control-room"
 display_name = "Control Room"
 service = "control-room"

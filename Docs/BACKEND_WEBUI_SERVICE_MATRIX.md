@@ -15,10 +15,10 @@
 | KMF | CCK/GCK/SCK, Key-Versionen, Crypto Periods, Rotation, OTAR, Vault und Backup | Rotation, Revoke/Destroy, OTAR-Freigabe und Backup; keine Rohschlüsselanzeige, im Testpaket bewusst offen ohne Tokens |
 | Transit | Regionen, Peers, Teilnehmer-/Gruppenregionen, Routen, Sessions, Queues und Failover | Peer sperren, Route ändern, Envelope einspeisen und Failover auslösen; im Testpaket bewusst offen ohne Tokens |
 | Control Room | Operatoren, Arbeitsplätze, Backend-Verknüpfung | Rollen, Tokens, Leitstellenkonfiguration |
-| Application Gateway | Connectoren, Queues, Webhooks | Connector aktivieren, Secrets ersetzen |
+| Application Gateway | Connectoren, Webhooks, Routing, Vorlagen, Delivery-/Dead-Letter-Queues und TTS | Connector aktivieren, Secrets ersetzen, Fremdzustellung auslösen und TTS veröffentlichen; im Testpaket bewusst offen ohne Management-Tokens |
 | Media Library | Audio, TTS, Vorlagen, Storage | Upload, Löschen, Freigabe |
 | Recorder | Aufnahmen, Suche, Retention, Integrität | Export, Retention, Hold und Löschung; im Testpaket bewusst offen ohne Tokens |
-| Observability | Metriken, Logs, Traces, Alarme | Alarmregeln, Retention, Stummschaltung |
+| Observability | Metriken, Logs, Traces, Alarme und Diagnose | Alarmregeln, Retention, Stummschaltung und Diagnoseexport; im Testpaket bewusst offen ohne Tokens |
 | Shared | kein Container; gemeinsames UI-Kit | nicht zutreffend |
 
 ## Gemeinsame Seiten

@@ -1,0 +1,38 @@
+name: SWMI Core Application Gateway
+
+on:
+  push:
+    paths:
+      - "system-backend/application-gateway/**"
+      - "tools/check_application_gateway.py"
+      - "Docs/SWMI_CORE_1_PACKAGE_N_APPLICATION_GATEWAY.md"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/swmi-core-application-gateway.yml"
+  pull_request:
+    paths:
+      - "system-backend/application-gateway/**"
+      - "tools/check_application_gateway.py"
+      - "Docs/SWMI_CORE_1_PACKAGE_N_APPLICATION_GATEWAY.md"
+      - "Cargo.toml"
+      - "Cargo.lock"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Static package check
+        run: python3 tools/check_application_gateway.py
+      - name: Format
+        run: cargo fmt --all -- --check
+      - name: Build
+        run: cargo build --locked --package netcore-application-gateway
+      - name: Test
+        run: cargo test --locked --package netcore-application-gateway
+      - name: Clippy
+        run: cargo clippy --locked --package netcore-application-gateway --all-targets -- -D warnings
