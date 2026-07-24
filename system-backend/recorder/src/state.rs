@@ -663,6 +663,31 @@ impl SharedRecorder {
         finalize_recording_locked(&mut state, &session_id, "manual_finalize")
     }
 
+    pub fn recording_audio_path(&self, id: &str) -> Result<PathBuf, String> {
+        let state = self.0.lock().expect("recorder state poisoned");
+        require_management(&state)?;
+        let metadata = state
+            .recordings
+            .get(id)
+            .cloned()
+            .ok_or_else(|| "recording not found or still active".to_string())?;
+        let directory = recording_directory(&state, &metadata)?;
+        let path = directory.join("audio.tacelp");
+        let canonical = path
+            .canonicalize()
+            .map_err(|error| format!("cannot resolve recording audio {}: {error}", path.display()))?;
+        let root = state
+            .config
+            .storage
+            .root
+            .canonicalize()
+            .map_err(|error| format!("cannot resolve recorder root: {error}"))?;
+        if !canonical.starts_with(root) || !canonical.is_file() {
+            return Err("recording audio escaped recorder root or is unavailable".to_string());
+        }
+        Ok(canonical)
+    }
+
     pub fn export_recording(&self, id: &str) -> Result<PathBuf, String> {
         let (metadata, directory, output) = {
             let state = self.0.lock().expect("recorder state poisoned");

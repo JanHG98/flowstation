@@ -31,7 +31,7 @@ Die Standardkonfiguration enthält Adapter beziehungsweise Verträge für:
 |---|---|---|
 | SDS Router | outbound | nativer NetCore-Aufruf |
 | Piper TTS | outbound | nativer Synthese-Workflow |
-| Media Library | outbound | Import-URL-Vertrag, bis LXC 15 standardmäßig deaktiviert |
+| Media Library | outbound | nativer Import-URL-Vertrag, standardmäßig aktiviert |
 | Telegram Bot | bidirectional | Bot-API outbound, Webhook-Ingress über Gateway |
 | DAPNET | bidirectional | gekapselter HTTP-Relay-Vertrag |
 | MeshCom | bidirectional | gekapselter HTTP-Relay-Vertrag |

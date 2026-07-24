@@ -140,5 +140,12 @@ kind = "application"
 base_url = "http://10.0.20.23:8220"
 critical = false
 
+[[services]]
+name = "media-library"
+display_name = "Media Library"
+kind = "media"
+base_url = "http://10.0.20.24:8230"
+critical = false
+
 [directory]
 hide_infrastructure = true

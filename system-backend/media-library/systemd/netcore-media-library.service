@@ -1,0 +1,38 @@
+[Unit]
+Description=NetCore-Tetra Media Library (OPEN LAB)
+Documentation=file:/opt/netcore-media-library/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=netcore-media-library
+Group=netcore-media-library
+ExecStart=/opt/netcore-media-library/bin/netcore-media-library --config /etc/netcore/media-library.toml
+Restart=on-failure
+RestartSec=2
+TimeoutStopSec=30
+WorkingDirectory=/var/lib/netcore-media-library
+StateDirectory=netcore-media-library
+RuntimeDirectory=netcore-media-library
+ConfigurationDirectory=netcore
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+ReadWritePaths=/var/lib/netcore-media-library -/mnt/nfs-share/Media-Library
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+[Install]
+WantedBy=multi-user.target

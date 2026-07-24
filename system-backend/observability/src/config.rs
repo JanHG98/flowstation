@@ -349,6 +349,7 @@ fn default_targets() -> Vec<TargetConfig> {
         target("kmf", "KMF", "kmf", 8190),
         target("transit", "Transit", "transit", 8200),
         target("application-gateway", "Application Gateway", "application-gateway", 8220),
+        target("media-library", "Media Library", "media-library", 8230),
         target("control-room", "Control Room", "control-room", 9010),
     ]
 }

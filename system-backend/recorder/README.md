@@ -92,6 +92,7 @@ Während der Aufnahme heißen Audio und Index `*.part`; `metadata.active.json` i
 | POST | `/api/v1/recordings/{id}/finalize` | aktive Aufnahme manuell schließen |
 | POST | `/api/v1/recordings/{id}/delete` | endgültig löschen, sofern erlaubt |
 | GET | `/api/v1/recordings/{id}/export` | unkomprimiertes TAR erzeugen/laden |
+| GET | `/api/v1/recordings/{id}/audio.tacelp` | unveränderte Rohframes für Media-Library-Import |
 | GET | `/api/v1/events` | Ereignisverlauf |
 | GET | `/metrics` | Prometheus-Textformat |
 

@@ -1,0 +1,52 @@
+name: SWMI Core Media Library
+
+on:
+  push:
+    paths:
+      - "system-backend/media-library/**"
+      - "system-backend/recorder/**"
+      - "system-backend/application-gateway/**"
+      - "system-backend/observability/**"
+      - "system-backend/control-room/config/control-room.example.toml"
+      - "bins/netcore-control-room/src/config.rs"
+      - "system-backend/services.toml"
+      - "Docs/BACKEND_WEBUI_SERVICE_MATRIX.md"
+      - "tools/check_media_library.py"
+      - "Docs/SWMI_CORE_1_PACKAGE_O_MEDIA_LIBRARY.md"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/swmi-core-media-library.yml"
+  pull_request:
+    paths:
+      - "system-backend/media-library/**"
+      - "system-backend/recorder/**"
+      - "system-backend/application-gateway/**"
+      - "system-backend/observability/**"
+      - "system-backend/control-room/config/control-room.example.toml"
+      - "bins/netcore-control-room/src/config.rs"
+      - "system-backend/services.toml"
+      - "Docs/BACKEND_WEBUI_SERVICE_MATRIX.md"
+      - "tools/check_media_library.py"
+      - "Docs/SWMI_CORE_1_PACKAGE_O_MEDIA_LIBRARY.md"
+      - "Cargo.toml"
+      - "Cargo.lock"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Static package check
+        run: python3 tools/check_media_library.py
+      - name: Format
+        run: cargo fmt --all -- --check
+      - name: Build
+        run: cargo build --locked --package netcore-media-library --package netcore-recorder
+      - name: Test
+        run: cargo test --locked --package netcore-media-library --package netcore-recorder
+      - name: Clippy
+        run: cargo clippy --locked --package netcore-media-library --package netcore-recorder --all-targets -- -D warnings

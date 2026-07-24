@@ -273,6 +273,7 @@ fn default_core_services() -> Vec<CoreServiceConfig> {
         service("kmf", "KMF", "security", 8190, false),
         service("transit", "Transit", "interworking", 8200, false),
         service("application-gateway", "Application Gateway", "application", 8220, false),
+        service("media-library", "Media Library", "media", 8230, false),
     ]
 }
 

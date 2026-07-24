@@ -125,6 +125,17 @@ fn recording_route(request: HttpRequest, recorder: SharedRecorder) -> HttpRespon
             |()| json_response(200, &json!({"deleted":true,"id":id})),
         ),
         ("POST", "finalize") => result_response(recorder.finalize_active(id)),
+        ("GET", "audio.tacelp") => match recorder.recording_audio_path(id) {
+            Ok(path) => file_response(
+                path,
+                "application/x-tetra-acelp",
+                vec![(
+                    "Content-Disposition".to_string(),
+                    format!("attachment; filename=\"netcore-recording-{id}.tacelp\""),
+                )],
+            ),
+            Err(error) => error_response(error),
+        },
         ("GET", "export") => match recorder.export_recording(id) {
             Ok(path) => file_response(
                 path,
@@ -245,6 +256,7 @@ fn openapi() -> serde_json::Value {
             "/api/v1/recordings/{id}/delete":{"post":{}},
             "/api/v1/recordings/{id}/finalize":{"post":{}},
             "/api/v1/recordings/{id}/export":{"get":{}},
+            "/api/v1/recordings/{id}/audio.tacelp":{"get":{}},
             "/api/v1/events":{"get":{}},
             "/api/v1/config":{"get":{}},
             "/metrics":{"get":{}}

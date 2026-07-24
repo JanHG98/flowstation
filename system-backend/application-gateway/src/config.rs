@@ -426,7 +426,7 @@ fn default_connectors() -> Vec<ConnectorSeed> {
         "media_library",
         "outbound",
         "http://127.0.0.1:8230/api/v1/assets/import-url",
-        false,
+        true,
     );
     media.health_endpoint = Some("http://127.0.0.1:8230/health/ready".to_string());
 

@@ -28,6 +28,7 @@ members = [
     "system-backend/transit",
     "system-backend/observability",
     "system-backend/application-gateway",
+    "system-backend/media-library",
     #"bins/bluestation-telemetry",
     #"bins/bluestation-control",
     #"bins/pdu-tool",

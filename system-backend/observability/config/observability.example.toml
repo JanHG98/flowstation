@@ -204,6 +204,17 @@ enabled = true
 labels = { environment = "open-lab", component = "application-gateway" }
 
 [[targets]]
+target_id = "media-library"
+display_name = "Media Library"
+service = "media-library"
+base_url = "http://127.0.0.1:8230"
+metrics_path = "/metrics"
+live_path = "/health/live"
+ready_path = "/health/ready"
+enabled = true
+labels = { environment = "open-lab", component = "media-library" }
+
+[[targets]]
 target_id = "control-room"
 display_name = "Control Room"
 service = "control-room"

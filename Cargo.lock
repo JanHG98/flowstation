@@ -1194,6 +1194,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "netcore-media-library"
+version = "1.3.0"
+dependencies = [
+ "base64",
+ "chrono",
+ "clap",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sha2",
+ "toml",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
 name = "netcore-media-switch"
 version = "1.3.0"
 dependencies = [
