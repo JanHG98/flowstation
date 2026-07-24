@@ -1148,6 +1148,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "netcore-ip-gateway"
+version = "1.3.0"
+dependencies = [
+ "chrono",
+ "clap",
+ "libc",
+ "serde",
+ "serde_json",
+ "toml",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
 name = "netcore-media-switch"
 version = "1.3.0"
 dependencies = [

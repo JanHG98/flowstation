@@ -10,7 +10,7 @@
 | Media Switch | Streams, Jitter, Routing, TBS-Legs, Recorder-Taps | Stream stummschalten, Puffer leeren, Testframe einspeisen; im Testpaket bewusst offen ohne Tokens |
 | SDS Router | Nachrichten, Queues, Zustelltrace | Nachricht senden, Retry, Queue löschen; im Testpaket bewusst offen ohne Tokens |
 | Packet Core | PDP Contexts, NSAPI, READY/STANDBY, Bearer, Fragmentierung und Flow Control | Kontext pagen, modifizieren, beenden oder trennen; im Testpaket bewusst offen ohne Tokens |
-| IP Gateway | Routing, NAT, Firewall, Capture | Firewall ändern, Capture starten |
+| IP Gateway | TUN, PDP-IP-Leases, Routing, NAT, Firewall, DNS, WAP/Testdienste, Flows und PCAP | Kernel-Reconcile, Route/NAT/Firewall ändern, Flow blockieren und Capture starten; im Testpaket bewusst offen ohne Tokens |
 | Security Core | Authentisierung, Policies, Sperren | Security Policy, Kontextwiderruf |
 | KMF | Key-Metadaten, OTAR, Crypto Periods | Rotation, OTAR, Restore; keine Rohschlüsselanzeige |
 | Transit | Regionen, Peers, Routen, Failover | Peer sperren, Failover, Route ändern |

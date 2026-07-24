@@ -1,0 +1,72 @@
+[server]
+bind = "0.0.0.0:8170"
+
+[packet_core]
+url = "http://127.0.0.1:8160"
+poll_interval_ms = 250
+context_refresh_ms = 1000
+request_timeout_ms = 2000
+outbox_batch = 250
+
+[storage]
+database_path = "/var/lib/netcore-ip-gateway/state.json"
+backup_path = "/var/lib/netcore-ip-gateway/state.json.bak"
+
+[interface]
+# shadow: Packet Core, Regeln und Kernel-Plan beobachten, aber kein TUN öffnen.
+# authoritative: /dev/net/tun öffnen, IP-Pakete transportieren und Kernelregeln anwenden.
+mode = "shadow"
+name = "ntc-tun0"
+address = "10.0.0.1/24"
+network = "10.0.0.0/24"
+mtu = 480
+owner_user = "netcore"
+delete_on_exit = true
+
+[routing]
+enable_ipv4_forwarding = true
+reconcile_interval_secs = 5
+install_connected_route = true
+
+[nat]
+enabled = true
+masquerade = true
+egress_interface = "eth0"
+
+[firewall]
+enabled = true
+default_forward_policy = "drop"
+allow_established = true
+# Im isolierten Labor standardmäßig freie Fahrt nach außen; vor Produktivbetrieb einschränken.
+allow_general_internet = true
+allow_icmp = true
+log_drops = false
+
+[dns]
+enabled = true
+bind = "0.0.0.0:53"
+upstream = "1.1.1.1:53"
+local_domain = "netcore.test"
+ttl_secs = 30
+query_timeout_ms = 2000
+
+[test_server]
+enabled = true
+bind = "0.0.0.0:8088"
+udp_echo_bind = "0.0.0.0:7007"
+
+[capture]
+directory = "/var/lib/netcore-ip-gateway/captures"
+max_captures = 64
+max_file_bytes = 268435456
+snaplen = 65535
+
+[security]
+mode = "open_lab"
+allow_remote_management = true
+
+[limits]
+max_body_bytes = 2097152
+max_events = 100000
+max_flows = 100000
+max_packet_bytes = 65535

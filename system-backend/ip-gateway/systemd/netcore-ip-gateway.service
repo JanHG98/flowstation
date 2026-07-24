@@ -1,0 +1,29 @@
+[Unit]
+Description=NetCore IP Gateway (OPEN LAB)
+After=network-online.target netcore-packet-core.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=netcore
+Group=netcore
+ExecStart=/usr/local/bin/netcore-ip-gateway --config /etc/netcore/ip-gateway.toml
+Restart=on-failure
+RestartSec=2
+NoNewPrivileges=true
+AmbientCapabilities=CAP_NET_ADMIN CAP_NET_RAW CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW CAP_NET_BIND_SERVICE
+PrivateTmp=true
+PrivateDevices=false
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=false
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_NETLINK AF_UNIX
+DeviceAllow=/dev/net/tun rw
+ReadWritePaths=/var/lib/netcore-ip-gateway /proc/sys/net/ipv4/ip_forward
+Environment=RUST_LOG=netcore_ip_gateway=info
+
+[Install]
+WantedBy=multi-user.target

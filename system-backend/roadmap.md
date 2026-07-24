@@ -1281,9 +1281,37 @@ Die lokale TLPD-Runtime ist abgeschlossen. Sie bleibt auf der TBS und stellt Dia
 
 ## Aktueller Stand: SWMI Mobility 1 und Core 1
 
-Die lokale Funkstack- und Mobility-Grundlage ist abgeschlossen. Darauf aufbauend sind die zentralen Open-Lab-Dienste `node-gateway`, `mobility-core`, `subscriber-core`, `group-core`, `call-control`, `media-switch`, `recorder` und `sds-router` jeweils mit eigener WebUI umgesetzt.
+Die lokale Funkstack- und Mobility-Grundlage ist abgeschlossen. Darauf aufbauend sind die zentralen Open-Lab-Dienste `node-gateway`, `mobility-core`, `subscriber-core`, `group-core`, `call-control`, `media-switch`, `recorder`, `sds-router`, `packet-core` und `ip-gateway` jeweils mit eigener WebUI umgesetzt.
 
-Der SDS Router nutzt den offenen Backend-WebSocket des Node Gateway, übernimmt netzweites Individual-, Gruppen-, Status- und Protocol-ID-Routing und lässt die Air-Interface-nahe Zustellung bewusst in der TBS. Der nächste zentrale Dienst ist `packet-core`; anschließend folgt die Kopplung an `ip-gateway`.
+Der Packet Core hält PDP-/NSAPI-Zustand, Reassembly und Downlink-Queue. Der IP Gateway koppelt dessen vollständige IPv4-N-PDUs über Linux-TUN an Routing, nftables, NAT, DNS sowie lokale WAP-/Testdienste und erzeugt direkt PCAP-Dateien. Als nächster zentraler Ausbau folgt die Security-Phase mit `security-core` und danach KMF.
 
 Bis zur späteren Security-Phase bleiben alle genannten LXC-Dienste ausdrücklich `open_lab`: keine Tokens, keine Benutzerkonten und kein TLS. Das ist nur für das isolierte Testnetz vorgesehen.
 
+
+
+# SWMI Core 1 – Paket H: IP Gateway
+
+## Ergebnis
+
+Paket H ergänzt den eigenständigen LXC-Dienst `system-backend/ip-gateway/` mit WebUI auf Port 8170. Vollständige IPv4-N-PDUs aus dem Packet Core werden ohne künstliche Ethernet-Schicht über ein Linux-TUN-Interface in normale IP-Netze überführt.
+
+## Funktionen
+
+- TUN-Interface und bidirektionale Packet-Core-Kopplung
+- IPv4-zu-ISSI/NSAPI-Zuordnung aus den aktiven PDP-Kontexten
+- Routing, IPv4-Forwarding und Kernel-Reconcile
+- nftables-Firewall, Flow-Block und Default-Policies
+- Masquerading, SNAT und DNAT
+- DNS-Forwarder mit statischen A-Records
+- WAP/WML-, HTTP- und UDP-Testdienste
+- Flow-Zähler und rohe IPv4-PCAPs (`DLT_RAW`)
+- Shadow- und Authoritative-Modus
+- persistente Regeln, API, OpenAPI, Metrics und eigene WebUI
+
+## Architekturgrenze
+
+Der Packet Core bleibt Eigentümer der SNDCP-State-Machine, Fragmentierung, Reassembly, Mobility Anchors und Downlink-Queue. Der IP Gateway kennt keine Air-PDUs und weist keine NSAPI zu. Er transportiert ausschließlich vollständige IP-N-PDUs.
+
+## Sicherheitsstatus
+
+Der Dienst läuft in der aktuellen Teststufe als `open_lab`: keine Anmeldung, keine Token und kein TLS. Im Authoritative-Modus besitzt er bewusst `CAP_NET_ADMIN`, `CAP_NET_RAW` und `CAP_NET_BIND_SERVICE`; deshalb ausschließlich im isolierten Labor betreiben.

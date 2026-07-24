@@ -358,7 +358,7 @@ impl SharedPacketCore {
     }
 
     pub fn npdu_outbox(&self, limit: usize) -> Vec<NpduRecord> {
-        self.lock().database.npdu_outbox.iter().rev().take(limit).cloned().collect()
+        self.lock().database.npdu_outbox.iter().take(limit).cloned().collect()
     }
 
     pub fn recent_events(&self, limit: usize) -> Vec<PacketEventRecord> {
