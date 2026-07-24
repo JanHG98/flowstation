@@ -51,7 +51,8 @@ Die bisher umgesetzten LXC-Dienste starten im ausdrücklich markierten `open_lab
 - `packet-core`: umgesetzt, PDP-/NSAPI-Kontexte, Fragmentierung, Mobility Anchor und WebUI
 - `ip-gateway`: umgesetzt, TUN, Routing, Firewall/NAT, DNS/WAP-Test und WebUI
 - `security-core`: umgesetzt, Security-Class-Policy, Challenge/Response, DCK-Kontexte, Sperren, Alarm/Audit und WebUI
-- nächster Security-Baustein: `kmf`
+- `kmf`: umgesetzt, CCK/GCK/SCK-Lifecycle, Key-Versionen, Crypto Periods, Rotation, versiegelte OTAR-Aktionen, Backup und WebUI
+- nächster Core-Baustein: `transit`
 - nächster Media-Baustein: `media-library` / Audio Player auf Basis des stabilen Recorder-Formats
 
 # 2. Normative Grundlage
@@ -1284,9 +1285,9 @@ Die lokale TLPD-Runtime ist abgeschlossen. Sie bleibt auf der TBS und stellt Dia
 
 ## Aktueller Stand: SWMI Mobility 1 und Core 1
 
-Die lokale Funkstack- und Mobility-Grundlage ist abgeschlossen. Darauf aufbauend sind die zentralen Open-Lab-Dienste `node-gateway`, `mobility-core`, `subscriber-core`, `group-core`, `call-control`, `media-switch`, `recorder`, `sds-router`, `packet-core` und `ip-gateway` jeweils mit eigener WebUI umgesetzt.
+Die lokale Funkstack- und Mobility-Grundlage ist abgeschlossen. Darauf aufbauend sind die zentralen Open-Lab-Dienste `node-gateway`, `mobility-core`, `subscriber-core`, `group-core`, `call-control`, `media-switch`, `recorder`, `sds-router`, `packet-core`, `ip-gateway`, `security-core` und `kmf` jeweils mit eigener WebUI umgesetzt.
 
-Der Packet Core hält PDP-/NSAPI-Zustand, Reassembly und Downlink-Queue. Der IP Gateway koppelt dessen vollständige IPv4-N-PDUs über Linux-TUN an Routing, nftables, NAT, DNS sowie lokale WAP-/Testdienste und erzeugt direkt PCAP-Dateien. Als nächster zentraler Ausbau folgt die Security-Phase mit `security-core` und danach KMF.
+Der Packet Core hält PDP-/NSAPI-Zustand, Reassembly und Downlink-Queue. Der IP Gateway koppelt dessen vollständige IPv4-N-PDUs über Linux-TUN an Routing, nftables, NAT, DNS sowie lokale WAP-/Testdienste und erzeugt direkt PCAP-Dateien. Security Core und KMF ergänzen Security-Class-Policy, Authentisierungs-/DCK-Orchestrierung sowie CCK/GCK/SCK-Lifecycle, Crypto Periods, Rotation, nodegebundene OTAR-Envelopes und sichere Vault-Backups. Als nächster zentraler LXC-Dienst folgt `transit`.
 
 Bis zur späteren Security-Phase bleiben alle genannten LXC-Dienste ausdrücklich `open_lab`: keine Tokens, keine Benutzerkonten und kein TLS. Das ist nur für das isolierte Testnetz vorgesehen.
 
@@ -1327,3 +1328,14 @@ Der Dienst läuft in der aktuellen Teststufe als `open_lab`: keine Anmeldung, ke
 Der Security Core ist als eigenständiger LXC-Dienst auf Port 8180 umgesetzt. Er verwaltet Sicherheitsprofile, Security-Class-Aushandlung, Challenge/Response-Kontexte, kurzlebige DCK-Installationsaufträge, Teilnehmer-/Gerätesperren, Alarme und Audit. Das Management bleibt in der aktuellen Testphase `open_lab`; Rohgeheimnisse sind aus normalen Managementpfaden ausgeschlossen.
 
 Der mitgelieferte HMAC-Lab-Provider ist nur für Integrationstests vorgesehen. Langzeitschlüssel, normative Authentisierungsprovider, CCK/GCK/SCK und OTAR folgen getrennt im nächsten Baustein `kmf`.
+
+---
+
+## Package J – KMF
+
+Die Key Management Facility ist als eigenständiger LXC-Dienst auf Port 8190 umgesetzt. Sie verwaltet CCK, GCK und SCK mit versionierten Crypto Periods, Rotation, Vorgänger-/Nachfolgerketten, Vier-Augen-Workflow, nodegebundener OTAR-Zustellung, Retry/Timeout, hashverkettetem Audit sowie verschlüsseltem Lab-Vault und verifizierten Backups.
+
+Die normale WebUI und Management-API geben kein Rohschlüsselmaterial aus. Edge-Zustellungen enthalten ausschließlich einen an das Ziel-Node gebundenen versiegelten Envelope. Der aktuelle `lab_file_vault` und das Lab-Envelope sind klar als Integrationsmechanismen markiert; HSM/PKCS#11, TETRA-TA-Algorithmen und D-OTAR-Air-Interface-PDUs bleiben spätere Ausbaustufen.
+
+Der Dienst bleibt in dieser Phase `open_lab`: keine Anmeldung, keine Tokens und kein TLS. Standard ist `shadow`; erst `authoritative` stellt vollständig freigegebene OTAR-Aktionen für die TBS Edge bereit.
+

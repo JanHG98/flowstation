@@ -121,8 +121,15 @@ warning = "OPEN LAB: no authentication, no tokens and no TLS; every reachable cl
 [[services]]
 name = "kmf"
 webui = true
+scheme = "http"
+management_port = 8190
+security_mode = "open_lab"
+token_auth = false
+tls = false
 restricted_management_network = true
 raw_secret_display = false
+depends_on = ["security-core"]
+warning = "OPEN LAB: no authentication, no tokens and no TLS; every reachable client may generate, rotate, revoke or destroy keys and release sealed OTAR actions"
 
 [[services]]
 name = "transit"

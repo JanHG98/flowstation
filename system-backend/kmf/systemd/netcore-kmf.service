@@ -1,0 +1,32 @@
+[Unit]
+Description=NetCore-Tetra Key Management Facility
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=netcore-kmf
+Group=netcore-kmf
+ExecStart=/usr/local/bin/netcore-kmf --config /etc/netcore/kmf.toml
+Restart=on-failure
+RestartSec=3
+Environment=RUST_LOG=netcore_kmf=info
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+ReadWritePaths=/var/lib/netcore-kmf
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+[Install]
+WantedBy=multi-user.target

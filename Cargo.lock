@@ -1163,6 +1163,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "netcore-kmf"
+version = "1.3.0"
+dependencies = [
+ "chrono",
+ "clap",
+ "serde",
+ "serde_json",
+ "sha2",
+ "toml",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
 name = "netcore-media-switch"
 version = "1.3.0"
 dependencies = [

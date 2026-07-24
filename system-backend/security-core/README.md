@@ -52,3 +52,7 @@ curl http://127.0.0.1:8180/api/v1/status
 - [Lab-Provider und Geheimnisse](docs/lab-provider-secret-handling.md)
 - [Open Lab](docs/open-lab-mode.md)
 - [LXC-Deployment](docs/lxc-deployment.md)
+
+## Beziehung zur KMF
+
+Die KMF unter `system-backend/kmf/` übernimmt jetzt CCK, GCK, SCK, Key-Versionen, Crypto Periods, Rotation und OTAR-Orchestrierung. Der Security Core bleibt für Authentisierung, Security-Class-Policy, Disable/Enable und kurzlebige DCK-Kontexte zuständig.
