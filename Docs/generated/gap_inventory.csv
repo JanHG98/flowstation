@@ -20,11 +20,11 @@ Todo-Typ,Typ-Platzhalter,Runtime,crates/tetra-core/src/tetra_common.rs,2,pub typ
 panic!,prüfen,Runtime,crates/tetra-core/src/tx_receipt.rs,114,panic!(
 panic!,prüfen,Runtime,crates/tetra-core/src/typed_pdu_fields.rs,194,"_ => panic!(), // Never happens"
 unimplemented!,kritisch,Runtime,crates/tetra-core/src/typed_pdu_fields.rs,641,"unimplemented!(""can't generically write a type4 field"");"
-unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/cmce/cmce_bs.rs,363,"unimplemented_log!(""{:?}"", pdu_type);"
-panic!,prüfen,Runtime,crates/tetra-entities/src/cmce/cmce_bs.rs,491,"panic!(""Unexpected message on LcmcSap: {:?}"", message.msg);"
-unreachable!,prüfen,Runtime,crates/tetra-entities/src/cmce/cmce_bs.rs,500,unreachable!();
-panic!,prüfen,Runtime,crates/tetra-entities/src/cmce/cmce_bs.rs,509,"panic!(""Unexpected control message: {:?}"", message.msg);"
-panic!,prüfen,Runtime,crates/tetra-entities/src/cmce/cmce_bs.rs,513,"panic!(""Unexpected SAP: {:?}"", message.sap);"
+unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/cmce/cmce_bs.rs,400,"unimplemented_log!(""{:?}"", pdu_type);"
+panic!,prüfen,Runtime,crates/tetra-entities/src/cmce/cmce_bs.rs,528,"panic!(""Unexpected message on LcmcSap: {:?}"", message.msg);"
+unreachable!,prüfen,Runtime,crates/tetra-entities/src/cmce/cmce_bs.rs,537,unreachable!();
+panic!,prüfen,Runtime,crates/tetra-entities/src/cmce/cmce_bs.rs,546,"panic!(""Unexpected control message: {:?}"", message.msg);"
+panic!,prüfen,Runtime,crates/tetra-entities/src/cmce/cmce_bs.rs,550,"panic!(""Unexpected SAP: {:?}"", message.sap);"
 TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/cmce/components/circuit_mgr.rs,148,// TODO FIXME we may do a bit smarter allocation here
 TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/cmce/components/circuit_mgr.rs,186,"circuit_mode: CircuitModeType::TchS, // TODO: only speech supported for now"
 TODO/FIXME,technische Schuld,Runtime,crates/tetra-entities/src/cmce/components/circuit_mgr.rs,187,"// endpoint_id: 0, // TODO, we don't use endpoints as of yet"
@@ -73,15 +73,15 @@ unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/cmce/s
 Todo-Typ,Typ-Platzhalter,Runtime,crates/tetra-entities/src/cmce/subentities/sds_bs.rs,7,"use tetra_core::{BitBuffer, Sap, SsiType, TdmaTime, TetraAddress, Todo, tetra_entities::TetraEntity, unimplemented_log};"
 Todo-Typ,Typ-Platzhalter,Runtime,crates/tetra-entities/src/cmce/subentities/sds_bs.rs,64,const SECONDARY_CARRIER_HINT: Todo = -2;
 Todo-Typ,Typ-Platzhalter,Runtime,crates/tetra-entities/src/cmce/subentities/sds_bs.rs,73,fn sds_carrier_hint(logical_ts: u8) -> Option<Todo> {
-Todo-Typ,Typ-Platzhalter,Runtime,crates/tetra-entities/src/cmce/subentities/sds_bs.rs,1141,"_ => (false, None, Layer2Service::Todo),"
-unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/cmce/subentities/sds_bs.rs,1608,"unimplemented_log!(""SDS: short number addressing not supported"");"
-unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/cmce/subentities/sds_bs.rs,1615,"unimplemented_log!(""SDS: TSI extension addressing not supported"");"
-unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/cmce/subentities/sds_bs.rs,1618,"unimplemented_log!(""SDS: external_subscriber_number not supported"");"
-unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/cmce/subentities/sds_bs.rs,1621,"unimplemented_log!(""SDS: dm_ms_address not supported"");"
-unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/cmce/subentities/sds_bs.rs,1630,"unimplemented_log!(""SDS-STATUS: short number addressing not supported"");"
-unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/cmce/subentities/sds_bs.rs,1637,"unimplemented_log!(""SDS-STATUS: TSI extension addressing not supported"");"
-unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/cmce/subentities/sds_bs.rs,1640,"unimplemented_log!(""SDS-STATUS: external_subscriber_number not supported"");"
-unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/cmce/subentities/sds_bs.rs,1643,"unimplemented_log!(""SDS-STATUS: dm_ms_address not supported"");"
+Todo-Typ,Typ-Platzhalter,Runtime,crates/tetra-entities/src/cmce/subentities/sds_bs.rs,1292,"_ => (false, None, Layer2Service::Todo),"
+unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/cmce/subentities/sds_bs.rs,1784,"unimplemented_log!(""SDS: short number addressing not supported"");"
+unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/cmce/subentities/sds_bs.rs,1791,"unimplemented_log!(""SDS: TSI extension addressing not supported"");"
+unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/cmce/subentities/sds_bs.rs,1794,"unimplemented_log!(""SDS: external_subscriber_number not supported"");"
+unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/cmce/subentities/sds_bs.rs,1797,"unimplemented_log!(""SDS: dm_ms_address not supported"");"
+unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/cmce/subentities/sds_bs.rs,1806,"unimplemented_log!(""SDS-STATUS: short number addressing not supported"");"
+unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/cmce/subentities/sds_bs.rs,1813,"unimplemented_log!(""SDS-STATUS: TSI extension addressing not supported"");"
+unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/cmce/subentities/sds_bs.rs,1816,"unimplemented_log!(""SDS-STATUS: external_subscriber_number not supported"");"
+unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/cmce/subentities/sds_bs.rs,1819,"unimplemented_log!(""SDS-STATUS: dm_ms_address not supported"");"
 panic!,prüfen,Runtime,crates/tetra-entities/src/cmce/subentities/sds_ms.rs,20,panic!();
 unimplemented_log!,offener Runtime-Pfad,Runtime,crates/tetra-entities/src/cmce/subentities/sds_ms.rs,33,"unimplemented_log!(""rx_sds_data not implemented"");"
 panic!,prüfen,Runtime,crates/tetra-entities/src/cmce/subentities/sds_ms.rs,43,panic!();
@@ -231,6 +231,7 @@ panic!,prüfen,Runtime,crates/tetra-entities/src/net_control/codec.rs,83,"panic!
 panic!,prüfen,Runtime,crates/tetra-entities/src/net_control/codec.rs,99,"panic!(""expected CommandA"");"
 panic!,prüfen,Runtime,crates/tetra-entities/src/net_control/codec.rs,112,"panic!(""expected CommandAResponse"");"
 panic!,prüfen,Runtime,crates/tetra-entities/src/net_control/codec.rs,125,"panic!(""expected SendSdsResponse"");"
+panic!,prüfen,Runtime,crates/tetra-entities/src/net_control/codec.rs,185,"panic!(""expected SdsDeliveryResponse"");"
 panic!,prüfen,Runtime,crates/tetra-entities/src/net_telemetry/channel.rs,108,"panic!(""expected Attach variant"");"
 panic!,prüfen,Runtime,crates/tetra-entities/src/net_telemetry/codec.rs,56,"panic!(""expected Registration"");"
 panic!,prüfen,Runtime,crates/tetra-entities/src/net_telemetry/codec.rs,68,"panic!(""expected Registration"");"
@@ -268,10 +269,10 @@ panic!,prüfen,Runtime,crates/tetra-entities/src/sndcp/protocol.rs,1485,"let SnP
 panic!,prüfen,Runtime,crates/tetra-entities/src/sndcp/protocol.rs,1504,"let SnPdu::Reconnect(decoded) = decoded else { panic!(""wrong PDU"") };"
 unreachable!,prüfen,Runtime,crates/tetra-entities/src/sndcp/qos.rs,102,"_ => unreachable!(),"
 unreachable!,prüfen,Runtime,crates/tetra-entities/src/sndcp/qos.rs,118,"_ => unreachable!(),"
-Todo-Typ,Typ-Platzhalter,Runtime,crates/tetra-entities/src/sndcp/sndcp_bs.rs,11,"use tetra_core::{BitBuffer, Layer2Service, Sap, TdmaTime, TimeslotOwner, Todo};"
-Todo-Typ,Typ-Platzhalter,Runtime,crates/tetra-entities/src/sndcp/sndcp_bs.rs,42,const SECONDARY_CARRIER_HINT: Todo = -2;
-Todo-Typ,Typ-Platzhalter,Runtime,crates/tetra-entities/src/sndcp/sndcp_bs.rs,379,fn carrier_hint(logical_ts: u8) -> Option<Todo> {
-unreachable!,prüfen,Runtime,crates/tetra-entities/src/sndcp/sndcp_bs.rs,1851,"ContextAvailability::Reserved(_) => unreachable!(),"
+Todo-Typ,Typ-Platzhalter,Runtime,crates/tetra-entities/src/sndcp/sndcp_bs.rs,12,"use tetra_core::{BitBuffer, Layer2Service, Sap, TdmaTime, TimeslotOwner, Todo};"
+Todo-Typ,Typ-Platzhalter,Runtime,crates/tetra-entities/src/sndcp/sndcp_bs.rs,43,const SECONDARY_CARRIER_HINT: Todo = -2;
+Todo-Typ,Typ-Platzhalter,Runtime,crates/tetra-entities/src/sndcp/sndcp_bs.rs,553,fn carrier_hint(logical_ts: u8) -> Option<Todo> {
+unreachable!,prüfen,Runtime,crates/tetra-entities/src/sndcp/sndcp_bs.rs,2067,"ContextAvailability::Reserved(_) => unreachable!(),"
 unreachable!,prüfen,Runtime,crates/tetra-entities/src/sndcp/state.rs,480,"_ => unreachable!(),"
 unreachable!,prüfen,Runtime,crates/tetra-entities/src/sndcp/state.rs,503,"_ => unreachable!(),"
 unreachable!,prüfen,Runtime,crates/tetra-entities/src/sndcp/state.rs,527,"_ => unreachable!(),"
@@ -712,7 +713,7 @@ Todo-Typ,Typ-Platzhalter,Runtime,crates/tetra-saps/src/tmv/mod.rs,78,"pub tch_ty
 Todo-Typ,Typ-Platzhalter,Runtime,crates/tetra-saps/src/tmv/mod.rs,79,"// pub monitoring_pattern_info: Option<Todo>,"
 Todo-Typ,Typ-Platzhalter,Runtime,crates/tetra-saps/src/tmv/mod.rs,86,"pub channel_info: Todo,"
 panic!,prüfen,Runtime,bins/bluestation-bs/src/main.rs,303,"panic!(""Unsupported PhyIo type: {:?}"", cfg.config().phy_io.backend);"
-panic!,prüfen,Runtime,bins/bluestation-bs/src/main.rs,495,"panic!(""Failed to start Asterisk SIP integration: {}"", err);"
+panic!,prüfen,Runtime,bins/bluestation-bs/src/main.rs,498,"panic!(""Failed to start Asterisk SIP integration: {}"", err);"
 unreachable!,prüfen,Runtime,bins/pdu-tool/src/entities/umac.rs,113,"_ => unreachable!(),"
 panic!,prüfen,Runtime,system-backend/group-core/src/state.rs,1021,"panic!(""expected command request"");"
 panic!,prüfen,Runtime,system-backend/group-core/src/state.rs,1029,"panic!(""expected group policy command"");"

@@ -1,8 +1,12 @@
-# Native UI – Login ab v5.0
+# Native Operator UI
 
-Die native Windows-UI nutzt keinen Operator-Token mehr. Sie zeigt eine Loginmaske.
+Die vorhandene native Windows-UI bleibt als Audio- und Operator-Client erhalten. Ihr Login-Dialog stammt aus dem vorbereiteten späteren RBAC-Betrieb.
 
-Windows-Config:
+## Aktuelle Open-Lab-Phase
+
+Der Control-Room-Server wird mit `--no-auth` betrieben. Deshalb sind weder Passwort noch Token serverseitig erforderlich. Für die aktuelle Referenzverwaltung ist die neue Browser-WebUI auf Port `9010` maßgeblich.
+
+Ein lokales Profil darf weiterhin Komfortwerte enthalten:
 
 ```toml
 [profiles.default]
@@ -18,4 +22,4 @@ default_lon = 9.7320
 default_zoom = 13
 ```
 
-Passwort wird beim Start in der UI eingegeben.
+Der native Client muss vor einem produktiven Einsatz an den späteren gesicherten Authentisierungsmodus angepasst und gemeinsam mit TLS/RBAC getestet werden. Ein in der Oberfläche abgefragtes Passwort erzeugt im Open-Lab-Modus keine zusätzliche Sicherheit.

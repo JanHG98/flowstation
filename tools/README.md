@@ -45,3 +45,7 @@ Der Check prüft Paketstruktur, Workspace-Einbindung, TBS-Control-Routing, SNDCP
 - `check_security_core.py`: prüft Security-Core-Paket, Open-Lab-Konfiguration, Secret-Redaction, WebUI-JavaScript und Installationsskripte.
 
 - `check_kmf.py`: prüft KMF-Paket, Vault-/Secret-Grenzen, nodegebundene OTAR-Envelopes, Audit-Hashkette, WebUI-JavaScript und Installationsskripte.
+
+- `check_transit.py`: prüft Transit-Paket, Regionen-/Peer- und Routing-Grundlagen, Path-Vector/Loop-Prevention, Failover, Open-Lab-Konfiguration, WebUI-JavaScript und Installationsskripte.
+
+- `check_control_room.py`: prüft Control-Room-Federation, Open-Lab-Konfiguration, Architekturgrenze, Incident-/Schichtbuch-Paket, Browser-WebUI und LXC-Skripte.

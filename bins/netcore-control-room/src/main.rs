@@ -1,9 +1,11 @@
 mod auth;
 mod config;
 mod http;
+mod operations;
 mod persistence;
 mod server;
 mod state;
+mod webui;
 mod ws;
 
 use std::net::SocketAddr;
@@ -14,6 +16,7 @@ use tracing_subscriber::EnvFilter;
 
 use crate::auth::AuthState;
 use crate::config::ControlRoomConfig;
+use crate::operations::SharedOperations;
 use crate::persistence::PersistenceHandle;
 
 #[derive(Debug, Clone, Parser)]
@@ -110,8 +113,28 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         tracing::warn!("Control Room user/password authentication disabled");
     }
 
+    let operations = SharedOperations::load(
+        config.federation.clone(),
+        config.operations.clone(),
+        config.services.clone(),
+    )?;
+    operations.start_poller();
+
+    if !auth.enabled() {
+        tracing::warn!("Control Room starts in OPEN LAB mode: no login, no tokens and no TLS");
+    }
+    tracing::info!(services = config.services.len(), "Core-service federation configured");
+
     let state = state::SharedControlRoom::new_with_persistence(config.server.history_limit, persistence);
-    let server = server::ControlRoomServer::new(config.server.bind, config.server.node_path, config.server.ui_path, state, auth, config.directory.clone());
+    let server = server::ControlRoomServer::new(
+        config.server.bind,
+        config.server.node_path,
+        config.server.ui_path,
+        state,
+        auth,
+        config.directory.clone(),
+        operations,
+    );
     server.run()?;
     Ok(())
 }

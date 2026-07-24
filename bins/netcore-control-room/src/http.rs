@@ -14,6 +14,10 @@ use crate::auth::{
     AuthError, AuthIdentity, AuthRole, AuthState, ChangePasswordRequest, CreateUserRequest, LoginRequest,
     LoginResponse, UpdateUserRequest, UserListResponse,
 };
+use crate::operations::{
+    CreateIncidentRequest, IncidentActionRequest, IncidentNoteRequest, SharedOperations,
+    ShiftLogRequest,
+};
 use crate::state::{SharedControlRoom, now_iso};
 
 const MAX_HTTP_REQUEST_BYTES: usize = 1024 * 1024;
@@ -67,9 +71,26 @@ impl HttpResponse {
             body: html.into().into_bytes(),
         }
     }
+
+    pub fn with_content_type(status: u16, content_type: &'static str, body: impl Into<Vec<u8>>) -> Self {
+        Self {
+            status,
+            reason: reason_phrase(status),
+            content_type,
+            body: body.into(),
+        }
+    }
 }
 
-pub fn handle_http_stream(mut stream: TcpStream, state: SharedControlRoom, node_path: &str, ui_path: &str, auth: AuthState, directory: SharedDirectory) {
+pub fn handle_http_stream(
+    mut stream: TcpStream,
+    state: SharedControlRoom,
+    node_path: &str,
+    ui_path: &str,
+    auth: AuthState,
+    directory: SharedDirectory,
+    operations: SharedOperations,
+) {
     let _ = stream.set_read_timeout(Some(Duration::from_secs(5)));
     let request = match read_http_request(&mut stream) {
         Ok(req) => req,
@@ -80,16 +101,26 @@ pub fn handle_http_stream(mut stream: TcpStream, state: SharedControlRoom, node_
     };
 
     tracing::debug!(method = %request.method, path = %request.path, "http request");
-    let response = route_http(request, state, node_path, ui_path, &auth, &directory);
+    let response = route_http(request, state, node_path, ui_path, &auth, &directory, &operations);
     let _ = write_response(&mut stream, &response);
 }
 
-fn route_http(request: HttpRequest, state: SharedControlRoom, node_path: &str, ui_path: &str, auth: &AuthState, directory: &SharedDirectory) -> HttpResponse {
+fn route_http(
+    request: HttpRequest,
+    state: SharedControlRoom,
+    node_path: &str,
+    ui_path: &str,
+    auth: &AuthState,
+    directory: &SharedDirectory,
+    operations: &SharedOperations,
+) -> HttpResponse {
     if request.method == "OPTIONS" {
         return HttpResponse::text(204, "");
     }
 
-    let health_public = request.method == "GET" && request.path == "/health" && auth.allow_health_unauthenticated();
+    let health_public = request.method == "GET"
+        && matches!(request.path.as_str(), "/health" | "/health/live" | "/health/ready")
+        && auth.allow_health_unauthenticated();
     let login_public = request.method == "POST" && request.path == "/api/login";
     let identity = if health_public || login_public {
         None
@@ -105,6 +136,69 @@ fn route_http(request: HttpRequest, state: SharedControlRoom, node_path: &str, u
 
     match (request.method.as_str(), request.path.as_str()) {
         ("GET", "/") => HttpResponse::html(200, index_html(node_path, ui_path)),
+        ("GET", "/health/live") => HttpResponse::json(200, &json!({
+            "ok": true,
+            "service": "netcore-control-room",
+            "status": "live",
+            "security_mode": "open_lab",
+            "timestamp": now_iso(),
+        })),
+        ("GET", "/health/ready") => {
+            let overview = operations.overview();
+            HttpResponse::json(200, &json!({
+                "ok": true,
+                "service": "netcore-control-room",
+                "status": if overview.critical_services_offline == 0 { "ready" } else { "degraded" },
+                "critical_services_offline": overview.critical_services_offline,
+                "operator_plane_available": true,
+                "timestamp": now_iso(),
+            }))
+        }
+        ("GET", "/metrics") => HttpResponse::with_content_type(
+            200,
+            "text/plain; version=0.0.4; charset=utf-8",
+            operations.metrics().into_bytes(),
+        ),
+        ("GET", "/api/v1/openapi.json") => HttpResponse::json(200, &control_room_openapi()),
+        ("GET", "/api/v1/config") => HttpResponse::json(200, &operations.config_snapshot()),
+        ("GET", "/api/v1/dependencies") => HttpResponse::json(200, &operations.dependencies()),
+        ("GET", "/api/v1/export") => HttpResponse::json(200, &operations.export()),
+        ("GET", "/api/v1/control-room/overview") => HttpResponse::json(200, &json!({
+            "service": "netcore-control-room",
+            "security_mode": "open_lab",
+            "authoritative_state": false,
+            "legacy": state.overview(),
+            "operations": operations.overview(),
+            "federated": operations.federated_domain_overview(),
+            "timestamp": now_iso(),
+        })),
+        ("GET", "/api/v1/services") => HttpResponse::json(200, &json!({
+            "services": operations.services(),
+            "overview": operations.overview(),
+            "timestamp": now_iso(),
+        })),
+        ("POST", "/api/v1/services/poll") => HttpResponse::json(
+            202,
+            &json!({
+                "accepted": operations.trigger_poll(),
+                "message": "service poll requested",
+                "timestamp": now_iso(),
+            }),
+        ),
+        ("GET", "/api/v1/incidents") => {
+            let limit = query_usize(&request, "limit", 200, 5000);
+            let status = request.query.get("status").map(String::as_str);
+            HttpResponse::json(200, &json!({
+                "incidents": operations.incidents(status, limit),
+                "timestamp": now_iso(),
+            }))
+        }
+        ("POST", "/api/v1/incidents") => operations_create_incident(&request.body, operations),
+        ("GET", "/api/v1/shift-log") => HttpResponse::json(200, &json!({
+            "entries": operations.shift_log(query_usize(&request, "limit", 200, 5000)),
+            "timestamp": now_iso(),
+        })),
+        ("POST", "/api/v1/shift-log") => operations_add_shift_log(&request.body, operations),
         ("GET", "/health") => HttpResponse::json(200, &json!({
             "ok": true,
             "service": "netcore-control-room",
@@ -116,7 +210,7 @@ fn route_http(request: HttpRequest, state: SharedControlRoom, node_path: &str, u
         ("GET", "/api/me") => HttpResponse::json(200, &json!({
             "ok": true,
             "user": identity.as_ref(),
-            "auth_mode": "user_password"
+            "auth_mode": if auth.enabled() { "user_password" } else { "open_lab" }
         })),
         ("GET", "/api/overview") => HttpResponse::json(200, &state.overview()),
         ("GET", "/api/directory") => HttpResponse::json(200, &directory_snapshot(directory)),
@@ -164,6 +258,12 @@ fn route_http(request: HttpRequest, state: SharedControlRoom, node_path: &str, u
         ("GET", "/api/admin/users") => admin_list_users(auth),
         ("POST", "/api/admin/users") => admin_create_user(&request.body, auth, identity.as_ref()),
         ("POST", "/api/commands") => submit_command_from_body(&request.body, state, None),
+        _ if request.path.starts_with("/api/v1/services/") => {
+            route_service_operation(&request, operations)
+        }
+        _ if request.path.starts_with("/api/v1/incidents/") => {
+            route_incident_operation(&request, operations)
+        }
         _ if request.path.starts_with("/api/admin/users/") => {
             match parse_admin_user_route(&request.path) {
                 Some((username, Some("password"))) if request.method == "POST" => admin_change_user_password(&username, &request.body, auth),
@@ -226,6 +326,9 @@ fn route_http(request: HttpRequest, state: SharedControlRoom, node_path: &str, u
 
 fn required_role_for_request(request: &HttpRequest) -> AuthRole {
     if request.path.starts_with("/api/admin/users")
+        || (request.method == "POST"
+            && request.path.starts_with("/api/v1/services/")
+            && (request.path.ends_with("/enable") || request.path.ends_with("/disable")))
         || request.path == "/api/directory/import"
         || request.path == "/api/directory/merge"
         || request.path == "/api/directory/refresh"
@@ -233,6 +336,13 @@ fn required_role_for_request(request: &HttpRequest) -> AuthRole {
         return AuthRole::Admin;
     }
     if request.method == "POST" {
+        if request.path == "/api/v1/services/poll"
+            || request.path == "/api/v1/incidents"
+            || request.path.starts_with("/api/v1/incidents/")
+            || request.path == "/api/v1/shift-log"
+        {
+            return AuthRole::Operator;
+        }
         if let Some(route) = parse_node_command_route(&request.path) {
             return match route.shortcut.as_deref() {
                 Some("restart-service") | Some("shutdown-service") => AuthRole::Admin,
@@ -1242,6 +1352,173 @@ fn query_bool(request: &HttpRequest, key: &str, default: bool) -> bool {
         .unwrap_or(default)
 }
 
+
+fn operations_create_incident(body: &[u8], operations: &SharedOperations) -> HttpResponse {
+    let request: CreateIncidentRequest = match parse_json_body(body) {
+        Ok(request) => request,
+        Err(response) => return response,
+    };
+    match operations.create_incident(request) {
+        Ok(incident) => HttpResponse::json(201, &json!({ "incident": incident })),
+        Err(error) => HttpResponse::json(400, &json!({ "error": error })),
+    }
+}
+
+fn operations_add_shift_log(body: &[u8], operations: &SharedOperations) -> HttpResponse {
+    let request: ShiftLogRequest = match parse_json_body(body) {
+        Ok(request) => request,
+        Err(response) => return response,
+    };
+    match operations.add_shift_log(request) {
+        Ok(entry) => HttpResponse::json(201, &json!({ "entry": entry })),
+        Err(error) => HttpResponse::json(400, &json!({ "error": error })),
+    }
+}
+
+fn route_service_operation(request: &HttpRequest, operations: &SharedOperations) -> HttpResponse {
+    let suffix = request.path.trim_start_matches("/api/v1/services/");
+    let mut parts = suffix.split('/').filter(|part| !part.is_empty());
+    let Some(name) = parts.next() else {
+        return HttpResponse::json(404, &json!({ "error": "service name missing" }));
+    };
+    let action = parts.next();
+    if parts.next().is_some() {
+        return HttpResponse::json(404, &json!({ "error": "unknown service route" }));
+    }
+    match (request.method.as_str(), action) {
+        ("GET", None) => match operations.service(name) {
+            Some(service) => HttpResponse::json(200, &service),
+            None => HttpResponse::json(404, &json!({ "error": format!("unknown service '{name}'") })),
+        },
+        ("POST", Some("enable")) | ("POST", Some("disable")) => {
+            let body: Value = if request.body.is_empty() {
+                json!({})
+            } else {
+                match serde_json::from_slice(&request.body) {
+                    Ok(value) => value,
+                    Err(error) => return HttpResponse::json(400, &json!({ "error": format!("invalid json: {error}") })),
+                }
+            };
+            let operator = body
+                .get("operator_id")
+                .and_then(Value::as_str)
+                .unwrap_or("operator");
+            let enabled = action == Some("enable");
+            match operations.set_service_enabled(name, enabled, operator) {
+                Ok(service) => HttpResponse::json(200, &json!({ "service": service })),
+                Err(error) => HttpResponse::json(404, &json!({ "error": error })),
+            }
+        }
+        _ => HttpResponse::json(404, &json!({
+            "error": "unknown service route",
+            "available": ["GET /api/v1/services/{name}", "POST /api/v1/services/{name}/enable", "POST /api/v1/services/{name}/disable"]
+        })),
+    }
+}
+
+fn route_incident_operation(request: &HttpRequest, operations: &SharedOperations) -> HttpResponse {
+    let suffix = request.path.trim_start_matches("/api/v1/incidents/");
+    let mut parts = suffix.split('/').filter(|part| !part.is_empty());
+    let Some(id) = parts.next() else {
+        return HttpResponse::json(404, &json!({ "error": "incident id missing" }));
+    };
+    let action = parts.next();
+    if parts.next().is_some() {
+        return HttpResponse::json(404, &json!({ "error": "unknown incident route" }));
+    }
+    match (request.method.as_str(), action) {
+        ("GET", None) => {
+            let incident = operations
+                .incidents(None, 5000)
+                .into_iter()
+                .find(|incident| incident.id == id);
+            match incident {
+                Some(incident) => HttpResponse::json(200, &incident),
+                None => HttpResponse::json(404, &json!({ "error": format!("unknown incident '{id}'") })),
+            }
+        }
+        ("POST", Some("ack")) => {
+            let action: IncidentActionRequest = match parse_json_body_or_default(&request.body) {
+                Ok(action) => action,
+                Err(response) => return response,
+            };
+            match operations.acknowledge_incident(id, action) {
+                Ok(incident) => HttpResponse::json(200, &json!({ "incident": incident })),
+                Err(error) => HttpResponse::json(400, &json!({ "error": error })),
+            }
+        }
+        ("POST", Some("resolve")) => {
+            let action: IncidentActionRequest = match parse_json_body_or_default(&request.body) {
+                Ok(action) => action,
+                Err(response) => return response,
+            };
+            match operations.resolve_incident(id, action) {
+                Ok(incident) => HttpResponse::json(200, &json!({ "incident": incident })),
+                Err(error) => HttpResponse::json(400, &json!({ "error": error })),
+            }
+        }
+        ("POST", Some("notes")) => {
+            let note: IncidentNoteRequest = match parse_json_body(&request.body) {
+                Ok(note) => note,
+                Err(response) => return response,
+            };
+            match operations.add_incident_note(id, note) {
+                Ok(incident) => HttpResponse::json(200, &json!({ "incident": incident })),
+                Err(error) => HttpResponse::json(400, &json!({ "error": error })),
+            }
+        }
+        _ => HttpResponse::json(404, &json!({
+            "error": "unknown incident route",
+            "available": ["GET /api/v1/incidents/{id}", "POST /api/v1/incidents/{id}/ack", "POST /api/v1/incidents/{id}/resolve", "POST /api/v1/incidents/{id}/notes"]
+        })),
+    }
+}
+
+fn parse_json_body_or_default<T>(body: &[u8]) -> Result<T, HttpResponse>
+where
+    T: for<'de> Deserialize<'de> + Default,
+{
+    if body.is_empty() {
+        Ok(T::default())
+    } else {
+        parse_json_body(body)
+    }
+}
+
+fn control_room_openapi() -> Value {
+    json!({
+        "openapi": "3.0.3",
+        "info": {
+            "title": "NetCore Control Room API",
+            "version": "1.0.0-open-lab",
+            "description": "Operator and presentation API. Domain state remains authoritative in the individual core services."
+        },
+        "servers": [{ "url": "/" }],
+        "paths": {
+            "/health/live": { "get": { "summary": "Liveness" } },
+            "/health/ready": { "get": { "summary": "Operator-plane readiness and dependency degradation" } },
+            "/metrics": { "get": { "summary": "Prometheus metrics" } },
+            "/api/v1/control-room/overview": { "get": { "summary": "Combined operator overview" } },
+            "/api/v1/services": { "get": { "summary": "Core-service health matrix" } },
+            "/api/v1/services/poll": { "post": { "summary": "Trigger an immediate service poll" } },
+            "/api/v1/services/{name}": { "get": { "summary": "Service detail" } },
+            "/api/v1/incidents": {
+                "get": { "summary": "Incident journal" },
+                "post": { "summary": "Create a manual incident" }
+            },
+            "/api/v1/shift-log": {
+                "get": { "summary": "Shift log" },
+                "post": { "summary": "Add a shift log entry" }
+            },
+            "/api/v1/dependencies": { "get": { "summary": "Architecture and dependency view" } },
+            "/api/v1/config": { "get": { "summary": "Sanitized configuration" } },
+            "/api/v1/export": { "get": { "summary": "Operational-state export" } }
+        },
+        "security": [],
+        "x-netcore-security-mode": "open_lab"
+    })
+}
+
 fn not_found(node_path: &str, ui_path: &str) -> HttpResponse {
     HttpResponse::json(
         404,
@@ -1250,6 +1527,20 @@ fn not_found(node_path: &str, ui_path: &str) -> HttpResponse {
             "available": [
                 "GET /",
                 "GET /health",
+                "GET /health/live",
+                "GET /health/ready",
+                "GET /metrics",
+                "GET /api/v1/control-room/overview",
+                "GET /api/v1/services",
+                "POST /api/v1/services/poll",
+                "GET /api/v1/incidents",
+                "POST /api/v1/incidents",
+                "GET /api/v1/shift-log",
+                "POST /api/v1/shift-log",
+                "GET /api/v1/dependencies",
+                "GET /api/v1/config",
+                "GET /api/v1/export",
+                "GET /api/v1/openapi.json",
                 "GET /api/overview",
                 "GET /api/directory",
                 "GET /api/subscribers?online=true",
@@ -1324,78 +1615,5 @@ fn reason_phrase(status: u16) -> &'static str {
 }
 
 fn index_html(node_path: &str, ui_path: &str) -> String {
-    format!(
-        r#"<!doctype html>
-<html lang="de">
-<head>
-  <meta charset="utf-8">
-  <title>NetCore Control Room</title>
-  <style>
-    body {{ font-family: system-ui, sans-serif; margin: 2rem; max-width: 980px; }}
-    code, pre {{ background: #f3f3f3; padding: .2rem .35rem; border-radius: .35rem; }}
-    pre {{ padding: 1rem; overflow: auto; }}
-    .ok {{ color: #087f23; font-weight: 700; }}
-  </style>
-</head>
-<body>
-  <h1>NetCore Control Room Core</h1>
-  <p class="ok">Server läuft.</p>
-  <p>Base-Station WebSocket: <code>{node_path}</code></p>
-  <p>UI/Event WebSocket: <code>{ui_path}</code></p>
-  <h2>HTTP API</h2>
-  <ul>
-    <li><code>GET /health</code></li>
-    <li><code>GET /api/overview</code> — schlanker Leitstellenstatus</li>
-    <li><code>GET /api/directory</code> — zentrales Teilnehmer-/Gruppen-/Status-Directory</li>
-    <li><code>GET /api/subscribers?online=true</code> — Teilnehmerliste</li>
-    <li><code>GET /api/groups</code> — Gruppen und Mitglieder</li>
-    <li><code>GET /api/calls</code> — aktive Rufe</li>
-    <li><code>GET /api/sds?limit=100</code> — SDS-Log</li>
-    <li><code>GET /api/emergencies?active=true</code> — Notrufe</li>
-    <li><code>GET /api/locations</code> — zuletzt bekannte LIP-/Positionsdaten</li>
-    <li><code>GET /api/nodes</code></li>
-    <li><code>GET /api/nodes/&lt;node_id&gt;</code> — Node-Detailansicht</li>
-    <li><code>GET /api/nodes/&lt;node_id&gt;/subscribers</code></li>
-    <li><code>GET /api/nodes/&lt;node_id&gt;/groups</code></li>
-    <li><code>GET /api/nodes/&lt;node_id&gt;/calls</code></li>
-    <li><code>GET /api/nodes/&lt;node_id&gt;/sds</code></li>
-    <li><code>GET /api/nodes/&lt;node_id&gt;/emergencies</code></li>
-    <li><code>GET /api/nodes/&lt;node_id&gt;/locations</code></li>
-    <li><code>GET /api/state</code> — kompletter Debug-State</li>
-    <li><code>GET /api/rf</code> — RF/SDR-Snapshot</li>
-    <li><code>GET /api/health/full</code> — technische Health-Daten</li>
-    <li><code>GET /api/packet-data</code> — SNDCP-, TUN-, PDP- und PDCH-Übersicht aller Nodes</li>
-    <li><code>GET /api/nodes/&lt;node_id&gt;/packet-data</code> — Paketdaten eines Nodes</li>
-    <li><code>GET /api/events?limit=50&amp;quiet=true</code></li>
-    <li><code>GET /api/commands?limit=50</code></li>
-    <li><code>POST /api/login</code> — Benutzer/Passwort Login-Prüfung</li>
-    <li><code>GET /api/me</code> — angemeldeter Benutzer</li>
-    <li><code>GET /api/admin/users</code> — Admin: Benutzerliste</li>
-    <li><code>POST /api/admin/users</code> — Admin: Benutzer anlegen</li>
-    <li><code>PATCH /api/admin/users/&lt;username&gt;</code> — Admin: Rolle/Aktivierung ändern</li>
-    <li><code>POST /api/admin/users/&lt;username&gt;/password</code> — Admin: Passwort ändern</li>
-    <li><code>DELETE /api/admin/users/&lt;username&gt;</code> — Admin: Benutzer löschen</li>
-    <li><code>POST /api/nodes/&lt;node_id&gt;/commands</code></li>
-    <li><code>POST /api/nodes/&lt;node_id&gt;/commands/kick</code></li>
-    <li><code>POST /api/nodes/&lt;node_id&gt;/commands/dgna</code></li>
-    <li><code>POST /api/nodes/&lt;node_id&gt;/commands/clear-emergency</code></li>
-    <li><code>POST /api/nodes/&lt;node_id&gt;/commands/legacy-wap</code> — WML über SDS Type 4, PID 0x04/0x84</li>
-  </ul>
-  <h2>Beispiel: Kick MS</h2>
-  <pre>curl -X POST http://127.0.0.1:9010/api/nodes/tbs-04010001/commands/kick \
-  -H 'Content-Type: application/json' \
-  -d '{{"operator_id":"jan","issi":2010001}}'</pre>
-
-  <h2>Beispiel: Legacy-WAP über SDS Type 4</h2>
-  <pre>curl -X POST http://127.0.0.1:9010/api/nodes/tbs-04010001/commands/legacy-wap \
-  -H 'Content-Type: application/json' \
-  -d '{{"operator_id":"jan","dest_issi":4010001,"title":"NetCore","message":"Statusseite öffnen","url":"http://10.0.0.1:9200/","transport":"wdp"}}'</pre>
-
-  <h2>Beispiel: DGNA Attach</h2>
-  <pre>curl -X POST http://127.0.0.1:9010/api/nodes/tbs-04010001/commands/dgna \
-  -H 'Content-Type: application/json' \
-  -d '{{"operator_id":"jan","issi":2010001,"gssi":1001,"attach":true}}'</pre>
-</body>
-</html>"#
-    )
+    crate::webui::index_html(node_path, ui_path)
 }

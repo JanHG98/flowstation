@@ -13,7 +13,7 @@
 | IP Gateway | TUN, PDP-IP-Leases, Routing, NAT, Firewall, DNS, WAP/Testdienste, Flows und PCAP | Kernel-Reconcile, Route/NAT/Firewall ändern, Flow blockieren und Capture starten; im Testpaket bewusst offen ohne Tokens |
 | Security Core | Authentisierung, Security Classes, DCK-Metadaten, Sperren, Alarm/Audit | Policy, Disable/Enable, Kontext-/DCK-Widerruf; keine Rohschlüsselanzeige |
 | KMF | CCK/GCK/SCK, Key-Versionen, Crypto Periods, Rotation, OTAR, Vault und Backup | Rotation, Revoke/Destroy, OTAR-Freigabe und Backup; keine Rohschlüsselanzeige, im Testpaket bewusst offen ohne Tokens |
-| Transit | Regionen, Peers, Routen, Failover | Peer sperren, Failover, Route ändern |
+| Transit | Regionen, Peers, Teilnehmer-/Gruppenregionen, Routen, Sessions, Queues und Failover | Peer sperren, Route ändern, Envelope einspeisen und Failover auslösen; im Testpaket bewusst offen ohne Tokens |
 | Control Room | Operatoren, Arbeitsplätze, Backend-Verknüpfung | Rollen, Tokens, Leitstellenkonfiguration |
 | Application Gateway | Connectoren, Queues, Webhooks | Connector aktivieren, Secrets ersetzen |
 | Media Library | Audio, TTS, Vorlagen, Storage | Upload, Löschen, Freigabe |

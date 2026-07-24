@@ -7,6 +7,7 @@ use serde_json::Value;
 
 use crate::auth::AuthState;
 use crate::http::{handle_http_stream, looks_like_websocket_upgrade, SharedDirectory};
+use crate::operations::SharedOperations;
 use crate::state::SharedControlRoom;
 use crate::ws::handle_websocket_stream;
 
@@ -17,10 +18,19 @@ pub struct ControlRoomServer {
     state: SharedControlRoom,
     auth: AuthState,
     directory: SharedDirectory,
+    operations: SharedOperations,
 }
 
 impl ControlRoomServer {
-    pub fn new(bind: SocketAddr, node_path: String, ui_path: String, state: SharedControlRoom, auth: AuthState, directory: Value) -> Self {
+    pub fn new(
+        bind: SocketAddr,
+        node_path: String,
+        ui_path: String,
+        state: SharedControlRoom,
+        auth: AuthState,
+        directory: Value,
+        operations: SharedOperations,
+    ) -> Self {
         Self {
             bind,
             node_path: normalize_path(node_path),
@@ -28,6 +38,7 @@ impl ControlRoomServer {
             state,
             auth,
             directory: std::sync::Arc::new(std::sync::Mutex::new(directory)),
+            operations,
         }
     }
 
@@ -51,6 +62,7 @@ impl ControlRoomServer {
         let ui_path = self.ui_path.clone();
         let auth = self.auth.clone();
         let directory = self.directory.clone();
+        let operations = self.operations.clone();
         let peer = stream.peer_addr().ok();
 
         let _ = thread::Builder::new()
@@ -63,7 +75,7 @@ impl ControlRoomServer {
                         handle_websocket_stream(stream, state, node_path, ui_path, auth);
                     }
                     Ok(_) => {
-                        handle_http_stream(stream, state, &node_path, &ui_path, auth, directory);
+                        handle_http_stream(stream, state, &node_path, &ui_path, auth, directory, operations);
                     }
                     Err(e) => {
                         tracing::warn!(?peer, "initial stream peek failed: {}", e);

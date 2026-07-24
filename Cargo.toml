@@ -25,6 +25,7 @@ members = [
     "system-backend/ip-gateway",
     "system-backend/security-core",
     "system-backend/kmf",
+    "system-backend/transit",
     #"bins/bluestation-telemetry",
     #"bins/bluestation-control",
     #"bins/pdu-tool",

@@ -1,0 +1,32 @@
+name: SWMI Core Control Room
+
+on:
+  push:
+    paths:
+      - "bins/netcore-control-room/**"
+      - "system-backend/control-room/**"
+      - "tools/check_control_room.py"
+      - "Docs/SWMI_CORE_1_PACKAGE_L_CONTROL_ROOM.md"
+      - "Cargo.toml"
+      - "Cargo.lock"
+  pull_request:
+    paths:
+      - "bins/netcore-control-room/**"
+      - "system-backend/control-room/**"
+      - "tools/check_control_room.py"
+      - "Docs/SWMI_CORE_1_PACKAGE_L_CONTROL_ROOM.md"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: python3 tools/check_control_room.py
+      - run: cargo fmt --all -- --check
+      - run: cargo build --locked --package netcore-control-room
+      - run: cargo test --locked --package netcore-control-room
+      - run: cargo clippy --locked --package netcore-control-room --all-targets -- -D warnings

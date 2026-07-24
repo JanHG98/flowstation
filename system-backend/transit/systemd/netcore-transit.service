@@ -1,0 +1,38 @@
+[Unit]
+Description=NetCore-Tetra regional Transit service
+Documentation=file:/opt/netcore-transit/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=netcore-transit
+Group=netcore-transit
+ExecStart=/opt/netcore-transit/bin/netcore-transit --config /etc/netcore/transit.toml
+Restart=on-failure
+RestartSec=2
+TimeoutStopSec=15
+WorkingDirectory=/var/lib/netcore-transit
+StateDirectory=netcore-transit
+RuntimeDirectory=netcore-transit
+ConfigurationDirectory=netcore
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+ReadWritePaths=/var/lib/netcore-transit
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+[Install]
+WantedBy=multi-user.target

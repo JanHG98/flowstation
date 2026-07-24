@@ -1,73 +1,137 @@
-# NetCore Control Room Core configuration for LXC/container deployment.
-# CLI flags override values from this file.
+# NetCore Control Room LXC – Open Lab
 
 [server]
-# In the LXC this should usually bind to all interfaces in the trusted VLAN/VPN.
 bind = "0.0.0.0:9010"
-
-# Base-station nodes connect here via WebSocket.
 node_path = "/node"
-
-# Reserved for native operator clients/live feeds. This is protocol/API, not a browser UI requirement.
 ui_path = "/ui"
-
-# In-memory ring buffer for recent events and command audit entries.
-history_limit = 1000
+history_limit = 2000
 
 [persistence]
-# Enables SQLite persistence for audit/history data and user/RBAC registry.
 enabled = true
-
-# Recommended path when running as systemd service in the LXC.
 database_path = "/var/lib/netcore-control-room/control-room.sqlite3"
-
-# Persist event log rows. High-rate RF/health noise is filtered unless persist_noisy_events=true.
 persist_events = true
 persist_noisy_events = false
-
-# Number of recent persisted rows loaded back into memory on startup.
-load_recent_limit = 1000
+load_recent_limit = 2000
 
 [auth]
-# Set to true after you configured the node token and bootstrap user/password in
-# /etc/netcore-control-room/control-room.env and added the node token to the TBS config.toml.
+# Current laboratory phase: deliberately no login, no node token and no TLS.
 enabled = false
-
-# Keep /health available without login for systemd/monitoring checks.
 allow_health_unauthenticated = true
-
-# TBS machine auth. Prefer environment variable over writing the secret here.
-node_token_env = "NETCORE_CONTROL_ROOM_NODE_TOKEN"
-
-# Initial/recovery admin login. Prefer environment variables over writing secrets here.
-bootstrap_username_env = "NETCORE_CONTROL_ROOM_BOOTSTRAP_USER"
-bootstrap_password_env = "NETCORE_CONTROL_ROOM_BOOTSTRAP_PASSWORD"
+node_token_env = ""
+bootstrap_username_env = ""
+bootstrap_password_env = ""
 bootstrap_role = "admin"
 
-# Development-only alternative. Do not commit real secrets.
-# node_token = "change-me-node-token"
-# bootstrap_username = "jan"
-# bootstrap_password = "change-me-admin-password"
+[federation]
+enabled = true
+poll_interval_secs = 5
+request_timeout_ms = 1200
+failure_threshold = 3
+fetch_summaries = true
 
+[operations]
+state_path = "/var/lib/netcore-control-room/operations.json"
+backup_path = "/var/lib/netcore-control-room/operations.json.bak"
+auto_service_incidents = true
+incident_limit = 5000
+shift_log_limit = 10000
 
-# Zentrales Directory für Operator-UI und API. Keine Secrets hier eintragen.
+# Replace 10.0.20.x with the addresses of the respective LXCs.
+[[services]]
+name = "node-gateway"
+display_name = "Node Gateway"
+kind = "edge"
+base_url = "http://10.0.20.10:8080"
+health_live = "/health/live"
+health_ready = "/health/ready"
+summary_path = "/api/v1/status"
+webui_path = "/"
+critical = true
+enabled = true
+
+[[services]]
+name = "mobility-core"
+display_name = "Mobility Core"
+kind = "core"
+base_url = "http://10.0.20.11:8090"
+critical = true
+
+[[services]]
+name = "subscriber-core"
+display_name = "Subscriber Core"
+kind = "core"
+base_url = "http://10.0.20.12:8100"
+critical = true
+
+[[services]]
+name = "group-core"
+display_name = "Group Core"
+kind = "core"
+base_url = "http://10.0.20.13:8110"
+critical = true
+
+[[services]]
+name = "call-control"
+display_name = "Call Control"
+kind = "core"
+base_url = "http://10.0.20.14:8120"
+critical = true
+
+[[services]]
+name = "media-switch"
+display_name = "Media Switch"
+kind = "media"
+base_url = "http://10.0.20.15:8130"
+critical = true
+
+[[services]]
+name = "recorder"
+display_name = "Recorder"
+kind = "media"
+base_url = "http://10.0.20.16:8140"
+critical = false
+
+[[services]]
+name = "sds-router"
+display_name = "SDS Router"
+kind = "data"
+base_url = "http://10.0.20.17:8150"
+critical = false
+
+[[services]]
+name = "packet-core"
+display_name = "Packet Core"
+kind = "data"
+base_url = "http://10.0.20.18:8160"
+critical = false
+
+[[services]]
+name = "ip-gateway"
+display_name = "IP Gateway"
+kind = "data"
+base_url = "http://10.0.20.19:8170"
+critical = false
+
+[[services]]
+name = "security-core"
+display_name = "Security Core"
+kind = "security"
+base_url = "http://10.0.20.20:8180"
+critical = true
+
+[[services]]
+name = "kmf"
+display_name = "KMF"
+kind = "security"
+base_url = "http://10.0.20.21:8190"
+critical = false
+
+[[services]]
+name = "transit"
+display_name = "Transit"
+kind = "interworking"
+base_url = "http://10.0.20.22:8200"
+critical = false
+
 [directory]
 hide_infrastructure = true
-
-[directory.subscribers."2010002"]
-name = "Jan HRT"
-device_class = "HRT"
-status = "Einsatzbereit"
-status_group = "crew"
-groups = [15201, 15205]
-
-[directory.groups."15201"]
-name = "NetCore Crew"
-kind = "Sprechgruppe"
-
-[directory.status_groups."crew"]
-name = "Crew-Status"
-
-[directory.statuses."1"]
-label = "Frei / bereit"
-group = "crew"

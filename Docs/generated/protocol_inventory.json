@@ -170,7 +170,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 363,
+      "line": 400,
       "path": "crates/tetra-entities/src/cmce/cmce_bs.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -178,7 +178,7 @@
     },
     {
       "category": "panic!",
-      "line": 491,
+      "line": 528,
       "path": "crates/tetra-entities/src/cmce/cmce_bs.rs",
       "scope": "Runtime",
       "severity": "prüfen",
@@ -186,7 +186,7 @@
     },
     {
       "category": "unreachable!",
-      "line": 500,
+      "line": 537,
       "path": "crates/tetra-entities/src/cmce/cmce_bs.rs",
       "scope": "Runtime",
       "severity": "prüfen",
@@ -194,7 +194,7 @@
     },
     {
       "category": "panic!",
-      "line": 509,
+      "line": 546,
       "path": "crates/tetra-entities/src/cmce/cmce_bs.rs",
       "scope": "Runtime",
       "severity": "prüfen",
@@ -202,7 +202,7 @@
     },
     {
       "category": "panic!",
-      "line": 513,
+      "line": 550,
       "path": "crates/tetra-entities/src/cmce/cmce_bs.rs",
       "scope": "Runtime",
       "severity": "prüfen",
@@ -594,7 +594,7 @@
     },
     {
       "category": "Todo-Typ",
-      "line": 1141,
+      "line": 1292,
       "path": "crates/tetra-entities/src/cmce/subentities/sds_bs.rs",
       "scope": "Runtime",
       "severity": "Typ-Platzhalter",
@@ -602,7 +602,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 1608,
+      "line": 1784,
       "path": "crates/tetra-entities/src/cmce/subentities/sds_bs.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -610,7 +610,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 1615,
+      "line": 1791,
       "path": "crates/tetra-entities/src/cmce/subentities/sds_bs.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -618,7 +618,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 1618,
+      "line": 1794,
       "path": "crates/tetra-entities/src/cmce/subentities/sds_bs.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -626,7 +626,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 1621,
+      "line": 1797,
       "path": "crates/tetra-entities/src/cmce/subentities/sds_bs.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -634,7 +634,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 1630,
+      "line": 1806,
       "path": "crates/tetra-entities/src/cmce/subentities/sds_bs.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -642,7 +642,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 1637,
+      "line": 1813,
       "path": "crates/tetra-entities/src/cmce/subentities/sds_bs.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -650,7 +650,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 1640,
+      "line": 1816,
       "path": "crates/tetra-entities/src/cmce/subentities/sds_bs.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -658,7 +658,7 @@
     },
     {
       "category": "unimplemented_log!",
-      "line": 1643,
+      "line": 1819,
       "path": "crates/tetra-entities/src/cmce/subentities/sds_bs.rs",
       "scope": "Runtime",
       "severity": "offener Runtime-Pfad",
@@ -1858,6 +1858,14 @@
     },
     {
       "category": "panic!",
+      "line": 185,
+      "path": "crates/tetra-entities/src/net_control/codec.rs",
+      "scope": "Runtime",
+      "severity": "prüfen",
+      "text": "panic!(\"expected SdsDeliveryResponse\");"
+    },
+    {
+      "category": "panic!",
       "line": 108,
       "path": "crates/tetra-entities/src/net_telemetry/channel.rs",
       "scope": "Runtime",
@@ -2154,7 +2162,7 @@
     },
     {
       "category": "Todo-Typ",
-      "line": 11,
+      "line": 12,
       "path": "crates/tetra-entities/src/sndcp/sndcp_bs.rs",
       "scope": "Runtime",
       "severity": "Typ-Platzhalter",
@@ -2162,7 +2170,7 @@
     },
     {
       "category": "Todo-Typ",
-      "line": 42,
+      "line": 43,
       "path": "crates/tetra-entities/src/sndcp/sndcp_bs.rs",
       "scope": "Runtime",
       "severity": "Typ-Platzhalter",
@@ -2170,7 +2178,7 @@
     },
     {
       "category": "Todo-Typ",
-      "line": 379,
+      "line": 553,
       "path": "crates/tetra-entities/src/sndcp/sndcp_bs.rs",
       "scope": "Runtime",
       "severity": "Typ-Platzhalter",
@@ -2178,7 +2186,7 @@
     },
     {
       "category": "unreachable!",
-      "line": 1851,
+      "line": 2067,
       "path": "crates/tetra-entities/src/sndcp/sndcp_bs.rs",
       "scope": "Runtime",
       "severity": "prüfen",
@@ -5706,7 +5714,7 @@
     },
     {
       "category": "panic!",
-      "line": 495,
+      "line": 498,
       "path": "bins/bluestation-bs/src/main.rs",
       "scope": "Runtime",
       "severity": "prüfen",
@@ -8572,7 +8580,7 @@
     }
   ],
   "summary": {
-    "gap_count": 719,
+    "gap_count": 720,
     "pdu_count": 77,
     "sap_primitive_count": 130,
     "state_type_count": 18
